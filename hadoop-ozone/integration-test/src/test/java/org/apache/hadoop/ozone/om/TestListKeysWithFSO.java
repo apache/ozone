@@ -160,11 +160,11 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     // So, will return EmptyList
     // a1/b2 < a1/b2Invalid
     List<String> expectedKeys =
-        getExpectedKeyList("a1/b2", "a1", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
 
     // case-2: Same prefixKey and startKey, but with an ending slash
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket);
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket, false);
     /**
      * a1/b2/d1/
      * a1/b2/d1/d11.tx
@@ -174,12 +174,12 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      * a1/b2/d3/
      * a1/b2/d3/d31.tx
      */
-    checkKeyList("a1/b2", "a1/b2/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/", expectedKeys, fsoOzoneBucket);
 
     // case-3: Same prefixKey and startKey, but without an ending slash.
     //  StartKey(dir) to be included in the finalList, if its a
     //  directory and not ended with trailing slash.
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2", legacyOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b2", "a1/b2", legacyOzoneBucket);
     /**
      * a1/b2/
      * a1/b2/d1/
@@ -190,42 +190,42 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      * a1/b2/d3/
      * a1/b2/d3/d31.tx
      */
-    checkKeyList("a1/b2", "a1/b2", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2", expectedKeys, fsoOzoneBucket);
 
     // case-4: StartKey is a file with an ending slash.
     //  StartKey(file) with or without an ending slash
     //  to be excluded in the finalList.
     expectedKeys =
-        getExpectedKeyList("a1/b2/d2", "a1/b2/d2/d22.tx/", legacyOzoneBucket);
-    checkKeyList("a1/b2/d2", "a1/b2/d2/d22.tx/", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2/d2", "a1/b2/d2/d22.tx/", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2/d2", "a1/b2/d2/d22.tx/", expectedKeys, fsoOzoneBucket);
 
     // case-5:
     // StartKey "a1/b2/d2/d22.tx" is a file and get all the keys lexographically
     // greater than "a1/b2/d2/d22.tx".
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a1/b2/d2/d22.tx", legacyOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1/b2/d2/d22.tx", legacyOzoneBucket);
     /**
      1 = "a1/b2/d3/"
      2 = "a1/b2/d3/d31.tx"
      */
-    checkKeyList("a1/b2", "a1/b2/d2/d22.tx", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/d22.tx", expectedKeys, fsoOzoneBucket);
 
     // case-6:
     // StartKey "a1/b2/d2" is a dir and get all the keys lexographically
     // greater than "a1/b2/d2".
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d2/", legacyOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b2", "a1/b2/d2/", legacyOzoneBucket);
     /**
      1 = "a1/b2/d2/d21.tx"
      2 = "a1/b2/d2/d22.tx"
      3 = "a1/b2/d3/"
      4 = "a1/b2/d3/d31.tx"
      */
-    checkKeyList("a1/b2", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
 
     // case-7: In below case, the startKey is a directory which is included
     // in the finalList. So, should we include startKey file in the finalList ?
     expectedKeys =
-        getExpectedKeyList("a1", "a1/b2/d2/d21.tx", legacyOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b2/d2/d21.tx", legacyOzoneBucket);
     /**
      1 = "a1/b2/d2/d22.tx"
      2 = "a1/b2/d3/"
@@ -238,11 +238,11 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      9 = "a1/b3/e3/"
      10 = "a1/b3/e3/e31.tx"
      */
-    checkKeyList("a1", "a1/b2/d2/d21.tx", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1", "a1/b2/d2/d21.tx", expectedKeys, fsoOzoneBucket);
 
     // case-8: StartKey(dir) to be included in the finalList, if its a
     //  directory and not ended with trailing slash.
-    expectedKeys = getExpectedKeyList("a1", "a1/b2/d2/", legacyOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1", "a1/b2/d2/", legacyOzoneBucket);
     /**
      1 = "a1/b2/d2/d21.tx"
      2 = "a1/b2/d2/d22.tx"
@@ -253,17 +253,25 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      10 = "a1/b3/e3/"
      11 = "a1/b3/e3/e31.tx"
      */
-    checkKeyList("a1", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
 
     // case-9: Reached Last Element, return EmptyList
     expectedKeys =
-        getExpectedKeyList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
-    checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
 
     // case-10: keyPrefix corresponds an exist file
     expectedKeys =
-        getExpectedKeyList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
-    checkKeyList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
+    checkKeyDeepList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
+
+    expectedKeys =
+        getExpectedKeyDeepList("a1/b2", "", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "", expectedKeys, fsoOzoneBucket);
+
+    expectedKeys =
+        getExpectedKeyDeepList("a1/b2", "a1/b2/d2/d21.tx", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/d21.tx", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -272,10 +280,10 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     List<String> expectedKeys = new ArrayList<>();
     expectedKeys.add("a1/b2/d2/d21.tx");
     // With trailing slash
-    checkKeyList("a1/b2/d2/d21.tx/", "", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2/d2/d21.tx/", "", expectedKeys, fsoOzoneBucket);
 
     //Without trailing slash
-    checkKeyList("a1/b2/d2/d21.tx", "", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2/d2/d21.tx", "", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -284,120 +292,120 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     // So, will return EmptyList
     // a1/b2 < a1/b2Invalid
     List<String> expectedKeys =
-        getExpectedKeyList("a1", "a1/a111/b111", legacyOzoneBucket);
-    checkKeyList("a1", "a1/a111/b111", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/a111/b111", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/a111/b111", expectedKeys, fsoOzoneBucket);
     // a1/b2 < a1/b20
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b20", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b20", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b2", "a1/b20", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b20", expectedKeys, fsoOzoneBucket);
 
     // case-2: StartKey LeafNode's parent is lexographically ahead than
     // prefixKey. So, will return EmptyList
     // a1/b1 < a1/b2
-    expectedKeys = getExpectedKeyList("a1/b1", "a1/b2/d0", legacyOzoneBucket);
-    checkKeyList("a1/b1", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b1", "a1/b2/d0", legacyOzoneBucket);
+    checkKeyDeepList("a1/b1", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
 
     // case-3:
     // StartKey LeafNode's parent is not matching with than prefixKey's parent.
     // So, will return EmptyList
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a0/b123Invalid", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a0/b123Invalid", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a0/b123Invalid", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a0/b123Invalid", expectedKeys, fsoOzoneBucket);
 
     // case-4: StartKey LeafNode is lexographically behind prefixKey.
     // So will return all the sub-paths of prefixKey
     // startKey=a1/b123Invalid is lexographically before prefixKey=a1/b2
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a1/b123Invalid", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b123Invalid", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1/b123Invalid", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b123Invalid", expectedKeys, fsoOzoneBucket);
 
     // case-5: StartKey LeafNode is a sub-directory of prefixKey.
     // So will fetch and return all the sub-paths after d0.
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/d0", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b2", "a1/b2/d0", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d0", expectedKeys, fsoOzoneBucket);
 
     // case-6: StartKey LeafNode is a sub-file of prefixKey.
     // So will fetch and return all the sub-paths after d111.txt.
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a1/b2/d111.txt", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b2/d111.txt", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1/b2/d111.txt", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d111.txt", expectedKeys, fsoOzoneBucket);
 
     // case-7: StartKey LeafNode is a sub-file of prefixKey.
     // So will fetch and return all the sub-paths after "d3/d4111.tx".
     // Since there is no sub-paths after "d3" it will return emptyList
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a1/b2/d3/d4111.tx", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b2/d3/d4111.tx", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1/b2/d3/d4111.tx", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d3/d4111.tx", expectedKeys, fsoOzoneBucket);
 
     // case-8: StartKey LeafNode is a sub-dir of prefixKey.
     // So will fetch and return all the sub-paths after "d311111".
-    expectedKeys = getExpectedKeyList("a1", "a1/b2/d311111", legacyOzoneBucket);
-    checkKeyList("a1", "a1/b2/d311111", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1", "a1/b2/d311111", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/b2/d311111", expectedKeys, fsoOzoneBucket);
 
     // case-9:
     // Immediate child of prefixKey is lexographically greater than "a1/b1".
     // So will fetch and return all the sub-paths after "b11111",
     // which is "a1/b2"
     expectedKeys =
-        getExpectedKeyList("a1", "a1/b11111/d311111", legacyOzoneBucket);
-    checkKeyList("a1", "a1/b11111/d311111", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b11111/d311111", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/b11111/d311111", expectedKeys, fsoOzoneBucket);
 
     // case-10:
     // StartKey "a1/b2/d2" is valid and get all the keys lexographically
     // greater than "a1/b2/d2/d11111".
     expectedKeys =
-        getExpectedKeyList("a1", "a1/b2/d2/d21111", legacyOzoneBucket);
-    checkKeyList("a1", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b2/d2/d21111", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
 
     // case-11: StartKey is a sub-path of prefixKey.
     // So will fetch and return all the sub-paths after "e311111".
     // Return EmptyList as we reached the end of the tree
     expectedKeys =
-        getExpectedKeyList("a1", "a1/b3/e3/e311111.tx", legacyOzoneBucket);
-    checkKeyList("a1", "a1/b3/e3/e311111.tx", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b3/e3/e311111.tx", legacyOzoneBucket);
+    checkKeyDeepList("a1", "a1/b3/e3/e311111.tx", expectedKeys, fsoOzoneBucket);
 
     // case-12: StartKey is a sub-path of prefixKey.
     // So will fetch and return all the sub-paths after "e4444".
     // Return EmptyList as we reached the end of the tree
     expectedKeys =
-        getExpectedKeyList("a1/b2", "a1/b3/e4444", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1/b3/e4444", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1/b3/e4444", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b3/e4444", expectedKeys, fsoOzoneBucket);
 
     // case-13:
     // StartKey is a sub-path of prefixKey and startKey with a trailing slash.
     // So will fetch and return all the sub-paths after "e".
-    expectedKeys = getExpectedKeyList("a1/b", "a1/b3/e/", legacyOzoneBucket);
-    checkKeyList("a1/b3", "a1/b3/e/", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b", "a1/b3/e/", legacyOzoneBucket);
+    checkKeyDeepList("a1/b3", "a1/b3/e/", expectedKeys, fsoOzoneBucket);
 
     // case-14: PrefixKey is empty and search should consider startKey.
     // Fetch all the keys after, a1/b2/d
-    expectedKeys = getExpectedKeyList("", "a1/b2/d", legacyOzoneBucket);
-    checkKeyList("", "a1/b2/d", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("", "a1/b2/d", legacyOzoneBucket);
+    checkKeyDeepList("", "a1/b2/d", expectedKeys, fsoOzoneBucket);
 
     // case-15: PrefixKey is empty and search should consider startKey.
-    expectedKeys = getExpectedKeyList("", "a1/b2/d2/d21111", legacyOzoneBucket);
-    checkKeyList("", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("", "a1/b2/d2/d21111", legacyOzoneBucket);
+    checkKeyDeepList("", "a1/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
 
     // case-16: PrefixKey is empty and search should consider startKey.
-    expectedKeys = getExpectedKeyList("", "a0/b2/d2/d21111", legacyOzoneBucket);
-    checkKeyList("", "a0/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("", "a0/b2/d2/d21111", legacyOzoneBucket);
+    checkKeyDeepList("", "a0/b2/d2/d21111", expectedKeys, fsoOzoneBucket);
 
     // case-17: Partial prefixKey and seek till prefixKey.
-    expectedKeys = getExpectedKeyList("a1/b", "a1/b1/e/", legacyOzoneBucket);
-    checkKeyList("a1/b", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a1/b", "a1/b1/e/", legacyOzoneBucket);
+    checkKeyDeepList("a1/b", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
 
     // case-18: Partial prefixKey and seek till prefixKey.
     expectedKeys =
-        getExpectedKeyList("a1/b1/c", "a1/b1/01/f/g/h", legacyOzoneBucket);
-    checkKeyList("a1/b1/c", "a1/b1/01/f/g/h", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b1/c", "a1/b1/01/f/g/h", legacyOzoneBucket);
+    checkKeyDeepList("a1/b1/c", "a1/b1/01/f/g/h", expectedKeys, fsoOzoneBucket);
 
     // case-19: Partial prefixKey and seek till prefixKey.
     expectedKeys =
-        getExpectedKeyList("a1/b1", "a1/01/e/f/g/h", legacyOzoneBucket);
-    checkKeyList("a1/b1", "a1/01/e/f/g/h", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b1", "a1/01/e/f/g/h", legacyOzoneBucket);
+    checkKeyDeepList("a1/b1", "a1/01/e/f/g/h", expectedKeys, fsoOzoneBucket);
 
     // case-20: Partial prefixKey and seek till prefixKey.
-    expectedKeys = getExpectedKeyList("a", "a1/b1/e/", legacyOzoneBucket);
-    checkKeyList("a", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
+    expectedKeys = getExpectedKeyDeepList("a", "a1/b1/e/", legacyOzoneBucket);
+    checkKeyDeepList("a", "a1/b1/e/", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -405,22 +413,27 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     // case-1: StartKey LeafNode is lexographically ahead than prefixKey.
     // So, will return EmptyList
     // a1/b2 < a1/b2Invalid
-    List<String> expectedKeys = getExpectedKeyList("", "", legacyOzoneBucket2);
-    checkKeyList("", "", expectedKeys, fsoOzoneBucket2);
+    List<String> expectedKeys = getExpectedKeyDeepList("", "", legacyOzoneBucket2);
+    checkKeyDeepList("", "", expectedKeys, fsoOzoneBucket2);
 
-    expectedKeys = getExpectedKeyList("", "a", legacyOzoneBucket2);
-    checkKeyList("", "a", expectedKeys, fsoOzoneBucket2);
+    expectedKeys = getExpectedKeyDeepList("", "a", legacyOzoneBucket2);
+    checkKeyDeepList("", "a", expectedKeys, fsoOzoneBucket2);
 
-    expectedKeys = getExpectedKeyList("a", "a", legacyOzoneBucket2);
-    checkKeyList("a", "a", expectedKeys, fsoOzoneBucket2);
+    expectedKeys = getExpectedKeyDeepList("a", "a", legacyOzoneBucket2);
+    checkKeyDeepList("a", "a", expectedKeys, fsoOzoneBucket2);
 
-    expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
-    checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
+
+    expectedKeys = getExpectedKeyDeepList("a", "a1", legacyOzoneBucket2);
+    checkKeyDeepList("a", "a1", expectedKeys, fsoOzoneBucket2);
+
+    expectedKeys = getExpectedKeyDeepList("a", "a1", legacyOzoneBucket2);
+    checkKeyDeepList("a", "a1", expectedKeys, fsoOzoneBucket2);
 
     // test when the keyPrefix = existing key
     expectedKeys =
-        getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
-    checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
+        getExpectedKeyDeepList("x/y/z/z1.tx", "", legacyOzoneBucket2);
+    checkKeyDeepList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
+
   }
 
   @Test
@@ -487,6 +500,27 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
 
+    keyPrefix = "a1/b1/";
+    startKey = "";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    keyPrefix = "a1/b1/";
+    startKey = "a1";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    keyPrefix = "a1/b1/";
+    startKey = "a1/b1";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
     // case-7: keyPrefix corresponds to multiple existing keys and
     // startKey is null in empty bucket
     keyPrefix = "a1/b1/c12";
@@ -503,6 +537,54 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     expectedKeys =
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
+  @Test
+  public void testDeepListKeysWithTrailingSlash() throws Exception {
+    List<String> expectedKeys;
+
+    // Case-1: StartKey is less than prefixKey, return emptyList.
+    String keyPrefix = "a1/b2/";
+    String startKey = "a1";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-2: StartKey is empty, return all node.
+    keyPrefix = "a1/b2/";
+    startKey = "";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-3: StartKey is same as prefixKey, return all nodes.
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-4: StartKey is greater than prefixKey
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2/d2/d21.tx";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-5: StartKey reaches last element, return emptyList
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2/d3/d31.tx";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-6:
+    keyPrefix = "a1/b1/c12";
+    startKey = "a1/b1/c1222.tx";
+    expectedKeys =
+        getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
   }
 
   @Test
@@ -611,7 +693,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     return keys;
   }
 
-  private static List<String> getExpectedKeyList(String keyPrefix,
+  private static List<String> getExpectedKeyDeepList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket)
       throws Exception {
     return getExpectedKeyList(keyPrefix, startKey, legacyBucket, false);
@@ -649,7 +731,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     assertEquals(keys, outputKeysList);
   }
 
-  private void checkKeyList(String keyPrefix, String startKey,
+  private void checkKeyDeepList(String keyPrefix, String startKey,
       List<String> keys, OzoneBucket fsoBucket) throws Exception {
     checkKeyList(keyPrefix, startKey, keys, fsoBucket, false);
   }
