@@ -57,33 +57,93 @@ public class CsiServer extends GenericCli implements Callable<Void> {
             CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);
 
-    OzoneClient rpcClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+    validateConfiguration(csiConfig);
 
-    EpollEventLoopGroup group = new EpollEventLoopGroup();
+    OzoneClient rpcClient = null;
+    EpollEventLoopGroup group = null;
+    Server server = null;
 
+    try {
+      rpcClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+      group = new EpollEventLoopGroup();
+
+      server = buildGrpcServer(csiConfig, rpcClient, group);
+
+      server.start();
+      LOG.info("CSI server started successfully on socket: {}",
+          csiConfig.getSocketPath());
+
+      addShutdownHook(server, rpcClient, group);
+
+      server.awaitTermination();
+    } catch (Exception e) {
+      LOG.error("Error starting CSI server", e);
+      cleanup(server, rpcClient, group);
+      throw e;
+    }
+
+    return null;
+  }
+
+  private void validateConfiguration(CsiConfig csiConfig) {
     if (csiConfig.getVolumeOwner().isEmpty()) {
       throw new IllegalArgumentException(
           "ozone.csi.owner is not set. You should set this configuration "
               + "variable to define which user should own all the created "
               + "buckets.");
     }
+  }
 
-    Server server =
-        NettyServerBuilder
-            .forAddress(new DomainSocketAddress(csiConfig.getSocketPath()))
-            .channelType(EpollServerDomainSocketChannel.class)
-            .workerEventLoopGroup(group)
-            .bossEventLoopGroup(group)
-            .addService(new IdentityService())
-            .addService(new ControllerService(rpcClient,
-                csiConfig.getDefaultVolumeSize()))
-            .addService(new NodeService(csiConfig))
-            .build();
+  private Server buildGrpcServer(CsiConfig csiConfig, OzoneClient rpcClient,
+      EpollEventLoopGroup group) {
+    return NettyServerBuilder
+        .forAddress(new DomainSocketAddress(csiConfig.getSocketPath()))
+        .channelType(EpollServerDomainSocketChannel.class)
+        .workerEventLoopGroup(group)
+        .bossEventLoopGroup(group)
+        .addService(new IdentityService())
+        .addService(new ControllerService(rpcClient,
+            csiConfig.getDefaultVolumeSize()))
+        .addService(new NodeService(csiConfig))
+        .build();
+  }
 
-    server.start();
-    server.awaitTermination();
-    rpcClient.close();
-    return null;
+  private void addShutdownHook(final Server server,
+      final OzoneClient rpcClient, final EpollEventLoopGroup group) {
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      LOG.info("Shutting down CSI server");
+      cleanup(server, rpcClient, group);
+    }));
+  }
+
+  private void cleanup(Server server, OzoneClient rpcClient,
+      EpollEventLoopGroup group) {
+    if (server != null) {
+      try {
+        server.shutdown();
+        if (!server.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS)) {
+          server.shutdownNow();
+        }
+      } catch (Exception e) {
+        LOG.error("Error shutting down gRPC server", e);
+      }
+    }
+
+    if (rpcClient != null) {
+      try {
+        rpcClient.close();
+      } catch (Exception e) {
+        LOG.error("Error closing Ozone client", e);
+      }
+    }
+
+    if (group != null) {
+      try {
+        group.shutdownGracefully();
+      } catch (Exception e) {
+        LOG.error("Error shutting down event loop group", e);
+      }
+    }
   }
 
   public static void main(String[] args) {
@@ -130,7 +190,8 @@ public class CsiServer extends GenericCli implements Callable<Void> {
     private String volumeOwner;
 
     @Config(key = "mount.command",
-        defaultValue = "goofys --endpoint %s %s %s",
+        defaultValue = "mountpoint-s3 -f --endpoint-url=%s --force-path-style --allow-overwrite " +
+            "--allow-delete --region=us-east-1 --maximum-throughput-gbps=40 --max-threads=64 %s %s",
         description =
             "This is the mount command which is used to publish volume."
                 + " these %s will be replicated by s3gAddress, volumeId "
