@@ -58,14 +58,14 @@ HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file 
 
 ### Create a volume
 
-```
+```bash
 # creates a volume called `volume1`.
 curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1?op=MKDIRS&user.name=hdfs"
 ```
 
 Example Output:
 
-```curl
+```bash
 HTTP/1.1 200 OK
 Date: Sat, 18 Oct 2025 07:51:21 GMT
 Cache-Control: no-cache
@@ -82,14 +82,14 @@ Content-Length: 17
 
 ### Create a bucket
 
-```
+```bash
 # creates a bucket called `bucket1`.
 curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1?op=MKDIRS&user.name=hdfs"
 ```
 
 Example Output:
 
-```curl
+```bash
 HTTP/1.1 200 OK
 Date: Sat, 18 Oct 2025 07:52:06 GMT
 Cache-Control: no-cache
@@ -106,12 +106,38 @@ Content-Length: 17
 
 ### Upload a file
 
-### Read the file content
-
-```angular2html
-curl 'http://httpfs-host:14000/webhdfs/v1/user/foo/README.txt?op=OPEN&user.name=foo'` returns the content of the key `/user/foo/README.txt`.
+```bash
+echo "hello" >> ./README.txt
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=CREATE&data=true&user.name=hdfs" -T ./README.txt -H"Content-Type: application/octet-stream" 
 ```
 
+Example Output
+
+```bash
+HTTP/1.1 100 Continue
+
+HTTP/1.1 201 Created
+Date: Sat, 18 Oct 2025 08:33:33 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 08:33:33 GMT
+Pragma: no-cache
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760812413286&s=09t7xKu/p/fjCJiQNL3bvW/Q7mTw28IbeNqDGlslZ6w="; Path=/; HttpOnly
+Location: http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt
+Content-Type: application/json
+Content-Length: 84
+
+{"Location":"http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt"}
+```
+
+### Read the file content
+
+```bash
+# returns the content of the key `/user/foo/README.txt`.
+curl 'http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=OPEN&user.name=foo'
+hello
+```
 
 ## Supported operations
 
