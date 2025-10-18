@@ -45,9 +45,9 @@ HttpFS has built-in security supporting Hadoop pseudo authentication and Kerbero
 
 HttpFS service itself is a Jetty based web-application that uses the Hadoop FileSystem API to talk to the cluster, it is a separate service which provides access to Ozone via a REST APIs. It should be started in addition to other regular Ozone components.
 
-To try it out, you can start a Docker Compose dev cluster that has an HttpFS gateway.
+To try it out, follow the instruction from the link below and start the Ozone cluster with Docker Compose. 
 
-Extract the release tarball, go to the `compose/ozone` directory and start the cluster:
+https://ozone.apache.org/docs/edge/start/startfromdockerhub.html
 
 ```bash
 docker-compose up -d --scale datanode=3
@@ -56,12 +56,61 @@ docker-compose up -d --scale datanode=3
 You can/should find now the HttpFS gateway in docker with the name `ozone_httpfs`.
 HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation. For example, using the `curl` Unix command.
 
-E.g. in the docker cluster you can execute commands like these:
+### Create a volume
 
-* `curl -i -X PUT "http://httpfs:14000/webhdfs/v1/vol1?op=MKDIRS&user.name=hdfs"` creates a volume called `vol1`.
+```
+# creates a volume called `volume1`.
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1?op=MKDIRS&user.name=hdfs"
+```
 
+Example Output:
 
-* `$ curl 'http://httpfs-host:14000/webhdfs/v1/user/foo/README.txt?op=OPEN&user.name=foo'` returns the content of the key `/user/foo/README.txt`.
+```curl
+HTTP/1.1 200 OK
+Date: Sat, 18 Oct 2025 07:51:21 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 07:51:21 GMT
+Pragma: no-cache
+Content-Type: application/json
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760809881100&s=OCdVOi8eyMguFySkmEJxm5EkRfj6NbAM9agi5Gue1Iw="; Path=/; HttpOnly
+Content-Length: 17
+
+{"boolean":true}
+```
+
+### Create a bucket
+
+```
+# creates a bucket called `bucket1`.
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1?op=MKDIRS&user.name=hdfs"
+```
+
+Example Output:
+
+```curl
+HTTP/1.1 200 OK
+Date: Sat, 18 Oct 2025 07:52:06 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 07:52:06 GMT
+Pragma: no-cache
+Content-Type: application/json
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760809926682&s=yvOaeaRCVJZ+z+nZQ/rM/Y01pzEmS9Pe2mE9f0b+TWw="; Path=/; HttpOnly
+Content-Length: 17
+
+{"boolean":true}
+```
+
+### Upload a file
+
+### Read the file content
+
+```angular2html
+curl 'http://httpfs-host:14000/webhdfs/v1/user/foo/README.txt?op=OPEN&user.name=foo'` returns the content of the key `/user/foo/README.txt`.
+```
 
 
 ## Supported operations
@@ -109,8 +158,6 @@ Remove ACL                            | not implemented in Ozone FileSystem API
 Set ACL                               | not implemented in Ozone FileSystem API
 Get ACL Status                        | not implemented in Ozone FileSystem API
 Check access                          | not implemented in Ozone FileSystem API
-
-
 
 ## Hadoop user and developer documentation about HttpFS
 
