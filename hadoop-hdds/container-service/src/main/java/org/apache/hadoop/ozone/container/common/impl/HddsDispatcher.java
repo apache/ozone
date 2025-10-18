@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.Span;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -75,6 +77,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -812,6 +816,76 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  @Override
+  public void streamDataReadOnly(ContainerCommandRequestProto msg,
+      StreamObserver<ContainerCommandResponseProto> streamObserver,
+      DispatcherContext dispatcherContext) {
+    Type cmdType = msg.getCmdType();
+    String traceID = msg.getTraceID();
+    Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
+    AuditAction action = getAuditAction(msg.getCmdType());
+    EventType eventType = getEventType(msg);
+
+    try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
+      Preconditions.checkNotNull(msg);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
+      }
+
+      PerformanceStringBuilder perf = new PerformanceStringBuilder();
+      ContainerCommandResponseProto responseProto = null;
+      long containerID = msg.getContainerID();
+      Container container = getContainer(containerID);
+      long startTime = Time.monotonicNow();
+
+      if (DispatcherContext.op(dispatcherContext).validateToken()) {
+        validateToken(msg);
+      }
+      if (getMissingContainerSet().contains(containerID)) {
+        throw new StorageContainerException(
+            "ContainerID " + containerID
+                + " has been lost and and cannot be recreated on this DataNode",
+            ContainerProtos.Result.CONTAINER_MISSING);
+      }
+      if (container == null) {
+        throw new StorageContainerException("ContainerID " + containerID + " does not exist",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      ContainerType containerType = getContainerType(container);
+      Handler handler = getHandler(containerType);
+      if (handler == null) {
+        throw new StorageContainerException("Invalid " + "ContainerType " + containerType,
+            ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+      }
+      perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
+      responseProto = handler.readBlock(msg, container, dispatcherContext, streamObserver);
+      long oPLatencyMS = Time.monotonicNow() - startTime;
+      metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
+      if (responseProto == null) {
+        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.SUCCESS, null);
+      } else {
+        containerSet.scanContainer(containerID, "ReadBlock failed " + responseProto.getResult());
+        audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
+            new Exception(responseProto.getMessage()));
+        streamObserver.onNext(responseProto);
+      }
+      perf.appendOpLatencyMs(oPLatencyMS);
+      performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
+
+    } catch (StorageContainerException sce) {
+      audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+    } catch (IOException ioe) {
+      final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
+          + " for " + dispatcherContext + ": " + ioe.getMessage();
+      final StorageContainerException sce = new StorageContainerException(
+          s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+    } finally {
+      span.end();
+    }
+  }
+
   private static DNAction getAuditAction(Type cmdType) {
     switch (cmdType) {
     case CreateContainer  : return DNAction.CREATE_CONTAINER;
@@ -836,6 +910,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
     case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;
+    case ReadBlock        : return DNAction.READ_BLOCK;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;

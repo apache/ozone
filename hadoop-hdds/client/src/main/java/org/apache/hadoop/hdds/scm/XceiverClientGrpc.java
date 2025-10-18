@@ -63,6 +63,7 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -384,25 +385,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         });
   }
 
-  private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<Validator> validators)
-      throws IOException {
-    ContainerCommandResponseProto responseProto = null;
-    IOException ioException = null;
-
-    // In case of an exception or an error, we will try to read from the
-    // datanodes in the pipeline in a round-robin fashion.
-    XceiverClientReply reply = new XceiverClientReply(null);
+  private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
     List<DatanodeDetails> datanodeList = null;
-
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
+    DatanodeBlockID blockID = getRequestBlockID(request);
 
     if (blockID != null) {
       if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
@@ -440,6 +425,33 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     if (!allInService) {
       datanodeList = sortDatanodeByOperationalState(datanodeList);
     }
+    return datanodeList;
+  }
+
+  private static DatanodeBlockID getRequestBlockID(ContainerCommandRequestProto request) {
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
+      blockID = request.getReadBlock().getBlockID();
+    }
+    return blockID;
+  }
+
+  private XceiverClientReply sendCommandWithRetry(
+      ContainerCommandRequestProto request, List<Validator> validators)
+      throws IOException {
+    ContainerCommandResponseProto responseProto = null;
+    IOException ioException = null;
+
+    // In case of an exception or an error, we will try to read from the
+    // datanodes in the pipeline in a round-robin fashion.
+    XceiverClientReply reply = new XceiverClientReply(null);
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
 
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -495,13 +507,40 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
-                processForDebug(request), pipeline);
+            processForDebug(request), pipeline);
       } else {
         LOG.warn(message + " on the pipeline {}.",
                 request.getCmdType(), pipeline);
       }
       throw ioException;
     }
+  }
+
+  @Override
+  public ClientCallStreamObserver<ContainerCommandRequestProto> streamRead(ContainerCommandRequestProto request,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException {
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        checkOpen(dn);
+        XceiverClientProtocolServiceStub stub = asyncStubs.get(dn.getID());
+        if (stub == null) {
+          throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executing command {} on datanode {}", processForDebug(request), dn);
+        }
+        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
+            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(streamObserver);
+        requestObserver.onNext(request);
+        requestObserver.onCompleted();
+        return (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver;
+      } catch (Exception e) {
+        LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+      }
+    }
+    throw new IOException("Failed to start streaming read to any available DataNodes");
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(
