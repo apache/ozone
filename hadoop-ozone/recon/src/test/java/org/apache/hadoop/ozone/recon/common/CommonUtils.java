@@ -87,10 +87,10 @@ public class CommonUtils {
     NamespaceSummaryResponse rootResponseObj =
         (NamespaceSummaryResponse) rootResponse.getEntity();
     assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
-    assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
-    assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
-    assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(3, rootResponseObj.getCountStats().getNumVolume());
+    assertEquals(5, rootResponseObj.getCountStats().getNumBucket());
+    assertEquals(7, rootResponseObj.getCountStats().getNumTotalDir());
+    assertEquals(14, rootResponseObj.getCountStats().getNumTotalKey());
     assertEquals("USER",
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getType());
     assertEquals("WRITE", rootResponseObj.getObjectDBInfo().getAcls().get(0)
@@ -112,7 +112,7 @@ public class CommonUtils {
         volResponseObj.getEntityType());
     assertEquals(2, volResponseObj.getCountStats().getNumBucket());
     assertEquals(4, volResponseObj.getCountStats().getNumTotalDir());
-    assertEquals(6, volResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(7, volResponseObj.getCountStats().getNumTotalKey());
     assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
             getObjectDBInfo()).getAdmin());
     assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
@@ -130,7 +130,7 @@ public class CommonUtils {
         (NamespaceSummaryResponse) bucketOneResponse.getEntity();
     assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
     assertEquals(4, bucketOneObj.getCountStats().getNumTotalDir());
-    assertEquals(4, bucketOneObj.getCountStats().getNumTotalKey());
+    assertEquals(5, bucketOneObj.getCountStats().getNumTotalKey());
     assertEquals("vol",
         ((BucketObjectDBInfo) bucketOneObj.getObjectDBInfo()).getVolumeName());
     assertEquals(StorageType.DISK,
@@ -172,7 +172,7 @@ public class CommonUtils {
         (NamespaceSummaryResponse) dirOneResponse.getEntity();
     assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
     assertEquals(3, dirOneObj.getCountStats().getNumTotalDir());
-    assertEquals(3, dirOneObj.getCountStats().getNumTotalKey());
+    assertEquals(4, dirOneObj.getCountStats().getNumTotalKey());
     assertEquals("dir1", dirOneObj.getObjectDBInfo().getName());
     assertEquals(0, dirOneObj.getObjectDBInfo().getMetadata().size());
     assertEquals(0, dirOneObj.getObjectDBInfo().getQuotaInBytes());
