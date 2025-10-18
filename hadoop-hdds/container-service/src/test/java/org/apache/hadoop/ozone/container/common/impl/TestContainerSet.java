@@ -375,4 +375,107 @@ public class TestContainerSet {
     return containerSet;
   }
 
+  /**
+   * Test that containerCount per volume returns correct count.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerCountPerVolume(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
+    HddsVolume vol1 = mock(HddsVolume.class);
+    when(vol1.getStorageID()).thenReturn("uuid-1");
+    HddsVolume vol2 = mock(HddsVolume.class);
+    when(vol2.getStorageID()).thenReturn("uuid-2");
+    HddsVolume vol3 = mock(HddsVolume.class);
+    when(vol3.getStorageID()).thenReturn("uuid-3");
+
+    ContainerSet containerSet = newContainerSet();
+
+    // Add 100 containers to vol1, 50 to vol2, 0 to vol3
+    for (int i = 0; i < 100; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      kvData.setVolume(vol1);
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    for (int i = 100; i < 150; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      kvData.setVolume(vol2);
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    // Verify counts
+    assertEquals(100, containerSet.containerCount(vol1));
+    assertEquals(50, containerSet.containerCount(vol2));
+    assertEquals(0, containerSet.containerCount(vol3));
+
+    // Remove some containers and verify counts are updated
+    containerSet.removeContainer(0);
+    containerSet.removeContainer(1);
+    containerSet.removeContainer(100);
+    assertEquals(98, containerSet.containerCount(vol1));
+    assertEquals(49, containerSet.containerCount(vol2));
+  }
+
+  /**
+   * Test that per-volume iterator only returns containers from that volume.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerIteratorPerVolume(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
+    HddsVolume vol1 = mock(HddsVolume.class);
+    when(vol1.getStorageID()).thenReturn("uuid-11");
+    HddsVolume vol2 = mock(HddsVolume.class);
+    when(vol2.getStorageID()).thenReturn("uuid-12");
+
+    ContainerSet containerSet = newContainerSet();
+
+    // Add containers with specific IDs to each volume
+    List<Long> vol1Ids = new ArrayList<>();
+    List<Long> vol2Ids = new ArrayList<>();
+
+    for (int i = 0; i < 20; i++) {
+      KeyValueContainerData kvData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      if (i % 2 == 0) {
+        kvData.setVolume(vol1);
+        vol1Ids.add((long) i);
+      } else {
+        kvData.setVolume(vol2);
+        vol2Ids.add((long) i);
+      }
+      kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+      containerSet.addContainer(new KeyValueContainer(kvData, new OzoneConfiguration()));
+    }
+
+    // Verify iterator only returns containers from vol1
+    Iterator<Container<?>> iter1 = containerSet.getContainerIterator(vol1);
+    List<Long> foundVol1Ids = new ArrayList<>();
+    while (iter1.hasNext()) {
+      foundVol1Ids.add(iter1.next().getContainerData().getContainerID());
+    }
+    assertEquals(vol1Ids.size(), foundVol1Ids.size());
+    assertTrue(foundVol1Ids.containsAll(vol1Ids));
+
+    // Verify iterator only returns containers from vol2
+    Iterator<Container<?>> iter2 = containerSet.getContainerIterator(vol2);
+    List<Long> foundVol2Ids = new ArrayList<>();
+    while (iter2.hasNext()) {
+      foundVol2Ids.add(iter2.next().getContainerData().getContainerID());
+    }
+    assertEquals(vol2Ids.size(), foundVol2Ids.size());
+    assertTrue(foundVol2Ids.containsAll(vol2Ids));
+  }
+
 }
