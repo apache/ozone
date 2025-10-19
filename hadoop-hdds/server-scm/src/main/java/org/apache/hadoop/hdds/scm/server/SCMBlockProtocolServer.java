@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -202,15 +203,19 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
-          blocks.add(block);
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
                 .sortByDistanceCost(client, nodes, nodes.size());
-            block.getPipeline().setNodesInOrder(sorted);
+            if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+              block = block.toBuilder()
+                  .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+                  .build();
+            }
           }
+          blocks.add(block);
         }
       }
 

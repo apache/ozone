@@ -38,9 +38,11 @@ import java.util.stream.Collectors;
 import java.util.UUID;
 
 import com.google.common.cache.RemovalListener;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -448,7 +450,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @return instance of DBCheckpoint
    */
   public static DBCheckpoint createOmSnapshotCheckpoint(
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, BatchOperation batchOperation)
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
@@ -479,10 +481,10 @@ public final class OmSnapshotManager implements AutoCloseable {
       // Clean up active DB's deletedTable right after checkpoint is taken,
       // with table write lock held
       deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
       // Clean up deletedDirectoryTable as well
       deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
     } finally {
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
@@ -513,7 +515,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void deleteKeysFromDelDirTableInSnapshotScope(
       OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName) throws IOException {
+      String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
     final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
@@ -526,7 +528,7 @@ public final class OmSnapshotManager implements AutoCloseable {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
             }
-            omMetadataManager.getDeletedDirTable().delete(entry.getKey());
+            omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation, entry.getKey());
             return null;
           });
     }
@@ -599,7 +601,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void deleteKeysFromDelKeyTableInSnapshotScope(
       OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName) throws IOException {
+      String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
     final String keyPrefix =
@@ -612,7 +614,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Removing key {} from DeletedTable", entry.getKey());
         }
-        omMetadataManager.getDeletedTable().delete(entry.getKey());
+        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation, entry.getKey());
         return null;
       });
     }
@@ -640,7 +642,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     String[] keyParts = keyName.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
-
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
+          bucketName), false);
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
       return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
           getActiveSnapshot(volumeName, bucketName, snapshotName);
     } else {
@@ -672,7 +679,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       // don't allow snapshot indicator without snapshot name
       throw new OMException(INVALID_KEY_NAME);
     }
-
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
         bucketName, snapshotName);
 

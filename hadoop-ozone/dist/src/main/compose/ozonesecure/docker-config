@@ -131,6 +131,7 @@ HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
+HADOOP-POLICY.XML_ozone.security.reconfigure.protocol.acl=*
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300

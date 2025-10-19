@@ -339,7 +339,7 @@ public final class ContainerTestUtils {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
 
-    return XceiverServerRatis.newXceiverServerRatis(dn, conf,
+    return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
   }

@@ -22,7 +22,9 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+
 
 /**
  * This class is used to track Volume Info stats for each HDDS Volume.
@@ -34,6 +36,8 @@ public class VolumeInfoMetrics {
   private String metricsSourceName = VolumeInfoMetrics.class.getSimpleName();
   private String volumeRootStr;
   private HddsVolume volume;
+  @Metric("Returns the RocksDB compact times of the Volume")
+  private MutableRate dbCompactLatency;
 
   /**
    * @param identifier Typically, path to volume root. e.g. /data/hdds
@@ -145,6 +149,10 @@ public class VolumeInfoMetrics {
   @Metric("Returns the Committed bytes of the Volume")
   public long getCommitted() {
     return volume.getCommittedBytes();
+  }
+
+  public void dbCompactTimesNanoSecondsIncr(long time) {
+    dbCompactLatency.add(time);
   }
 
 }

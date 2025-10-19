@@ -27,10 +27,11 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -38,9 +39,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.keyvalue.impl.MappedBufferManager;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -70,16 +73,18 @@ public class TestChunkUtils {
   private static final int BUFFER_CAPACITY = 1 << 20;
   private static final int MAPPED_BUFFER_THRESHOLD = 32 << 10;
   private static final Random RANDOM = new Random();
+  private static final MappedBufferManager MAPPED_BUFFER_MANAGER = new MappedBufferManager(100);
 
   static ChunkBuffer readData(File file, long off, long len)
       throws StorageContainerException {
     LOG.info("off={}, len={}", off, len);
     return ChunkUtils.readData(len, BUFFER_CAPACITY, file, off, null,
-        MAPPED_BUFFER_THRESHOLD);
+        MAPPED_BUFFER_THRESHOLD, true, MAPPED_BUFFER_MANAGER);
   }
 
   @Test
   public void concurrentReadOfSameFile() throws Exception {
+    int threads = 10;
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
@@ -89,7 +94,6 @@ public class TestChunkUtils {
       int offset = 0;
       File file = tempFile.toFile();
       ChunkUtils.writeData(file, data, offset, len, null, true);
-      int threads = 10;
       ExecutorService executor = new ThreadPoolExecutor(threads, threads,
           0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
       AtomicInteger processed = new AtomicInteger();
@@ -130,46 +134,68 @@ public class TestChunkUtils {
   }
 
   @Test
-  public void concurrentProcessing() throws Exception {
-    final int perThreadWait = 1000;
-    final int maxTotalWait = 5000;
-    int threads = 20;
-    List<Path> paths = new LinkedList<>();
+  public void concurrentReadWriteOfSameFile() throws Exception {
+    final int threads = 10;
+    ChunkUtils.setStripedLock(Striped.readWriteLock(threads));
+    final byte[] array = "Hello World".getBytes(UTF_8);
 
-    try {
-      ExecutorService executor = new ThreadPoolExecutor(threads, threads,
-          0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-      AtomicInteger processed = new AtomicInteger();
-      for (int i = 0; i < threads; i++) {
-        Path path = Files.createTempFile(PREFIX, String.valueOf(i));
-        paths.add(path);
-        executor.execute(() -> {
+    Path tempFile = Files.createTempFile(PREFIX, "concurrent_read_write");
+    File file = tempFile.toFile();
+    AtomicInteger success = new AtomicInteger(0);
+    AtomicInteger fail = new AtomicInteger(0);
+
+    ExecutorService executor = new ThreadPoolExecutor(10, 10,
+        0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+    for (int i = 0; i < threads; i++) {
+      final int threadNumber = i;
+      final ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
+      final int len = data.limit();
+      final int offset = i * len;
+
+      CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+        try {
+          ChunkUtils.writeData(file, data, offset, len, null, true);
+          success.getAndIncrement();
+        } catch (StorageContainerException e) {
+          throw new RuntimeException(e);
+        }
+      }, executor).whenCompleteAsync((v, e) -> {
+        if (e == null) {
           try {
-            ChunkUtils.processFileExclusively(path, () -> {
-              try {
-                Thread.sleep(perThreadWait);
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
-              processed.incrementAndGet();
-              return null;
-            });
-          } catch (InterruptedException e) {
-            e.printStackTrace();
+            final ChunkBuffer chunk = readData(file, offset, len);
+            // There should be only one element in readBuffers
+            final List<ByteBuffer> buffers = chunk.asByteBufferList();
+            assertEquals(1, buffers.size());
+            final ByteBuffer readBuffer = buffers.get(0);
+
+            LOG.info("Read data ({}): {}", threadNumber,
+                new String(readBuffer.array(), UTF_8));
+            if (!Arrays.equals(array, readBuffer.array())) {
+              fail.getAndIncrement();
+            }
+            assertEquals(len, readBuffer.remaining());
+          } catch (Exception ee) {
+            LOG.error("Failed to read data ({})", threadNumber, ee);
+            fail.getAndIncrement();
           }
-        });
-      }
-      try {
-        GenericTestUtils.waitFor(() -> processed.get() == threads,
-            100, maxTotalWait);
-      } finally {
-        executor.shutdownNow();
+        } else {
+          fail.getAndIncrement();
+        }
+      }, executor);
+      futures.add(future);
+    }
+    try {
+      for (CompletableFuture<Void> future : futures) {
+        future.join();
       }
     } finally {
-      for (Path path : paths) {
-        FileUtils.deleteQuietly(path.toFile());
-      }
+      executor.shutdownNow();
     }
+    assertEquals(success.get(), threads);
+    assertEquals(fail.get(), 0);
   }
 
   @Test

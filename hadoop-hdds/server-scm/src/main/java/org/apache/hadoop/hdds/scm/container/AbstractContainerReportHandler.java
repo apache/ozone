@@ -291,9 +291,6 @@ public class AbstractContainerReportHandler {
       }
 
       if (replica.getState() == State.CLOSED) {
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
-
         /*
         For an EC container, only the first index and the parity indexes are
         guaranteed to have block data. So, update the container's state in SCM
@@ -309,8 +306,14 @@ public class AbstractContainerReportHandler {
           }
         }
 
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica with index {}.", containerId, datanode,
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          logger.warn("Ignored moving container {} from CLOSING to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
+        }
+        logger.info("Moving container {} from CLOSING to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
             replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
@@ -334,10 +337,15 @@ public class AbstractContainerReportHandler {
        *
        */
       if (replica.getState() == State.CLOSED) {
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          logger.warn("Ignored moving container {} from QUASI_CLOSED to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
+        }
+        logger.info("Moving container {} from QUASI_CLOSED to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
       }
@@ -374,6 +382,32 @@ public class AbstractContainerReportHandler {
     }
 
     return ignored;
+  }
+
+  /**
+   * Helper method to verify that the replica's bcsId matches the container's in SCM.
+   * Throws IOException if the bcsIds do not match.
+   * <p>
+   * @param replicaBcsId Replica bcsId
+   * @param containerBcsId Container bcsId in SCM
+   * @param datanode DatanodeDetails for logging
+   * @param containerId ContainerID for logging
+   * @return true if verification has passed, false otherwise
+   */
+  private boolean verifyBcsId(long replicaBcsId, long containerBcsId,
+      DatanodeDetails datanode, ContainerID containerId) {
+
+    if (replicaBcsId != containerBcsId) {
+      final String errMsg = "Unexpected bcsId for container " + containerId +
+          " from datanode " + datanode + ". replica's: " + replicaBcsId +
+          ", SCM's: " + containerBcsId +
+          ". Ignoring container report for " + containerId;
+
+      logger.error(errMsg);
+      return false;
+    } else {
+      return true;
+    }
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,

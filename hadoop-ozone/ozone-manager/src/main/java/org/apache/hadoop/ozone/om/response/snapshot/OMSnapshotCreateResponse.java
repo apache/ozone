@@ -79,7 +79,7 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
 
     // Create the snapshot checkpoint. Also cleans up some tables.
     OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
-        snapshotInfo);
+        snapshotInfo, batchOperation);
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
     // Remove all entries from snapshotRenamedTable

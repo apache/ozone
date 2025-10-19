@@ -38,9 +38,14 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
+import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
+
+import com.amazonaws.services.s3.AmazonS3;
+import software.amazon.awssdk.services.s3.S3Client;
+
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -168,9 +173,16 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /**
    * Returns a {@link ReconServer} instance.
    *
-   * @return List of {@link ReconServer}
+   * @return {@link ReconServer} instance if it is initialized, otherwise null.
    */
   ReconServer getReconServer();
+
+  /**
+   * Returns a {@link Gateway} instance.
+   *
+   * @return {@link Gateway} instance if it is initialized, otherwise null.
+   */
+  Gateway getS3G();
 
   /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
@@ -179,6 +191,16 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return {@link OzoneClient}
    */
   OzoneClient newClient() throws IOException;
+
+  /**
+   * Returns an {@link AmazonS3} to use AWS SDK V1 to access the {@link MiniOzoneCluster}.
+   */
+  AmazonS3 newS3Client();
+
+  /**
+   * Returns an {@link S3Client} to use AWS SDK V2 to access the {@link MiniOzoneCluster}.
+   */
+  S3Client newS3ClientV2() throws Exception;
 
   /**
    * Returns StorageContainerLocationClient to communicate with
@@ -256,6 +278,21 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void stopRecon();
 
   /**
+   * Start S3G.
+   */
+  void startS3G();
+
+  /**
+   * Restart S3G.
+   */
+  void restartS3G();
+
+  /**
+   * Stop S3G.
+   */
+  void stopS3G();
+
+  /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
@@ -325,7 +362,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
-    
+
     protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
@@ -338,6 +375,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
+    protected boolean includeS3G = false;
 
 
     protected Optional<Integer> omLayoutVersion = Optional.empty();
@@ -616,6 +654,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
+      return this;
+    }
+
+    public Builder includeS3G(boolean include) {
+      this.includeS3G = include;
       return this;
     }
 

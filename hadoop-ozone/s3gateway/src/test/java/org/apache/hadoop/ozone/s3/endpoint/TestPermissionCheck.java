@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -86,6 +87,8 @@ public class TestPermissionCheck {
     Mockito.when(client.getObjectStore()).thenReturn(objectStore);
     Mockito.when(client.getConfiguration()).thenReturn(conf);
     headers = Mockito.mock(HttpHeaders.class);
+    Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     clientProtocol = Mockito.mock(ClientProtocol.class);
     Mockito.when(client.getProxy()).thenReturn(clientProtocol);
   }
