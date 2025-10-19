@@ -50,11 +50,14 @@ To try it out, follow the instruction from the link below and start the Ozone cl
 https://ozone.apache.org/docs/edge/start/startfromdockerhub.html
 
 ```bash
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 
-You can/should find now the HttpFS gateway in docker with the name `ozone_httpfs`.
-HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation. For example, using the `curl` Unix command.
+You can/should find now the HttpFS gateway in docker with the name like `ozone_httpfs`,
+and it can be accessed throw `localhost:14000`.
+HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation.
+
+Here's some example usage:
 
 ### Create a volume
 
