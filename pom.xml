@@ -109,7 +109,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <io.grpc.version>1.71.0</io.grpc.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <jacoco.version>0.8.13</jacoco.version>
+    <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
