@@ -333,7 +333,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             && ((versionEntry.getVersion() != 0 && versionEntry.getVersion() != snapshotLocalData.getVersion())
             || isSnapshotPurged);
         if (toRemove) {
-          snapshotLocalData.removeVersionSSTFileInfos(versionEntry.getVersion());
+          snapshotLocalDataProvider.removeVersion(versionEntry.getVersion());
         }
       }
       snapshotLocalDataProvider.commit();
@@ -438,7 +438,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     // Track all predecessors of the existing versions and remove the node from the graph.
     for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
       LocalDataVersionNode existingVersionNode = existingVersion.getValue();
-      predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
+      predecessors.put(existingVersion.getKey(), new HashSet<>(localDataGraph.predecessors(existingVersionNode)));
       versionsRemoved = versionsRemoved || !newVersions.containsKey(existingVersion.getKey());
       localDataGraph.removeNode(existingVersionNode);
     }
@@ -787,7 +787,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         } else if (snapshotLocalDataFile.exists()) {
           LOG.info("Deleting Yaml file corresponding to snapshotId: {} in path : {}",
               super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
-          if (snapshotLocalDataFile.delete()) {
+          if (!snapshotLocalDataFile.delete()) {
             throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
           }
         }

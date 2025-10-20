@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,6 +40,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -98,6 +101,7 @@ public class TestOmSnapshotLocalDataManager {
   private static YamlSerializer<OmSnapshotLocalData> snapshotLocalDataYamlSerializer;
   private static List<String> lockCapturor;
   private static OzoneConfiguration conf;
+  private static Map<UUID, Boolean> purgedSnapshotIdMap;
 
   @Mock
   private OMMetadataManager omMetadataManager;
@@ -137,6 +141,7 @@ public class TestOmSnapshotLocalDataManager {
       }
     };
     lockCapturor = new ArrayList<>();
+    purgedSnapshotIdMap = new HashMap<>();
   }
 
   @AfterAll
@@ -163,7 +168,10 @@ public class TestOmSnapshotLocalDataManager {
     when(rdbStore.getSnapshotsParentDir()).thenReturn(snapshotsDir.getAbsolutePath());
     when(rdbStore.getDbLocation()).thenReturn(dbLocation);
     this.snapshotUtilMock = mockStatic(SnapshotUtils.class);
-    snapshotUtilMock.when(() -> SnapshotUtils.isSnapshotPurged(any(), any(), any())).thenReturn(false);
+    purgedSnapshotIdMap.clear();
+    snapshotUtilMock.when(() -> SnapshotUtils.isSnapshotPurged(any(), any(), any()))
+        .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
+    conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, -1);
   }
 
   @AfterEach
@@ -418,6 +426,75 @@ public class TestOmSnapshotLocalDataManager {
     try (ReadableOmSnapshotLocalDataProvider snap = snapshotLocalDataManager.getOmSnapshotLocalData(snapId)) {
       assertEquals(expectedVersion, snap.getSnapshotLocalData().getVersion());
       assertEquals(expectedVersions, snap.getSnapshotLocalData().getVersionSstFileInfos().keySet());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testOrphanVersionDeletionWithVersionDeletion(boolean purgeSnapshot) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    addVersionsToLocalData(localDataManager, firstSnapId, ImmutableMap.of(1, 1, 2, 2, 3, 3));
+    addVersionsToLocalData(localDataManager, secondSnapId, ImmutableMap.of(4, 2, 8, 1, 10, 3, 11, 3));
+    addVersionsToLocalData(localDataManager, thirdSnapId, ImmutableMap.of(5, 8, 13, 10));
+    assertEquals(new HashSet<>(snapshotIds), localDataManager.getSnapshotToBeCheckedForOrphans().keySet());
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+    purgedSnapshotIdMap.put(secondSnapId, purgeSnapshot);
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, thirdSnapId);
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(thirdSnapId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertEquals(Sets.newHashSet(0, 13), snapshotLocalData.getVersionSstFileInfos().keySet());
+    }
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, secondSnapId);
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      if (purgeSnapshot) {
+        assertEquals(Sets.newHashSet(0, 10), snapshotLocalData.getVersionSstFileInfos().keySet());
+      } else {
+        assertEquals(Sets.newHashSet(0, 10, 11), snapshotLocalData.getVersionSstFileInfos().keySet());
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testOrphanVersionDeletionWithChainUpdate(boolean purgeSnapshot) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    UUID thirdSnapId = snapshotIds.get(2);
+
+    addVersionsToLocalData(localDataManager, firstSnapId, ImmutableMap.of(1, 1, 2, 2, 3, 3));
+    addVersionsToLocalData(localDataManager, secondSnapId, ImmutableMap.of(4, 2, 8, 1, 10, 3, 11, 3));
+    addVersionsToLocalData(localDataManager, thirdSnapId, ImmutableMap.of(5, 8, 13, 10));
+    purgedSnapshotIdMap.put(secondSnapId, purgeSnapshot);
+    try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
+             localDataManager.getWritableOmSnapshotLocalData(thirdSnapId, firstSnapId)) {
+      snapshotLocalDataProvider.commit();
+    }
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(thirdSnapId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertEquals(Sets.newHashSet(0, 5, 13), snapshotLocalData.getVersionSstFileInfos().keySet());
+      assertEquals(firstSnapId, snapshotLocalData.getPreviousSnapshotId());
+    }
+
+    assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, secondSnapId);
+    if (purgeSnapshot) {
+      NoSuchFileException e = assertThrows(NoSuchFileException.class,
+          () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
+      assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
+    } else {
+      try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
+        OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+        assertEquals(Sets.newHashSet(0, 11), snapshotLocalData.getVersionSstFileInfos().keySet());
+      }
     }
   }
 
