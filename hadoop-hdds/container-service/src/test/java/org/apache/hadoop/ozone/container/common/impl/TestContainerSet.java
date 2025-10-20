@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
@@ -67,6 +69,33 @@ public class TestContainerSet {
 
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
+  }
+
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+    
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+    
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+    
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.remove(containerId);
+      return null;
+    }).when(volume).removeContainer(any(Long.class));
+    
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    when(volume.getContainerCount()).thenAnswer(inv -> (long) containerIds.size());
+    
+    return volume;
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -157,10 +186,8 @@ public class TestContainerSet {
   public void testIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol1 = mock(HddsVolume.class);
-    when(vol1.getStorageID()).thenReturn("uuid-1");
-    HddsVolume vol2 = mock(HddsVolume.class);
-    when(vol2.getStorageID()).thenReturn("uuid-2");
+    HddsVolume vol1 = mockHddsVolume("uuid-1");
+    HddsVolume vol2 = mockHddsVolume("uuid-2");
 
     ContainerSet containerSet = newContainerSet();
     for (int i = 0; i < 10; i++) {
@@ -202,8 +229,7 @@ public class TestContainerSet {
   public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol = mock(HddsVolume.class);
-    when(vol.getStorageID()).thenReturn("uuid-1");
+    HddsVolume vol = mockHddsVolume("uuid-1");
     Random random = new Random();
     ContainerSet containerSet = newContainerSet();
     int containerCount = 50;
@@ -382,12 +408,9 @@ public class TestContainerSet {
   public void testContainerCountPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol1 = mock(HddsVolume.class);
-    when(vol1.getStorageID()).thenReturn("uuid-1");
-    HddsVolume vol2 = mock(HddsVolume.class);
-    when(vol2.getStorageID()).thenReturn("uuid-2");
-    HddsVolume vol3 = mock(HddsVolume.class);
-    when(vol3.getStorageID()).thenReturn("uuid-3");
+    HddsVolume vol1 = mockHddsVolume("uuid-1");
+    HddsVolume vol2 = mockHddsVolume("uuid-2");
+    HddsVolume vol3 = mockHddsVolume("uuid-3");
 
     ContainerSet containerSet = newContainerSet();
 
@@ -432,10 +455,8 @@ public class TestContainerSet {
   public void testContainerIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol1 = mock(HddsVolume.class);
-    when(vol1.getStorageID()).thenReturn("uuid-11");
-    HddsVolume vol2 = mock(HddsVolume.class);
-    when(vol2.getStorageID()).thenReturn("uuid-12");
+    HddsVolume vol1 = mockHddsVolume("uuid-11");
+    HddsVolume vol2 = mockHddsVolume("uuid-12");
 
     ContainerSet containerSet = newContainerSet();
 

@@ -34,15 +34,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToLongFunction;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -78,14 +75,6 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final WitnessedContainerMetadataStore containerMetadataStore;
   // Handler that will be invoked when a scan of a container in this set is requested.
   private OnDemandContainerScanner containerScanner;
-  
-  // Maps volume storage ID to a set of container IDs
-  private final ConcurrentHashMap<String, ConcurrentSkipListSet<Long>> volumeToContainersMap =
-      new ConcurrentHashMap<>();
-  
-  // Maps volume storage ID to container count
-  private final ConcurrentHashMap<String, AtomicLong> volumeContainerCountCache =
-      new ConcurrentHashMap<>();
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -216,38 +205,16 @@ public class ContainerSet implements Iterable<Container<?>> {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);
       }
-      // Update per-volume index and count cache
-      updateVolumeIndexOnAdd(container);
-      
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(containerId);
+      }
       return true;
     } else {
       LOG.warn("Container already exists with container Id {}", containerId);
       throw new StorageContainerException("Container already exists with " +
           "container Id " + containerId,
           ContainerProtos.Result.CONTAINER_EXISTS);
-    }
-  }
-  
-  /**
-   * Updates the per-volume container index when a container is added.
-   *
-   * @param container the container being added
-   */
-  private void updateVolumeIndexOnAdd(Container<?> container) {
-    HddsVolume volume = container.getContainerData().getVolume();
-    if (volume != null && volume.getStorageID() != null) {
-      String volumeUuid = volume.getStorageID();
-      long containerId = container.getContainerData().getContainerID();
-      
-      // Add container ID to volume's container set
-      volumeToContainersMap
-          .computeIfAbsent(volumeUuid, k -> new ConcurrentSkipListSet<>())
-          .add(containerId);
-      
-      // Increment volume's container count
-      volumeContainerCountCache
-          .computeIfAbsent(volumeUuid, k -> new AtomicLong(0))
-          .incrementAndGet();
     }
   }
 
@@ -336,47 +303,13 @@ public class ContainerSet implements Iterable<Container<?>> {
           "containerMap", containerId);
       return false;
     } else {
-      // Update per-volume index and count cache
-      updateVolumeIndexOnRemove(removed);
-      
+      HddsVolume volume = removed.getContainerData().getVolume();
+      if (volume != null) {
+        volume.removeContainer(containerId);
+      }
       LOG.debug("Container with containerId {} is removed from containerMap",
           containerId);
       return true;
-    }
-  }
-  
-  /**
-   * Updates the per-volume container index when a container is removed.
-   *
-   * @param container the container being removed
-   */
-  private void updateVolumeIndexOnRemove(Container<?> container) {
-    HddsVolume volume = container.getContainerData().getVolume();
-    if (volume != null && volume.getStorageID() != null) {
-      String volumeUuid = volume.getStorageID();
-      long containerId = container.getContainerData().getContainerID();
-      
-      // Remove container ID from volume's container set
-      ConcurrentSkipListSet<Long> containerSet = volumeToContainersMap.get(volumeUuid);
-      if (containerSet != null) {
-        containerSet.remove(containerId);
-        
-        // If the set is now empty, remove it from the map to save memory
-        if (containerSet.isEmpty()) {
-          volumeToContainersMap.remove(volumeUuid);
-        }
-      }
-      
-      // Decrement volume's container count
-      AtomicLong count = volumeContainerCountCache.get(volumeUuid);
-      if (count != null) {
-        long newCount = count.decrementAndGet();
-        
-        // If count reaches zero, remove from cache to save memory
-        if (newCount <= 0) {
-          volumeContainerCountCache.remove(volumeUuid);
-        }
-      }
     }
   }
 
@@ -484,19 +417,18 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public Iterator<Container<?>> getContainerIterator(HddsVolume volume) {
     Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    
-    ConcurrentSkipListSet<Long> containerIds = volumeToContainersMap.get(volumeUuid);
-    if (containerIds == null || containerIds.isEmpty()) {
-      return Collections.emptyIterator();
+    Iterator<Long> containerIdIterator = volume.getContainerIterator();
+
+    List<Container<?>> containers = new ArrayList<>();
+    while (containerIdIterator.hasNext()) {
+      Long containerId = containerIdIterator.next();
+      Container<?> container = containerMap.get(containerId);
+      if (container != null) {
+        containers.add(container);
+      }
     }
-    List<Container<?>> containers = containerIds.stream()
-        .map(containerMap::get)
-        .filter(Objects::nonNull)
-        .sorted(ContainerDataScanOrder.INSTANCE)
-        .collect(Collectors.toList());
-    
+    containers.sort(ContainerDataScanOrder.INSTANCE);
+
     return containers.iterator();
   }
 
@@ -508,10 +440,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public long containerCount(HddsVolume volume) {
     Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    AtomicLong count = volumeContainerCountCache.get(volumeUuid);
-    return count != null ? count.get() : 0;
+    return volume.getContainerCount();
   }
 
   /**
