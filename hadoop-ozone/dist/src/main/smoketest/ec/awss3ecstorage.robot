@@ -78,7 +78,7 @@ Test multipart upload with STANDARD_IA storage
                         Verify Key EC Replication Config    /s3v/${BUCKET}/${PREFIX}/ecmultipartKey32    RS    3    2    1048576
 
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/ecmultipartKey63     0     --storage-class STANDARD_IA --metadata="storage-config=rs-6-3-1024k"
-    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/part1
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${PREFIX}/ecmultipartKey63    ${uploadID}    1    /tmp/1mb
     ${result} =         Execute AWSS3APICli   list-parts --bucket ${BUCKET} --key ${PREFIX}/ecmultipartKey63 --upload-id ${uploadID}
     ${part1} =          Execute               echo '${result}' | jq -r '.Parts[0].ETag'
                         Should Be equal       ${part1}    ${eTag1}
