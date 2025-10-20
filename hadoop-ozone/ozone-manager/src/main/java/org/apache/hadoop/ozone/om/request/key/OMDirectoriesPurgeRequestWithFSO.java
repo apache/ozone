@@ -205,6 +205,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               bucketNameInfo.getVolumeName(), bucketNameInfo.getBucketName());
           if (omBucketInfo != null && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.purgeSnapshotUsedNamespace(1);
+            volBucketInfoMap.put(Pair.of(omBucketInfo.getVolumeName(), omBucketInfo.getBucketName()), omBucketInfo);
           }
           numDirsDeleted++;
         }

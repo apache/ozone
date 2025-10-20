@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
@@ -27,6 +27,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -188,9 +190,9 @@ public abstract class AbstractReclaimableFilterTest {
   private void mockOmSnapshotManager(OzoneManager om) throws RocksDBException, IOException {
     try (MockedStatic<ManagedRocksDB> rocksdb = Mockito.mockStatic(ManagedRocksDB.class);
          MockedConstruction<SnapshotDiffManager> mockedSnapshotDiffManager =
-             Mockito.mockConstruction(SnapshotDiffManager.class, (mock, context) ->
+             mockConstruction(SnapshotDiffManager.class, (mock, context) ->
                  doNothing().when(mock).close());
-         MockedConstruction<SnapshotCache> mockedCache = Mockito.mockConstruction(SnapshotCache.class,
+         MockedConstruction<SnapshotCache> mockedCache = mockConstruction(SnapshotCache.class,
              (mock, context) -> {
                Map<UUID, UncheckedAutoCloseableSupplier<OmSnapshot>> map = new HashMap<>();
                when(mock.get(any(UUID.class))).thenAnswer(i -> {
@@ -237,7 +239,10 @@ public abstract class AbstractReclaimableFilterTest {
       conf.set(OZONE_METADATA_DIRS, testDir.toAbsolutePath().toFile().getAbsolutePath());
       when(om.getConfiguration()).thenReturn(conf);
       when(om.isFilesystemSnapshotEnabled()).thenReturn(true);
-      this.omSnapshotManager = new OmSnapshotManager(om);
+      try (MockedConstruction<OmSnapshotLocalDataManager> ignored =
+               mockConstruction(OmSnapshotLocalDataManager.class)) {
+        this.omSnapshotManager = new OmSnapshotManager(om);
+      }
     }
   }
 

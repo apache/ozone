@@ -82,6 +82,7 @@ execute_robot_test ${SCM} repair/ratis-transaction-repair.robot
 repair_and_restart_om "ozonesecure-ha-om1-1" "om1"
 repair_and_restart_om "ozonesecure-ha-om2-1" "om2"
 repair_and_restart_om "ozonesecure-ha-om3-1" "om3"
+wait_for_om_leader
 if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list 1>/dev/null; then
   echo "Command timed out or failed => OMs are not running as expected. Test for repairing ratis transaction failed."
   exit 1

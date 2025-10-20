@@ -106,7 +106,7 @@ When a DataNode needs to select a volume to store new data, it uses a volume cho
 |-----------------------------------------------|------------------------------|----------------------------------------------------------------------------------------------|
 | hdds.datanode.volume.choosing.policy          | CapacityVolumeChoosingPolicy | The policy used to select a volume for new containers.                                       |
 | hdds.datanode.volume.min.free.space           | 20GB                         | Minimum free space required on a volume to be eligible for new containers.                   |
-| hdds.datanode.volume.min.free.space.percent   | 0.001                        | Minimum free space percentage required on a volume to be eligible for new containers.        |
+| hdds.datanode.volume.min.free.space.percent   | 0.02                         | Minimum free space percentage required on a volume to be eligible for new containers.        |
 
 ### Disk Balancer
 

@@ -18,14 +18,12 @@
 package org.apache.hadoop.ozone.om.response.snapshot;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -37,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +97,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
       // Delete Snapshot checkpoint directory.
-      deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
+      OmSnapshotLocalDataManager snapshotLocalDataManager = ((OmMetadataManagerImpl) omMetadataManager)
+          .getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+      deleteCheckpointDirectory(snapshotLocalDataManager, omMetadataManager, snapshotInfo);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
@@ -117,8 +118,8 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   /**
    * Deletes the checkpoint directory for a snapshot.
    */
-  private void deleteCheckpointDirectory(OMMetadataManager omMetadataManager,
-                                         SnapshotInfo snapshotInfo) {
+  private void deleteCheckpointDirectory(OmSnapshotLocalDataManager snapshotLocalDataManager,
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
     // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
     // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
     // directory can run in parallel along with this operation.
@@ -127,14 +128,11 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
     if (acquiredSnapshotLock) {
       Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
-      Path snapshotLocalDataPath = Paths.get(
-          OmSnapshotManager.getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
       try {
         FileUtils.deleteDirectory(snapshotDirPath.toFile());
-        Files.deleteIfExists(snapshotLocalDataPath);
       } catch (IOException ex) {
-        LOG.error("Failed to delete snapshot directory {} and/or local data file {} for snapshot {}",
-            snapshotDirPath, snapshotLocalDataPath, snapshotInfo.getTableKey(), ex);
+        LOG.error("Failed to delete snapshot directory {} for snapshot {}",
+            snapshotDirPath, snapshotInfo.getTableKey(), ex);
       } finally {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
       }

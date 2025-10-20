@@ -292,17 +292,19 @@ public final class SnapshotUtils {
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
 
-  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+  // Validates the previous path snapshotId for given a snapshotInfo. In case snapshotInfo is
+  // null, the snapshotInfo would be considered as AOS and previous snapshot becomes the latest snapshot in the global
+  // snapshot chain. Would throw OMException if validation fails otherwise function would pass.
+  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
     UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
         SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
     if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
-      LOG.warn("Snapshot validation failed. Expected previous snapshotId : " +
-          expectedPreviousSnapshotId + " but was " + previousSnapshotId);
-      return false;
+      throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+          expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+          OMException.ResultCodes.INVALID_REQUEST);
     }
-    return true;
   }
 
   /**
