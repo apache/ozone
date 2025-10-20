@@ -47,7 +47,7 @@ class TestHttpServletUtils {
   @ParameterizedTest
   @MethodSource("provideGetResponseFormatTestCases")
   public void testGetResponseFormat(@Nullable String contentType,
-                                    HttpServletUtils.ResponseFormat expectResponseFormat) {
+      HttpServletUtils.ResponseFormat expectResponseFormat) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getHeader(HttpHeaders.ACCEPT))
         .thenReturn(contentType);
