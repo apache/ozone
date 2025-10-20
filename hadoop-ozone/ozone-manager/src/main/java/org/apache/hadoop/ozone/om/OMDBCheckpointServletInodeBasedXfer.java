@@ -255,19 +255,17 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        List<Path> sstFiles = new ArrayList<>();
-        checkpoint = createAndPrepareCheckpoint(tmpdir, true, sstFiles);
+        // get the list of sst files of the checkpoint.
+        checkpoint = createAndPrepareCheckpoint(true);
+        List<Path> sstFiles = extractSSTFilesFromCompactionLog(checkpoint);
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
         writeDBToArchive(sstFilesToExclude, sstFiles.stream(),
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, null, false);
         if (includeSnapshotData) {
           Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
-          Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
           writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, getCompactionLogDir(), false);
-          writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-              hardLinkFileMap, getSstBackupDir(), false);
           // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
           transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
               archiveOutputStream, hardLinkFileMap);
@@ -489,19 +487,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * The copy to the temporary directory for compaction log and SST backup files
    * is done to maintain a consistent view of the files in these directories.
    *
-   * @param tmpdir Temporary directory for storing checkpoint-related files.
    * @param flush  If true, flushes in-memory data to disk before checkpointing.
-   * @return List of SST file Path objects.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush, List<Path> sstFiles) throws IOException {
-    // make tmp directories to contain the copies
-    Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
-    Files.createDirectories(tmpSstBackupDir);
+  private DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
+    // Create & return the checkpoint.
+    return getDbStore().getCheckpoint(flush);
+  }
 
-    // Create checkpoint.
-    DBCheckpoint dbCheckpoint = getDbStore().getCheckpoint(flush);
-
+  private List<Path> extractSSTFilesFromCompactionLog(DBCheckpoint dbCheckpoint) throws IOException {
+    List<Path> sstFiles = new ArrayList<>();
     try (OmMetadataManagerImpl checkpointMetadataManager =
              OmMetadataManagerImpl.createCheckpointMetadataManager(getConf(), dbCheckpoint)) {
       try (Table.KeyValueIterator<String, CompactionLogEntry>
@@ -517,7 +512,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     } catch (Exception e) {
       throw new IOException("Error reading compaction log from checkpoint", e);
     }
-
-    return dbCheckpoint;
+    return sstFiles;
   }
 }
