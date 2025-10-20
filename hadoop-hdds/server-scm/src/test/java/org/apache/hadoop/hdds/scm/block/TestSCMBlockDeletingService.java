@@ -49,11 +49,14 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.SchedulingMode;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -66,6 +69,9 @@ public class TestSCMBlockDeletingService {
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
   private ScmBlockDeletingServiceMetrics metrics;
+  private DeletedBlockLog mockDeletedBlockLog;
+  private SCMServiceManager scmServiceManager;
+  private SCMContext scmContext;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -75,8 +81,8 @@ public class TestSCMBlockDeletingService {
     metrics = ScmBlockDeletingServiceMetrics.create();
     when(nodeManager.getTotalDatanodeCommandCount(any(),
         any())).thenReturn(0);
-    SCMServiceManager scmServiceManager = mock(SCMServiceManager.class);
-    SCMContext scmContext = mock(SCMContext.class);
+    scmServiceManager = mock(SCMServiceManager.class);
+    scmContext = mock(SCMContext.class);
 
     DatanodeDeletedBlockTransactions ddbt =
         new DatanodeDeletedBlockTransactions();
@@ -90,13 +96,22 @@ public class TestSCMBlockDeletingService {
     ddbt.addTransactionToDN(datanode1.getID(), tx1);
     ddbt.addTransactionToDN(datanode2.getID(), tx1);
     ddbt.addTransactionToDN(datanode3.getID(), tx1);
-    DeletedBlockLog mockDeletedBlockLog = mock(DeletedBlockLog.class);
+    mockDeletedBlockLog = mock(DeletedBlockLog.class);
     when(mockDeletedBlockLog.getTransactions(
         anyInt(), anySet())).thenReturn(ddbt);
+    createServiceWithSchedulingMode(SchedulingMode.FIXED_RATE);
+  }
+
+  /**
+   * Helper method to create SCMBlockDeletingService with specific scheduling mode.
+   */
+  private void createServiceWithSchedulingMode(SchedulingMode mode) {
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    scmConfig.setBlockDeletingServiceSchedulingMode(mode.name());
 
     service = spy(new SCMBlockDeletingService(
         mockDeletedBlockLog, nodeManager, eventPublisher, scmContext,
-        scmServiceManager, conf, conf.getObject(ScmConfig.class), metrics, Clock.system(
+        scmServiceManager, conf, scmConfig, metrics, Clock.system(
         ZoneOffset.UTC), mock(ReconfigurationHandler.class)));
     when(service.shouldRun()).thenReturn(true);
   }
@@ -107,8 +122,11 @@ public class TestSCMBlockDeletingService {
     ScmBlockDeletingServiceMetrics.unRegister();
   }
 
-  @Test
-  public void testCall() throws Exception {
+  @ParameterizedTest
+  @EnumSource(SchedulingMode.class)
+  public void testCall(SchedulingMode schedulingMode) throws Exception {
+    // Create service with the specified scheduling mode
+    createServiceWithSchedulingMode(schedulingMode);
     callDeletedBlockTransactionScanner();
 
     ArgumentCaptor<CommandForDatanode> argumentCaptor =

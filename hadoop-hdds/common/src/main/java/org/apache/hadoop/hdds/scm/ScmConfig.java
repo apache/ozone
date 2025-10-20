@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.hdds.utils.SchedulingMode;
 
 /**
  * The configuration class for the SCM service.
@@ -138,6 +139,15 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int transactionToDNsCommitMapLimit = 5000000;
 
+  @Config(key = "hdds.scm.block.deleting.service.scheduling.mode",
+      defaultValue = "FIXED_RATE",
+      type = ConfigType.STRING,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      description = "Scheduling mode for the block deleting service. For detailed, " +
+          "see org.apache.hadoop.hdds.utils.SchedulingMode"
+  )
+  private String blockDeletingServiceSchedulingMode = SchedulingMode.FIXED_RATE.name();
+
   public int getTransactionToDNsCommitMapLimit() {
     return transactionToDNsCommitMapLimit;
   }
@@ -196,6 +206,14 @@ public class ScmConfig extends ReconfigurableConfig {
 
   public int getBlockDeletionLimit() {
     return blockDeletionLimit;
+  }
+
+  public String getBlockDeletingServiceSchedulingMode() {
+    return blockDeletingServiceSchedulingMode;
+  }
+
+  public void setBlockDeletingServiceSchedulingMode(String schedulingMode) {
+    this.blockDeletingServiceSchedulingMode = schedulingMode;
   }
 
   /**

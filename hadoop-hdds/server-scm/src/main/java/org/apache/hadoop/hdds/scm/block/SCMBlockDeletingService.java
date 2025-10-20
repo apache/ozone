@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
+import org.apache.hadoop.hdds.utils.SchedulingMode;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
@@ -95,6 +96,21 @@ public class SCMBlockDeletingService extends BackgroundService
   private final Clock clock;
   private final int transactionToDNsCommitMapLimit;
 
+  /**
+   * Parse scheduling mode from configuration string.
+   * 
+   * @param modeString the configuration string
+   * @return SchedulingMode enum value, defaults to FIXED_RATE if invalid
+   */
+  private static SchedulingMode parseSchedulingMode(String modeString) {
+    try {
+      return SchedulingMode.valueOf(modeString.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Invalid scheduling mode '{}', using FIXED_RATE as default", modeString);
+      return SchedulingMode.FIXED_RATE;
+    }
+  }
+
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
              NodeManager nodeManager, EventPublisher eventPublisher,
@@ -107,7 +123,8 @@ public class SCMBlockDeletingService extends BackgroundService
         TimeUnit.MILLISECONDS, BLOCK_DELETING_SERVICE_CORE_POOL_SIZE,
         conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS), scmContext.threadNamePrefix());
+            TimeUnit.MILLISECONDS), scmContext.threadNamePrefix(),
+        parseSchedulingMode(scmConfig.getBlockDeletingServiceSchedulingMode()));
 
     this.safemodeExitRunDelayMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
