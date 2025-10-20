@@ -440,11 +440,13 @@ public class TestOmSnapshotLocalDataManager {
   @ValueSource(booleans = {true, false})
   public void testWriteVersionValidation(boolean nextVersionExisting) throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
-    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
     UUID prevSnapId = snapshotIds.get(0);
     UUID snapId = snapshotIds.get(1);
+    UUID nextSnapId = snapshotIds.get(2);
     addVersionsToLocalData(localDataManager, prevSnapId, ImmutableMap.of(4, 1));
     addVersionsToLocalData(localDataManager, snapId, ImmutableMap.of(5, 4));
+    addVersionsToLocalData(localDataManager, nextSnapId, ImmutableMap.of(6, 0));
 
     validateVersions(localDataManager, snapId, 5, Sets.newHashSet(0, 5));
     validateVersions(localDataManager, prevSnapId, 4, Sets.newHashSet(0, 4));
