@@ -39,6 +39,8 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.util.XMLUtils;
+import org.apache.ratis.util.MemoizedCheckedSupplier;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -47,6 +49,9 @@ import org.w3c.dom.Element;
  * Provides methods for parsing request headers and writing responses.
  */
 public final class HttpServletUtils implements Serializable {
+
+  private static final CheckedSupplier<DocumentBuilderFactory, ParserConfigurationException> DOCUMENT_BUILDER_FACTORY =
+      MemoizedCheckedSupplier.valueOf(XMLUtils::newSecureDocumentBuilderFactory);
 
   private HttpServletUtils() {
     // Utility class, prevent instantiation
@@ -97,8 +102,7 @@ public final class HttpServletUtils implements Serializable {
 
   private static void writeXmlError(String errorMessage, Writer out) throws IOException {
     try {
-      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
-      DocumentBuilder builder = factory.newDocumentBuilder();
+      DocumentBuilder builder = DOCUMENT_BUILDER_FACTORY.get().newDocumentBuilder();
       Document doc = builder.newDocument();
 
       Element root = doc.createElement("error");
