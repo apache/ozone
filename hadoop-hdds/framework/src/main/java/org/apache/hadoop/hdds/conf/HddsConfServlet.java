@@ -99,7 +99,7 @@ public class HddsConfServlet extends HttpServlet {
    * Guts of the servlet - extracted for easy testing.
    */
   static void writeResponse(OzoneConfiguration conf, Writer out, HttpServletUtils.ResponseFormat format,
-                            String propertyName)
+      String propertyName)
       throws IOException, IllegalArgumentException {
     switch (format) {
     case JSON:
