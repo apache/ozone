@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -70,9 +71,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private StreamingReader streamingReader;
 
   private final boolean verifyChecksum;
-  //private final Function<BlockID, BlockLocationInfo> refreshFunction;
-  //private final RetryPolicy retryPolicy;
-  //private int retries;
+  private final Function<BlockID, BlockLocationInfo> refreshFunction;
+  private final RetryPolicy retryPolicy;
+  private int retries = 0;
 
   public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
@@ -86,9 +87,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
     this.verifyChecksum = config.isChecksumVerify();
-    //this.refreshFunction = refreshFunction;
-    //this.retryPolicy = HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
-    //    TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
+    this.retryPolicy = getReadRetryPolicy(config);
+    this.refreshFunction = refreshFunction;
   }
 
   @Override
@@ -218,13 +218,26 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     if (initialized) {
       return;
     }
-    acquireClient();
-    streamingReader = new StreamingReader();
-    ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
-        ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
-            pipelineRef.get().getReplicaIndexes(), streamingReader);
-    streamingReader.setRequestObserver(requestObserver);
-    initialized = true;
+    while (true) {
+      try {
+        acquireClient();
+        streamingReader = new StreamingReader();
+        ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
+            ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
+                pipelineRef.get().getReplicaIndexes(), streamingReader);
+        streamingReader.setRequestObserver(requestObserver);
+        initialized = true;
+        return;
+      } catch (IOException ioe) {
+        if (shouldRetryRead(ioe, retryPolicy, retries++)) {
+          releaseClient();
+          refreshBlockInfo(ioe);
+          LOG.warn("Retrying read for block {} due to {}", blockID, ioe.getMessage());
+        } else {
+          throw ioe;
+        }
+      }
+    }
   }
 
   private int fillBuffer() throws IOException {
@@ -249,74 +262,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     xceiverClientFactory = null;
   }
 
-  /*
-  Commenting out for now as we probably need these for retries which are yet to be implemented.
-
-    private boolean shouldRetryRead(IOException cause) throws IOException {
-    RetryPolicy.RetryAction retryAction;
-    try {
-      retryAction = retryPolicy.shouldRetry(cause, ++retries, 0, true);
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-    return retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
-  }
-
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
-        blockID, pipelineRef.get().getId(), cause.getMessage());
-    if (refreshFunction != null) {
-      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
-      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
-      if (blockLocationInfo == null) {
-        LOG.warn("No new block location info for block {}", blockID);
-      } else {
-        pipelineRef.set(getPipeline(blockLocationInfo.getPipeline()));
-        LOG.info("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
-
-        tokenRef.set(blockLocationInfo.getToken());
-        if (blockLocationInfo.getToken() != null) {
-          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
-          LOG.info("A new token is added for block {}. Expiry: {}",
-              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
-        }
-      }
-    } else {
-      throw cause;
-    }
+    refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
-
-  private boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
-  }
-
-  private void handleStorageContainerException(StorageContainerException e) throws IOException {
-    if (shouldRetryRead(e)) {
-      releaseClient();
-      refreshBlockInfo(e);
-    } else {
-      throw e;
-    }
-  }
-
-  private void handleIOException(IOException ioe) throws IOException {
-    if (shouldRetryRead(ioe)) {
-      if (isConnectivityIssue(ioe)) {
-        releaseClient();
-        refreshBlockInfo(ioe);
-      } else {
-        releaseClient();
-      }
-    } else {
-      throw ioe;
-    }
-  }
-
-   */
 
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
