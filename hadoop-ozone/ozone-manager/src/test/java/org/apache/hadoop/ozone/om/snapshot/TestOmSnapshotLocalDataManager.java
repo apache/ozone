@@ -472,6 +472,16 @@ public class TestOmSnapshotLocalDataManager {
       }
       validateVersions(localDataManager, snapId, 5, Sets.newHashSet(0));
       validateVersions(localDataManager, prevSnapId, 4, Sets.newHashSet(0));
+      // Check next snapshot is able to resolve to previous snapshot.
+      try (ReadableOmSnapshotLocalDataProvider nextSnap = localDataManager.getOmSnapshotLocalData(nextSnapId,
+          prevSnapId)) {
+        OmSnapshotLocalData snapshotLocalData = nextSnap.getSnapshotLocalData();
+        assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
+        snapshotLocalData.getVersionSstFileInfos()
+            .forEach((version, versionMeta) -> {
+              assertEquals(0, versionMeta.getPreviousSnapshotVersion());
+            });
+      }
     }
   }
 
