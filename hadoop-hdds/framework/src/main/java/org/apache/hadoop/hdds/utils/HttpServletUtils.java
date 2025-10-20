@@ -83,7 +83,7 @@ public final class HttpServletUtils implements Serializable {
    * @param response     the response
    */
   public static void writeErrorResponse(int status, String errorMessage, ResponseFormat format,
-                                        HttpServletResponse response)
+      HttpServletResponse response)
       throws IOException {
     response.setStatus(status);
     PrintWriter writer = response.getWriter();
