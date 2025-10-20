@@ -842,7 +842,6 @@ public class TestOMDbCheckpointServlet {
         .getStore()
         .getRocksDBCheckpointDiffer();
 
-
     ExecutorService executorService = Executors.newCachedThreadPool();
 
     OMDBCheckpointServlet omDbCheckpointServlet = new OMDBCheckpointServlet();

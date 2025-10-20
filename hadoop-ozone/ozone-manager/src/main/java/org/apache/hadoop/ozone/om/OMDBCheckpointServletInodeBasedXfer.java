@@ -44,6 +44,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -72,6 +74,7 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,12 +255,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        checkpoint = createAndPrepareCheckpoint(tmpdir, true);
+        List<Path> sstFiles = new ArrayList<>();
+        checkpoint = createAndPrepareCheckpoint(tmpdir, true, sstFiles);
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
-        Path checkpointDir = checkpoint.getCheckpointLocation();
-        writeDBToArchive(sstFilesToExclude, checkpointDir,
-            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
+        writeDBToArchive(sstFilesToExclude, sstFiles.stream(),
+            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, null, false);
         if (includeSnapshotData) {
           Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
           Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
@@ -404,13 +407,25 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return snapshotPaths;
   }
 
+  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
+      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
+      Map<String, String> hardLinkFileMap, Path destDir, boolean onlySstFile) throws IOException {
+    if (!Files.exists(dbDir)) {
+      LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
+      return true;
+    }
+    Stream<Path> files = Files.list(dbDir);
+    return writeDBToArchive(sstFilesToExclude, files,
+        maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, destDir, onlySstFile);
+  }
+
   /**
    * Writes database files to the archive, handling deduplication based on inode IDs.
    * Here the dbDir could either be a snapshot db directory, the active om.db,
    * compaction log dir, sst backup dir.
    *
    * @param sstFilesToExclude Set of SST file IDs to exclude from the archive
-   * @param dbDir Directory containing database files to archive
+   * @param files Stream of files to archive
    * @param maxTotalSstSize Maximum total size of SST files to include
    * @param archiveOutputStream Archive output stream
    * @param tmpDir Temporary directory for processing
@@ -426,17 +441,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @throws IOException if an I/O error occurs
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
+  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Stream<Path> files, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
       Map<String, String> hardLinkFileMap, Path destDir, boolean onlySstFile) throws IOException {
-    if (!Files.exists(dbDir)) {
-      LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
-      return true;
-    }
     long bytesWritten = 0L;
     int filesWritten = 0;
     long lastLoggedTime = Time.monotonicNow();
-    try (Stream<Path> files = Files.list(dbDir)) {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {
         if (!Files.isDirectory(dbFile)) {
@@ -470,7 +480,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           }
         }
       }
-    }
     return true;
   }
 
@@ -482,10 +491,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    *
    * @param tmpdir Temporary directory for storing checkpoint-related files.
    * @param flush  If true, flushes in-memory data to disk before checkpointing.
-   * @return The created database checkpoint.
+   * @return List of SST file Path objects.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush) throws IOException {
+  private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush, List<Path> sstFiles) throws IOException {
     // make tmp directories to contain the copies
     Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
     Files.createDirectories(tmpSstBackupDir);
@@ -493,17 +502,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     // Create checkpoint.
     DBCheckpoint dbCheckpoint = getDbStore().getCheckpoint(flush);
 
-    try {
-      RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
-      List<String> sstFiles =
-          differ.getCompactionLogSstFiles(dbCheckpoint.getCheckpointLocation());
-      for (String sstFile : sstFiles) {
-        Path sstFileToLink = getSstBackupDir().resolve(sstFile);
-        if (Files.exists(sstFileToLink)) {
-          Files.createLink(tmpSstBackupDir.resolve(sstFile), sstFileToLink);
-        } else {
-          LOG.warn("SST file {} from compaction log not found in backup " +
-              "directory {}", sstFile, getSstBackupDir());
+    try (OmMetadataManagerImpl checkpointMetadataManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(getConf(), dbCheckpoint)) {
+      try (Table.KeyValueIterator<String, CompactionLogEntry>
+               iterator = checkpointMetadataManager.getCompactionLogTable().iterator()) {
+        iterator.seekToFirst();
+
+        while (iterator.hasNext()) {
+          CompactionLogEntry logEntry = iterator.next().getValue();
+          logEntry.getInputFileInfoList().forEach(f ->
+              sstFiles.add(Paths.get(f.getFileName())));
         }
       }
     } catch (Exception e) {
