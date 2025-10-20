@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -433,12 +434,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
         existingSnapVersions.getSnapshotVersions();
     Map<Integer, LocalDataVersionNode> newVersions = snapshotVersions.getSnapshotVersions();
-    Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
+    Map<Integer, List<LocalDataVersionNode>> predecessors = new HashMap<>();
     boolean versionsRemoved = false;
     // Track all predecessors of the existing versions and remove the node from the graph.
     for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
       LocalDataVersionNode existingVersionNode = existingVersion.getValue();
-      predecessors.put(existingVersion.getKey(), new HashSet<>(localDataGraph.predecessors(existingVersionNode)));
+      // Create a copy of predecessors since the list of nodes returned would be a mutable set and it changes as the
+      // nodes in the graph would change.
+      predecessors.put(existingVersion.getKey(), new ArrayList<>(localDataGraph.predecessors(existingVersionNode)));
       versionsRemoved = versionsRemoved || !newVersions.containsKey(existingVersion.getKey());
       localDataGraph.removeNode(existingVersionNode);
     }
@@ -447,7 +450,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     addSnapshotVersionMeta(snapshotId, snapshotVersions);
     // Reconnect all the predecessors for existing nodes.
     for (Map.Entry<Integer, LocalDataVersionNode> entry : newVersions.entrySet()) {
-      for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
+      for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptyList())) {
         localDataGraph.putEdge(predecessor, entry.getValue());
       }
     }
@@ -626,11 +629,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                 Set<LocalDataVersionNode> versionNode = localDataGraph.successors(entry.getValue());
                 if (versionNode.size() > 1) {
                   throw new IOException(String.format("Snapshot %s version %d has multiple successors %s",
-                      currentIteratedSnapshotId, entry.getValue(), versionNode));
+                      currentIteratedSnapshotId, entry.getValue().getVersion(), versionNode));
                 }
                 if (versionNode.isEmpty()) {
                   throw new IOException(String.format("Snapshot %s version %d doesn't have successor",
-                      currentIteratedSnapshotId, entry.getValue()));
+                      currentIteratedSnapshotId, entry.getValue().getVersion()));
                 }
                 // Set the version node for iterated version to the successor corresponding to the previous snapshot id.
                 entry.setValue(versionNode.iterator().next());

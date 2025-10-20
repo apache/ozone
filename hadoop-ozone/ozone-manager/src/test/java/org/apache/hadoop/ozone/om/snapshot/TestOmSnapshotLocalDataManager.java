@@ -528,11 +528,13 @@ public class TestOmSnapshotLocalDataManager {
   @ValueSource(booleans = {true, false})
   public void testWriteVersionValidation(boolean nextVersionExisting) throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
-    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3);
     UUID prevSnapId = snapshotIds.get(0);
     UUID snapId = snapshotIds.get(1);
+    UUID nextSnapId = snapshotIds.get(2);
     addVersionsToLocalData(localDataManager, prevSnapId, ImmutableMap.of(4, 1));
     addVersionsToLocalData(localDataManager, snapId, ImmutableMap.of(5, 4));
+    addVersionsToLocalData(localDataManager, nextSnapId, ImmutableMap.of(6, 0));
 
     validateVersions(localDataManager, snapId, 5, Sets.newHashSet(0, 5));
     validateVersions(localDataManager, prevSnapId, 4, Sets.newHashSet(0, 4));
@@ -558,6 +560,16 @@ public class TestOmSnapshotLocalDataManager {
       }
       validateVersions(localDataManager, snapId, 5, Sets.newHashSet(0));
       validateVersions(localDataManager, prevSnapId, 4, Sets.newHashSet(0));
+      // Check next snapshot is able to resolve to previous snapshot.
+      try (ReadableOmSnapshotLocalDataProvider nextSnap = localDataManager.getOmSnapshotLocalData(nextSnapId,
+          prevSnapId)) {
+        OmSnapshotLocalData snapshotLocalData = nextSnap.getSnapshotLocalData();
+        assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
+        snapshotLocalData.getVersionSstFileInfos()
+            .forEach((version, versionMeta) -> {
+              assertEquals(0, versionMeta.getPreviousSnapshotVersion());
+            });
+      }
     }
   }
 
