@@ -933,10 +933,6 @@ public final class ContainerProtocolCalls  {
 
     return readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
         replicaIndexes, streamObserver);
-   // tryEachDatanode(xceiverClient.getPipeline(),
-   //     d -> readBlock(xceiverClient,
-   //         validators, blockID, builder, readBlockRequest, d, replicaIndexes, streamObserver),
-   //     d -> toErrorMessage(blockID, d));
   }
 
   private static ClientCallStreamObserver<ContainerCommandRequestProto> readBlock(XceiverClientSpi xceiverClient,

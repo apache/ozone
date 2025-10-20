@@ -22,17 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.util.Collections;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
@@ -43,6 +49,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -65,12 +72,25 @@ public class TestStreamBlockInputStream {
   private ChecksumData checksumData;
   private byte[] data;
   private ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
+  private Function<BlockID, BlockLocationInfo> refreshFunction;
 
   @BeforeEach
   public void setup() throws Exception {
     Token<OzoneBlockTokenIdentifier> token = mock(Token.class);
     when(token.encodeToUrlString()).thenReturn("url");
+
+    Set<HddsProtos.BlockTokenSecretProto.AccessModeProto> modes =
+        Collections.singleton(HddsProtos.BlockTokenSecretProto.AccessModeProto.READ);
+    OzoneBlockTokenIdentifier tokenIdentifier = new OzoneBlockTokenIdentifier("owner", new BlockID(1, 1),
+        modes, Time.monotonicNow() + 10000, 10);
+    tokenIdentifier.setSecretKeyId(UUID.randomUUID());
+    when(token.getIdentifier()).thenReturn(tokenIdentifier.getBytes());
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+
+    BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
+    when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
+    when(blockLocationInfo.getToken()).thenReturn(token);
+
     xceiverClient = mock(XceiverClientGrpc.class);
     when(xceiverClient.getPipeline()).thenReturn(pipeline);
     xceiverClientFactory = mock(XceiverClientFactory.class);
@@ -80,7 +100,9 @@ public class TestStreamBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamReadBlock(true);
-    Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
+    clientConfig.setMaxReadRetryCount(1);
+    refreshFunction = mock(Function.class);
+    when(refreshFunction.apply(any())).thenReturn(blockLocationInfo);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
     createDataAndChecksum();
@@ -105,9 +127,9 @@ public class TestStreamBlockInputStream {
     assertEquals(data[0], blockStream.read());
     blockStream.close();
     // Verify that cancel() was called on the requestObserver mock
-    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
-    org.mockito.Mockito.verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
+    verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
   }
 
   @Test
@@ -117,9 +139,9 @@ public class TestStreamBlockInputStream {
     assertEquals(1, blockStream.getPos());
     blockStream.unbuffer();
     // Verify that cancel() was called on the requestObserver mock
-    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
-    org.mockito.Mockito.verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
+    verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
     // The next read should "rebuffer" and continue from the last position
     assertEquals(data[1], blockStream.read());
     assertEquals(2, blockStream.getPos());
@@ -132,9 +154,9 @@ public class TestStreamBlockInputStream {
     blockStream.seek(100);
     assertEquals(100, blockStream.getPos());
     // Verify that cancel() was called on the requestObserver mock
-    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    verify(requestObserver).cancel(any(), any());
     // The xceiverClient should not be released
-    org.mockito.Mockito.verify(xceiverClientFactory, never())
+    verify(xceiverClientFactory, never())
         .releaseClientForReadData(xceiverClient, false);
 
     assertEquals(data[100], blockStream.read());
@@ -184,6 +206,29 @@ public class TestStreamBlockInputStream {
     });
     assertThrows(IOException.class, () -> blockStream.read(byteBuffer));
     assertThrows(IOException.class, () -> blockStream.seek(10));
+  }
+
+  @Test
+  public void testRefreshFunctionCalledForAllDNsBadOnInitialize() throws IOException {
+    // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
+    when(xceiverClient.streamRead(any(), any()))
+        .thenThrow(new IOException("Test induced exception"))
+        .thenAnswer((InvocationOnMock invocation) -> {
+          StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
+          streamObserver.onNext(createChunkResponse());
+          streamObserver.onCompleted();
+          return requestObserver;
+        });
+    blockStream.read();
+    verify(refreshFunction, times(1)).apply(any());
+  }
+
+  @Test
+  public void testExceptionThrownAfterRetriesExhaused() throws IOException {
+    // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
+    when(xceiverClient.streamRead(any(), any())).thenThrow(new IOException("Test induced exception"));
+    assertThrows(IOException.class, () -> blockStream.read());
+    verify(refreshFunction, times(1)).apply(any());
   }
 
   private void createDataAndChecksum() throws OzoneChecksumException {
