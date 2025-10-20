@@ -207,9 +207,6 @@ public final class OMConfigKeys {
       "ozone.om.ratis.server.pending.write.element-limit";
   public static final int OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT = 4096;
 
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT = "ozone.om.ratis.server.pending.write.byte-limit";
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT = "64MB";
-
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
