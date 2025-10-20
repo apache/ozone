@@ -82,7 +82,7 @@ public class HddsConfServlet extends HttpServlet {
   }
 
   private void processCommand(String cmd, HttpServletUtils.ResponseFormat format, HttpServletRequest request,
-                              HttpServletResponse response, Writer out, String name)
+      HttpServletResponse response, Writer out, String name)
       throws IOException {
     try {
       if (cmd == null) {
