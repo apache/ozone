@@ -64,6 +64,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -255,7 +257,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           try {
             checkpointMetadataManager =
                 OmMetadataManagerImpl.createCheckpointMetadataManager(om.getConfiguration(), checkpoint);
-            snapshotPaths = getSnapshotDirs(checkpointMetadataManager);
+            snapshotPaths = getSnapshotDirsFromDB(checkpointMetadataManager);
           } finally {
             if (checkpointMetadataManager != null) {
               checkpointMetadataManager.stop();
@@ -402,6 +404,29 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
       Path path = Paths.get(snapshotDir);
       snapshotPaths.add(path);
+    }
+    return snapshotPaths;
+  }
+
+  /**
+   * Collects paths to all snapshot databases from the OM DB.
+   *
+   * @param omMetadataManager OMMetadataManager instance
+   * @return Set of paths to snapshot databases
+   * @throws IOException if an I/O error occurs
+   */
+  Set<Path> getSnapshotDirsFromDB(OMMetadataManager omMetadataManager) throws IOException {
+    Set<Path> snapshotPaths = new HashSet<>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iter =
+        omMetadataManager.getSnapshotInfoTable().iterator()) {
+      while (iter.hasNext()) {
+        Table.KeyValue<String, SnapshotInfo> kv = iter.next();
+        SnapshotInfo snapshotInfo = kv.getValue();
+        String snapshotDir = OmSnapshotManager.getSnapshotPath(getConf(),
+            snapshotInfo.getCheckpointDirName());
+        Path path = Paths.get(snapshotDir);
+        snapshotPaths.add(path);
+      }
     }
     return snapshotPaths;
   }
