@@ -31,6 +31,8 @@ public class ContainerScanError {
   /**
    * Represents the reason a container scan failed and a container should
    * be marked unhealthy.
+   * Note: When adding a new FailureType, ensure a corresponding test is added to
+   * {@link org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions}.
    */
   public enum FailureType {
     MISSING_CONTAINER_DIR,
