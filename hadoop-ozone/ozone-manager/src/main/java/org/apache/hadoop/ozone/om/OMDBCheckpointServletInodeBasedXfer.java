@@ -261,11 +261,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
         writeDBToArchive(sstFilesToExclude, sstFiles.stream(),
-            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, null, false);
+            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
         if (includeSnapshotData) {
-          Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
-          writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-              hardLinkFileMap, getCompactionLogDir(), false);
+          writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
+              hardLinkFileMap, false);
           // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
           transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
               archiveOutputStream, hardLinkFileMap);
@@ -318,14 +317,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
       }
     }
-  }
-
-  @VisibleForTesting
-  boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dir,
-      AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
-      Path tmpdir, Map<String, String> hardLinkFileMap, boolean onlySstFile) throws IOException {
-    return writeDBToArchive(sstFilesToExclude, dir, maxTotalSstSize,
-        archiveOutputStream, tmpdir, hardLinkFileMap, null, onlySstFile);
   }
 
   private static void cleanupCheckpoint(DBCheckpoint checkpoint) {
@@ -405,16 +396,17 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return snapshotPaths;
   }
 
-  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
+  @VisibleForTesting
+  boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
-      Map<String, String> hardLinkFileMap, Path destDir, boolean onlySstFile) throws IOException {
+      Map<String, String> hardLinkFileMap, boolean onlySstFile) throws IOException {
     if (!Files.exists(dbDir)) {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
     }
     Stream<Path> files = Files.list(dbDir);
     return writeDBToArchive(sstFilesToExclude, files,
-        maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, destDir, onlySstFile);
+        maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
   }
 
   /**
@@ -428,7 +420,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param archiveOutputStream Archive output stream
    * @param tmpDir Temporary directory for processing
    * @param hardLinkFileMap Map of hardlink file paths to their unique identifiers for deduplication
-   * @param destDir Destination directory for the archived files. If null,
    * the archived files are not moved to this directory.
    * @param onlySstFile If true, only SST files are processed. If false, all files are processed.
    * <p>
@@ -441,7 +432,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean writeDBToArchive(Set<String> sstFilesToExclude, Stream<Path> files, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
-      Map<String, String> hardLinkFileMap, Path destDir, boolean onlySstFile) throws IOException {
+      Map<String, String> hardLinkFileMap, boolean onlySstFile) throws IOException {
     long bytesWritten = 0L;
     int filesWritten = 0;
     long lastLoggedTime = Time.monotonicNow();
@@ -453,9 +444,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           }
           String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
           String path = dbFile.toFile().getAbsolutePath();
-          if (destDir != null) {
-            path = destDir.resolve(dbFile.getFileName()).toString();
-          }
           // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
           if (path.contains(OM_CHECKPOINT_DIR)) {
             path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
