@@ -546,9 +546,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return isSufficientlyReplicated(false);
   }
 
-  public boolean isUnderReplicated() {
-    return !isSufficientlyReplicated();
-  }
 
   @Override
   public String toString() {
@@ -578,7 +575,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);
     
-    if (isUnderReplicated()) {
+    if (!isSufficientlyReplicated()) {
       List<Integer> missingIndexes = unavailableIndexes(true);
       sb.append(" [UNDER_REPLICATED: missing indexes ")
         .append(missingIndexes).append("]");

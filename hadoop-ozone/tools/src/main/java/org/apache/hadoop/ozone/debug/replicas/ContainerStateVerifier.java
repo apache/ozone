@@ -21,6 +21,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -101,6 +103,12 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       }
       replicaCheckMsg.append(", Container state in SCM is ").append(containerInfoToken.getContainerState());
 
+      String replicationStatus = checkReplicationStatus(keyLocation.getContainerID());
+      replicaCheckMsg.append(", ").append(replicationStatus);
+      if (replicationStatus.contains("UNDER_REPLICATED") || replicationStatus.contains("REPLICATION_CHECK_FAILED")) {
+        pass = false;
+      }
+
       if (pass) {
         return BlockVerificationResult.pass();
       } else {
@@ -155,18 +163,57 @@ public class ContainerStateVerifier implements ReplicaVerifier {
     // Cache miss - fetch and store
     ContainerInfo info = containerOperationClient.getContainer(containerId);
     String encodeToken = containerOperationClient.getEncodedContainerToken(containerId);
-    cachedData = new ContainerInfoToken(info.getState(), encodeToken);
+    cachedData = new ContainerInfoToken(info.getState(), encodeToken, info);
     encodedTokenCache.put(containerId, cachedData);
     return cachedData;
+  }
+
+  private String checkReplicationStatus(long containerId) {
+    try {
+      ContainerInfoToken token = getContainerInfoToken(containerId);
+      ContainerInfo containerInfo = token.getContainerInfo();
+      
+      // Get container replicas from SCM
+      List<ContainerReplicaInfo> replicaInfos = 
+          containerOperationClient.getContainerReplicas(containerId);
+      
+      if (replicaInfos.isEmpty()) {
+        return "[UNDER_REPLICATED: no replicas found]";
+      }
+      
+      int replicationFactor = containerInfo.getReplicationFactor().getNumber();
+      int healthyReplicas = 0;
+      
+      for (ContainerReplicaInfo replicaInfo : replicaInfos) {
+        if (!replicaInfo.getState().equals("UNHEALTHY")) {
+          healthyReplicas++;
+        }
+      }
+      
+      if (healthyReplicas < replicationFactor) {
+        return String.format("[UNDER_REPLICATED: %d/%d healthy replicas]", 
+            healthyReplicas, replicationFactor);
+      } else if (healthyReplicas > replicationFactor) {
+        return String.format("[OVER_REPLICATED: %d/%d healthy replicas]", 
+            healthyReplicas, replicationFactor);
+      } else {
+        return "[HEALTHY_REPLICATION]";
+      }
+      
+    } catch (Exception e) {
+      return "[REPLICATION_CHECK_FAILED: " + e.getMessage() + "]";
+    }
   }
 
   private static class ContainerInfoToken {
     private HddsProtos.LifeCycleState state;
     private final String encodedToken;
+    private final ContainerInfo containerInfo;
 
-    ContainerInfoToken(HddsProtos.LifeCycleState lifeState, String token) {
+    ContainerInfoToken(HddsProtos.LifeCycleState lifeState, String token, ContainerInfo info) {
       this.state = lifeState;
       this.encodedToken = token;
+      this.containerInfo = info;
     }
 
     @Override
@@ -193,6 +240,10 @@ public class ContainerStateVerifier implements ReplicaVerifier {
 
     public String getEncodedToken() {
       return encodedToken;
+    }
+    
+    public ContainerInfo getContainerInfo() {
+      return containerInfo;
     }
   }
 

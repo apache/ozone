@@ -258,7 +258,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       result += " +considerUnhealthy";
     }
 
-    if (isUnderReplicated()) {
+    if (!isSufficientlyReplicated()) {
       result += " [UNDER_REPLICATED: need " + additionalReplicaNeeded() + " more]";
     } else if (isOverReplicated()) {
       result += " [OVER_REPLICATED: excess " + getExcessRedundancy(true) + " replica(s)]";
@@ -548,12 +548,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     return delta <= 0;
   }
 
-  /**
-   * @return true if the container is under replicated, false otherwise
-   */
-  public boolean isUnderReplicated() {
-    return !isSufficientlyReplicated();
-  }
 
   /**
    * Return true if the container is over replicated. Decommission and
