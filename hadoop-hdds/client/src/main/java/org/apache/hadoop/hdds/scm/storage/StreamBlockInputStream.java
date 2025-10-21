@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockR
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -229,14 +230,22 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         initialized = true;
         return;
       } catch (IOException ioe) {
-        if (shouldRetryRead(ioe, retryPolicy, retries++)) {
-          releaseClient();
-          refreshBlockInfo(ioe);
-          LOG.warn("Retrying read for block {} due to {}", blockID, ioe.getMessage());
-        } else {
-          throw ioe;
-        }
+        handleExceptions(ioe);
       }
+    }
+  }
+
+  private void handleExceptions(IOException cause) throws IOException {
+    if (cause instanceof StorageContainerException || isConnectivityIssue(cause)) {
+      if (shouldRetryRead(cause, retryPolicy, retries++)) {
+        releaseClient();
+        refreshBlockInfo(cause);
+        LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
+      } else {
+        throw cause;
+      }
+    } else {
+      throw cause;
     }
   }
 

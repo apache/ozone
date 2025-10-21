@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -207,13 +206,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
         seek(blockPosition);
       }
     }
-  }
-
-  /**
-   * Check if this exception is because datanodes are not reachable.
-   */
-  private boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
