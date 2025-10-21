@@ -111,10 +111,10 @@ Content-Length: 17
 
 ```bash
 echo "hello" >> ./README.txt
-curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=CREATE&data=true&user.name=hdfs" -T ./README.txt -H"Content-Type: application/octet-stream" 
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=CREATE&data=true&user.name=hdfs" -T ./README.txt -H "Content-Type: application/octet-stream" 
 ```
 
-Example Output
+Example Output:
 
 ```bash
 HTTP/1.1 100 Continue
