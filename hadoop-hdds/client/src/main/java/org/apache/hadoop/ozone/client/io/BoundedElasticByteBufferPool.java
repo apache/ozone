@@ -40,6 +40,14 @@ public class BoundedElasticByteBufferPool implements ByteBufferPool {
   private final long maxPoolSize;
   private  final AtomicLong currentPoolSize = new AtomicLong(0);
 
+  /**
+   * A logical timestamp counter used for creating unique Keys in the TreeMap.
+   * This is used as the insertionTime for the Key instead of System.nanoTime()
+   * to guarantee uniqueness and avoid a potential spin-wait in putBuffer
+   * if two buffers of the same capacity are added at the same nanosecond.
+   */
+  private long logicalTimestamp = 0;
+
   public BoundedElasticByteBufferPool(long maxPoolSize) {
     super();
     this.maxPoolSize = maxPoolSize;
@@ -56,15 +64,14 @@ public class BoundedElasticByteBufferPool implements ByteBufferPool {
     if (entry == null) {
       // Pool is empty or has no suitable buffer. Allocate a new one.
       return direct ? ByteBuffer.allocateDirect(length) : ByteBuffer.allocate(length);
-    } else {
-      tree.remove(entry.getKey());
-      ByteBuffer buffer = entry.getValue();
-
-      // Decrement the size because we are taking a buffer OUT of the pool.
-      currentPoolSize.addAndGet(-buffer.capacity());
-      buffer.clear();
-      return buffer;
     }
+    tree.remove(entry.getKey());
+    ByteBuffer buffer = entry.getValue();
+
+    // Decrement the size because we are taking a buffer OUT of the pool.
+    currentPoolSize.addAndGet(-buffer.capacity());
+    buffer.clear();
+    return buffer;
   }
 
   @Override
@@ -81,10 +88,7 @@ public class BoundedElasticByteBufferPool implements ByteBufferPool {
 
     buffer.clear();
     TreeMap<Key, ByteBuffer> tree = getBufferTree(buffer.isDirect());
-    Key key;
-    do {
-      key = new Key(buffer.capacity(), System.nanoTime());
-    } while (tree.containsKey(key));
+    Key key = new Key(buffer.capacity(), logicalTimestamp++);
 
     tree.put(key, buffer);
     // Increment the size because we have successfully added buffer back to the pool.
