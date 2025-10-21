@@ -69,61 +69,27 @@ cp $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-linux-aarc
 ## ARM-based Apple Silicon (Apple M1 ... etc)
 
 ```bash
-PROTOBUF_VERSION="3.7.1"
-curl -sSL https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz | tar zx
-cd protobuf-${PROTOBUF_VERSION}
-./configure --disable-shared
-make -j
-# install protoc to the local Maven repository
-mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
-# workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
-cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
-
-cd ..
-# Download protobuf 2.5.0 tarball
+# Patch protobuf 2.5.0 - this is needed for Hadoop 2 support
 PROTOBUF_VERSION="2.5.0"
-curl -sSL https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-${PROTOBUF_VERSION}.tar.gz | tar zx
+curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz
+tar xzf protobuf-2.5.0.tar.gz
 cd protobuf-${PROTOBUF_VERSION}
 
-# patch protobuf 2.5.0
-curl -L -O https://gist.githubusercontent.com/liusheng/64aee1b27de037f8b9ccf1873b82c413/raw/118c2fce733a9a62a03281753572a45b6efb8639/protobuf-2.5.0-arm64.patch
-patch -p1 < protobuf-2.5.0-arm64.patch
-# build protobuf
-./configure --disable-shared
-make
-# install protoc to the local Maven repository
-mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
-# workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
-cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
+# Open the file `src/google/protobuf/stubs/platform_macros.h` with an editor like vim and append the following lines after line 59 (include the #).  
+# Save the file when complete.
 
-cd ..
-# Patch protobuf 3.19.6
-PROTOBUF_VERSION="3.19.6"
-curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
-tar xzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
-cd protobuf-${PROTOBUF_VERSION}
+#elif defined(__arm64__)
+#define GOOGLE_PROTOBUF_ARCH_ARM 1
+#define GOOGLE_PROTOBUF_ARCH_64_BIT 1
+
+# Execute the following commands to build `protoc`
 ./configure --disable-shared
 make -j
+cd ..
+# Install protoc to the local Maven repository
 mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
-# workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
-cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
-
-cd ..
-# Compile grpc
-# Pre-req: Manually install Gradle (version 7.0 or higher) and a compatible JVM (JDK 8 or higher) as required by gRPC Java v1.71.0. See https://github.com/grpc/grpc-java/blob/v1.71.0/README.md for details.
-git clone https://github.com/grpc/grpc-java.git
-cd grpc-java
-git checkout v1.71.0
-PARENTDIR=$(cd .. && pwd)
-export PROTOBUF_ROOT="$PARENTDIR/protobuf-${PROTOBUF_VERSION}"
-export PATH="${PROTOBUF_ROOT}/src:$PATH"
-export CPPFLAGS="-I${PROTOBUF_ROOT}/src"
-export LDFLAGS="-L${PROTOBUF_ROOT}/src/.libs"
-./gradlew :grpc-compiler:java_pluginExecutable -PskipAndroid=true
-PLUGIN="protoc-gen-grpc-java-1.71.0-osx-aarch_64.exe"
-cp compiler/build/exe/java_plugin/protoc-gen-grpc-java $PLUGIN
-mvn install:install-file -DgroupId=io.grpc -DartifactId=protoc-gen-grpc-java -Dversion=1.71.0 -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=$PLUGIN
-cd ..
+# Workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
+mv $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
 ```
 
 ## Build Ozone

@@ -158,8 +158,10 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       // TODO: HDDS-4565: consider all the sub-paths if the path is a dir.
       long quotaReleased = sumBlockLengths(omKeyInfo);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L);
+      // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
+      boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
+      omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
+      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;

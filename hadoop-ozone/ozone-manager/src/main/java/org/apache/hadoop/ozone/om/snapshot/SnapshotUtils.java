@@ -244,7 +244,8 @@ public final class SnapshotUtils {
    * @throws IOException
    */
   public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
-      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws
+      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, long bucketId,
+      OMMetadataManager metadataManager) throws
       IOException {
     String dbKey = snapshotMoveKeyInfos.getKey();
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
@@ -260,7 +261,7 @@ public final class SnapshotUtils {
     // can happen on om transaction replay on snapshotted rocksdb.
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
     if (result == null) {
-      result = new RepeatedOmKeyInfo(keyInfoList);
+      result = new RepeatedOmKeyInfo(keyInfoList, bucketId);
     } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
       keyInfoList.forEach(result::addOmKeyInfo);
     }
@@ -291,17 +292,19 @@ public final class SnapshotUtils {
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
 
-  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+  // Validates the previous path snapshotId for given a snapshotInfo. In case snapshotInfo is
+  // null, the snapshotInfo would be considered as AOS and previous snapshot becomes the latest snapshot in the global
+  // snapshot chain. Would throw OMException if validation fails otherwise function would pass.
+  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
     UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
         SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
     if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
-      LOG.warn("Snapshot validation failed. Expected previous snapshotId : " +
-          expectedPreviousSnapshotId + " but was " + previousSnapshotId);
-      return false;
+      throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+          expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+          OMException.ResultCodes.INVALID_REQUEST);
     }
-    return true;
   }
 
   /**

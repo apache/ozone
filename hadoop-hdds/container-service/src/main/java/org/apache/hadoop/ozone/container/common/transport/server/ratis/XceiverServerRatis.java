@@ -30,9 +30,8 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -662,8 +661,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
-
+    try (Scope ignored = span.makeCurrent()) {
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
@@ -679,7 +677,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       processReply(reply);
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

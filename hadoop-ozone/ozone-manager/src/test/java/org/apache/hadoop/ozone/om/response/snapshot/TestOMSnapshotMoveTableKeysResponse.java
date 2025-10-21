@@ -33,9 +33,11 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -65,12 +67,12 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
     super(true);
   }
 
-  private void createSnapshots(boolean createSecondSnapshot) throws Exception {
+  private void createSnapshots(boolean createSecondSnapshot, long bucketId) throws Exception {
     addDataToTable(getOmMetadataManager().getSnapshotRenamedTable(), getRenameKeys(getVolumeName(), getBucketName(), 0,
         10,  snapshotName1));
     addDataToTable(getOmMetadataManager().getDeletedTable(), getDeletedKeys(getVolumeName(), getBucketName(), 0,
         10, 10, 0).stream()
-        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight())))
+        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight(), bucketId)))
         .collect(Collectors.toList()));
     addDataToTable(getOmMetadataManager().getDeletedDirTable(),
         getDeletedDirKeys(getVolumeName(), getBucketName(), 0, 10, 1).stream()
@@ -81,11 +83,11 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
         15,  snapshotName2));
     addDataToTable(getOmMetadataManager().getDeletedTable(), getDeletedKeys(getVolumeName(), getBucketName(), 5,
         8, 10, 10).stream()
-        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight())))
+        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight(), bucketId)))
         .collect(Collectors.toList()));
     addDataToTable(getOmMetadataManager().getDeletedTable(), getDeletedKeys(getVolumeName(), getBucketName(), 8,
         15, 10, 0).stream()
-        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight())))
+        .map(pair -> Pair.of(pair.getKey(), new RepeatedOmKeyInfo(pair.getRight(), bucketId)))
         .collect(Collectors.toList()));
     addDataToTable(getOmMetadataManager().getDeletedDirTable(),
         getDeletedDirKeys(getVolumeName(), getBucketName(), 5, 15, 1).stream()
@@ -105,12 +107,13 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testMoveTableKeysToNextSnapshot(boolean nextSnapshotExists) throws Exception {
-    createSnapshots(nextSnapshotExists);
-
+    OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(getOmMetadataManager(), getVolumeName(), getBucketName());
+    createSnapshots(nextSnapshotExists, omBucketInfo.getObjectID());
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = getOmSnapshotManager().getSnapshot(
         getVolumeName(), getBucketName(), snapshotName1);
          UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
+
       OmSnapshot snapshot = snapshot1.get();
       List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> deletedTable = new ArrayList<>();
       List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> deletedDirTable = new ArrayList<>();
@@ -135,7 +138,8 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       OMSnapshotMoveTableKeysResponse response = new OMSnapshotMoveTableKeysResponse(
           OzoneManagerProtocolProtos.OMResponse.newBuilder().setStatus(OzoneManagerProtocolProtos.Status.OK)
               .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotMoveTableKeys).build(),
-          snapshotInfo1, nextSnapshotExists ? snapshotInfo2 : null, deletedTable, deletedDirTable, renamedTable);
+          snapshotInfo1, nextSnapshotExists ? snapshotInfo2 : null, omBucketInfo.getObjectID(), deletedTable,
+          deletedDirTable, renamedTable);
       try (BatchOperation batchOperation = getOmMetadataManager().getStore().initBatchOperation()) {
         response.addToDBBatch(getOmMetadataManager(), batchOperation);
         getOmMetadataManager().getStore().commitBatchOperation(batchOperation);

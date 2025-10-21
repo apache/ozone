@@ -27,7 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -95,6 +96,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServletInodeBasedXfer.class);
   private static final long serialVersionUID = 1L;
+  private transient BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -125,6 +127,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+    lock = new OMDBCheckpointServlet.Lock(om);
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
   }
 
   @Override
@@ -311,7 +319,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, false);
         Path snapshotLocalPropertyYaml = Paths.get(
-            OmSnapshotManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
+            OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
         if (Files.exists(snapshotLocalPropertyYaml)) {
           File yamlFile = snapshotLocalPropertyYaml.toFile();
           hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());

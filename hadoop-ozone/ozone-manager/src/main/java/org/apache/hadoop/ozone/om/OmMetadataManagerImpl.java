@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDir
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -102,9 +103,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.PoolBasedHierarchicalResourceLockManager;
+import org.apache.hadoop.ozone.om.lock.ReadOnlyHierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -125,13 +129,14 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore {
+    S3SecretStore, Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
   private DBStore store;
 
   private final IOzoneManagerLock lock;
+  private final HierarchicalResourceLockManager hierarchicalLockManager;
 
   private TypedTable<String, PersistedUserVolumeInfo> userTable;
   private TypedTable<String, OmVolumeArgs> volumeTable;
@@ -196,6 +201,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       this.perfMetrics = this.ozoneManager.getPerfMetrics();
     }
     this.lock = new OzoneManagerLock(conf);
+    this.hierarchicalLockManager = new PoolBasedHierarchicalResourceLockManager(conf);
     this.omEpoch = OmUtils.getOMEpoch();
     start(conf);
   }
@@ -206,6 +212,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected OmMetadataManagerImpl() {
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
+    this.hierarchicalLockManager = new PoolBasedHierarchicalResourceLockManager(conf);
     this.omEpoch = 0;
     perfMetrics = null;
   }
@@ -238,6 +245,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
+    hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
@@ -257,6 +265,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles) throws IOException {
     try {
       lock = new OmReadOnlyLock();
+      hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
       omEpoch = 0;
       String snapshotDir = OMStorage.getOmDbDir(conf) +
           OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -474,6 +483,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       store.close();
       store = null;
     }
+    try {
+      hierarchicalLockManager.close();
+    } catch (Exception e) {
+      LOG.error("Error closing hierarchical lock manager", e);
+    }
     tableCacheMetricsMap.values().forEach(TableCacheMetrics::unregister);
     // OzoneManagerLock cleanup
     lock.cleanup();
@@ -541,6 +555,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException {
     return getOzoneKeyFSO(volume, bucket, OM_KEY_PREFIX);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) throws IOException {
+    String[] keySplit = fsoKey.split(OM_KEY_PREFIX);
+    try {
+      return new VolumeBucketId(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
+    } catch (NumberFormatException e) {
+      throw new IOException("Invalid format for FSO Key: " + fsoKey, e);
+    }
   }
 
   @Override
@@ -628,6 +655,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public IOzoneManagerLock getLock() {
     return lock;
+  }
+
+  @Override
+  public HierarchicalResourceLockManager getHierarchicalLockManager() {
+    return hierarchicalLockManager;
   }
 
   @Override
@@ -958,7 +990,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return new ListOpenFilesResult(
-        getTotalOpenKeyCount(),
+        getTotalOpenKeyCount(bucketLayout, dbOpenKeyPrefix),
         hasMore,
         retContToken,
         openKeySessionList);
@@ -1328,11 +1360,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return getMultipartInfoTable().isExist(multipartInfoDbKey);
   }
 
-  @Override
-  public long getTotalOpenKeyCount() throws IOException {
-    // Get an estimated key count of OpenKeyTable + OpenFileTable
-    return openKeyTable.getEstimatedKeyCount()
-        + openFileTable.getEstimatedKeyCount();
+  private long getTotalOpenKeyCount(BucketLayout bucketLayout, String prefix) throws IOException {
+    long count = 0;
+    try (TableIterator<String, String>
+             keyValueTableIterator = getOpenKeyTable(bucketLayout).keyIterator(prefix)) {
+      while (keyValueTableIterator.hasNext()) {
+        count += 1;
+        keyValueTableIterator.next();
+      }
+    }
+    return count;
   }
 
   @Override
@@ -1809,6 +1846,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return false;
   }
 
+  @Override
+  public void close() throws IOException {
+    stop();
+  }
+
   private final class S3SecretBatcher implements S3Batcher {
     @Override
     public void addWithBatch(AutoCloseable batchOperator, String id, S3SecretValue s3SecretValue)
@@ -1854,10 +1896,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
 
       if (addCacheMetrics) {
-        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
-        if (previous != null) {
-          previous.unregister();
+        if (tableCacheMetricsMap.containsKey(name)) {
+          tableCacheMetricsMap.get(name).unregister();
         }
+        tableCacheMetricsMap.put(name, table.createCacheMetrics());
       }
       return table;
     }

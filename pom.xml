@@ -37,9 +37,9 @@
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
     <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.5</assertj.version>
+    <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.33.9</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.35.10</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -62,7 +62,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.13.1</commons-text.version>
-    <commons-validator.version>1.6</commons-validator.version>
+    <commons-validator.version>1.10.0</commons-validator.version>
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
@@ -89,15 +89,17 @@
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
-    <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
+    <exec-maven-plugin.version>3.6.1</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
-    <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
-    <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
+    <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
     <gson.version>2.13.1</gson.version>
-    <guava.version>33.4.8-jre</guava.version>
+    <guava.version>33.5.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
+    <!-- versions included in hadoop-thirdparty, update in sync (+ jar-report and LICENSE) -->
+    <hadoop-thirdparty.protobuf.artifact>hadoop-shaded-protobuf_3_25</hadoop-thirdparty.protobuf.artifact>
+    <hadoop-thirdparty.protobuf.version>3.25.5</hadoop-thirdparty.protobuf.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
-    <hadoop.version>3.4.1</hadoop.version>
+    <hadoop.version>3.4.2</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hamcrest.version>2.2</hamcrest.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
@@ -107,8 +109,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <io.grpc.version>1.71.0</io.grpc.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <jacoco.version>0.8.13</jacoco.version>
-    <jaeger.version>1.8.1</jaeger.version>
+    <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
@@ -136,10 +137,10 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.13.4</junit5.version>
+    <junit5.version>5.14.0</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
-    <license-maven-plugin.version>2.6.0</license-maven-plugin.version>
+    <license-maven-plugin.version>2.7.0</license-maven-plugin.version>
     <log4j2.version>2.25.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
@@ -178,7 +179,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentracing.version>0.33.0</opentracing.version>
+    <opentelemetry.version>1.54.1</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Joshua Tree</ozone.release>
     <ozone.version>2.1.0-SNAPSHOT</ozone.version>
@@ -193,13 +194,14 @@
     <prometheus.version>0.16.0</prometheus.version>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
-    <!-- ProtocolBuffer version, used to verify the protoc version and -->
-    <!-- define the protobuf JAR version                               -->
-    <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
-    <proto3.hadooprpc.protobuf.version>3.25.5</proto3.hadooprpc.protobuf.version>
-    <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+    <protobuf2.version>2.5.0</protobuf2.version>
+    <protobuf3.version>3.25.8</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
+    <!-- versions included in ratis-thirdparty, update in sync -->
+    <ratis-thirdparty.grpc.version>1.71.0</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.119.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.protobuf.version>3.25.5</ratis-thirdparty.protobuf.version>
     <ratis.thirdparty.version>1.0.9</ratis.thirdparty.version>
     <ratis.version>3.2.0</ratis.version>
     <re2j.version>1.7</re2j.version>
@@ -210,7 +212,7 @@
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
-    <snakeyaml.version>2.0</snakeyaml.version>
+    <snakeyaml.version>2.5</snakeyaml.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
@@ -234,7 +236,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.7-4</zstd-jni.version>
+    <zstd-jni.version>1.5.7-5</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -411,7 +413,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${proto2.hadooprpc.protobuf.version}</version>
+        <version>${protobuf2.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
@@ -538,35 +540,34 @@
         <version>${dropwizard-metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-client</artifactId>
-        <version>${jaeger.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-api</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-core</artifactId>
-        <version>${jaeger.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-context</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-api</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-exporter-otlp</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-noop</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-util</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-common</artifactId>
+        <version>${opentelemetry.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-trace</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
@@ -958,7 +959,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+        <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
         <version>${hadoop-thirdparty.version}</version>
       </dependency>
       <dependency>
@@ -1853,6 +1854,11 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
+            <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.proto3:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.protocol.proto3:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.security.proto3:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
+            <sourceFileExcludes>
+              <exclude>**/package-info.java</exclude>
+              <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
+            </sourceFileExcludes>
             <doclint>none</doclint>
             <notimestamp>true</notimestamp>
           </configuration>
@@ -2015,6 +2021,17 @@
                     <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
                     <bannedImports>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Prefer JDK built-in</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.HadoopIllegalArgumentException</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2201,6 +2218,12 @@
             <printFailingErrors>true</printFailingErrors>
             <includeTests>true</includeTests>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.xolstice.maven.plugins</groupId>
+          <artifactId>protobuf-maven-plugin</artifactId>
+          <version>${protobuf-maven-plugin.version}</version>
+          <extensions>true</extensions>
         </plugin>
       </plugins>
     </pluginManagement>

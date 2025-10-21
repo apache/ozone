@@ -51,7 +51,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   OZONE_ACCEPTANCE_TEST_TYPE="maven"
 
   if [[ -z "${HADOOP_AWS_DIR}" ]]; then
-    HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
+    hadoop_version=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
 
@@ -66,7 +66,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
     if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
       mkdir -p "${dir}"
       if [[ ! -f "${dir}.tar.gz" ]]; then
-        local url="https://www.apache.org/dyn/closer.lua?action=download&filename=hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+        local url="https://www.apache.org/dyn/closer.lua?action=download&filename=hadoop/common/hadoop-${hadoop_version}/hadoop-${hadoop_version}-src.tar.gz"
         echo "Downloading Hadoop from ${url}"
         curl -LSs --fail -o "${dir}.tar.gz" "$url" || return 1
       fi
@@ -75,7 +75,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   }
 
   if ! download_hadoop_aws "${HADOOP_AWS_DIR}"; then
-    echo "Failed to download Hadoop ${HADOOP_VERSION}" > "${REPORT_FILE}"
+    echo "Failed to download Hadoop ${hadoop_version}" > "${REPORT_FILE}"
     exit 1
   fi
 fi

@@ -98,10 +98,18 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
-    
-    // Update immediate parent's totals (these fields now represent totals)
+
+    // Update immediate parent's totals (includes all descendant files)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     ++fileBucket[binIndex];
@@ -109,7 +117,7 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), 1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -130,6 +138,7 @@ public class NSSummaryTaskDbEventHandler {
     boolean directoryAlreadyExists = (curNSSummary != null);
     long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
     int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
+    long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
 
     if (curNSSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
@@ -158,7 +167,8 @@ public class NSSummaryTaskDbEventHandler {
 
     // If the directory already existed with content, propagate its totals upward
     if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
-      propagateSizeUpwards(parentObjectId, existingSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+      propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
+          existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
     }
   }
 
@@ -185,12 +195,18 @@ public class NSSummaryTaskDbEventHandler {
     // Decrement immediate parent's totals (these fields now represent totals)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    long keyReplSize = keyInfo.getReplicatedSize();
+    if (currentReplSize >= 0 && keyReplSize >= 0) {
+      nsSummary.setReplicatedSizeOfFiles(currentReplSize - keyReplSize);
+    }
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(),
+        -keyInfo.getReplicatedSize(), -1, nsSummaryMap);
   }
 
   protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
@@ -222,10 +238,18 @@ public class NSSummaryTaskDbEventHandler {
       // Decrement parent's totals by the deleted directory's totals
       parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
       parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
+      long parentReplSize = parentNsSummary.getReplicatedSizeOfFiles();
+      long deletedReplSize = deletedDirSummary.getReplicatedSizeOfFiles();
+      if (parentReplSize >= 0 && deletedReplSize >= 0) {
+        parentNsSummary.setReplicatedSizeOfFiles(parentReplSize - deletedReplSize);
+      }
       
       // Propagate the decrements upwards to all ancestors
-      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(), 
-                          -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
+      if (deletedReplSize < 0) {
+        deletedReplSize = 0;
+      }
+      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(),
+          -deletedReplSize, -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
       
       // Set the deleted directory's parentId to 0 (unlink it)
       deletedDirSummary.setParentId(0);
@@ -274,7 +298,7 @@ public class NSSummaryTaskDbEventHandler {
    * This ensures that when files are added/deleted, all ancestor directories
    * reflect the total changes in their sizeOfFiles and numOfFiles fields.
    */
-  protected void propagateSizeUpwards(long objectId, long sizeChange,
+  protected void propagateSizeUpwards(long objectId, long sizeChange, long replicatedSizeChange,
                                        int countChange, Map<Long, NSSummary> nsSummaryMap) 
                                        throws IOException {
     // Get the current directory's NSSummary
@@ -297,11 +321,16 @@ public class NSSummaryTaskDbEventHandler {
       if (parentSummary != null) {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
+        long parentReplSize = parentSummary.getReplicatedSizeOfFiles();
+        if (parentReplSize < 0) {
+          parentReplSize = 0;
+        }
+        parentSummary.setReplicatedSizeOfFiles(parentReplSize + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
         
         // Recursively propagate to grandparents
-        propagateSizeUpwards(parentId, sizeChange, countChange, nsSummaryMap);
+        propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }
     }
   }
