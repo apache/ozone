@@ -354,9 +354,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-            iterator = checkpointMetadataManager
-            .getSnapshotInfoTable().iterator()) {
+    TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        iterator = checkpointMetadataManager
+        .getSnapshotInfoTable().iterator()) {
 
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
