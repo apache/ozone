@@ -257,14 +257,17 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         // this is the last step where we transfer the active om.db contents
         // get the list of sst files of the checkpoint.
         checkpoint = createAndPrepareCheckpoint(true);
-        List<Path> sstFiles = extractSSTFilesFromCompactionLog(checkpoint);
+        List<Path> sstBackupFiles = extractSSTFilesFromCompactionLog(checkpoint);
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
-        writeDBToArchive(sstFilesToExclude, sstFiles.stream(),
+        Path checkpointDir = checkpoint.getCheckpointLocation();
+        writeDBToArchive(sstFilesToExclude, checkpointDir,
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
         if (includeSnapshotData) {
           writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, false);
+          writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(),
+              maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
           // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
           transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
               archiveOutputStream, hardLinkFileMap);
@@ -436,36 +439,36 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     long bytesWritten = 0L;
     int filesWritten = 0;
     long lastLoggedTime = Time.monotonicNow();
-      Iterable<Path> iterable = files::iterator;
-      for (Path dbFile : iterable) {
-        if (!Files.isDirectory(dbFile)) {
-          if (onlySstFile && !dbFile.toString().endsWith(ROCKSDB_SST_SUFFIX)) {
-            continue;
+    Iterable<Path> iterable = files::iterator;
+    for (Path dbFile : iterable) {
+      if (!Files.isDirectory(dbFile)) {
+        if (onlySstFile && !dbFile.toString().endsWith(ROCKSDB_SST_SUFFIX)) {
+          continue;
+        }
+        String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        String path = dbFile.toFile().getAbsolutePath();
+        // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+        if (path.contains(OM_CHECKPOINT_DIR)) {
+          path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
+        }
+        hardLinkFileMap.put(path, fileId);
+        if (!sstFilesToExclude.contains(fileId)) {
+          long fileSize = Files.size(dbFile);
+          if (maxTotalSstSize.get() - fileSize <= 0) {
+            return false;
           }
-          String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
-          String path = dbFile.toFile().getAbsolutePath();
-          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
-          if (path.contains(OM_CHECKPOINT_DIR)) {
-            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
-          }
-          hardLinkFileMap.put(path, fileId);
-          if (!sstFilesToExclude.contains(fileId)) {
-            long fileSize = Files.size(dbFile);
-            if (maxTotalSstSize.get() - fileSize <= 0) {
-              return false;
-            }
-            bytesWritten += linkAndIncludeFile(dbFile.toFile(), fileId, archiveOutputStream, tmpDir);
-            filesWritten++;
-            maxTotalSstSize.addAndGet(-fileSize);
-            sstFilesToExclude.add(fileId);
-            if (Time.monotonicNow() - lastLoggedTime >= 30000) {
-              LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
-                  bytesWritten / (1024), filesWritten);
-              lastLoggedTime = Time.monotonicNow();
-            }
+          bytesWritten += linkAndIncludeFile(dbFile.toFile(), fileId, archiveOutputStream, tmpDir);
+          filesWritten++;
+          maxTotalSstSize.addAndGet(-fileSize);
+          sstFilesToExclude.add(fileId);
+          if (Time.monotonicNow() - lastLoggedTime >= 30000) {
+            LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
+                bytesWritten / (1024), filesWritten);
+            lastLoggedTime = Time.monotonicNow();
           }
         }
       }
+    }
     return true;
   }
 
