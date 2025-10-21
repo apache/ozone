@@ -2184,13 +2184,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
-    <value>64MB</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>Maximum byte size of all pending write requests.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.ratis.server.pending.write.element-limit</name>
     <value>4096</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
@@ -4837,5 +4830,15 @@
     <description>When KeyProvider is configured, the max retries allowed to attempt
       warm up edek cache if none of key successful on OM start up.
     </description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
+    <value>1024</value>
+    <description>Soft limit for number of lock objects that could be idle in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
+    <value>10000</value>
+    <description>Maximum number of lock objects that could be present in the pool.</description>
   </property>
 </configuration>

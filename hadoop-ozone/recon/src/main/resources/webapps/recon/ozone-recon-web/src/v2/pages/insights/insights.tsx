@@ -74,8 +74,7 @@ const Insights: React.FC<{}> = () => {
 
   // Process the API responses when they're available
   useEffect(() => {
-    if (!fileCountAPI.loading && !containerCountAPI.loading && 
-        fileCountAPI.data && containerCountAPI.data) {
+    if (!fileCountAPI.loading && !containerCountAPI.loading) {
       
       // Extract errors
       const fileAPIError = fileCountAPI.error;

@@ -25,7 +25,7 @@ import java.io.IOException;
  * there is no cyclic lock ordering on resources.
  * Typically, this can be used for locking elements which form a DAG like structure.(E.g. FSO tree, Snapshot chain etc.)
  */
-public interface HierachicalResourceLockManager extends AutoCloseable {
+public interface HierarchicalResourceLockManager extends AutoCloseable {
 
   /**
    * Acquires a read lock on the specified resource using the provided key.
