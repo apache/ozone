@@ -520,6 +520,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ClientCallStreamObserver<ContainerCommandRequestProto> streamRead(ContainerCommandRequestProto request,
       StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException {
     List<DatanodeDetails> datanodeList = sortDatanodes(request);
+    IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
       try {
         checkOpen(dn);
@@ -536,11 +537,16 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         requestObserver.onNext(request);
         requestObserver.onCompleted();
         return (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver;
-      } catch (Exception e) {
+      } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+        lastException = e;
       }
     }
-    throw new IOException("Failed to start streaming read to any available DataNodes");
+    if (lastException != null) {
+      throw lastException;
+    } else {
+      throw new IOException("Failed to start streaming read to any available DataNodes");
+    }
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(

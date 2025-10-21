@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 
 /**
  * Abstract class used as an interface for input streams related to Ozone
@@ -125,6 +126,13 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
     } else {
       throw cause;
     }
+  }
+
+  /**
+   * Check if this exception is because datanodes are not reachable.
+   */
+  protected boolean isConnectivityIssue(IOException ex) {
+    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
   }
 
 }

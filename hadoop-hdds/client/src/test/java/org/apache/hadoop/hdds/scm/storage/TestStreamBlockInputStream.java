@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,7 +33,9 @@ import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,8 +45,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -51,11 +56,16 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
@@ -208,11 +218,12 @@ public class TestStreamBlockInputStream {
     assertThrows(IOException.class, () -> blockStream.seek(10));
   }
 
-  @Test
-  public void testRefreshFunctionCalledForAllDNsBadOnInitialize() throws IOException {
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggeringRefresh")
+  public void testRefreshFunctionCalledForAllDNsBadOnInitialize(IOException thrown) throws IOException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
     when(xceiverClient.streamRead(any(), any()))
-        .thenThrow(new IOException("Test induced exception"))
+        .thenThrow(thrown)
         .thenAnswer((InvocationOnMock invocation) -> {
           StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
           streamObserver.onNext(createChunkResponse());
@@ -223,10 +234,20 @@ public class TestStreamBlockInputStream {
     verify(refreshFunction, times(1)).apply(any());
   }
 
-  @Test
-  public void testExceptionThrownAfterRetriesExhaused() throws IOException {
+  @ParameterizedTest
+  @MethodSource("exceptionsNotTriggeringRefresh")
+  public void testRefreshNotCalledForAllDNsBadOnInitialize(IOException thrown) throws IOException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
-    when(xceiverClient.streamRead(any(), any())).thenThrow(new IOException("Test induced exception"));
+    when(xceiverClient.streamRead(any(), any()))
+        .thenThrow(thrown);
+    assertThrows(IOException.class, () -> blockStream.read());
+    verify(refreshFunction, times(0)).apply(any());
+  }
+
+  @Test
+  public void testExceptionThrownAfterRetriesExhausted() throws IOException {
+    // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
+    when(xceiverClient.streamRead(any(), any())).thenThrow(new StorageContainerException(CONTAINER_NOT_FOUND));
     assertThrows(IOException.class, () -> blockStream.read());
     verify(refreshFunction, times(1)).apply(any());
   }
@@ -258,6 +279,22 @@ public class TestStreamBlockInputStream {
         .setReadBlock(response)
         .setResult(ContainerProtos.Result.SUCCESS)
         .build();
+  }
+
+  private static Stream<Arguments> exceptionsTriggeringRefresh() {
+    return Stream.of(
+        Arguments.of(new StorageContainerException(CONTAINER_NOT_FOUND)),
+        Arguments.of(new IOException(new ExecutionException(
+            new StatusException(Status.UNAVAILABLE))))
+    );
+  }
+
+  private static Stream<Arguments> exceptionsNotTriggeringRefresh() {
+    return Stream.of(
+        Arguments.of(new SCMSecurityException("Security problem")),
+        Arguments.of(new OzoneChecksumException("checksum missing")),
+        Arguments.of(new IOException("Some random exception."))
+    );
   }
 
 }
