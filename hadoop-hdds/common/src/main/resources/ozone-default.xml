@@ -4716,5 +4716,13 @@
     <description>Number of workers executed of key lifecycle management service. This
       configuration should be set to greater than 0.</description>
   </property>
-
+  <property>
+    <name>ozone.lifecycle.service.delete.cached.directory.max-count</name>
+    <value>1000000</value>
+    <tag>OZONE</tag>
+    <description>Max numbers of directory objects held in memory stack for recursive FSO bucket evaluating for
+      a lifecycle evaluating task. Once the cached directory objects exceeds this limit, the evaluation of the involved
+      directories will abort.
+    </description>
+  </property>
 </configuration>
