@@ -39,6 +39,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -461,7 +462,7 @@ public class KeyLifecycleService extends BackgroundService {
         return;
       }
 
-      List<Long> deletedDirList = new ArrayList<>();
+      HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         PendingEvaluateDirectory item = stack.pop();
         OmDirectoryInfo currentDir = item.getDirectoryInfo();
@@ -534,9 +535,8 @@ public class KeyLifecycleService extends BackgroundService {
         } else {
           // this item is a parent directory, check how many sub directories are deleted.
           for (OmDirectoryInfo subDir : subDirSummary.getSubDirList()) {
-            if (deletedDirList.contains(subDir.getObjectID())) {
+            if (deletedDirSet.remove(subDir.getObjectID())) {
               deletedDirCount++;
-              deletedDirList.remove(subDir.getObjectID());
             }
           }
         }
@@ -554,13 +554,13 @@ public class KeyLifecycleService extends BackgroundService {
         //    and fromKey is also in table
         long numKeysUnderDir = 0;
         long numKeysExpired = 0;
-        List<String> deletedKeyList = new ArrayList();
+        HashSet<String> deletedKeySet = new HashSet();
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
           OmKeyInfo key = entry.getValue().getCacheValue();
           if (key == null) {
-            deletedKeyList.add(entry.getKey().getCacheKey());
+            deletedKeySet.add(entry.getKey().getCacheKey());
             continue;
           }
           numKeysUnderDir++;
@@ -587,7 +587,7 @@ public class KeyLifecycleService extends BackgroundService {
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
             numKeyIterated++;
-            if (deletedKeyList.contains(keyValue.getKey())) {
+            if (deletedKeySet.contains(keyValue.getKey())) {
               continue;
             }
             numKeysUnderDir++;
@@ -621,7 +621,7 @@ public class KeyLifecycleService extends BackgroundService {
                 handleAndClearFullList(bucket, dirList, true);
               }
               dirList.add(currentDirPath, 0, currentDir.getUpdateID());
-              deletedDirList.add(currentDir.getObjectID());
+              deletedDirSet.add(currentDir.getObjectID());
             }
           }
         }
@@ -636,15 +636,14 @@ public class KeyLifecycleService extends BackgroundService {
       Table dirTable = metaMgr.getDirectoryTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
           cacheIter = dirTable.cacheIterator();
-
-      List<String> deletedKeyList = new ArrayList();
+      HashSet<String> deletedDirSet = new HashSet();
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
             cacheIter.next();
         numDirIterated++;
         OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
         if (cacheOmDirInfo == null) {
-          deletedKeyList.add(entry.getKey().getCacheKey());
+          deletedDirSet.add(entry.getKey().getCacheKey());
           continue;
         }
         if (cacheOmDirInfo.getParentObjectID() == dirObjID) {
@@ -659,7 +658,7 @@ public class KeyLifecycleService extends BackgroundService {
           numDirIterated++;
           Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
           OmDirectoryInfo dir = entry.getValue();
-          if (deletedKeyList.contains(entry.getKey())) {
+          if (deletedDirSet.contains(entry.getKey())) {
             continue;
           }
           if (dir.getParentObjectID() == dirObjID) {
