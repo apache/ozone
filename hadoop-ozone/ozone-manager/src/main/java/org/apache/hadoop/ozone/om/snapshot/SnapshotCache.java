@@ -351,6 +351,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
             LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
             // Close the instance, which also closes its DB handle.
             try {
+              // we need to explicitly flush here, close does not explicitly do a flush
+              v.get().getMetadataManager().getStore().flushDB();
               v.get().close();
             } catch (IOException ex) {
               throw new IllegalStateException("Error while closing snapshot DB.", ex);
