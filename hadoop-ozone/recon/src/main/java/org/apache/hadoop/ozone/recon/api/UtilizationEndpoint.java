@@ -21,9 +21,12 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BUCKET;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
+import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,12 +37,14 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
-import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountKey;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
+import org.jooq.DSLContext;
+import org.jooq.Record1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,17 +55,19 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 public class UtilizationEndpoint {
 
+  private UtilizationSchemaDefinition utilizationSchemaDefinition;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private ReconFileMetadataManager reconFileMetadataManager;
-  private ReconContainerSizeMetadataManager reconContainerSizeMetadataManager;
   private static final Logger LOG = LoggerFactory
       .getLogger(UtilizationEndpoint.class);
 
   @Inject
-  public UtilizationEndpoint(
-      ReconFileMetadataManager reconFileMetadataManager,
-      ReconContainerSizeMetadataManager reconContainerSizeMetadataManager) {
+  public UtilizationEndpoint(ContainerCountBySizeDao containerCountBySizeDao,
+                             UtilizationSchemaDefinition utilizationSchemaDefinition,
+                             ReconFileMetadataManager reconFileMetadataManager) {
+    this.utilizationSchemaDefinition = utilizationSchemaDefinition;
+    this.containerCountBySizeDao = containerCountBySizeDao;
     this.reconFileMetadataManager = reconFileMetadataManager;
-    this.reconContainerSizeMetadataManager = reconContainerSizeMetadataManager;
   }
 
   /**
@@ -129,7 +136,7 @@ public class UtilizationEndpoint {
   }
 
   /**
-   * Return the container size counts from RocksDB.
+   * Return the container size counts from Recon DB.
    *
    * @return {@link Response}
    */
@@ -138,46 +145,31 @@ public class UtilizationEndpoint {
   public Response getContainerCounts(
       @QueryParam(RECON_QUERY_CONTAINER_SIZE)
           long upperBound) {
-    List<ContainerCountBySize> resultSet = new ArrayList<>();
+    DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
+    Long containerSizeUpperBound =
+        ReconUtils.getContainerSizeUpperBound(upperBound);
+    List<ContainerCountBySize> resultSet;
     try {
-      Table<ContainerSizeCountKey, Long> containerCountTable =
-          reconContainerSizeMetadataManager.getContainerCountTable();
-
-      Long containerSizeUpperBound =
-          ReconUtils.getContainerSizeUpperBound(upperBound);
-
       if (upperBound > 0) {
-        // Query for specific container size
-        ContainerSizeCountKey key =
-            new ContainerSizeCountKey(containerSizeUpperBound);
-        Long count = containerCountTable.get(key);
-        if (count != null && count > 0) {
-          ContainerCountBySize record = new ContainerCountBySize();
-          record.setContainerSize(containerSizeUpperBound);
-          record.setCount(count);
-          resultSet.add(record);
-        }
+        // Get the current count from database and update
+        Record1<Long> recordToFind =
+            dslContext.newRecord(
+                    CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
+                .value1(containerSizeUpperBound);
+        ContainerCountBySize record =
+            containerCountBySizeDao.findById(recordToFind.value1());
+        resultSet = record != null ?
+            Collections.singletonList(record) : Collections.emptyList();
       } else {
-        // Iterate through all records
-        try (KeyValueIterator<ContainerSizeCountKey, Long> iterator =
-            containerCountTable.iterator()) {
-          while (iterator.hasNext()) {
-            Table.KeyValue<ContainerSizeCountKey, Long> entry = iterator.next();
-            ContainerSizeCountKey key = entry.getKey();
-            Long count = entry.getValue();
-
-            if (count != null && count > 0) {
-              ContainerCountBySize record = new ContainerCountBySize();
-              record.setContainerSize(key.getContainerSizeUpperBound());
-              record.setCount(count);
-              resultSet.add(record);
-            }
-          }
-        }
+        // fetch all records having values greater than zero
+        resultSet = containerCountBySizeDao.findAll().stream()
+            .filter(record -> record.getCount() > 0)
+            .collect(Collectors.toList());
       }
       return Response.ok(resultSet).build();
     } catch (Exception e) {
-      LOG.error("Error retrieving container counts from RocksDB", e);
+      // Log the exception and return a server error response
+      LOG.error("Error retrieving container counts", e);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
   }
