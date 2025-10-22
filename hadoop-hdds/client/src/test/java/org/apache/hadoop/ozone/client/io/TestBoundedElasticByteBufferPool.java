@@ -50,7 +50,7 @@ public class TestBoundedElasticByteBufferPool {
     pool.putBuffer(buffer3);
 
     // The pool should now contain 15KB data
-    Assertions.assertEquals(bufferSize * 3, pool.getCurrentPoolSize());
+    Assertions.assertEquals(bufferSize * 3L, pool.getCurrentPoolSize());
 
     // Get the buffers back. They should come back in the same
     // order they were put in (FIFO).
