@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
@@ -46,7 +47,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import jakarta.annotation.Nullable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -442,7 +442,7 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    @SuppressWarnings("checkstyle:parameternumber")
+    @SuppressWarnings({"checkstyle:parameternumber", "checkstyle:MethodLength"})
     private void evaluateKeyAndDirTable(OmBucketInfo bucket, long volumeObjId, Table<String, OmKeyInfo> keyTable,
         String directoryPath, @Nullable OmDirectoryInfo dir, List<OmLCRule> ruleList, LimitedExpiredObjectList keyList,
         LimitedExpiredObjectList dirList) {
@@ -487,7 +487,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
 
           // filter sub directory list
-          if (subDirSummary.getSubDirCount() > 0) {
+          if (!subDirSummary.getSubDirList().isEmpty()) {
             Iterator<OmDirectoryInfo> iterator = subDirSummary.getSubDirList().iterator();
             while (iterator.hasNext()) {
               OmDirectoryInfo subDir = iterator.next();
@@ -509,7 +509,7 @@ public class KeyLifecycleService extends BackgroundService {
             }
           }
 
-          if (subDirSummary.getSubDirList().size() > 0) {
+          if (!subDirSummary.getSubDirList().isEmpty()) {
             item.setSubDirSummary(subDirSummary);
             try {
               stack.push(item);
@@ -534,10 +534,10 @@ public class KeyLifecycleService extends BackgroundService {
         } else {
           // this item is a parent directory, check how many sub directories are deleted.
           for (OmDirectoryInfo subDir : subDirSummary.getSubDirList()) {
-              if (deletedDirList.contains(subDir.getObjectID())) {
-                deletedDirCount++;
-                deletedDirList.remove(subDir.getObjectID());
-              }
+            if (deletedDirList.contains(subDir.getObjectID())) {
+              deletedDirCount++;
+              deletedDirList.remove(subDir.getObjectID());
+            }
           }
         }
 
@@ -610,7 +610,7 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         // if this directory is empty or all files/subDirs are expired, evaluate itself
-        if ((numKeysUnderDir == 0 && subDirSummary.getSubDirCount() == 0 ) ||
+        if ((numKeysUnderDir == 0 && subDirSummary.getSubDirCount() == 0) ||
             (numKeysUnderDir == numKeysExpired && deletedDirCount == subDirSummary.getSubDirCount())) {
           for (OmLCRule rule : ruleList) {
             String path = (rule.getEffectivePrefix() != null && rule.getEffectivePrefix().endsWith(OM_KEY_PREFIX)) ?
