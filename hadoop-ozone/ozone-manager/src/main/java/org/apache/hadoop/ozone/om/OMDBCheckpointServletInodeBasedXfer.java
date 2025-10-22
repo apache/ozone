@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -495,10 +496,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
                iterator = checkpointMetadataManager.getCompactionLogTable().iterator()) {
         iterator.seekToFirst();
 
+        Path sstBackupDir = getSstBackupDir();
+
         while (iterator.hasNext()) {
           CompactionLogEntry logEntry = iterator.next().getValue();
           logEntry.getInputFileInfoList().forEach(f ->
-              sstFiles.add(Paths.get(f.getFileName())));
+              sstFiles.add(sstBackupDir.resolve(f.getFileName() + ".sst")));
         }
       }
     } catch (Exception e) {
