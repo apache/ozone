@@ -234,7 +234,7 @@ public class TestInfoSubCommand {
 
     // Ensure each DN UUID is mentioned in the message:
     for (DatanodeDetails dn : datanodes) {
-      Pattern uuidPattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
+      Pattern uuidPattern = Pattern.compile(".*" + dn.getID().toString() + ".*",
           Pattern.DOTALL);
       assertThat(replica).matches(uuidPattern);
     }
@@ -324,7 +324,7 @@ public class TestInfoSubCommand {
     assertTrue(json.matches("(?s).*replicas.*"));
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(
-          ".*replicas.*" + dn.getUuid().toString() + ".*", Pattern.DOTALL);
+          ".*replicas.*" + dn.getID().toString() + ".*", Pattern.DOTALL);
       Matcher matcher = pattern.matcher(json);
       assertTrue(matcher.matches());
     }
@@ -343,7 +343,7 @@ public class TestInfoSubCommand {
           .setContainerID(1)
           .setBytesUsed(1234)
           .setState("CLOSED")
-          .setPlaceOfBirth(dn.getUuid())
+          .setPlaceOfBirth(dn.getID())
           .setDatanodeDetails(dn)
           .setKeyCount(1)
           .setSequenceId(1);

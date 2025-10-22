@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -95,7 +95,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void storeContainerReplicaHistory(Long containerID,
-      Map<UUID, ContainerReplicaHistory> tsMap) throws IOException;
+      Map<DatanodeID, ContainerReplicaHistory> tsMap) throws IOException;
 
   /**
    * Batch version of storeContainerReplicaHistory.
@@ -104,7 +104,7 @@ public interface ReconContainerMetadataManager {
    * @throws IOException
    */
   void batchStoreContainerReplicaHistory(
-      Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap)
+      Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException;
 
   /**
@@ -139,7 +139,7 @@ public interface ReconContainerMetadataManager {
    * @return A map of ContainerReplicaWithTimestamp of the given containerID.
    * @throws IOException
    */
-  Map<UUID, ContainerReplicaHistory> getContainerReplicaHistory(
+  Map<DatanodeID, ContainerReplicaHistory> getContainerReplicaHistory(
       Long containerID) throws IOException;
 
   /**
