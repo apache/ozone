@@ -120,12 +120,6 @@ public class TestDeleteBlocksCommandHandler {
       return null;
     }).when(volume).addContainer(any(Long.class));
 
-    doAnswer(inv -> {
-      Long containerId = inv.getArgument(0);
-      containerIds.remove(containerId);
-      return null;
-    }).when(volume).removeContainer(any(Long.class));
-
     when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
     return volume;
   }
