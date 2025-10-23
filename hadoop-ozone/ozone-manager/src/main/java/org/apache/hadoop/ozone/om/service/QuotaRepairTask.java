@@ -112,7 +112,7 @@ public class QuotaRepairTask {
           createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
         repairActiveDb(activeMetaManager, builder, buckets);
 
-        // TODO: repair snapshots for quota
+      // TODO: repair snapshots for quota
 
         // submit request to update
         ClientId clientId = ClientId.randomId();
