@@ -661,7 +661,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           ReconOMMetadataManager checkpointedManager = reinitEvent.getCheckpointedOMMetadataManager();
           if (checkpointedManager != null) {
             LOG.info("Cleaning up unprocessed checkpoint from drained ReconTaskReInitializationEvent");
-            cleanupCheckpoint(checkpointedManager);
+            // Close the database connections first
+            checkpointedManager.close();
+            LOG.debug("Closed checkpointed OM metadata manager database connections");
+            // Then clean up the files
+            cleanupCheckpointFiles(checkpointedManager);
           }
         }
       }
@@ -853,48 +857,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
   }
   
-  /**
-   * Cleanup checkpointed OM metadata manager and associated checkpoint files.
-   * This method closes the database connections and removes the temporary checkpoint files.
-   * 
-   * @param checkpointedManager the checkpointed OM metadata manager to clean up
-   */
-  private void cleanupCheckpoint(ReconOMMetadataManager checkpointedManager) {
-    if (checkpointedManager == null) {
-      return;
-    }
-    try {
-      // Get the checkpoint location before closing
-      File checkpointLocation = null;
-      try {
-        if (checkpointedManager.getStore() != null && 
-            checkpointedManager.getStore().getDbLocation() != null) {
-          // The checkpoint location is typically the parent directory of the DB location
-          checkpointLocation = checkpointedManager.getStore().getDbLocation().getParentFile();
-        }
-      } catch (Exception e) {
-        LOG.warn("Failed to get checkpoint location for cleanup", e);
-      }
-      
-      // Close the database connections first
-      checkpointedManager.close();
-      LOG.debug("Closed checkpointed OM metadata manager database connections");
-      
-      // Clean up the checkpoint files if we have the location
-      if (checkpointLocation != null && checkpointLocation.exists()) {
-        try {
-          FileUtils.deleteDirectory(checkpointLocation);
-          LOG.debug("Cleaned up checkpoint directory: {}", checkpointLocation);
-        } catch (IOException e) {
-          LOG.warn("Failed to cleanup checkpoint directory: {}", checkpointLocation, e);
-        }
-      }
-      
-    } catch (Exception e) {
-      LOG.warn("Failed to cleanup checkpointed OM metadata manager", e);
-    }
-  }
-
   /**
    * Cleanup checkpoint files for a checkpointed OM metadata manager.
    * This method only removes the temporary checkpoint files without closing database connections.
