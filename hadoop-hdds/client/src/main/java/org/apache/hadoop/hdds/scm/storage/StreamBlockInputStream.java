@@ -278,6 +278,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
+  private synchronized void releaseStreamResources(StreamingReadResponse response) {
+    xceiverClient.completeStreamRead(response);
+  }
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
@@ -359,7 +363,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private void releaseResources() {
       boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
       if (wasNotYetComplete) {
-        xceiverClient.completeStreamRead(response);
+        releaseStreamResources(response);
       }
     }
 
