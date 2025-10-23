@@ -388,7 +388,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
     Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(), OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
-    deleteWalFiles(snapshotDbDir);
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
@@ -584,16 +583,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Verify all services eventually succeeded
     assertEquals(0, servicesBlocked.get(), "No services should be blocked anymore");
     assertTrue(servicesSucceeded.get() > 0, "Services should have succeeded after lock release");
-  }
-
-  private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
-    try (Stream<Path> filesInTarball = Files.list(snapshotDbDir)) {
-      List<Path> files = filesInTarball.filter(p -> p.toString().contains(".log"))
-          .collect(Collectors.toList());
-      for (Path p : files) {
-        Files.delete(p);
-      }
-    }
   }
 
   private static Set<Path> getAllPathsInTarball(File newDbDir) throws IOException {
