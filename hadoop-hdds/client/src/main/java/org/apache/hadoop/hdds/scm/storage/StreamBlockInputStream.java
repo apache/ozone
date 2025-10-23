@@ -292,7 +292,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final AtomicBoolean failed = new AtomicBoolean(false);
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private StreamingReadResponse response;
+    private volatile StreamingReadResponse response;
 
     // TODO: Semaphore in XceiverClient which count open stream?
     public boolean hasNext() {
@@ -378,7 +378,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         }
         offerToQueue(readBlock);
       } catch (OzoneChecksumException e) {
-        // Calling onError will cancel the stream on the server side and also set the failure state.
+        // Inform the server we want to cancel the RPC by cancelling the request observer
+        // (this tells the other side to stop sending). Then use local onError handling
+        // to set failure state and release resources.
+        try {
+          if (response != null && response.getRequestObserver() != null) {
+            response.getRequestObserver().cancel("Checksum failed", e);
+          }
+        } catch (Throwable cancelEx) {
+          LOG.warn("Failed to cancel request observer after checksum error", cancelEx);
+        }
         onError(e);
       }
     }
