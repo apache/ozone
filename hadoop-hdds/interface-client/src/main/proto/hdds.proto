@@ -200,6 +200,8 @@ message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
     repeated NodeOperationalState nodeOperationalStates = 3;
+    optional int32 totalVolumeCount = 4;
+    optional int32 healthyVolumeCount = 5;
 }
 
 message NodePool {
