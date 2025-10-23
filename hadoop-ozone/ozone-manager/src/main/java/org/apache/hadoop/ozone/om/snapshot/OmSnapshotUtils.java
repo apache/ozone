@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,6 +138,8 @@ public final class OmSnapshotUtils {
   public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
+    Path checkpointDataDirPath = Paths.get(dbPath.getParent().toString(), OM_CHECKPOINT_DATA_DIR);
+    checkpointDataDirPath.toFile().mkdir();
     List<Path> filesToDelete = new ArrayList<>();
     if (hardLinkFile.exists()) {
       // Read file.
@@ -151,13 +155,9 @@ public final class OmSnapshotUtils {
           }
           String from = parts[1];
           String to = parts[0];
-          String omDbPrefix = OM_DB_NAME + PATH_SEPARATOR;
-          if (to.startsWith(omDbPrefix)) {
-            to = to.substring(omDbPrefix.length());
-          }
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           filesToDelete.add(fullFromPath);
-          Path fullToPath = Paths.get(dbPath.toString(), to);
+          Path fullToPath = Paths.get(checkpointDataDirPath.toString(), to);
           // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();
           if ((parent != null) && (!parent.toFile().exists())) {
@@ -174,13 +174,7 @@ public final class OmSnapshotUtils {
       }
     }
     if (deleteSourceFiles) {
-      for (Path fileToDelete : filesToDelete) {
-        try {
-          Files.deleteIfExists(fileToDelete);
-        } catch (IOException e) {
-          LOG.warn("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
-        }
-      }
+      FileUtil.fullyDelete(dbPath.toFile());
     }
   }
 
