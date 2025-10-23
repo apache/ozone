@@ -334,7 +334,7 @@ public class TestOmUtils {
       fail("Valid txId should not throw exception: " + e.getMessage());
     }
 
-    long invalidTxId = OmUtils.MAX_TRXN_ID + 1;
+    long invalidTxId = (1L << 54) - 1;  // MAX_TRXN_ID + 1
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> OmUtils.getObjectIdFromTxId(2, invalidTxId));
     assertTrue(exception.getMessage().contains("TransactionID exceeds max limit"));
