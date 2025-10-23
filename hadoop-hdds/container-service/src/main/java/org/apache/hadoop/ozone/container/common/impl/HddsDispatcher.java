@@ -600,6 +600,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     // We have to find a more efficient way to close a container.
     boolean isSpaceFull = isVolumeFull || isContainerFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
+    LOG.info("Swamianthan Checking to be closed : {} containerId: {}", shouldClose, container.getContainerData().getContainerID());
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
       ContainerAction.Reason reason =
@@ -612,6 +613,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       AtomicBoolean immediateCloseActionSent = containerData.getImmediateCloseActionSent();
       // if an immediate heartbeat has not been triggered already, trigger it now
       if (immediateCloseActionSent.compareAndSet(false, true)) {
+        LOG.info("Swamianthan Closing : {} containerId: {}", shouldClose,
+            container.getContainerData().getContainerID());
         context.getParent().triggerHeartbeat();
         if (isVolumeFull) {
           // log only if volume is full
