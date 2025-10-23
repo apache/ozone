@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -643,11 +644,17 @@ public class SCMClientProtocolServer implements
       List<HddsProtos.Node> result = new ArrayList<>();
       for (DatanodeDetails node : queryNode(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        result.add(HddsProtos.Node.newBuilder()
+        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState())
-            .build());
+            .addNodeOperationalStates(ns.getOperationalState());
+        
+        if (datanodeInfo != null) {
+          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+        }
+        result.add(nodeBuilder.build());
       }
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.QUERY_NODE, auditMap));
@@ -669,11 +676,17 @@ public class SCMClientProtocolServer implements
       DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
       if (node != null) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        result = HddsProtos.Node.newBuilder()
+        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.getProtoBufMessage())
             .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState())
-            .build();
+            .addNodeOperationalStates(ns.getOperationalState());
+
+        if (datanodeInfo != null) {
+          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+        }
+        result = nodeBuilder.build();
       }
     } catch (NodeNotFoundException e) {
       IOException ex = new IOException(
