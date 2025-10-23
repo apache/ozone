@@ -516,14 +516,29 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
+  /**
+   * Starts a streaming read operation, intended to read entire blocks from the datanodes. This method expects a
+   * {@link StreamObserver} to be passed in, which will be used to receive the streamed data from the datanode.
+   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is returned, which contains
+   * information about the datanode used for the read, and the request observer that can be used to manage the stream
+   * (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent streaming reads so upon
+   * successful return of this method, the caller must ensure to call {@link #completeStreamRead(StreamingReadResponse)}
+   * to release the semaphore once the streaming read is complete.
+   * @param request The container command request to initiate the streaming read.
+   * @param streamObserver The observer that will handle the streamed responses.
+   * @return A {@link StreamingReadResponse} containing details of the streaming read operation.
+   * @throws IOException
+   * @throws InterruptedException
+   */
   @Override
-  public ClientCallStreamObserver<ContainerCommandRequestProto> streamRead(ContainerCommandRequestProto request,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException {
+  public StreamingReadResponse streamRead(ContainerCommandRequestProto request,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException, InterruptedException {
     List<DatanodeDetails> datanodeList = sortDatanodes(request);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
       try {
         checkOpen(dn);
+        semaphore.acquire();
         XceiverClientProtocolServiceStub stub = asyncStubs.get(dn.getID());
         if (stub == null) {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
@@ -536,9 +551,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             .send(streamObserver);
         requestObserver.onNext(request);
         requestObserver.onCompleted();
-        return (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver;
+        return new StreamingReadResponse(dn, (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver);
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+        semaphore.release();
         lastException = e;
       }
     }
@@ -547,6 +563,16 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } else {
       throw new IOException("Failed to start streaming read to any available DataNodes");
     }
+  }
+
+  /**
+   * This method should be called to indicate the end of streaming read. Its primary purpose is to release the
+   * semaphore acquired when starting the streaming read, but is also used to update any metrics or debug logs as
+   * needed.
+   */
+  @Override
+  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+    semaphore.release();
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -44,7 +45,6 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,12 +223,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       try {
         acquireClient();
         streamingReader = new StreamingReader();
-        ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
+        StreamingReadResponse response =
             ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
                 pipelineRef.get().getReplicaIndexes(), streamingReader);
-        streamingReader.setRequestObserver(requestObserver);
+        streamingReader.setRequestResponse(response);
         initialized = true;
         return;
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        handleExceptions(new IOException("Interrupted", ie));
       } catch (IOException ioe) {
         handleExceptions(ioe);
       }
@@ -283,8 +286,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final BlockingQueue<ContainerProtos.ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>(1);
     private final AtomicBoolean completed = new AtomicBoolean(false);
     private final AtomicBoolean failed = new AtomicBoolean(false);
+    private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
+    private StreamingReadResponse response;
 
     // TODO: Semaphore in XceiverClient which count open stream?
     public boolean hasNext() {
@@ -336,9 +340,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       return buf;
     }
 
-    public void setRequestObserver(
-        ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver) {
-      this.requestObserver = requestObserver;
+    public void setRequestResponse(StreamingReadResponse streamingReadResponse) {
+      this.response = streamingReadResponse;
     }
 
     /**
@@ -346,9 +349,17 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
      * cause the onError() to be called in this observer with a CANCELLED exception.
      */
     public void cancel() {
-      if (requestObserver != null) {
-        requestObserver.cancel("Cancelled by client", CANCELLED_EXCEPTION);
+      if (response != null && response.getRequestObserver() != null) {
+        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
         completed.set(true);
+        releaseResources();
+      }
+    }
+
+    private void releaseResources() {
+      boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
+      if (wasNotYetComplete) {
+        xceiverClient.completeStreamRead(response);
       }
     }
 
@@ -375,12 +386,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       } else {
         failed.set(true);
         error.set(throwable);
+        releaseResources();
       }
     }
 
     @Override
     public void onCompleted() {
       completed.set(true);
+      releaseResources();
     }
 
     private void offerToQueue(ReadBlockResponseProto item) {
