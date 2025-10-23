@@ -37,16 +37,30 @@ The user needs to `kinit` first and once they have authenticated via kerberos
 
 ## Obtain Secrets
 
-* S3 clients can get the secret access id and user secret from OzoneManager.
+S3 clients can get the secret access id and user secret from OzoneManager.
 
+### Using the command line
+
+For a regular user to get their own secret:
 ```bash
 ozone s3 getsecret
 ```
 
-* Or by sending request to /secret S3 REST endpoint.
+An Ozone administrator can get a secret for a specific user by using the `-u` flag:
+```bash
+ozone s3 getsecret -u <username>
+```
 
+### Using the REST API
+
+A user can get their own secret by making a `PUT` request to the `/secret` endpoint:
 ```bash
 curl -X PUT --negotiate -u : https://localhost:9879/secret
+```
+
+An Ozone administrator can get a secret for a specific user by appending the username to the path:
+```bash
+curl -X PUT --negotiate -u : https://localhost:9879/secret/<username>
 ```
 
 This command will talk to ozone, validate the user via Kerberos and generate
