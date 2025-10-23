@@ -1205,6 +1205,7 @@ message BasicKeyInfo {
     optional string eTag = 8;
     optional string ownerName = 9;
     optional bool isEncrypted = 10;
+    optional bool isFile = 11;
 }
 
 message DirectoryInfo {
