@@ -39,10 +39,12 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -132,7 +134,7 @@ public class TestStreamBlockInputStream {
   }
 
   @Test
-  public void testCloseStreamReleasesResources() throws IOException {
+  public void testCloseStreamReleasesResources() throws IOException, InterruptedException {
     setupSuccessfulRead();
     assertEquals(data[0], blockStream.read());
     blockStream.close();
@@ -140,10 +142,11 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
+    verify(xceiverClient, times(1)).completeStreamRead(any());
   }
 
   @Test
-  public void testUnbufferReleasesResourcesAndResumesFromLastPosition() throws IOException {
+  public void testUnbufferReleasesResourcesAndResumesFromLastPosition() throws IOException, InterruptedException {
     setupSuccessfulRead();
     assertEquals(data[0], blockStream.read());
     assertEquals(1, blockStream.getPos());
@@ -152,19 +155,21 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
+    verify(xceiverClient, times(1)).completeStreamRead(any());
     // The next read should "rebuffer" and continue from the last position
     assertEquals(data[1], blockStream.read());
     assertEquals(2, blockStream.getPos());
   }
 
   @Test
-  public void testSeekReleasesTheStreamAndStartsFromNewPosition() throws IOException {
+  public void testSeekReleasesTheStreamAndStartsFromNewPosition() throws IOException, InterruptedException {
     setupSuccessfulRead();
     assertEquals(data[0], blockStream.read());
     blockStream.seek(100);
     assertEquals(100, blockStream.getPos());
     // Verify that cancel() was called on the requestObserver mock
     verify(requestObserver).cancel(any(), any());
+    verify(xceiverClient, times(1)).completeStreamRead(any());
     // The xceiverClient should not be released
     verify(xceiverClientFactory, never())
         .releaseClientForReadData(xceiverClient, false);
@@ -174,27 +179,28 @@ public class TestStreamBlockInputStream {
   }
 
   @Test
-  public void testErrorThrownIfStreamReturnsError() throws IOException {
+  public void testErrorThrownIfStreamReturnsError() throws IOException, InterruptedException {
     // Note the error will only be thrown when the buffer needs to be refilled. I think case, as its the first
     // read it will try to fill the buffer and encounter the error, but a reader could continue reading until the
     // buffer is exhausted before seeing the error.
     when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
       StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
       streamObserver.onError(new IOException("Test induced error"));
-      return requestObserver;
+      return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
     });
     assertThrows(IOException.class, () -> blockStream.read());
+    verify(xceiverClient, times(0)).completeStreamRead(any());
   }
 
   @Test
-  public void seekOutOfBounds() throws IOException {
+  public void seekOutOfBounds() throws IOException, InterruptedException {
     setupSuccessfulRead();
     assertThrows(IOException.class, () -> blockStream.seek(-1));
     assertThrows(IOException.class, () -> blockStream.seek(BLOCK_SIZE + 1));
   }
 
   @Test
-  public void readPastEOFReturnsEOF() throws IOException {
+  public void readPastEOFReturnsEOF() throws IOException, InterruptedException {
     setupSuccessfulRead();
     blockStream.seek(BLOCK_SIZE);
     // Ensure the stream is at EOF even after two attempts to read
@@ -204,7 +210,7 @@ public class TestStreamBlockInputStream {
   }
 
   @Test
-  public void ensureExceptionThrownForReadAfterClosed() throws IOException {
+  public void ensureExceptionThrownForReadAfterClosed() throws IOException, InterruptedException {
     setupSuccessfulRead();
     blockStream.close();
     ByteBuffer byteBuffer = ByteBuffer.allocate(10);
@@ -220,7 +226,8 @@ public class TestStreamBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggeringRefresh")
-  public void testRefreshFunctionCalledForAllDNsBadOnInitialize(IOException thrown) throws IOException {
+  public void testRefreshFunctionCalledForAllDNsBadOnInitialize(IOException thrown)
+      throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
     when(xceiverClient.streamRead(any(), any()))
         .thenThrow(thrown)
@@ -228,7 +235,7 @@ public class TestStreamBlockInputStream {
           StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
           streamObserver.onNext(createChunkResponse());
           streamObserver.onCompleted();
-          return requestObserver;
+          return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
         });
     blockStream.read();
     verify(refreshFunction, times(1)).apply(any());
@@ -236,7 +243,8 @@ public class TestStreamBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsNotTriggeringRefresh")
-  public void testRefreshNotCalledForAllDNsBadOnInitialize(IOException thrown) throws IOException {
+  public void testRefreshNotCalledForAllDNsBadOnInitialize(IOException thrown)
+      throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
     when(xceiverClient.streamRead(any(), any()))
         .thenThrow(thrown);
@@ -245,7 +253,7 @@ public class TestStreamBlockInputStream {
   }
 
   @Test
-  public void testExceptionThrownAfterRetriesExhausted() throws IOException {
+  public void testExceptionThrownAfterRetriesExhausted() throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
     when(xceiverClient.streamRead(any(), any())).thenThrow(new StorageContainerException(CONTAINER_NOT_FOUND));
     assertThrows(IOException.class, () -> blockStream.read());
@@ -258,12 +266,12 @@ public class TestStreamBlockInputStream {
     checksumData = checksum.computeChecksum(data);
   }
 
-  private void setupSuccessfulRead() throws IOException {
+  private void setupSuccessfulRead() throws IOException, InterruptedException {
     when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
       StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
       streamObserver.onNext(createChunkResponse());
       streamObserver.onCompleted();
-      return requestObserver;
+      return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
     });
   }
 
