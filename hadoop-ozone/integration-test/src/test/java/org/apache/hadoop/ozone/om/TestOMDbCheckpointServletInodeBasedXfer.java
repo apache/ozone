@@ -239,7 +239,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
         .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
-    doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any());
   }
 

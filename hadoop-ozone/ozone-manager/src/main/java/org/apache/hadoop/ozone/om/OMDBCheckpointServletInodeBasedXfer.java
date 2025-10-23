@@ -518,7 +518,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param flush  If true, flushes in-memory data to disk before checkpointing.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
+  DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
     // Create & return the checkpoint.
     return getDbStore().getCheckpoint(flush);
   }
