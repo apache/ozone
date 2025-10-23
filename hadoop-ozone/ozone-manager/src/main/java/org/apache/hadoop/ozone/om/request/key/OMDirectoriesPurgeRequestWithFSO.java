@@ -114,8 +114,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         // Validating previous snapshot can ensure the chain hasn't changed.
         UUID expectedPreviousSnapshotId = purgeDirsRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeDirsRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
-        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-            expectedPreviousSnapshotId);
+        if (!validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId)) {
+          return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse,
+              new OMException("Snapshot validation failed", OMException.ResultCodes.INVALID_REQUEST)));
+        }
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
