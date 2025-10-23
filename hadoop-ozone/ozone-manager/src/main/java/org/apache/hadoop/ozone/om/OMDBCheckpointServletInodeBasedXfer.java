@@ -500,7 +500,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         while (iterator.hasNext()) {
           CompactionLogEntry logEntry = iterator.next().getValue();
           logEntry.getInputFileInfoList().forEach(f ->
-              sstFiles.add(sstBackupDir.resolve(f.getFileName() + ".sst")));
+              sstFiles.add(sstBackupDir.resolve(f.getFileName() + ROCKSDB_SST_SUFFIX)));
         }
       }
     } catch (Exception e) {
