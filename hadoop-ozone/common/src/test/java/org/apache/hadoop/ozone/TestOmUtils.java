@@ -167,13 +167,13 @@ public class TestOmUtils {
     OzoneConfiguration conf = new OzoneConfiguration();
     String serviceId = "myOmId";
 
-    conf.set(OZONE_OM_NODES_KEY + "." + serviceId, "omA,omB,omC");
+    conf.set(OZONE_OM_NODES_KEY  + "." + serviceId, "omA,omB,omC");
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omA", "omA-host:9861");
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omB", "omB-host:9861");
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId + ".omC", "omC-host:9861");
 
     String serviceId2 = "myOmId2";
-    conf.set(OZONE_OM_NODES_KEY + "." + serviceId2, "om1");
+    conf.set(OZONE_OM_NODES_KEY  + "." + serviceId2, "om1");
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId2 + ".om1", "om1-host");
 
     Set<String> hosts = getOmHostsFromConfig(conf, serviceId);
@@ -259,7 +259,6 @@ public class TestOmUtils {
     assertTrue(result.containsAll(expected));
   }
 
-  // Regression tests for OM epoch and txld calculation methods
   @Test
   void testGetOMEpoch() {
     assertEquals(2, OmUtils.getOMEpoch());
