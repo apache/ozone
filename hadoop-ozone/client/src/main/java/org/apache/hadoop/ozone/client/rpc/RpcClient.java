@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.ozone.OzoneAcl.LINK_BUCKET_DEFAULT_ACL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_GB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_GB_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
@@ -322,8 +322,8 @@ public class RpcClient implements ClientProtocol {
           }
         }).build();
     long maxPoolSize = (long) conf.getStorageSize(
-        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_GB,
-        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_GB_DEFAULT,
+        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE,
+        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT,
         StorageUnit.GB);
     this.byteBufferPool = new BoundedElasticByteBufferPool(maxPoolSize);
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl

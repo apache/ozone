@@ -466,7 +466,7 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>ozone.client.elastic.byte.buffer.pool.max.size.gb</name>
+    <name>ozone.client.elastic.byte.buffer.pool.max.size</name>
     <value>16GB</value>
     <tag>OZONE, CLIENT</tag>
     <description>
