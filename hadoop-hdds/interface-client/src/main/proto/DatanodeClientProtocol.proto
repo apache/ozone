@@ -43,7 +43,7 @@ package hadoop.hdds.datanode;
  *     this allows us to return the metadata of a container.
  *
  *  3. UpdateContainer - Updates a container metadata.
-
+ *
  *  4. DeleteContainer - This call is made to delete a container.
  *
  *  5. ListContainer - Returns the list of containers on this
@@ -55,8 +55,7 @@ package hadoop.hdds.datanode;
  *
  *  8. DeleteBlock - Deletes a given block.
  *
- *  9. ListBlock - Returns a list of blocks that are present inside
- *      a given container.
+ *  9. ListBlock - Returns a list of blocks that are present inside a given container.
  *
  *  10. ReadChunk - Allows us to read a chunk.
  *
@@ -74,9 +73,17 @@ package hadoop.hdds.datanode;
  *
  *  17. CloseContainer - Closes an open container and makes it immutable.
  *
- *  18. CopyContainer - Copies a container from a remote machine.
+ *  18. GetCommittedBlockLength - Returns the committed length of a block.
  *
- *  19. FinalizeBlock - Finalize block request from client.
+ *  19. StreamInit - Initializes a stream for writing data.
+ *
+ *  20. StreamWrite - Writes data to an initialized stream.
+ *
+ *  21. FinalizeBlock - Finalize block request from client.
+ *
+ *  22. Echo - Echo request for testing and debugging purposes.
+ *
+ *  23. GetContainerChecksumInfo - Retrieves checksum information for a container.
  */
 
 enum Type {
