@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -61,6 +62,7 @@ import org.apache.commons.compress.utils.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -390,6 +392,25 @@ public class TestOmSnapshotLocalDataManager {
 
       IOException ex = assertThrows(IOException.class, omSnapshotLocalDataProvider::commit);
       assertTrue(ex.getMessage().contains("since previous snapshot with version hasn't been loaded"));
+    }
+  }
+
+  @Test
+  public void testUpdateTransactionInfo() throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
+    UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);
+    try (WritableOmSnapshotLocalDataProvider snap = localDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertNull(snapshotLocalData.getTransactionInfo());
+      snap.setTransactionInfo(transactionInfo);
+      snap.commit();
+    }
+
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertEquals(transactionInfo, snapshotLocalData.getTransactionInfo());
     }
   }
 
@@ -861,7 +882,7 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file2.sst", "columnFamily1", "key3", "key10"));
     sstFiles.add(createMockLiveFileMetaData("file3.sst", "columnFamily2", "key1", "key8"));
     sstFiles.add(createMockLiveFileMetaData("file4.sst", "columnFamily2", "key0", "key10"));
-    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId);
+    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null);
   }
 
   private void createSnapshotLocalDataFile(UUID snapshotId, UUID previousSnapshotId)
