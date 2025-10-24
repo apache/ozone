@@ -42,7 +42,6 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
    */
-
   private static final int DATA_LENGTH = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
   private byte[] inputData;
   private TestBucket bucket;

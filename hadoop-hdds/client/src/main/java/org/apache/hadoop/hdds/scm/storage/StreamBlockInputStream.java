@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamingReadResponse;
+import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -45,7 +46,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -223,10 +224,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       try {
         acquireClient();
         streamingReader = new StreamingReader();
-        StreamingReadResponse response =
-            ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
-                pipelineRef.get().getReplicaIndexes(), streamingReader);
-        streamingReader.setRequestResponse(response);
+        ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
+            pipelineRef.get().getReplicaIndexes(), streamingReader);
         initialized = true;
         return;
       } catch (InterruptedException ie) {
@@ -279,13 +278,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   }
 
   private synchronized void releaseStreamResources(StreamingReadResponse response) {
-    xceiverClient.completeStreamRead(response);
+    if (xceiverClient != null) {
+      xceiverClient.completeStreamRead(response);
+    }
   }
 
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
-  public class StreamingReader implements StreamObserver<ContainerProtos.ContainerCommandResponseProto> {
+  public class StreamingReader implements StreamingReaderSpi {
 
     private final BlockingQueue<ContainerProtos.ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>(1);
     private final AtomicBoolean completed = new AtomicBoolean(false);
@@ -294,7 +295,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final AtomicReference<Throwable> error = new AtomicReference<>();
     private volatile StreamingReadResponse response;
 
-    // TODO: Semaphore in XceiverClient which count open stream?
     public boolean hasNext() {
       return !responseQueue.isEmpty() || !completed.get();
     }
@@ -344,22 +344,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       return buf;
     }
 
-    public void setRequestResponse(StreamingReadResponse streamingReadResponse) {
-      this.response = streamingReadResponse;
-    }
-
-    /**
-     * By calling cancel, the client will send a cancel signal to the server, which will stop sending more data and
-     * cause the onError() to be called in this observer with a CANCELLED exception.
-     */
-    public void cancel() {
-      if (response != null && response.getRequestObserver() != null) {
-        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
-        completed.set(true);
-        releaseResources();
-      }
-    }
-
     private void releaseResources() {
       boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
       if (wasNotYetComplete) {
@@ -378,35 +362,63 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         }
         offerToQueue(readBlock);
       } catch (OzoneChecksumException e) {
-        // Inform the server we want to cancel the RPC by cancelling the request observer
-        // (this tells the other side to stop sending). Then use local onError handling
-        // to set failure state and release resources.
-        try {
-          if (response != null && response.getRequestObserver() != null) {
-            response.getRequestObserver().cancel("Checksum failed", e);
-          }
-        } catch (Throwable cancelEx) {
-          LOG.warn("Failed to cancel request observer after checksum error", cancelEx);
-        }
-        onError(e);
+        LOG.warn("Checksum verification failed for block {} from datanode {}",
+            getBlockID(), response.getDatanodeDetails(), e);
+        cancelDueToError(e);
       }
     }
 
     @Override
     public void onError(Throwable throwable) {
-      if (throwable == CANCELLED_EXCEPTION) {
-        completed.set(true);
+      if (throwable instanceof StatusRuntimeException) {
+        if (((StatusRuntimeException) throwable).getStatus().getCode().name().equals("CANCELLED")) {
+          // This is expected when the client cancels the stream.
+          setCompleted();
+        }
       } else {
-        failed.set(true);
-        error.set(throwable);
-        releaseResources();
+        setFailed(throwable);
       }
+      releaseResources();
     }
 
     @Override
     public void onCompleted() {
-      completed.set(true);
+      setCompleted();
       releaseResources();
+    }
+
+    /**
+     * By calling cancel, the client will send a cancel signal to the server, which will stop sending more data and
+     * cause the onError() to be called in this observer with a CANCELLED exception.
+     */
+    public void cancel() {
+      if (response != null && response.getRequestObserver() != null) {
+        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
+        setCompleted();
+        releaseResources();
+      }
+    }
+
+    public void cancelDueToError(Throwable exception) {
+      if (response != null && response.getRequestObserver() != null) {
+        response.getRequestObserver().onError(exception);
+        setFailed(exception);
+        releaseResources();
+      }
+    }
+
+    private void setFailed(Throwable throwable) {
+      if (completed.get()) {
+        throw new IllegalArgumentException("Cannot mark a completed stream as failed");
+      }
+      failed.set(true);
+      error.set(throwable);
+    }
+
+    private void setCompleted() {
+      if (!failed.get()) {
+        completed.set(true);
+      }
     }
 
     private void offerToQueue(ReadBlockResponseProto item) {
@@ -420,6 +432,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
           return;
         }
       }
+    }
+
+    @Override
+    public void setStreamingReadResponse(StreamingReadResponse streamingReadResponse) {
+      response = streamingReadResponse;
     }
   }
 

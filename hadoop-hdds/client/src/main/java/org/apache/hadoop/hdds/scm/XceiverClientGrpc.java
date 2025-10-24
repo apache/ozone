@@ -518,21 +518,20 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   /**
    * Starts a streaming read operation, intended to read entire blocks from the datanodes. This method expects a
-   * {@link StreamObserver} to be passed in, which will be used to receive the streamed data from the datanode.
-   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is returned, which contains
-   * information about the datanode used for the read, and the request observer that can be used to manage the stream
-   * (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent streaming reads so upon
-   * successful return of this method, the caller must ensure to call {@link #completeStreamRead(StreamingReadResponse)}
-   * to release the semaphore once the streaming read is complete.
+   * {@link StreamingReaderSpi} to be passed in, which will be used to receive the streamed data from the datanode.
+   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is set into the pass StreamObserver,
+   * which contains information about the datanode used for the read, and the request observer that can be used to
+   * manage the stream (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent
+   * streaming reads so upon successful return of this method, the caller must ensure to call
+   * {@link #completeStreamRead(StreamingReadResponse)} to release the semaphore once the streaming read is complete.
    * @param request The container command request to initiate the streaming read.
-   * @param streamObserver The observer that will handle the streamed responses.
-   * @return A {@link StreamingReadResponse} containing details of the streaming read operation.
+   * @param streamObserver The observer that will handle the streamed responses.=
    * @throws IOException
    * @throws InterruptedException
    */
   @Override
-  public StreamingReadResponse streamRead(ContainerCommandRequestProto request,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException, InterruptedException {
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
     List<DatanodeDetails> datanodeList = sortDatanodes(request);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
@@ -549,9 +548,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         StreamObserver<ContainerCommandRequestProto> requestObserver = stub
             .withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(streamObserver);
+        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
+            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
         requestObserver.onNext(request);
         requestObserver.onCompleted();
-        return new StreamingReadResponse(dn, (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver);
+        return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
         semaphore.release();

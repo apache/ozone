@@ -62,7 +62,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.scm.StreamingReadResponse;
+import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -917,9 +916,9 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public static StreamingReadResponse readBlock(
+  public static void readBlock(
       XceiverClientSpi xceiverClient, long offset, BlockID blockID, Token<? extends TokenIdentifier> token,
-      Map<DatanodeDetails, Integer> replicaIndexes, StreamObserver<ContainerCommandResponseProto> streamObserver)
+      Map<DatanodeDetails, Integer> replicaIndexes, StreamingReaderSpi streamObserver)
       throws IOException, InterruptedException {
     final ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
@@ -931,14 +930,14 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    return readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
+    readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
         replicaIndexes, streamObserver);
   }
 
-  private static StreamingReadResponse readBlock(XceiverClientSpi xceiverClient,
+  private static void readBlock(XceiverClientSpi xceiverClient,
       BlockID blockID, ContainerCommandRequestProto.Builder builder, ReadBlockRequestProto.Builder readBlockBuilder,
       DatanodeDetails datanode, Map<DatanodeDetails, Integer> replicaIndexes,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException, InterruptedException {
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
     int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
     if (replicaIndex > 0) {
@@ -948,6 +947,6 @@ public final class ContainerProtocolCalls  {
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(datanode.getUuidString())
         .setReadBlock(readBlockBuilder).build();
-    return xceiverClient.streamRead(request, streamObserver);
+    xceiverClient.streamRead(request, streamObserver);
   }
 }

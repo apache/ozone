@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamingReadResponse;
+import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -61,7 +63,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -183,11 +184,14 @@ public class TestStreamBlockInputStream {
     // Note the error will only be thrown when the buffer needs to be refilled. I think case, as its the first
     // read it will try to fill the buffer and encounter the error, but a reader could continue reading until the
     // buffer is exhausted before seeing the error.
-    when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
-      StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
+    doAnswer((InvocationOnMock invocation) -> {
+      StreamingReaderSpi streamObserver = invocation.getArgument(1);
+      StreamingReadResponse resp =
+          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+      streamObserver.setStreamingReadResponse(resp);
       streamObserver.onError(new IOException("Test induced error"));
-      return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-    });
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
     assertThrows(IOException.class, () -> blockStream.read());
     verify(xceiverClient, times(0)).completeStreamRead(any());
   }
@@ -229,14 +233,18 @@ public class TestStreamBlockInputStream {
   public void testRefreshFunctionCalledForAllDNsBadOnInitialize(IOException thrown)
       throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
-    when(xceiverClient.streamRead(any(), any()))
-        .thenThrow(thrown)
-        .thenAnswer((InvocationOnMock invocation) -> {
-          StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
-          streamObserver.onNext(createChunkResponse());
-          streamObserver.onCompleted();
-          return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-        });
+
+    doAnswer((InvocationOnMock invocation) -> {
+      throw thrown;
+    }).doAnswer((InvocationOnMock invocation) -> {
+      StreamingReaderSpi streamObserver = invocation.getArgument(1);
+      StreamingReadResponse resp =
+          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.onNext(createChunkResponse(false));
+      streamObserver.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
     blockStream.read();
     verify(refreshFunction, times(1)).apply(any());
   }
@@ -246,8 +254,9 @@ public class TestStreamBlockInputStream {
   public void testRefreshNotCalledForAllDNsBadOnInitialize(IOException thrown)
       throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
-    when(xceiverClient.streamRead(any(), any()))
-        .thenThrow(thrown);
+    doAnswer((InvocationOnMock invocation) -> {
+      throw thrown;
+    }).when(xceiverClient).streamRead(any(), any());
     assertThrows(IOException.class, () -> blockStream.read());
     verify(refreshFunction, times(0)).apply(any());
   }
@@ -255,9 +264,26 @@ public class TestStreamBlockInputStream {
   @Test
   public void testExceptionThrownAfterRetriesExhausted() throws IOException, InterruptedException {
     // In this case, if the first attempt to connect to any of the DNs fails, it should retry by refreshing the pipeline
-    when(xceiverClient.streamRead(any(), any())).thenThrow(new StorageContainerException(CONTAINER_NOT_FOUND));
+    doAnswer((InvocationOnMock invocation) -> {
+      throw new StorageContainerException(CONTAINER_NOT_FOUND);
+    }).when(xceiverClient).streamRead(any(), any());
+
     assertThrows(IOException.class, () -> blockStream.read());
     verify(refreshFunction, times(1)).apply(any());
+  }
+
+  @Test
+  public void testInvalidChecksumThrowsException() throws IOException, InterruptedException {
+    doAnswer((InvocationOnMock invocation) -> {
+      StreamingReaderSpi streamObserver = invocation.getArgument(1);
+      StreamingReadResponse resp =
+          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.onNext(createChunkResponse(true));
+      streamObserver.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+    assertThrows(IOException.class, () -> blockStream.read());
   }
 
   private void createDataAndChecksum() throws OzoneChecksumException {
@@ -267,25 +293,45 @@ public class TestStreamBlockInputStream {
   }
 
   private void setupSuccessfulRead() throws IOException, InterruptedException {
-    when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
-      StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
-      streamObserver.onNext(createChunkResponse());
+    doAnswer((InvocationOnMock invocation) -> {
+      StreamingReaderSpi streamObserver = invocation.getArgument(1);
+      StreamingReadResponse resp =
+          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
+      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.onNext(createChunkResponse(false));
       streamObserver.onCompleted();
-      return new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-    });
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
   }
 
-  private ContainerProtos.ContainerCommandResponseProto createChunkResponse() {
-    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
-        .setChecksumData(checksumData.getProtoBufMessage())
-        .setData(ByteString.copyFrom(data))
-        .setOffset(0)
-        .build();
+  private ContainerProtos.ContainerCommandResponseProto createChunkResponse(boolean invalidChecksum) {
+    ContainerProtos.ReadBlockResponseProto response = invalidChecksum ?
+        createInValidChecksumResponse() : createValidResponse();
 
     return ContainerProtos.ContainerCommandResponseProto.newBuilder()
         .setCmdType(ContainerProtos.Type.ReadBlock)
         .setReadBlock(response)
         .setResult(ContainerProtos.Result.SUCCESS)
+        .build();
+  }
+
+  private ContainerProtos.ReadBlockResponseProto createValidResponse() {
+    return ContainerProtos.ReadBlockResponseProto.newBuilder()
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .setData(ByteString.copyFrom(data))
+        .setOffset(0)
+        .build();
+  }
+
+  private ContainerProtos.ReadBlockResponseProto createInValidChecksumResponse() {
+    byte[] invalidData = new byte[data.length];
+    System.arraycopy(data, 0, invalidData, 0, data.length);
+    // Corrupt the data
+    invalidData[0] = (byte) (invalidData[0] + 1);
+    return ContainerProtos.ReadBlockResponseProto.newBuilder()
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .setData(ByteString.copyFrom(invalidData))
+        .setOffset(0)
         .build();
   }
 
