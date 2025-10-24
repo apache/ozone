@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone.recon.fsck;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-
+import javax.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -45,8 +43,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
 
 /**
  * V2 implementation of Container Health Task that uses SCM's ReplicationManager
@@ -74,6 +70,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   private final long interval;
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTaskV2(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
@@ -148,7 +145,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   }
 
   /**
-   * Part 1: For each container Recon has, check its health status with SCM.
+   * Part 1: For each container Recon has, sync its health status with SCM.
    * This validates Recon's container superset against SCM's authoritative state.
    * Process containers in batches to avoid OOM.
    */
@@ -157,7 +154,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
     LOG.info("Starting Recon to SCM container validation (batch processing)");
 
-    int validatedCount = 0;
+    int syncedCount = 0;
     int errorCount = 0;
     int batchSize = 100; // Process 100 containers at a time
     long startContainerID = 0;
@@ -179,20 +176,15 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
         if (state != HddsProtos.LifeCycleState.CLOSED &&
             state != HddsProtos.LifeCycleState.QUASI_CLOSED &&
             state != HddsProtos.LifeCycleState.CLOSING) {
-          LOG.info("Container {} not in CLOSED, QUASI_CLOSED or CLOSING state.", container);
+          LOG.debug("Container {} in state {} - skipping (not CLOSED/QUASI_CLOSED/CLOSING)",
+              container.getContainerID(), state);
           continue;
         }
 
         try {
-          // Ask SCM: What's the health status of this container?
-          ReplicationManagerReport report =
-              scmClient.checkContainerStatus(container);
-          LOG.info("Container {} check status {}", container.getContainerID(), report);
-
-          // Update Recon's V2 table based on SCM's answer
-          syncContainerHealthToDatabase(container, report, currentTime);
-
-          validatedCount++;
+          // Sync this container's health status with SCM (source of truth)
+          syncContainerWithSCM(container, currentTime, true);
+          syncedCount++;
 
         } catch (ContainerNotFoundException e) {
           // Container exists in Recon but not in SCM
@@ -201,7 +193,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
           schemaManagerV2.deleteAllStatesForContainer(container.getContainerID());
           errorCount++;
         } catch (Exception e) {
-          LOG.error("Error checking container {} status with SCM",
+          LOG.error("Error syncing container {} with SCM",
               container.getContainerID(), e);
           errorCount++;
         }
@@ -212,13 +204,13 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       startContainerID = lastContainerID + 1;
     }
 
-    LOG.info("Recon to SCM validation complete: validated={}, errors={}",
-        validatedCount, errorCount);
+    LOG.info("Recon to SCM validation complete: synced={}, errors={}",
+        syncedCount, errorCount);
   }
 
   /**
-   * Part 2: Get all CLOSED, QUASI_CLOSED, CLOSING containers from SCM and ensure Recon has them.
-   * For containers missing in Recon, check their health status with SCM and update V2 table.
+   * Part 2: Get all CLOSED, QUASI_CLOSED, CLOSING containers from SCM and sync with V2 table.
+   * For all containers (both in Recon and not in Recon), sync their health status with SCM.
    * This ensures Recon doesn't miss any unhealthy containers that SCM knows about.
    * Process containers in batches to avoid OOM.
    */
@@ -227,9 +219,9 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
     LOG.info("Starting SCM to Recon container synchronization (batch processing)");
 
-    int existsInBoth = 0;
+    int syncedCount = 0;
     int missingInRecon = 0;
-    int unhealthyInSCM = 0;
+    int errorCount = 0;
     int totalProcessed = 0;
     long startId = 0;
     int batchSize = 1000;
@@ -256,80 +248,38 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
         // Process this batch
         for (ContainerInfo scmContainer : batch) {
+          totalProcessed++;
+
           try {
-            // Check if Recon already has this container
-            containerManager.getContainer(scmContainer.containerID());
-            existsInBoth++;
-            // Container exists in both - already handled in Part 1
-
-          } catch (ContainerNotFoundException e) {
-            // Container exists in SCM but not in Recon
-            // Since SCM is the source of truth, check its health status
-            LOG.info("Container {} exists in SCM ({}) but not in Recon - checking health status",
-                scmContainer.getContainerID(), state);
-            missingInRecon++;
-
+            // Check if Recon has this container
+            ContainerInfo reconContainer = null;
+            boolean existsInRecon = true;
             try {
-              // Get health status from SCM for this container
-              ReplicationManagerReport report =
-                  scmClient.checkContainerStatus(scmContainer);
-              LOG.info("Container {} (missing in Recon) health status from SCM: {}",
-                  scmContainer.getContainerID(), report);
-
-              // Check if this container is unhealthy according to SCM
-              boolean isUnhealthy = report.getStat(HealthState.MISSING) > 0 ||
-                  report.getStat(HealthState.UNDER_REPLICATED) > 0 ||
-                  report.getStat(HealthState.OVER_REPLICATED) > 0 ||
-                  report.getStat(HealthState.MIS_REPLICATED) > 0;
-
-              if (isUnhealthy) {
-                // Update V2 table with SCM's health status
-                // Note: We cannot get replicas from Recon's containerManager since container doesn't exist
-                // So we'll use SCM's report directly with placeholder values for replica counts
-                List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
-                int expectedReplicaCount = scmContainer.getReplicationConfig().getRequiredNodes();
-                int actualReplicaCount = 0; // Unknown since container not in Recon
-
-                if (report.getStat(HealthState.MISSING) > 0) {
-                  recordsToInsert.add(createRecord(scmContainer, UnHealthyContainerStates.MISSING,
-                      currentTime, expectedReplicaCount, actualReplicaCount,
-                      "Reported by SCM (container not in Recon)"));
-                }
-
-                if (report.getStat(HealthState.UNDER_REPLICATED) > 0) {
-                  recordsToInsert.add(createRecord(scmContainer, UnHealthyContainerStates.UNDER_REPLICATED,
-                      currentTime, expectedReplicaCount, actualReplicaCount,
-                      "Reported by SCM (container not in Recon)"));
-                }
-
-                if (report.getStat(HealthState.OVER_REPLICATED) > 0) {
-                  recordsToInsert.add(createRecord(scmContainer, UnHealthyContainerStates.OVER_REPLICATED,
-                      currentTime, expectedReplicaCount, actualReplicaCount,
-                      "Reported by SCM (container not in Recon)"));
-                }
-
-                if (report.getStat(HealthState.MIS_REPLICATED) > 0) {
-                  recordsToInsert.add(createRecord(scmContainer, UnHealthyContainerStates.MIS_REPLICATED,
-                      currentTime, expectedReplicaCount, actualReplicaCount,
-                      "Reported by SCM (container not in Recon)"));
-                }
-
-                if (!recordsToInsert.isEmpty()) {
-                  schemaManagerV2.insertUnhealthyContainerRecords(recordsToInsert);
-                  unhealthyInSCM++;
-                  LOG.info("Updated V2 table with {} unhealthy states for container {} (missing in Recon)",
-                      recordsToInsert.size(), scmContainer.getContainerID());
-                }
-              }
-
-            } catch (Exception ex) {
-              LOG.error("Error checking health status for container {} (missing in Recon)",
-                  scmContainer.getContainerID(), ex);
+              reconContainer = containerManager.getContainer(scmContainer.containerID());
+            } catch (ContainerNotFoundException e) {
+              existsInRecon = false;
+              missingInRecon++;
             }
+
+            // Sync with SCM regardless of whether container exists in Recon
+            // This ensures V2 table always matches SCM's truth
+            if (existsInRecon) {
+              // Container exists in Recon - sync using Recon's container info (has replicas)
+              syncContainerWithSCM(reconContainer, currentTime, true);
+            } else {
+              // Container missing in Recon - sync using SCM's container info (no replicas available)
+              syncContainerWithSCM(scmContainer, currentTime, false);
+            }
+
+            syncedCount++;
+
+          } catch (Exception ex) {
+            LOG.error("Error syncing container {} from SCM",
+                scmContainer.getContainerID(), ex);
+            errorCount++;
           }
         }
 
-        totalProcessed += batch.size();
         startId = batch.get(batch.size() - 1).getContainerID() + 1;
         LOG.debug("SCM to Recon sync processed {} {} containers, next startId: {}",
             totalProcessed, state, startId);
@@ -338,13 +288,43 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       LOG.info("Completed processing {} containers from SCM", state);
     }
 
-    LOG.info("SCM to Recon sync complete: totalProcessed={}, existsInBoth={}, " +
-        "onlyInSCM={}, unhealthyInSCM={}",
-        totalProcessed, existsInBoth, missingInRecon, unhealthyInSCM);
+    LOG.info("SCM to Recon sync complete: totalProcessed={}, synced={}, " +
+        "missingInRecon={}, errors={}",
+        totalProcessed, syncedCount, missingInRecon, errorCount);
+  }
+
+  /**
+   * Sync a single container's health status with SCM (single source of truth).
+   * This method queries SCM for the container's health status and updates the V2 table accordingly.
+   *
+   * @param container The container to sync
+   * @param currentTime Current timestamp
+   * @param canAccessReplicas Whether we can access replicas from Recon's containerManager
+   *                          (true if container exists in Recon, false if only in SCM)
+   * @throws IOException if SCM communication fails
+   */
+  private void syncContainerWithSCM(
+      ContainerInfo container,
+      long currentTime,
+      boolean canAccessReplicas) throws IOException {
+
+    // Get SCM's authoritative health status for this container
+    ReplicationManagerReport report = scmClient.checkContainerStatus(container);
+    LOG.debug("Container {} health status from SCM: {}", container.getContainerID(), report);
+
+    // Sync to V2 table based on SCM's report
+    if (canAccessReplicas) {
+      // Container exists in Recon - we can access replicas for accurate counts and REPLICA_MISMATCH check
+      syncContainerHealthToDatabase(container, report, currentTime);
+    } else {
+      // Container doesn't exist in Recon - sync without replica information
+      syncContainerHealthToDatabaseWithoutReplicas(container, report, currentTime);
+    }
   }
 
   /**
    * Sync container health state to V2 database based on SCM's ReplicationManager report.
+   * This version is used when container exists in Recon and we can access replicas.
    */
   private void syncContainerHealthToDatabase(
       ContainerInfo container,
@@ -410,8 +390,89 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   }
 
   /**
+   * Sync container health state to V2 database for containers NOT in Recon.
+   * This version handles containers that only exist in SCM (no replica access).
+   */
+  private void syncContainerHealthToDatabaseWithoutReplicas(
+      ContainerInfo container,
+      ReplicationManagerReport report,
+      long currentTime) {
+
+    List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
+    boolean isHealthy = true;
+
+    // We cannot get replicas from Recon since container doesn't exist
+    int expectedReplicaCount = container.getReplicationConfig().getRequiredNodes();
+    int actualReplicaCount = 0; // Unknown
+
+    // Check each health state from SCM's report
+    if (report.getStat(HealthState.MISSING) > 0) {
+      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MISSING,
+          currentTime, expectedReplicaCount, actualReplicaCount,
+          "Reported by SCM (container not in Recon)"));
+      isHealthy = false;
+    }
+
+    if (report.getStat(HealthState.UNDER_REPLICATED) > 0) {
+      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.UNDER_REPLICATED,
+          currentTime, expectedReplicaCount, actualReplicaCount,
+          "Reported by SCM (container not in Recon)"));
+      isHealthy = false;
+    }
+
+    if (report.getStat(HealthState.OVER_REPLICATED) > 0) {
+      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.OVER_REPLICATED,
+          currentTime, expectedReplicaCount, actualReplicaCount,
+          "Reported by SCM (container not in Recon)"));
+      isHealthy = false;
+    }
+
+    if (report.getStat(HealthState.MIS_REPLICATED) > 0) {
+      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MIS_REPLICATED,
+          currentTime, expectedReplicaCount, actualReplicaCount,
+          "Reported by SCM (container not in Recon)"));
+      isHealthy = false;
+    }
+
+    // Insert/update unhealthy records
+    if (!recordsToInsert.isEmpty()) {
+      try {
+        schemaManagerV2.insertUnhealthyContainerRecords(recordsToInsert);
+        LOG.info("Updated V2 table with {} unhealthy states for container {} (not in Recon)",
+            recordsToInsert.size(), container.getContainerID());
+      } catch (Exception e) {
+        LOG.error("Failed to insert unhealthy records for container {} (not in Recon)",
+            container.getContainerID(), e);
+      }
+    }
+
+    // If healthy according to SCM, remove SCM-tracked states from V2 table
+    if (isHealthy) {
+      try {
+        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
+            UnHealthyContainerStates.MISSING);
+        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
+            UnHealthyContainerStates.UNDER_REPLICATED);
+        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
+            UnHealthyContainerStates.OVER_REPLICATED);
+        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
+            UnHealthyContainerStates.MIS_REPLICATED);
+      } catch (Exception e) {
+        LOG.warn("Failed to delete healthy container {} records from V2",
+            container.getContainerID(), e);
+      }
+    }
+
+    // Note: REPLICA_MISMATCH is NOT checked here because:
+    // - Container doesn't exist in Recon, so we cannot access replicas
+    // - REPLICA_MISMATCH is Recon-only detection (SCM doesn't track checksums)
+    // - It will be checked when container eventually syncs to Recon
+  }
+
+  /**
    * Check for REPLICA_MISMATCH locally (SCM doesn't track data checksums).
    * This compares checksums across replicas to detect data inconsistencies.
+   * ONLY called when container exists in Recon and we can access replicas.
    */
   private void checkAndUpdateReplicaMismatch(
       ContainerInfo container,

@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersV2Dao;
