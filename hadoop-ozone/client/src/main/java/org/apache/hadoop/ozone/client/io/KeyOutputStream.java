@@ -254,7 +254,6 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  @VisibleForTesting
   void handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {
     while (len > 0) {
