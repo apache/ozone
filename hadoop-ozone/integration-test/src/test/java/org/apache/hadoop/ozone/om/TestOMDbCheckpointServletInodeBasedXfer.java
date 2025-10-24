@@ -728,13 +728,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         if (path.contains(OM_CHECKPOINT_DIR)) {
           path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
         }
-        if (path.startsWith(OM_DB_NAME)) {
-          Path fileName = Paths.get(path).getFileName();
-          // fileName will not be null, added null check for findbugs
-          if (fileName != null) {
-            path = fileName.toString();
-          }
-        }
         hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
         inodesFromOmDbCheckpoint.add(inode);
       }
