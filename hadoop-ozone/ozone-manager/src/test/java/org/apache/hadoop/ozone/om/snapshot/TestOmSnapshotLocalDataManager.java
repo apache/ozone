@@ -171,7 +171,7 @@ public class TestOmSnapshotLocalDataManager {
     when(rdbStore.getDbLocation()).thenReturn(dbLocation);
     this.snapshotUtilMock = mockStatic(SnapshotUtils.class);
     purgedSnapshotIdMap.clear();
-    snapshotUtilMock.when(() -> SnapshotUtils.isSnapshotPurged(any(), any(), any()))
+    snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
         .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
     conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, -1);
   }
@@ -397,7 +397,7 @@ public class TestOmSnapshotLocalDataManager {
 
   @Test
   public void testUpdateTransactionInfo() throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
     UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);

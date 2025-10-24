@@ -34,8 +34,6 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.hadoop.hdds.utils.db.CodecException;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -89,15 +87,6 @@ public final class SnapshotUtils {
           FILE_NOT_FOUND);
     }
     return snapshotInfo;
-  }
-
-  public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
-      UUID snapshotId) throws RocksDatabaseException, CodecException {
-    String tableKey = chainManager.getTableKey(snapshotId);
-    if (tableKey == null) {
-      return true;
-    }
-    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey);
   }
 
   public static SnapshotInfo getSnapshotInfo(OzoneManager ozoneManager,

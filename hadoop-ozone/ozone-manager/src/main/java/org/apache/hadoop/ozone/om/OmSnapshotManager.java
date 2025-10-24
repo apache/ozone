@@ -345,6 +345,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
+  public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
+      UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      return true;
+    }
+    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
+  }
+
   /**
    * Help reject OM startup if snapshot feature is disabled
    * but there are snapshots remaining in this OM. Note: snapshots that are

@@ -325,7 +325,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider = new WritableOmSnapshotLocalDataProvider(
         snapshotId)) {
       OmSnapshotLocalData snapshotLocalData = snapshotLocalDataProvider.getSnapshotLocalData();
-      boolean isSnapshotPurged = SnapshotUtils.isSnapshotPurged(chainManager, metadataManager, snapshotId);
+      boolean isSnapshotPurged = OmSnapshotManager.isSnapshotPurged(chainManager, metadataManager, snapshotId,
+          snapshotLocalData.getTransactionInfo());
       for (Map.Entry<Integer, LocalDataVersionNode> integerLocalDataVersionNodeEntry : getVersionNodeMap()
           .get(snapshotId).getSnapshotVersions().entrySet()) {
         LocalDataVersionNode versionEntry = integerLocalDataVersionNodeEntry.getValue();
@@ -431,7 +432,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+  private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions,
+      boolean transactionInfoSet) throws IOException {
     SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
     Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
         existingSnapVersions.getSnapshotVersions();
@@ -463,9 +465,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           snapshotVersions.getPreviousSnapshotId())) {
         increamentOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
       }
-      // If the version is also updated it could mean that there could be some orphan version present within the
+      // If the transactionInfo set this means the snapshot has been purged and the entire yaml file could have
+      // become an orphan if the version is also updated it
+      // could mean that there could be some orphan version present within the
       // same snapshot.
-      if (existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
+      if (transactionInfoSet || existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
         increamentOrphanCheckCount(snapshotId);
       }
     }
@@ -802,7 +806,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
           }
         }
-        upsertNode(super.snapshotId, localDataVersionNodes);
+        upsertNode(super.snapshotId, localDataVersionNodes, getSnapshotLocalData().getTransactionInfo() != null);
         // Reset dirty bit
         resetDirty();
       }
