@@ -84,6 +84,23 @@ public class RetryRequestBatcher {
       }
       return Long.compare(this.endOffset, other.endOffset);
     }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null || getClass() != obj.getClass()) {
+        return false;
+      }
+      PendingWriteChunk that = (PendingWriteChunk) obj;
+      return offset == that.offset && length == that.length && endOffset == that.endOffset;
+    }
+
+    @Override
+    public int hashCode() {
+      return Long.hashCode(endOffset) * 31 + Long.hashCode(offset);
+    }
   }
 
   /**
