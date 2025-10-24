@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 
 /**
@@ -145,8 +144,8 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
-  public StreamingReadResponse streamRead(ContainerCommandRequestProto request,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException, InterruptedException {
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
 
