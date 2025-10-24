@@ -42,6 +42,13 @@ public class RetryRequestBatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(RetryRequestBatcher.class);
 
+  // Sliding window buffer: maintains inflight writeChunk and putBlock requests.
+  private final List<PendingWriteChunk> inflightWriteChunks;
+  private int writeChunkStartIndex;
+  private final LinkedList<Long> inflightPutBlocks;
+  private long acknowledgedOffset;
+  private long sentOffset;
+
   /**
    * Represents a pending writeChunk request ordered by end offset.
    */
@@ -105,13 +112,6 @@ public class RetryRequestBatcher {
       return totalDataLength;
     }
   }
-
-  // Sliding window buffer: maintains inflight writeChunk and putBlock requests.
-  private final List<PendingWriteChunk> inflightWriteChunks;
-  private int writeChunkStartIndex;
-  private final LinkedList<Long> inflightPutBlocks;
-  private long acknowledgedOffset;
-  private long sentOffset;
 
   public RetryRequestBatcher() {
     this.inflightWriteChunks = new ArrayList<>();
