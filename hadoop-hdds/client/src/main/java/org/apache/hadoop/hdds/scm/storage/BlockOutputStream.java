@@ -158,7 +158,7 @@ public class BlockOutputStream extends OutputStream {
   private CompletableFuture<Void> lastFlushFuture;
   private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
 
-  // Sliding window optimizer for retry operations
+  // Retry request batcher for retry operations
   private final RetryRequestBatcher retryRequestBatcher;
 
   /**
@@ -474,14 +474,37 @@ public class BlockOutputStream extends OutputStream {
     List<ChunkBuffer> combinedChunks = retryPlan.getCombinedChunks();
     boolean needsPutBlock = retryPlan.needsPutBlock();
 
+    List<ChunkBuffer> chunksToWrite = combinedChunks;
+    if (chunksToWrite.isEmpty() && len > 0) {
+      List<ChunkBuffer> fallback = new ArrayList<>(allocatedBuffers.size());
+      for (ChunkBuffer buffer : allocatedBuffers) {
+        if (buffer.position() > 0) {
+          fallback.add(buffer);
+        }
+      }
+      if (!fallback.isEmpty()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Sliding window optimizer returned no chunks; falling back to {} allocated buffers",
+              fallback.size());
+        }
+        chunksToWrite = fallback;
+        needsPutBlock = true;
+      }
+    }
+
+    if (chunksToWrite.isEmpty()) {
+      LOG.warn("Retry requested for length {} but no chunk buffers available to resend", len);
+      return;
+    }
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sliding window optimization: combined {} chunks into {}, needsPutBlock={}",
-          allocatedBuffers.size(), combinedChunks.size(), needsPutBlock);
+          allocatedBuffers.size(), chunksToWrite.size(), needsPutBlock);
     }
 
     // Write combined chunks
     long remainingLen = len;
-    for (ChunkBuffer buffer : combinedChunks) {
+    for (ChunkBuffer buffer : chunksToWrite) {
       if (remainingLen <= 0) {
         break;
       }
@@ -510,7 +533,7 @@ public class BlockOutputStream extends OutputStream {
     }
 
     // Send final putBlock if needed and not already piggybacked
-    if (needsPutBlock && (!allowPutBlockPiggybacking || combinedChunks.isEmpty())) {
+    if (needsPutBlock && !allowPutBlockPiggybacking) {
       updatePutBlockLength();
       CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
       CompletableFuture<Void> watchForCommitAsync =
