@@ -158,6 +158,9 @@ public class BlockOutputStream extends OutputStream {
   private CompletableFuture<Void> lastFlushFuture;
   private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
 
+  // Sliding window optimizer for retry operations
+  private final RetryRequestBatcher retryRequestBatcher;
+
   /**
    * Creates a new BlockOutputStream.
    *
@@ -236,6 +239,7 @@ public class BlockOutputStream extends OutputStream {
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
     LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
+    this.retryRequestBatcher = new RetryRequestBatcher();
   }
 
   /**
@@ -464,23 +468,51 @@ public class BlockOutputStream extends OutputStream {
           allocatedBuffers.size());
     }
     Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
-    int count = 0;
-    while (len > 0) {
-      ChunkBuffer buffer = allocatedBuffers.get(count);
-      long writeLen = Math.min(buffer.position(), len);
-      len -= writeLen;
-      count++;
+
+    // Use sliding window optimization to combine requests
+    RetryRequestBatcher.OptimizedRetryPlan retryPlan = retryRequestBatcher.optimizeForRetry();
+    List<ChunkBuffer> combinedChunks = retryPlan.getCombinedChunks();
+    boolean needsPutBlock = retryPlan.needsPutBlock();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sliding window optimization: combined {} chunks into {}, needsPutBlock={}",
+          allocatedBuffers.size(), combinedChunks.size(), needsPutBlock);
+    }
+
+    // Write combined chunks
+    long remainingLen = len;
+    for (ChunkBuffer buffer : combinedChunks) {
+      if (remainingLen <= 0) {
+        break;
+      }
+      long writeLen = Math.min(buffer.position(), remainingLen);
+      remainingLen -= writeLen;
       writtenDataLength += writeLen;
       updateWriteChunkLength();
-      updatePutBlockLength();
-      LOG.debug("Write chunk on retry buffer = {}", buffer);
-      CompletableFuture<PutBlockResult> putBlockFuture;
-      if (allowPutBlockPiggybacking) {
-        putBlockFuture = writeChunkAndPutBlock(buffer, false);
+
+      if (allowPutBlockPiggybacking && needsPutBlock && remainingLen == 0) {
+        // Last chunk: piggyback putBlock
+        updatePutBlockLength();
+        CompletableFuture<PutBlockResult> putBlockFuture = writeChunkAndPutBlock(buffer, false);
+        CompletableFuture<Void> watchForCommitAsync =
+            putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
+        try {
+          watchForCommitAsync.get();
+        } catch (InterruptedException e) {
+          handleInterruptedException(e, true);
+        } catch (ExecutionException e) {
+          handleExecutionException(e);
+        }
       } else {
+        // Write chunk without putBlock
         writeChunk(buffer);
-        putBlockFuture = executePutBlock(false, false);
       }
+    }
+
+    // Send final putBlock if needed and not already piggybacked
+    if (needsPutBlock && (!allowPutBlockPiggybacking || combinedChunks.isEmpty())) {
+      updatePutBlockLength();
+      CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
       CompletableFuture<Void> watchForCommitAsync =
           putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
       try {
@@ -491,6 +523,7 @@ public class BlockOutputStream extends OutputStream {
         handleExecutionException(e);
       }
     }
+    retryRequestBatcher.clear();
   }
 
   /**
@@ -571,6 +604,7 @@ public class BlockOutputStream extends OutputStream {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalWriteChunkLength;
+    retryRequestBatcher.trackInflightPutBlockRequest(flushPos);
     final List<ChunkBuffer> byteBufferList;
     if (!force) {
       Preconditions.checkNotNull(bufferList);
@@ -656,6 +690,7 @@ public class BlockOutputStream extends OutputStream {
       bufferList = new ArrayList<>();
     }
     bufferList.add(buffer);
+    retryRequestBatcher.trackInflightWriteChunkRequest(buffer, chunkOffset.get());
   }
 
   private void writeChunk(ChunkBuffer buffer) throws IOException {
@@ -1018,6 +1053,7 @@ public class BlockOutputStream extends OutputStream {
     }
     // for standalone protocol, logIndex will always be 0.
     updateCommitInfo(asyncReply, byteBufferList);
+    retryRequestBatcher.acknowledgeUpTo(flushPos);
   }
 
   /**
