@@ -3301,12 +3301,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           .build());
     }
 
-    // Since this OM is processing the request, we can assume it to be the
-    // leader OM
-
+    RaftPeerRole selfRole;
+    RaftPeerId leaderId = null;
+    if (omRatisServer == null) {
+      selfRole = RaftPeerRole.LEADER;
+    } else {
+      leaderId = omRatisServer.getLeaderId();
+      RaftPeerId selfPeerId = omRatisServer.getRaftPeerId();
+      if (leaderId != null && leaderId.equals(selfPeerId)) {
+        selfRole = RaftPeerRole.LEADER;
+      } else if (omNodeDetails.isRatisListener()) {
+        selfRole = RaftPeerRole.LISTENER;
+      } else {
+        selfRole = RaftPeerRole.FOLLOWER;
+      }
+    }
     OMRoleInfo omRole = OMRoleInfo.newBuilder()
         .setNodeId(getOMNodeId())
-        .setServerRole(RaftPeerRole.LEADER.name())
+        .setServerRole(selfRole.name())
         .build();
     omServiceInfoBuilder.setOmRoleInfo(omRole);
 
@@ -3330,10 +3342,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               .setValue(peerNode.getRpcPort())
               .build());
 
-      String role = peerNode.isRatisListener() ? RaftPeerRole.LISTENER.name() : RaftPeerRole.FOLLOWER.name();
+      RaftPeerRole roleForPeer;
+      if (leaderId != null && peerNode.getNodeId().equals(leaderId.toString())) {
+        roleForPeer = RaftPeerRole.LEADER;
+      } else if (peerNode.isRatisListener()) {
+        roleForPeer = RaftPeerRole.LISTENER;
+      } else {
+        roleForPeer = RaftPeerRole.FOLLOWER;
+      }
       OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
           .setNodeId(peerNode.getNodeId())
-          .setServerRole(role)
+          .setServerRole(roleForPeer.name())
           .build();
       peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
 
