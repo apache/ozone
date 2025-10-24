@@ -49,7 +49,7 @@ OZONE-SITE.XML_hdds.heartbeat.interval=5s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=15s
 OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=5s
-OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5m
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
@@ -64,3 +64,5 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+OZONE-SITE.XML_ozone.recon.container.health.use.scm.report=true
+OZONE-SITE.XML_ozone.recon.task.missingcontainer.interval=10s

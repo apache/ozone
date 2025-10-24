@@ -110,10 +110,13 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTaskV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -153,8 +156,10 @@ public class ReconStorageContainerManagerFacade
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
-  private final ContainerHealthTask containerHealthTask;
+  private final ReconScmTask containerHealthTask;
+  private final ReconScmTask containerHealthTaskV2;
   private final DataSource dataSource;
+  private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
 
   private DBStore dbStore;
   private ReconNodeManager nodeManager;
@@ -183,7 +188,8 @@ public class ReconStorageContainerManagerFacade
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
                                             DataSource dataSource,
-                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager)
+                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
+                                            ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2)
       throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
@@ -265,13 +271,36 @@ public class ReconStorageContainerManagerFacade
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
         scmServiceProvider, reconTaskConfig, taskStatusUpdaterManager);
 
-    containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
-        containerHealthSchemaManager, containerPlacementPolicy,
-        reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
+    // Create legacy ContainerHealthTask (always runs, writes to UNHEALTHY_CONTAINERS)
+    LOG.info("Creating ContainerHealthTask (legacy)");
+    containerHealthTask = new ContainerHealthTask(
+        containerManager,
+        scmServiceProvider,
+        containerHealthSchemaManager,
+        containerPlacementPolicy,
+        reconTaskConfig,
+        reconContainerMetadataManager,
+        conf,
+        taskStatusUpdaterManager
+    );
+
+    // Create ContainerHealthTaskV2 (always runs, writes to UNHEALTHY_CONTAINERS_V2)
+    LOG.info("Creating ContainerHealthTaskV2");
+    containerHealthTaskV2 = new ContainerHealthTaskV2(
+        containerManager,
+        scmServiceProvider,
+        containerHealthSchemaManagerV2,
+        containerPlacementPolicy,
+        reconContainerMetadataManager,
+        conf,
+        reconTaskConfig,
+        taskStatusUpdaterManager
+    );
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager,
         reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
 
+    this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.dataSource = dataSource;
 
     StaleNodeHandler staleNodeHandler =
@@ -347,6 +376,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconScmTasks.add(containerHealthTaskV2);
     reconScmTasks.add(containerSizeCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
@@ -711,7 +741,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   @VisibleForTesting
-  public ContainerHealthTask getContainerHealthTask() {
+  public ReconScmTask getContainerHealthTask() {
     return containerHealthTask;
   }
 

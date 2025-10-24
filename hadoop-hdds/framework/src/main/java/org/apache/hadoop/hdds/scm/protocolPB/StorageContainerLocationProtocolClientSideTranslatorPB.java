@@ -48,6 +48,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.CheckContainerStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.CheckContainerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
@@ -897,6 +899,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetReplicationManagerReport,
             builder -> builder.setReplicationManagerReportRequest(request))
         .getGetReplicationManagerReportResponse();
+    return ReplicationManagerReport.fromProtobuf(response.getReport());
+  }
+
+  @Override
+  public ReplicationManagerReport checkContainerStatus(
+      ContainerInfo containerInfo) throws IOException {
+    CheckContainerStatusRequestProto request =
+        CheckContainerStatusRequestProto.newBuilder()
+            .setContainerInfo(containerInfo.getProtobuf())
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .build();
+    CheckContainerStatusResponseProto response =
+        submitRequest(Type.CheckContainerStatus,
+            builder -> builder.setCheckContainerStatusRequest(request))
+        .getCheckContainerStatusResponse();
     return ReplicationManagerReport.fromProtobuf(response.getReport());
   }
 

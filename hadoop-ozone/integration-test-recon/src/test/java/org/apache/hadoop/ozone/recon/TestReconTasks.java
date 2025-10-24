@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -252,7 +253,7 @@ public class TestReconTasks {
 
       // Check if EMPTY_MISSING containers are not added to the DB and their count is logged
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
@@ -290,7 +291,7 @@ public class TestReconTasks {
 
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
@@ -319,7 +320,7 @@ public class TestReconTasks {
                   0L, Optional.empty(), 1000);
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
