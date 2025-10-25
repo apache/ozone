@@ -336,12 +336,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // remove the version entry if it is not referenced by any other snapshot version node. For version node 0
         // a newly created snapshot version could point to a version with indegree 0 in such a scenario a version 0
         // node can be only deleted if the snapshot is also purged.
-        boolean toRemove = localDataGraph.inDegree(versionEntry) == 0
-            && ((versionEntry.getVersion() != 0 && versionEntry.getVersion() != snapshotLocalData.getVersion())
-            || isSnapshotPurged);
-        if (toRemove) {
-          snapshotLocalDataProvider.removeVersion(versionEntry.getVersion());
+        internalLock.readLock().lock();
+        try {
+          boolean toRemove = localDataGraph.inDegree(versionEntry) == 0
+              && ((versionEntry.getVersion() != 0 && versionEntry.getVersion() != snapshotLocalData.getVersion())
+              || isSnapshotPurged);
+          if (toRemove) {
+            snapshotLocalDataProvider.removeVersion(versionEntry.getVersion());
+          }
+        } finally {
+          internalLock.readLock().unlock();
         }
+
       }
       snapshotLocalDataProvider.commit();
     }
