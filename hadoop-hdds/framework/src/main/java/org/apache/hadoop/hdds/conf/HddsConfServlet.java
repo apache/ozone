@@ -26,6 +26,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.hadoop.conf.ConfServlet.BadFormatException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -92,6 +93,8 @@ public class HddsConfServlet extends HttpServlet {
       }
     } catch (IllegalArgumentException iae) {
       HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_NOT_FOUND, iae.getMessage(), format, response);
+    } catch (BadFormatException bfe){
+      HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_BAD_REQUEST, bfe.getMessage(), format, response);
     }
   }
 
@@ -100,15 +103,16 @@ public class HddsConfServlet extends HttpServlet {
    */
   static void writeResponse(OzoneConfiguration conf, Writer out, HttpServletUtils.ResponseFormat format,
       String propertyName)
-      throws IOException, IllegalArgumentException {
+      throws IOException, IllegalArgumentException, BadFormatException {
     switch (format) {
     case JSON:
       OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
       break;
     case XML:
-    default:
       conf.writeXml(propertyName, out);
       break;
+    default:
+      throw new BadFormatException("Bad format: " + format);
     }
   }
 
