@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.hdds.utils.HttpServletUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A servlet to print out the running configuration data.
@@ -39,6 +41,8 @@ import org.apache.hadoop.hdds.utils.HttpServletUtils;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Unstable
 public class HddsConfServlet extends HttpServlet {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(HddsConfServlet.class);
 
   private static final long serialVersionUID = 1L;
 
@@ -83,7 +87,7 @@ public class HddsConfServlet extends HttpServlet {
   }
 
   private void processCommand(String cmd, HttpServletUtils.ResponseFormat format, HttpServletRequest request,
-      HttpServletResponse response, Writer out, String name)
+                              HttpServletResponse response, Writer out, String name)
       throws IOException {
     try {
       if (cmd == null) {
@@ -93,8 +97,10 @@ public class HddsConfServlet extends HttpServlet {
       }
     } catch (IllegalArgumentException iae) {
       HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_NOT_FOUND, iae.getMessage(), format, response);
-    } catch (BadFormatException bfe){
-      HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_BAD_REQUEST, bfe.getMessage(), format, response);
+    } catch (BadFormatException bfe) {
+      LOG.error("format should be either JSON or XML, got {}", format, bfe);
+      HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+          "Caught an exception while processing HddsConfServlet request", format, response);
     }
   }
 
@@ -102,7 +108,7 @@ public class HddsConfServlet extends HttpServlet {
    * Guts of the servlet - extracted for easy testing.
    */
   static void writeResponse(OzoneConfiguration conf, Writer out, HttpServletUtils.ResponseFormat format,
-      String propertyName)
+                            String propertyName)
       throws IOException, IllegalArgumentException, BadFormatException {
     switch (format) {
     case JSON:
