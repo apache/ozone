@@ -573,6 +573,19 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
         .append(", ReplicationConfig: ").append(repConfig)
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);
+    
+    if (!isSufficientlyReplicated()) {
+      List<Integer> missingIndexes = unavailableIndexes(true);
+      sb.append(" [UNDER_REPLICATED: missing indexes ")
+        .append(missingIndexes).append(']');
+    } else if (isOverReplicated()) {
+      List<Integer> excessIndexes = overReplicatedIndexes(false);
+      sb.append(" [OVER_REPLICATED: excess indexes ")
+        .append(excessIndexes).append(']');
+    } else {
+      sb.append(" [HEALTHY_REPLICATION]");
+    }
+      
     return sb.toString();
   }
 
