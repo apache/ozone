@@ -130,7 +130,7 @@
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.6</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.20</jnr-posix.version>
+    <jnr-posix.version>3.1.21</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
