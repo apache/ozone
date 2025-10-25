@@ -3555,6 +3555,53 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+
+    // OM should be leader and ready.
+    if (!isLeaderReady()) {
+      throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
+    }
+
+    final UserGroupInformation ugi = getRemoteUser();
+    // Check Ozone admin privilege
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to trigger "
+          + "snapshot defragmentation manually", PERMISSION_DENIED);
+    }
+
+    // Get the SnapshotDefragService from KeyManager
+    final SnapshotDefragService defragService = keyManager.getSnapshotDefragService();
+    if (defragService == null) {
+      throw new OMException("Snapshot defragmentation service is not initialized",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Trigger Snapshot Defragmentation
+    if (noWait) {
+      final Thread t = new Thread(() -> {
+        try {
+          defragService.start();
+        } catch (Exception e) {
+          LOG.error("Error during snapshot defragmentation", e);
+        }
+      }, threadPrefix + "SnapshotDefrag");
+      t.start();
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation without waiting"
+          + " in a new thread, tid = {}", ugi, t.getId());
+      return true;
+    } else {
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation and is waiting", ugi);
+      try {
+        defragService.start();
+        return true;
+      } catch (Exception e) {
+        LOG.error("Error during snapshot defragmentation", e);
+        return false;
+      }
+    }
+  }
+
+  @Override
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException {
     return upgradeFinalizer.finalize(upgradeClientID, this);
