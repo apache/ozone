@@ -349,10 +349,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Set<Path> snapshotPaths = new HashSet<>();
 
     // get snapshotInfo entries
-    OmMetadataManagerImpl checkpointMetadataManager =
+    try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
 
@@ -365,8 +365,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         }
         snapshotPaths.add(path);
       }
-    } finally {
-      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }
