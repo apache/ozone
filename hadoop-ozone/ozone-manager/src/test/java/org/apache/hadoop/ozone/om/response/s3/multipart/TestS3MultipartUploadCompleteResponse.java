@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -236,7 +235,7 @@ public class TestS3MultipartUploadCompleteResponse
   }
 
   protected long runAddDBToBatchWithParts(String volumeName,
-    String bucketName, String keyName, int deleteEntryCount)
+      String bucketName, String keyName, int deleteEntryCount)
         throws Exception {
 
     String multipartUploadID = UUID.randomUUID().toString();
