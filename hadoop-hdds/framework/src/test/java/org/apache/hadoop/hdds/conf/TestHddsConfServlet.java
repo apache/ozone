@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.conf.HddsConfServlet.writeResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -107,7 +106,15 @@ public class TestHddsConfServlet {
   @SuppressWarnings("unchecked")
   public void testWriteJson() throws Exception {
     StringWriter sw = new StringWriter();
-    writeResponse(getTestConf(), sw, HttpServletUtils.ResponseFormat.JSON, null);
+    PrintWriter pw = new PrintWriter(sw);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(pw);
+
+    OzoneConfiguration conf = getTestConf();
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.JSON, (out) -> {
+      OzoneConfiguration.dumpConfiguration(conf, null, out);
+    }, IllegalArgumentException.class);
+
     String json = sw.toString();
     boolean foundSetting = false;
     Object parsed = JSON.parse(json);
@@ -128,7 +135,15 @@ public class TestHddsConfServlet {
   @Test
   public void testWriteXml() throws Exception {
     StringWriter sw = new StringWriter();
-    writeResponse(getTestConf(), sw, HttpServletUtils.ResponseFormat.XML, null);
+    PrintWriter pw = new PrintWriter(sw);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(pw);
+
+    OzoneConfiguration conf = getTestConf();
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.XML, (out) -> {
+      conf.writeXml(null, out);
+    }, IllegalArgumentException.class);
+
     String xml = sw.toString();
 
     DocumentBuilderFactory docBuilderFactory =

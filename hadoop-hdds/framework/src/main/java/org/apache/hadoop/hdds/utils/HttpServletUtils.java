@@ -123,6 +123,49 @@ public final class HttpServletUtils implements Serializable {
   }
 
   /**
+   * Write response according to the specified format.
+   * The caller provides a callback to write the content.
+   *
+   * @param response        the HTTP servlet response
+   * @param format          the response format
+   * @param contentWriter   callback to write content to the writer
+   * @param exceptionClass  class of exception to propagate from contentWriter
+   * @param <E>             the type of exception that may be thrown by contentWriter
+   * @throws IOException if an I/O error occurs
+   * @throws E           if contentWriter throws an exception of type E
+   */
+  public static <E extends Exception> void writeResponse(HttpServletResponse response, ResponseFormat format,
+                                   CheckedConsumer<Writer> contentWriter,
+                                   Class<E> exceptionClass)
+      throws IOException, E {
+    response.setContentType(format.getContentType());
+    Writer out = response.getWriter();
+    try {
+      contentWriter.accept(out);
+    } catch (IOException e) {
+      // Always rethrow IOException as-is
+      throw e;
+    } catch (Exception e) {
+      // If exception matches the generic type, throw it
+      if (exceptionClass.isInstance(e)) {
+        throw exceptionClass.cast(e);
+      }
+      // Otherwise wrap in IOException
+      throw new IOException("Failed to write response", e);
+    }
+  }
+
+  /**
+   * Functional interface for operations that accept a parameter and may throw exceptions.
+   *
+   * @param <T> the type of the input to the operation
+   */
+  @FunctionalInterface
+  public interface CheckedConsumer<T> {
+    void accept(T t) throws Exception;
+  }
+
+  /**
    * Response format enumeration for HTTP responses.
    * Supports JSON, XML, and UNSPECIFIED formats.
    */

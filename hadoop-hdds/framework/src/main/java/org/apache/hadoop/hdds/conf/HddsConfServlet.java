@@ -77,53 +77,41 @@ public class HddsConfServlet extends HttpServlet {
       format = HttpServletUtils.ResponseFormat.XML;
     }
 
-    response.setContentType(format.getContentType());
-
     String name = request.getParameter("name");
-    Writer out = response.getWriter();
     String cmd = request.getParameter(COMMAND);
 
-    processCommand(cmd, format, request, response, out, name);
+    processCommand(cmd, format, request, response, name);
   }
 
   private void processCommand(String cmd, HttpServletUtils.ResponseFormat format, HttpServletRequest request,
-                              HttpServletResponse response, Writer out, String name)
+                              HttpServletResponse response, String name)
       throws IOException {
     try {
       if (cmd == null) {
-        writeResponse(getConfFromContext(), out, format, name);
+        HttpServletUtils.writeResponse(response, format, (out) -> {
+          switch (format) {
+          case JSON:
+            OzoneConfiguration.dumpConfiguration(getConfFromContext(), name, out);
+            break;
+          case XML:
+            getConfFromContext().writeXml(name, out);
+            break;
+          default:
+            throw new BadFormatException("Bad format: " + format);
+          }
+        }, IllegalArgumentException.class);
       } else {
-        processConfigTagRequest(request, cmd, out);
+        processConfigTagRequest(request, cmd, response);
       }
     } catch (IllegalArgumentException iae) {
       HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_NOT_FOUND, iae.getMessage(), format, response);
-    } catch (BadFormatException bfe) {
-      LOG.error("format should be either JSON or XML, got {}", format, bfe);
-      HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-          "Caught an exception while processing HddsConfServlet request", format, response);
     }
   }
 
-  /**
-   * Guts of the servlet - extracted for easy testing.
-   */
-  static void writeResponse(OzoneConfiguration conf, Writer out, HttpServletUtils.ResponseFormat format,
-                            String propertyName)
-      throws IOException, IllegalArgumentException, BadFormatException {
-    switch (format) {
-    case JSON:
-      OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
-      break;
-    case XML:
-      conf.writeXml(propertyName, out);
-      break;
-    default:
-      throw new BadFormatException("Bad format: " + format);
-    }
-  }
-
-  private void processConfigTagRequest(HttpServletRequest request, String cmd, Writer out) throws IOException {
+  private void processConfigTagRequest(HttpServletRequest request, String cmd, HttpServletResponse response)
+      throws IOException {
     OzoneConfiguration config = getOzoneConfig();
+    Writer out = response.getWriter();
 
     switch (cmd) {
     case "getOzoneTags":
