@@ -67,6 +67,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   private final long interval;
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTaskV2(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
