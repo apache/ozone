@@ -87,14 +87,15 @@ public final class HttpServletUtils implements Serializable {
     PrintWriter writer = response.getWriter();
     switch (format) {
     case JSON:
-      Map<String, String> errorMap = new HashMap<String, String>();
+      Map<String, String> errorMap = new HashMap<>();
       errorMap.put("error", errorMessage);
       writer.write(JsonUtils.toJsonString(errorMap));
       break;
     case XML:
-    default:
       writeXmlError(errorMessage, writer);
       break;
+    default:
+      throw new IOException("Unsupported response format for error response: " + format);
     }
   }
 
