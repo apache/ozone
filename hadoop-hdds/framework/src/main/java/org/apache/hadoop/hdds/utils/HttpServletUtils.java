@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
