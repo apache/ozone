@@ -65,7 +65,6 @@ public final class HttpServletUtils implements Serializable {
    * otherwise {@link ResponseFormat#XML} (default for backwards compatibility)
    * @see HttpHeaders#ACCEPT
    */
-  @VisibleForTesting
   public static ResponseFormat getResponseFormat(HttpServletRequest request) throws IllegalArgumentException {
     String format = request.getHeader(HttpHeaders.ACCEPT);
     if (format == null) {
