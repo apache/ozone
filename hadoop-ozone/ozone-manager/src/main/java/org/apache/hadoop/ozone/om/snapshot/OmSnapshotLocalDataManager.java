@@ -179,7 +179,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private LocalDataVersionNode getVersionNode(UUID snapshotId, int version) {
-    if (!versionNodeMap.containsKey(snapshotId)) {
+    if (snapshotId == null || !versionNodeMap.containsKey(snapshotId)) {
       return null;
     }
     return versionNodeMap.get(snapshotId).getVersionNode(version);
@@ -190,7 +190,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     if (!versionNodeMap.containsKey(snapshotId)) {
       for (LocalDataVersionNode versionNode : snapshotVersionsMeta.getSnapshotVersions().values()) {
         validateVersionAddition(versionNode);
-        LocalDataVersionNode previousVersionNode = versionNode.previousSnapshotId == null ? null :
+        LocalDataVersionNode previousVersionNode =
             getVersionNode(versionNode.previousSnapshotId, versionNode.previousSnapshotVersion);
         localDataGraph.addNode(versionNode);
         if (previousVersionNode != null) {
