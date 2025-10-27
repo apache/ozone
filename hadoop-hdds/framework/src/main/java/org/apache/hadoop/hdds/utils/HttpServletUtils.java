@@ -134,9 +134,7 @@ public final class HttpServletUtils implements Serializable {
    * @throws E           if contentWriter throws an exception of type E
    */
   public static <E extends Exception> void writeResponse(HttpServletResponse response, ResponseFormat format,
-                                   CheckedConsumer<Writer> contentWriter,
-                                   Class<E> exceptionClass)
-      throws IOException, E {
+      CheckedConsumer<Writer> contentWriter, Class<E> exceptionClass) throws IOException, E {
     response.setContentType(format.getContentType());
     Writer out = response.getWriter();
     try {
