@@ -205,6 +205,10 @@ public class ContainerSet implements Iterable<Container<?>> {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);
       }
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(containerId);
+      }
       return true;
     } else {
       LOG.warn("Container already exists with container Id {}", containerId);
@@ -299,6 +303,10 @@ public class ContainerSet implements Iterable<Container<?>> {
           "containerMap", containerId);
       return false;
     } else {
+      HddsVolume volume = removed.getContainerData().getVolume();
+      if (volume != null) {
+        volume.removeContainer(containerId);
+      }
       LOG.debug("Container with containerId {} is removed from containerMap",
           containerId);
       return true;
@@ -409,13 +417,19 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public Iterator<Container<?>> getContainerIterator(HddsVolume volume) {
     Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-            .getStorageID()))
-        .sorted(ContainerDataScanOrder.INSTANCE)
-        .iterator();
+    Iterator<Long> containerIdIterator = volume.getContainerIterator();
+
+    List<Container<?>> containers = new ArrayList<>();
+    while (containerIdIterator.hasNext()) {
+      Long containerId = containerIdIterator.next();
+      Container<?> container = containerMap.get(containerId);
+      if (container != null) {
+        containers.add(container);
+      }
+    }
+    containers.sort(ContainerDataScanOrder.INSTANCE);
+
+    return containers.iterator();
   }
 
   /**
@@ -426,11 +440,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public long containerCount(HddsVolume volume) {
     Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-        .getStorageID())).count();
+    return volume.getContainerCount();
   }
 
   /**
