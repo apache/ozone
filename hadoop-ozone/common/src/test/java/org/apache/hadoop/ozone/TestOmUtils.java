@@ -288,8 +288,8 @@ public class TestOmUtils {
 
   @Test
   void testGetTxIdFromObjectId() {
-    long[] testTxIds = { 0L, 1L, 100L, 1000L, 0x123456789ABCDL, OmUtils.MAX_TRXN_ID };
-    long[] testEpochs = { 0L, 1L, 2L, 3L };
+    long[] testTxIds = {0L, 1L, 100L, 1000L, 0x123456789ABCDL, OmUtils.MAX_TRXN_ID};
+    long[] testEpochs = {0L, 1L, 2L, 3L};
 
     for (long epoch : testEpochs) {
       for (long txId : testTxIds) {
