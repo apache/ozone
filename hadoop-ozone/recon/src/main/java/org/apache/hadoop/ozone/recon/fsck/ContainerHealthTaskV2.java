@@ -64,13 +64,9 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   private final StorageContainerServiceProvider scmClient;
   private final ContainerManager containerManager;
   private final ContainerHealthSchemaManagerV2 schemaManagerV2;
-  private final ReconContainerMetadataManager reconContainerMetadataManager;
-  private final PlacementPolicy placementPolicy;
-  private final OzoneConfiguration conf;
   private final long interval;
 
   @Inject
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTaskV2(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
@@ -84,9 +80,6 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     this.scmClient = scmClient;
     this.containerManager = containerManager;
     this.schemaManagerV2 = schemaManagerV2;
-    this.reconContainerMetadataManager = reconContainerMetadataManager;
-    this.placementPolicy = placementPolicy;
-    this.conf = conf;
     this.interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
     LOG.info("Initialized ContainerHealthTaskV2 with SCM-based two-way sync, interval={}ms", interval);
   }
