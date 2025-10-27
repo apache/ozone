@@ -220,7 +220,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     if (!includeSnapshotData) {
       maxTotalSstSize.set(Long.MAX_VALUE);
     } else {
-      snapshotPaths = getSnapshotDirs(omMetadataManager);
+      snapshotPaths = getSnapshotDirsFromDB(omMetadataManager);
     }
 
     if (sstFilesToExclude.isEmpty()) {
@@ -383,25 +383,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     return ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
-  }
-
-  /**
-   * Collects paths to all snapshot databases.
-   *
-   * @param omMetadataManager OMMetadataManager instance
-   * @return Set of paths to snapshot databases
-   * @throws IOException if an I/O error occurs
-   */
-  Set<Path> getSnapshotDirs(OMMetadataManager omMetadataManager) throws IOException {
-    Set<Path> snapshotPaths = new HashSet<>();
-    SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
-    for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
-      String snapshotDir =
-          OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
-      Path path = Paths.get(snapshotDir);
-      snapshotPaths.add(path);
-    }
-    return snapshotPaths;
   }
 
   /**

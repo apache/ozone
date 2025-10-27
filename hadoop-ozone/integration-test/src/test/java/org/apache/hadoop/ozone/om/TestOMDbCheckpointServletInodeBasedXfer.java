@@ -231,7 +231,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .thenReturn(lock);
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
@@ -598,9 +597,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    * from checkpoint metadata (frozen state) rather than live OM metadata (current state).
    * Scenario:
    * 1. Create snapshots S1, S2
-   * 2. Checkpoint is created (freezes state with S1, S2)
-   * 3. S2 gets purged from live OM (after checkpoint creation)
-   * 4. Servlet processes checkpoint - should still include S2 data
+   * 2. Create Snapshot S3
+   * 3. Checkpoint is created (freezes state with S1, S2)
+   * 4. S2 gets purged from live OM (after checkpoint creation)
+   * 5. Servlet processes checkpoint - should still include S2 data
    */
   @Test
   public void testCheckpointIncludesSnapshotsFromFrozenState() throws Exception {
@@ -624,15 +624,23 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data2".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot2");
+    TestDataUtil.createKey(bucket, "key3",
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "data3".getBytes(StandardCharsets.UTF_8));
+    client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot3");
     om.getMetadataManager().getStore().flushDB();
 
     // At this point: Live OM has snapshots S1, S2
     List<OzoneSnapshot> snapshotsBeforePurge = new ArrayList<>();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshotsBeforePurge::add);
-    assertEquals(2, snapshotsBeforePurge.size(), "Should have 2 snapshots initially");
+    assertEquals(3, snapshotsBeforePurge.size(), "Should have 3 snapshots initially");
     OzoneSnapshot snapshot2 = snapshotsBeforePurge.stream()
         .filter(snap -> snap.getName().equals("snapshot2"))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
+    OzoneSnapshot snapshot3 = snapshotsBeforePurge.stream()
+        .filter(snap -> snap.getName().equals("snapshot3"))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
 
@@ -666,12 +674,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     om.getMetadataManager().getSnapshotInfoTable().delete(snapshot2TableKey);
     om.getMetadataManager().getStore().flushDB();
 
-    // Verify live OM now only sees 1 snapshot
+    // Verify live OM now only sees 2 snapshots
     List<OzoneSnapshot> snapshotsAfterPurge = new ArrayList<>();
     // simulating a purge here by only adding active snapshots
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshotsAfterPurge::add);
-    assertEquals(1, snapshotsAfterPurge.size(), "Should have 1 snapshot after purge");
+    assertEquals(2, snapshotsAfterPurge.size(), "Should have 1 snapshot after purge");
     // Extract tarball and verify contents
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
@@ -681,11 +689,16 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
     Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
+    Path snapshot3DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+        OM_DB_NAME + "-" + snapshot3.getSnapshotId());
     boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);
-    // The critical assertion: checkpoint should include snapshot2 data
-    // even though it was purged from live OM after checkpoint creation
+    boolean snapshot3IncludedInCheckpoint = Files.exists(snapshot3DbDir);
+    // The critical assertion: checkpoint should include snapshot2 and snapshot3 data
+    // even though snapshot2 was purged from live OM after checkpoint creation
     assertTrue(snapshot2IncludedInCheckpoint,
         "Checkpoint should include snapshot2 data even though it was purged from live OM.");
+    assertTrue(snapshot3IncludedInCheckpoint,
+        "Checkpoint should include snapshot3 data");
     // Cleanup
     if (capturedCheckpoint.get() != null) {
       capturedCheckpoint.get().cleanupCheckpoint();
