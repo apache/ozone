@@ -167,9 +167,7 @@ public class SCMStateMachine extends BaseStateMachine {
       if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
-      updateLastAppliedTermIndex(appliedTermIndex);
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry())));
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
