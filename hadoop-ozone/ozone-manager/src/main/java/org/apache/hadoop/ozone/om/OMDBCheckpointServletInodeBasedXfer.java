@@ -265,15 +265,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
         if (includeSnapshotData) {
           // get the list of snapshots from the checkpoint
-          OmMetadataManagerImpl checkpointMetadataManager = null;
-          try {
-            checkpointMetadataManager =
-                OmMetadataManagerImpl.createCheckpointMetadataManager(om.getConfiguration(), checkpoint);
+          try (OmMetadataManagerImpl checkpointMetadataManager = OmMetadataManagerImpl
+              .createCheckpointMetadataManager(om.getConfiguration(), checkpoint)) {
             snapshotPaths = getSnapshotDirsFromDB(checkpointMetadataManager);
-          } finally {
-            if (checkpointMetadataManager != null) {
-              checkpointMetadataManager.stop();
-            }
           }
           writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, false);
