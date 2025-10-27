@@ -95,7 +95,8 @@ public final class HttpServletUtils implements Serializable {
       writeXmlError(errorMessage, writer);
       break;
     default:
-      throw new IOException("Unsupported response format for error response: " + format);
+      throw new IOException("Unsupported response format for error response: " + format,
+          new IllegalArgumentException("Bad format: " + format));
     }
   }
 
