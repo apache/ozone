@@ -65,11 +65,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   /**
    * Admin command should take effect on all SCM instance.
+   * This includes both write operations (that must be synchronized across HA)
+   * and read-only operations that are safe to execute on followers.
    */
   Set<Type> ADMIN_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
       Type.StartReplicationManager,
       Type.StopReplicationManager,
-      Type.ForceExitSafeMode));
+      Type.ForceExitSafeMode,
+      Type.InSafeMode,                    
+      Type.GetSafeModeRuleStatuses));     
 
   /**
    * Asks SCM where a container should be allocated. SCM responds with the
