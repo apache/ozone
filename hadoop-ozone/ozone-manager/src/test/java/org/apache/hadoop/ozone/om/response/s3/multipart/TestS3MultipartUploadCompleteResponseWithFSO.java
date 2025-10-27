@@ -46,22 +46,6 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
   private long parentID;
 
-  private S3InitiateMultipartUploadResponse addS3InitiateMultipartUpload(
-          String volumeName, String bucketName, String keyName,
-          String multipartUploadID, long volumeId,
-          long bucketId) throws IOException {
-
-    S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
-        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
-            keyName, multipartUploadID, new ArrayList<>(), volumeId,
-            bucketId);
-
-    s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
-            batchOperation);
-
-    return s3InitiateMultipartUploadResponseFSO;
-  }
-
   @Override
   protected String getKeyName() {
     return dirName + UUID.randomUUID().toString();
