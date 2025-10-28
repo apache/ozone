@@ -22,19 +22,23 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -49,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -70,13 +75,13 @@ public class TestOMHALeaderSpecificACLEnforcement {
 
   private static final String OM_SERVICE_ID = "om-service-test-admin";
   private static final int NUM_OF_OMS = 3;
-  private static final String TEST_USER = "testuser-" + 
+  private static final String TEST_USER = "testuser-" +
       RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
-  private static final String TEST_VOLUME = "testvol-" + 
+  private static final String TEST_VOLUME = "testvol-" +
       RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
-  private static final String ADMIN_VOLUME = "adminvol-" + 
+  private static final String ADMIN_VOLUME = "adminvol-" +
       RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
-  private static final String TEST_BUCKET = "testbucket-" + 
+  private static final String TEST_BUCKET = "testbucket-" +
       RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
 
   private MiniOzoneHAClusterImpl cluster;
@@ -90,10 +95,10 @@ public class TestOMHALeaderSpecificACLEnforcement {
     // Create test user
     testUserUgi = UserGroupInformation.createUserForTesting(TEST_USER, new String[]{"testgroup"});
     adminUserUgi = UserGroupInformation.getCurrentUser();
-    
+
     // Set up and start the cluster
     setupCluster();
-    
+
     // Create admin volume that will be used for bucket permission testing
     theLeaderOM = cluster.getOMLeader();
     createAdminVolume();
@@ -112,14 +117,14 @@ public class TestOMHALeaderSpecificACLEnforcement {
     OzoneManager currentLeader = cluster.getOMLeader();
     if (!currentLeader.getOMNodeId().equals(theLeaderOM.getOMNodeId())) {
       currentLeader.transferLeadership(theLeaderOM.getOMNodeId());
-      GenericTestUtils.waitFor(() -> {
+      BooleanSupplier leadershipCheck = () -> {
         try {
-          OzoneManager currentLeaderCheck = cluster.getOMLeader();
-          return !currentLeaderCheck.getOMNodeId().equals(currentLeader.getOMNodeId());
+          return !cluster.getOMLeader().getOMNodeId().equals(currentLeader.getOMNodeId());
         } catch (Exception e) {
           return false;
         }
-      }, 1000, 30000);
+      };
+      GenericTestUtils.waitFor(leadershipCheck, 1000, 30000);
     }
   }
 
@@ -136,26 +141,24 @@ public class TestOMHALeaderSpecificACLEnforcement {
     // Step 1: Get the current leader OM
     OzoneManager currentLeader = cluster.getOMLeader();
     String leaderNodeId = currentLeader.getOMNodeId();
-    
+
     // Step 2: Add test user as admin only to the current leader OM
     addAdminToSpecificOM(currentLeader, TEST_USER);
-    
+
     // Verify admin was added
-    assertTrue(currentLeader.getOmAdminUsernames().contains(TEST_USER),
-        "Test user should be admin on leader OM");
-    
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
     // Step 3: Test volume and bucket creation as test user (should succeed)
     testVolumeAndBucketCreationAsUser(true);
-    
+
     // Step 4: Force leadership transfer to another OM node
     OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
-    assertNotEquals(leaderNodeId, newLeader.getOMNodeId(), 
+    assertNotEquals(leaderNodeId, newLeader.getOMNodeId(),
         "Leadership should have transferred to a different node");
-    
+
     // Step 5: Verify test user is NOT admin on new leader
-    assertTrue(!newLeader.getOmAdminUsernames().contains(TEST_USER),
-        "Test user should NOT be admin on new leader OM");
-    
+    assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
     // Step 6: Test volume and bucket creation as test user (should fail)
     testVolumeAndBucketCreationAsUser(false);
   }
@@ -167,16 +170,16 @@ public class TestOMHALeaderSpecificACLEnforcement {
     OzoneConfiguration conf = createBaseConfiguration();
     conf.setClass(OZONE_ACL_AUTHORIZER_CLASS, OzoneNativeAuthorizer.class,
         IAccessAuthorizer.class);
-    
+
     // Build HA cluster
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumDatanodes(3);
-    
+
     cluster = builder.build();
     cluster.waitForClusterToBeReady();
-    
+
     // Create client
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
   }
@@ -186,14 +189,14 @@ public class TestOMHALeaderSpecificACLEnforcement {
    */
   private OzoneConfiguration createBaseConfiguration() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    
+
     // Enable ACL for proper permission testing
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    
+
     // Set current user as initial admin (needed for cluster setup)
     String currentUser = adminUserUgi.getShortUserName();
     conf.set(OZONE_ADMINISTRATORS, currentUser);
-    
+
     return conf;
   }
 
@@ -204,12 +207,12 @@ public class TestOMHALeaderSpecificACLEnforcement {
    */
   private void createAdminVolume() throws Exception {
     ObjectStore adminObjectStore = client.getObjectStore();
-    
+
     // Create volume as admin user
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setOwner(adminUserUgi.getShortUserName())
         .build();
-    
+
     adminObjectStore.createVolume(ADMIN_VOLUME, volumeArgs);
   }
 
@@ -220,64 +223,64 @@ public class TestOMHALeaderSpecificACLEnforcement {
   private void addAdminToSpecificOM(OzoneManager om, String username) throws Exception {
     // Get current admin users
     String currentAdmins = String.join(",", om.getOmAdminUsernames());
-    
+
     // Add the new user to admin list
     String newAdmins = currentAdmins + "," + username;
-    
+
     // Reconfigure the OM to add the new admin
     om.getReconfigurationHandler().reconfigureProperty(OZONE_ADMINISTRATORS, newAdmins);
   }
 
   /**
    * Tests volume and bucket creation as the test user.
-   * 
+   *
    * @param shouldSucceed true if operations should succeed, false if they should fail
    */
   private void testVolumeAndBucketCreationAsUser(boolean shouldSucceed) throws Exception {
     // Switch to test user context
     UserGroupInformation.setLoginUser(testUserUgi);
-    
+
     try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
       ObjectStore userObjectStore = userClient.getObjectStore();
-      
+
       if (shouldSucceed) {
         // Test volume creation (should succeed)
         VolumeArgs volumeArgs = VolumeArgs.newBuilder()
             .setOwner(TEST_USER)
             .build();
-        
+
         userObjectStore.createVolume(TEST_VOLUME, volumeArgs);
         OzoneVolume volume = userObjectStore.getVolume(TEST_VOLUME);
         assertNotNull(volume, "Volume should be created successfully");
         assertEquals(TEST_VOLUME, volume.getName());
-        
+
         // Test bucket creation (should succeed)
         BucketArgs bucketArgs = BucketArgs.newBuilder()
             .build();
-        
+
         volume.createBucket(TEST_BUCKET, bucketArgs);
         OzoneBucket bucket = volume.getBucket(TEST_BUCKET);
         assertNotNull(bucket, "Bucket should be created successfully");
         assertEquals(TEST_BUCKET, bucket.getName());
-        
+
       } else {
         // Test volume creation (should fail)
         VolumeArgs volumeArgs = VolumeArgs.newBuilder()
             .setOwner(TEST_USER)
             .build();
-        
+
         String newVolumeName = "failtest-" + RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
         OMException volumeException = assertThrows(OMException.class, () -> {
           userObjectStore.createVolume(newVolumeName, volumeArgs);
         }, "Volume creation should fail for non-admin user");
         assertEquals(PERMISSION_DENIED, volumeException.getResult());
-        
+
         // Test bucket creation (should fail) - use admin-created volume
         if (volumeExists(userObjectStore, ADMIN_VOLUME)) {
           OzoneVolume adminVolume = userObjectStore.getVolume(ADMIN_VOLUME);
           BucketArgs bucketArgs = BucketArgs.newBuilder().build();
           String newBucketName = "failtest-" + RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
-          
+
           OMException bucketException = assertThrows(OMException.class, () -> {
             adminVolume.createBucket(newBucketName, bucketArgs);
           }, "Bucket creation should fail for non-admin user in admin-owned volume");
@@ -335,8 +338,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
     addAdminToSpecificOM(currentLeader, TEST_USER);
 
     // Verify admin was added
-    assertTrue(currentLeader.getOmAdminUsernames().contains(TEST_USER),
-        "Test user should be admin on leader OM");
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
 
     // Switch to test user and try setTimes as admin (should succeed)
     UserGroupInformation.setLoginUser(testUserUgi);
@@ -358,8 +360,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
       OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
       assertNotEquals(leaderNodeId, newLeader.getOMNodeId(),
           "Leadership should have transferred to a different node");
-      assertFalse(newLeader.getOmAdminUsernames().contains(TEST_USER),
-          "Test user should NOT be admin on new leader OM");
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
 
       long anotherMtime = System.currentTimeMillis() + 10000;
       OMException exception = assertThrows(OMException.class, () -> {
@@ -371,6 +372,489 @@ public class TestOMHALeaderSpecificACLEnforcement {
       // Reset to original user
       UserGroupInformation.setLoginUser(adminUserUgi);
     }
+  }
+
+  /**
+   * Tests that setQuota ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testVolumeSetQuotaAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "quotavol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volume as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to set quota as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+
+      OzoneQuota quota1 = OzoneQuota.getOzoneQuota(100L * 1024 * 1024 * 1024, 1000);
+      userVolume.setQuota(quota1); // Set quota to 100GB
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OzoneQuota quota2 = OzoneQuota.getOzoneQuota(200L * 1024 * 1024 * 1024, 2000);
+      OMException exception = assertThrows(OMException.class, () -> {
+        userVolume.setQuota(quota2);
+      }, "setQuota should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that setOwner ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testVolumeSetOwnerAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "ownervol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volume as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to change owner as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+
+      userVolume.setOwner("newowner");
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OMException exception = assertThrows(OMException.class, () -> {
+        userVolume.setOwner("anothernewowner");
+      }, "setOwner should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that deleteVolume ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testVolumeDeleteAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume1 = "delvol1-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testVolume2 = "delvol2-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volumes as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume1, volumeArgs);
+    adminObjectStore.createVolume(testVolume2, volumeArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to delete volume as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+
+      userObjectStore.deleteVolume(testVolume1);
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OMException exception = assertThrows(OMException.class, () -> {
+        userObjectStore.deleteVolume(testVolume2);
+      }, "deleteVolume should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that setBucketProperty ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testBucketSetPropertyAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "bucketpropvol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket = "bucketprop-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volume and bucket as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    BucketArgs bucketArgs = BucketArgs.newBuilder().build();
+    adminVolume.createBucket(testBucket, bucketArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to set bucket properties as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+      OzoneBucket userBucket = userVolume.getBucket(testBucket);
+
+      // Set versioning
+      userBucket.setVersioning(true);
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OMException exception = assertThrows(OMException.class, () -> {
+        userBucket.setVersioning(false);
+      }, "setBucketProperty should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that setBucketOwner ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testBucketSetOwnerAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "bucketownervol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket = "bucketowner-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volume and bucket as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    BucketArgs bucketArgs = BucketArgs.newBuilder().build();
+    adminVolume.createBucket(testBucket, bucketArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to set bucket owner as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+      OzoneBucket userBucket = userVolume.getBucket(testBucket);
+
+      // Set new owner
+      userBucket.setOwner("newowner");
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OMException exception = assertThrows(OMException.class, () -> {
+        userBucket.setOwner("anothernewowner");
+      }, "setBucketOwner should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that deleteBucket ACL check is enforced in preExecute and is leader-specific.
+   */
+  @Test
+  public void testBucketDeleteAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "bucketdelvol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket1 = "bucketdel1-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket2 = "bucketdel2-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Create volume and buckets as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    BucketArgs bucketArgs = BucketArgs.newBuilder().build();
+    adminVolume.createBucket(testBucket1, bucketArgs);
+    adminVolume.createBucket(testBucket2, bucketArgs);
+
+    // Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Test user should be able to delete bucket as admin
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+
+      userVolume.deleteBucket(testBucket1);
+
+      // Transfer leadership
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Should fail on new leader
+      OMException exception = assertThrows(OMException.class, () -> {
+        userVolume.deleteBucket(testBucket2);
+      }, "deleteBucket should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, exception.getResult());
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+  }
+
+  /**
+   * Tests that deleteKeys (bulk) ACL check is enforced in preExecute and is leader-specific.
+   *
+   * <p>This test verifies that when using the bulk deleteKeys API:
+   * <ul>
+   *   <li>Keys that pass ACL checks are deleted successfully</li>
+   *   <li>Keys that fail ACL checks are silently filtered out (no exception thrown)</li>
+   *   <li>ACL enforcement is based on the current leader's configuration</li>
+   * </ul>
+   *
+   * <p>The test flow:
+   * <ol>
+   *   <li>Create test volume, bucket, and multiple keys as admin</li>
+   *   <li>Add test user as admin on current leader</li>
+   *   <li>Test user successfully deletes first key using bulk API</li>
+   *   <li>Transfer leadership to node where test user is NOT admin</li>
+   *   <li>Test user attempts to delete second key - operation succeeds but key is not deleted</li>
+   *   <li>Verify the key still exists (was filtered out due to ACL failure)</li>
+   * </ol>
+   */
+  @Test
+  public void testKeysDeleteAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "keysdelvol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket = "keysdel-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String keyName1 = "key1-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String keyName2 = "key2-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Step 1: Create volume, bucket, and keys as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    BucketArgs bucketArgs = BucketArgs.newBuilder().build();
+    adminVolume.createBucket(testBucket, bucketArgs);
+    OzoneBucket adminBucket = adminVolume.getBucket(testBucket);
+
+    // Create test keys
+    try (OzoneOutputStream out = adminBucket.createKey(keyName1, 0)) {
+      out.write("test data 1".getBytes(UTF_8));
+    }
+    try (OzoneOutputStream out = adminBucket.createKey(keyName2, 0)) {
+      out.write("test data 2".getBytes(UTF_8));
+    }
+
+    // Step 2: Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    String originalLeaderNodeId = currentLeader.getOMNodeId();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Step 3: Test user deletes first key successfully using bulk API
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+      OzoneBucket userBucket = userVolume.getBucket(testBucket);
+
+      // Use bulk deleteKeys API (this supports ACL filtering)
+      userBucket.deleteKeys(Collections.singletonList(keyName1));
+
+      // Verify key1 was deleted
+      OMException ex1 = assertThrows(OMException.class, () -> userBucket.getKey(keyName1),
+          "Key1 should be deleted");
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex1.getResult());
+
+      // Step 4: Transfer leadership to another node where test user is NOT admin
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertNotEquals(originalLeaderNodeId, newLeader.getOMNodeId(),
+          "Leadership should have transferred to a different node");
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Step 5: Attempt to delete second key - should not throw but key should not be deleted
+      // The bulk deleteKeys API filters out keys that fail ACL check in preExecute
+      userBucket.deleteKeys(Collections.singletonList(keyName2));
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+
+    // Step 6: Verify key2 still exists (was filtered out due to ACL failure)
+    OzoneKey key2 = adminBucket.getKey(keyName2);
+    assertNotNull(key2, "Key2 should still exist after being filtered out by ACL check");
+    assertEquals(keyName2, key2.getName());
+  }
+
+  /**
+   * Tests that renameKeys (bulk) ACL check is enforced in preExecute and is leader-specific.
+   *
+   * <p>This test verifies that when using the bulk renameKeys API:
+   * <ul>
+   *   <li>Key pairs that pass ACL checks are renamed successfully</li>
+   *   <li>Key pairs that fail ACL checks are silently filtered out (no exception thrown)</li>
+   *   <li>ACL enforcement is based on the current leader's configuration</li>
+   * </ul>
+   *
+   * <p>The test flow:
+   * <ol>
+   *   <li>Create test volume, bucket, and multiple keys as admin with LEGACY bucket layout</li>
+   *   <li>Add test user as admin on current leader</li>
+   *   <li>Test user successfully renames first key using bulk API</li>
+   *   <li>Transfer leadership to node where test user is NOT admin</li>
+   *   <li>Test user attempts to rename second key - operation succeeds but key is not renamed</li>
+   *   <li>Verify the key still has original name (was filtered out due to ACL failure)</li>
+   * </ol>
+   *
+   * <p>Note: This test uses LEGACY bucket layout because the bulk renameKeys API is deprecated
+   * and not supported for FILE_SYSTEM_OPTIMIZED layouts.
+   */
+  @Test
+  public void testKeysRenameAclEnforcementAfterLeadershipChange() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "keysrenamevol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket = "keysrename-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String keyName1 = "key1-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String keyName2 = "key2-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String newKeyName1 = "newkey1-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String newKeyName2 = "newkey2-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Step 1: Create volume, bucket with LEGACY layout, and keys as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    // Use LEGACY bucket layout since bulk renameKeys is not supported for FSO
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.LEGACY)
+        .build();
+    adminVolume.createBucket(testBucket, bucketArgs);
+    OzoneBucket adminBucket = adminVolume.getBucket(testBucket);
+
+    // Create test keys
+    try (OzoneOutputStream out = adminBucket.createKey(keyName1, 0)) {
+      out.write("test data 1".getBytes(UTF_8));
+    }
+    try (OzoneOutputStream out = adminBucket.createKey(keyName2, 0)) {
+      out.write("test data 2".getBytes(UTF_8));
+    }
+
+    // Step 2: Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    String originalLeaderNodeId = currentLeader.getOMNodeId();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Step 3: Test user renames first key successfully using bulk API
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+      OzoneVolume userVolume = userObjectStore.getVolume(testVolume);
+      OzoneBucket userBucket = userVolume.getBucket(testBucket);
+
+      // Use bulk renameKeys API (this supports ACL filtering)
+      Map<String, String> renameMap1 = new HashMap<>();
+      renameMap1.put(keyName1, newKeyName1);
+      userBucket.renameKeys(renameMap1);
+
+      // Verify key1 was renamed
+      OMException ex1 = assertThrows(OMException.class, () -> userBucket.getKey(keyName1),
+          "Original key1 should not exist after rename");
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex1.getResult());
+      assertNotNull(userBucket.getKey(newKeyName1), "Renamed key1 should exist");
+
+      // Step 4: Transfer leadership to another node where test user is NOT admin
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertNotEquals(originalLeaderNodeId, newLeader.getOMNodeId(),
+          "Leadership should have transferred to a different node");
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Step 5: Attempt to rename second key - should not throw but key should not be renamed
+      // The bulk renameKeys API filters out key pairs that fail ACL check in preExecute
+      Map<String, String> renameMap2 = new HashMap<>();
+      renameMap2.put(keyName2, newKeyName2);
+      userBucket.renameKeys(renameMap2);
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+
+    // Step 6: Verify key2 still has original name (was filtered out due to ACL failure)
+    OzoneKey key2 = adminBucket.getKey(keyName2);
+    assertNotNull(key2, "Original key2 should still exist after being filtered out by ACL check");
+    assertEquals(keyName2, key2.getName());
+
+    // Verify new key name doesn't exist
+    OMException ex2 = assertThrows(OMException.class, () -> adminBucket.getKey(newKeyName2),
+        "New key name should not exist after ACL filtering");
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex2.getResult());
   }
 
   /**
@@ -387,41 +871,41 @@ public class TestOMHALeaderSpecificACLEnforcement {
 
   /**
    * Transfers leadership from current leader to another OM node.
-   * 
+   *
    * @param currentLeader the current leader OM
    * @return the new leader OM after transfer
    */
   private OzoneManager transferLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
     // Get list of all OMs
     List<OzoneManager> omList = new ArrayList<>(cluster.getOzoneManagersList());
-    
+
     // Remove current leader from list
     omList.remove(currentLeader);
-    
+
     // Select the first alternative OM as target
     OzoneManager targetOM = omList.get(0);
     String targetNodeId = targetOM.getOMNodeId();
-    
+
     // Transfer leadership
     currentLeader.transferLeadership(targetNodeId);
-    
+
     // Wait for leadership transfer to complete
-    GenericTestUtils.waitFor(() -> {
+    BooleanSupplier leadershipTransferCheck = () -> {
       try {
-        OzoneManager currentLeaderCheck = cluster.getOMLeader();
-        return !currentLeaderCheck.getOMNodeId().equals(currentLeader.getOMNodeId());
+        return !cluster.getOMLeader().getOMNodeId().equals(currentLeader.getOMNodeId());
       } catch (Exception e) {
         return false;
       }
-    }, 1000, 30000);
-    
+    };
+    GenericTestUtils.waitFor(leadershipTransferCheck, 1000, 30000);
+
     // Verify leadership change
     cluster.waitForLeaderOM();
     OzoneManager newLeader = cluster.getOMLeader();
-    
-    assertEquals(targetNodeId, newLeader.getOMNodeId(), 
+
+    assertEquals(targetNodeId, newLeader.getOMNodeId(),
         "Leadership should have transferred to target OM");
-    
+
     return newLeader;
   }
 }

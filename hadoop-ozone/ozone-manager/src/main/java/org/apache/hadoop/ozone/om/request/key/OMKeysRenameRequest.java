@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
+import static org.apache.hadoop.ozone.OzoneConsts.DST_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RENAMED_KEYS_MAP;
+import static org.apache.hadoop.ozone.OzoneConsts.SRC_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.UNRENAMED_KEYS_MAP;
+import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_RENAME;
@@ -78,6 +82,76 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    super.preExecute(ozoneManager);
+
+    RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
+    RenameKeysArgs renameKeysArgs = renameKeysRequest.getRenameKeysArgs();
+
+    String volumeName = renameKeysArgs.getVolumeName();
+    String bucketName = renameKeysArgs.getBucketName();
+
+    // Resolve bucket link
+    ResolvedBucket resolvedBucketObj = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName));
+    String resolvedVolume = resolvedBucketObj.realVolume();
+    String resolvedBucket = resolvedBucketObj.realBucket();
+
+    // ACL check during preExecute - filter out key pairs that fail ACL check
+    List<RenameKeysMap> keyPairsPassingAcl = new ArrayList<>();
+    if (ozoneManager.getAclsEnabled()) {
+      for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
+        String fromKeyName = renameKey.getFromKeyName();
+        String toKeyName = renameKey.getToKeyName();
+
+        // Skip empty key names - they will be handled in validateAndUpdateCache
+        if (fromKeyName.isEmpty() || toKeyName.isEmpty()) {
+          keyPairsPassingAcl.add(renameKey);
+          continue;
+        }
+
+        try {
+          // Check ACLs: DELETE permission on source key, CREATE permission on destination key
+          checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, fromKeyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+          checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, toKeyName,
+              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+          keyPairsPassingAcl.add(renameKey);
+        } catch (IOException ex) {
+          // Log ACL failure but continue processing other key pairs
+          LOG.warn("ACL check failed for rename {} -> {} during preExecute, key pair will be skipped: {}",
+              fromKeyName, toKeyName, ex.getMessage());
+          // Audit the failure
+          Map<String, String> auditMap = new LinkedHashMap<>();
+          auditMap.put(VOLUME, resolvedVolume);
+          auditMap.put(BUCKET, resolvedBucket);
+          auditMap.put(SRC_KEY, fromKeyName);
+          auditMap.put(DST_KEY, toKeyName);
+          markForAudit(ozoneManager.getAuditLogger(),
+              buildAuditMessage(OMAction.RENAME_KEYS, auditMap, ex,
+                  getOmRequest().getUserInfo()));
+        }
+      }
+    } else {
+      // ACLs not enabled, all key pairs pass
+      keyPairsPassingAcl.addAll(renameKeysArgs.getRenameKeysMapList());
+    }
+
+    // Build modified request with only key pairs that passed ACL check
+    RenameKeysArgs.Builder modifiedArgs = renameKeysArgs.toBuilder()
+        .clearRenameKeysMap()
+        .addAllRenameKeysMap(keyPairsPassingAcl);
+
+    RenameKeysRequest.Builder modifiedRequest = renameKeysRequest.toBuilder()
+        .setRenameKeysArgs(modifiedArgs);
+
+    return getOmRequest().toBuilder()
+        .setRenameKeysRequest(modifiedRequest)
+        .setUserInfo(getUserIfNotExists(ozoneManager))
+        .build();
+  }
+
+  @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
@@ -125,7 +199,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+
+      // ACL check already done in preExecute, key pairs in the request have passed ACL
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 
         fromKeyName = renameKey.getFromKeyName();
@@ -139,25 +214,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
                   .build());
           LOG.error("Key name is empty fromKeyName {} toKeyName {}",
               fromKeyName, toKeyName);
-          continue;
-        }
-
-        try {
-          // check Acls to see if user has access to perform delete operation
-          // on old key and create operation on new key
-          checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-          checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-        } catch (Exception ex) {
-          renameStatus = false;
-          unRenamedKeys.add(
-              unRenameKey.setFromKeyName(fromKeyName).setToKeyName(toKeyName)
-                  .build());
-          LOG.error("Acl check failed for fromKeyName {} toKeyName {}",
-              fromKeyName, toKeyName, ex);
           continue;
         }
 
