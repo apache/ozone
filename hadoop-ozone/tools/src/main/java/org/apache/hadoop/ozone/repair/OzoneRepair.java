@@ -27,8 +27,8 @@ import picocli.CommandLine;
  * Ozone Repair Command line tool.
  */
 @CommandLine.Command(name = "ozone repair",
-    description = "Advanced tool to repair Ozone. The nodes being repaired " +
-        "must be stopped before the tool is run.",
+    description = "Advanced tool to repair Ozone. Check subcommand help for respective" +
+        " role status requirements.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {

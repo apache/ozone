@@ -73,8 +73,8 @@ import picocli.CommandLine.Command;
  */
 @Command(
     name = "upgrade-container-schema",
-    description = "Offline upgrade all schema V2 containers to schema V3 " +
-        "for this datanode.",
+    description = "Offline upgrade all schema V2 containers to schema V3 for this datanode." + 
+        " DataNode should be stopped for this command.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UpgradeContainerSchema extends RepairTool {

@@ -41,7 +41,8 @@ import picocli.CommandLine;
     name = "compact",
     description = "CLI to compact a column-family in the DB while the service is offline.\n" +
         "Note: If om.db is compacted with this tool then it will negatively impact " +
-        "the Ozone Manager's efficient snapshot diff.",
+        "the Ozone Manager's efficient snapshot diff." + 
+        " The corresponding OM or SCM or DataNode role should be stopped for this tool.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
