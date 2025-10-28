@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
  * The only supported Condition operation is s3:prefix - all others will throw
  * UnsupportedOperationException.
  * <p>
- * The only supported Effect is Allow - all others will be silently ignored.
+ * The only supported Effect is Allow - all others will throw UnsupportedOperationException.
  * <p>
  * If a (currently) unsupported S3 action is requested, such as s3:GetAccelerateConfiguration,
  * it will be silently ignored.
