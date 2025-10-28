@@ -22,6 +22,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -96,6 +98,14 @@ public class NSSummaryTaskDbEventHandler {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
       nsSummary = new NSSummary();
+      // Look up the parent directory info from OM to get its parentId
+      // This ensures the propagation chain is not broken
+      // Below logic will handles edge cases where events might arrive out of order or in different batches
+      OmDirectoryInfo parentDirInfo = getParentDirInfo(parentObjectId);
+      if (parentDirInfo != null) {
+        nsSummary.setParentId(parentDirInfo.getParentObjectID());
+        nsSummary.setDirName(parentDirInfo.getName());
+      }
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
 
@@ -294,12 +304,37 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   /**
+   * Retrieves directory information from OM metadata by object ID.
+   * This is used to populate parentId when creating a new NSSummary.
+   *
+   * @param objectId the directory's object ID
+   * @return OmDirectoryInfo if found, null otherwise
+   */
+  private OmDirectoryInfo getParentDirInfo(long objectId) {
+    try {
+      // Search through the directory table to find the entry with matching objectId
+      Table<String, OmDirectoryInfo> dirTable = reconOMMetadataManager.getDirectoryTable();
+      TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator = dirTable.iterator();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        if (dirInfo != null && dirInfo.getObjectID() == objectId) {
+          return dirInfo;
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Error looking up directory info for objectId: {}", objectId, e);
+    }
+    return null;
+  }
+
+  /**
    * Propagates size and count changes upwards through the parent chain.
    * This ensures that when files are added/deleted, all ancestor directories
    * reflect the total changes in their sizeOfFiles and numOfFiles fields.
    */
   protected void propagateSizeUpwards(long objectId, long sizeChange, long replicatedSizeChange,
-                                       int countChange, Map<Long, NSSummary> nsSummaryMap) 
+                                       int countChange, Map<Long, NSSummary> nsSummaryMap)
                                        throws IOException {
     // Get the current directory's NSSummary
     NSSummary nsSummary = nsSummaryMap.get(objectId);
