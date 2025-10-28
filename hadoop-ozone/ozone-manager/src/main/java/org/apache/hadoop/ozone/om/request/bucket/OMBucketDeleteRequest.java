@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.V
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -74,6 +75,37 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    super.preExecute(ozoneManager);
+    DeleteBucketRequest deleteBucketRequest =
+        getOmRequest().getDeleteBucketRequest();
+    String volumeName = deleteBucketRequest.getVolumeName();
+    String bucketName = deleteBucketRequest.getBucketName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
+            volumeName, bucketName, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volumeName);
+        auditMap.put(OzoneConsts.BUCKET, bucketName);
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.DELETE_BUCKET, auditMap, ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager))
+        .build();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long transactionLogIndex = context.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -101,13 +133,6 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     boolean success = true;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
-            volumeName, bucketName, null);
-      }
-
       // acquire lock
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));

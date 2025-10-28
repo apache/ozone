@@ -78,6 +78,59 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    super.preExecute(ozoneManager);
+
+    RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
+    RenameKeysArgs renameKeysArgs = renameKeysRequest.getRenameKeysArgs();
+    
+    String volumeName = renameKeysArgs.getVolumeName();
+    String bucketName = renameKeysArgs.getBucketName();
+
+    // Resolve bucket link
+    ResolvedBucket resolvedBucketObj = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName));
+    String resolvedVolume = resolvedBucketObj.realVolume();
+    String resolvedBucket = resolvedBucketObj.realBucket();
+
+    // ACL check during preExecute - check all key pairs
+    if (ozoneManager.getAclsEnabled()) {
+      for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
+        String fromKeyName = renameKey.getFromKeyName();
+        String toKeyName = renameKey.getToKeyName();
+        
+        // Skip empty key names - they will be handled in validateAndUpdateCache
+        if (fromKeyName.isEmpty() || toKeyName.isEmpty()) {
+          continue;
+        }
+
+        try {
+          // Check ACLs: DELETE permission on source key, CREATE permission on destination key
+          checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, fromKeyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+          checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, toKeyName,
+              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+        } catch (IOException ex) {
+          // Ensure audit log captures preExecute failures
+          Map<String, String> auditMap = new LinkedHashMap<>();
+          auditMap.put("volume", resolvedVolume);
+          auditMap.put("bucket", resolvedBucket);
+          auditMap.put("fromKey", fromKeyName);
+          auditMap.put("toKey", toKeyName);
+          markForAudit(ozoneManager.getAuditLogger(),
+              buildAuditMessage(OMAction.RENAME_KEYS, auditMap, ex,
+                  getOmRequest().getUserInfo()));
+          throw ex;
+        }
+      }
+    }
+
+    return getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager))
+        .build();
+  }
+
+  @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
@@ -125,7 +178,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 
         fromKeyName = renameKey.getFromKeyName();
@@ -139,25 +191,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
                   .build());
           LOG.error("Key name is empty fromKeyName {} toKeyName {}",
               fromKeyName, toKeyName);
-          continue;
-        }
-
-        try {
-          // check Acls to see if user has access to perform delete operation
-          // on old key and create operation on new key
-          checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-          checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-        } catch (Exception ex) {
-          renameStatus = false;
-          unRenamedKeys.add(
-              unRenameKey.setFromKeyName(fromKeyName).setToKeyName(toKeyName)
-                  .build());
-          LOG.error("Acl check failed for fromKeyName {} toKeyName {}",
-              fromKeyName, toKeyName, ex);
           continue;
         }
 
