@@ -42,7 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -95,6 +97,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.event.Level;
 
@@ -739,6 +744,43 @@ class TestOmSnapshotManager {
     assertEquals(fileSize, 0);
     assertEquals(copyFiles.get(addNonSstToCopiedFiles.getFileName().toString()).get(addNonSstToCopiedFiles),
         destAddNonSstToCopiedFiles);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPath(int version) {
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    RDBStore store = mock(RDBStore.class);
+    when(metadataManager.getStore()).thenReturn(store);
+    File file = new File("test-db");
+    when(store.getDbLocation()).thenReturn(file);
+    String path = "dir1/dir2";
+    when(store.getSnapshotsParentDir()).thenReturn(path);
+    UUID snapshotId = UUID.randomUUID();
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(metadataManager, snapshotId, version).toString();
+    String expectedPath = "dir1/dir2/test-db-" + snapshotId;
+    if (version != 0) {
+      expectedPath = expectedPath + "-" + version;
+    }
+    assertEquals(expectedPath, snapshotPath);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPathFromConf(int version) {
+    try (MockedStatic<OMStorage> mocked = mockStatic(OMStorage.class)) {
+      String omDir = "dir1/dir2";
+      mocked.when(() -> OMStorage.getOmDbDir(any())).thenReturn(new File(omDir));
+      OzoneConfiguration conf = mock(OzoneConfiguration.class);
+      SnapshotInfo snapshotInfo = createSnapshotInfo("volumeName", "bucketname");
+      String snapshotPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, version);
+      String expectedPath = omDir + OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+          OM_DB_NAME + "-" + snapshotInfo.getSnapshotId();
+      if (version != 0) {
+        expectedPath = expectedPath + "-" + version;
+      }
+      assertEquals(expectedPath, snapshotPath);
+    }
   }
 
   @Test
