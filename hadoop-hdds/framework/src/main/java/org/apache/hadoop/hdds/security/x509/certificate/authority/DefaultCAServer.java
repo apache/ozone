@@ -34,8 +34,10 @@ import java.security.PrivateKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -206,7 +208,7 @@ public class DefaultCAServer implements CertificateServer {
       CertificateApprover.ApprovalType approverType, NodeType role,
       String certSerialId) {
     LocalDateTime beginDate = LocalDateTime.now();
-    LocalDateTime endDate = expiryFor(beginDate, role);
+    Duration certDuration = getDuration(beginDate, role);
 
     CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
     CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
@@ -224,7 +226,7 @@ public class DefaultCAServer implements CertificateServer {
         break;
       case KERBEROS_TRUSTED:
       case TESTING_AUTOMATIC:
-        X509Certificate signedCertificate = signAndStoreCertificate(beginDate, endDate, csr, role, certSerialId);
+        X509Certificate signedCertificate = signAndStoreCertificate(beginDate, certDuration, csr, role, certSerialId);
         CertificateCodec codec = new CertificateCodec(config, componentName);
         CertPath certPath = codec.getCertPath();
         CertPath updatedCertPath = codec.prependCertToCertPath(signedCertificate, certPath);
@@ -240,17 +242,20 @@ public class DefaultCAServer implements CertificateServer {
     return certPathPromise;
   }
 
-  private LocalDateTime expiryFor(LocalDateTime beginDate, NodeType role) {
+  private Duration getDuration(LocalDateTime beginDate, NodeType role) {
     // When issuing certificates for sub-ca use the max certificate duration similar to self-signed root certificate.
     if (role == NodeType.SCM) {
-      return beginDate.plus(config.getMaxCertificateDuration());
+      return config.getMaxCertificateDuration();
     }
-    return beginDate.plus(config.getDefaultCertDuration());
+    return config.getDefaultCertDuration();
   }
 
   private X509Certificate signAndStoreCertificate(
-      LocalDateTime beginDate, LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role, String certSerialId
+      LocalDateTime beginDate, Duration duration, PKCS10CertificationRequest csr, NodeType role, String certSerialId
   ) throws IOException, OperatorCreationException, CertificateException {
+
+    ZoneId zoneId = ZoneId.systemDefault();
+    ZonedDateTime endDate = beginDate.atZone(zoneId).plus(duration);
 
     lock.lock();
     X509Certificate xcert;
@@ -260,7 +265,7 @@ public class DefaultCAServer implements CertificateServer {
           getPrivateKey(),
           getCACertificate(),
           Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
-          Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
+          Date.from(endDate.toInstant()),
           csr, scmID, clusterID, certSerialId);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
@@ -487,14 +492,14 @@ public class DefaultCAServer implements CertificateServer {
       throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
     LocalDateTime beginDate = LocalDateTime.now();
-    LocalDateTime endDate =
-        beginDate.plus(securityConfig.getMaxCertificateDuration());
+    ZoneId zoneId = ZoneId.systemDefault();
+    ZonedDateTime endDate = beginDate.atZone(zoneId).plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
         .setSubject(this.subject)
         .setScmID(this.scmID)
         .setClusterID(this.clusterID)
         .setBeginDate(beginDate)
-        .setEndDate(endDate)
+        .setEndDate(endDate.toLocalDateTime())
         .makeCA(rootCertificateId)
         .setConfiguration(securityConfig)
         .setKey(key);
