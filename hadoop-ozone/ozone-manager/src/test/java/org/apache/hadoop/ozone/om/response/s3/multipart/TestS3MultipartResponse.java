@@ -435,17 +435,6 @@ public class TestS3MultipartResponse {
         getBucketLayout());
   }
 
-  protected S3MultipartUploadCommitPartResponse getMultipartUploadCommitPartResp(
-      String multipartKey, String openKey,
-      OmMultipartKeyInfo multipartKeyInfo, Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
-      OmKeyInfo openPartKeyInfoToBeDeleted, OmBucketInfo omBucketInfo,
-      OMResponse omResponse) {
-    return new S3MultipartUploadCommitPartResponse(omResponse,
-        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
-        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
-        getBucketLayout());
-  }
-
   public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
