@@ -119,6 +119,10 @@ public abstract class OzoneObj implements IOzoneObj {
    */
   public enum StoreType {
     OZONE(OzoneConsts.OZONE),
+    // NOTE: do not use S3 StoreType value.  RangerOzoneAuthorizer currently sets the volume
+    // to s3Vol for this StoreType, which is incorrect for both single and
+    // multi-tenant scenarios.  The enum is value is not being removed in case there
+    // are older clients still using it.
     S3(OzoneConsts.S3);
 
     /**
