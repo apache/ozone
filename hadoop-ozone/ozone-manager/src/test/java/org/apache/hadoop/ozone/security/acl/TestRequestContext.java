@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -80,6 +82,66 @@ public class TestRequestContext {
         "Wrongly sets recursive flag value");
   }
 
+  @Test
+  public void testSessionPolicy() {
+    final RequestContext.Builder builder = new RequestContext.Builder();
+    RequestContext context = builder.build();
+    assertNull(context.getSessionPolicy(), "sessionPolicy should default to null");
+
+    final String policy = "{\"Statement\":[]}";
+    context = new RequestContext.Builder()
+        .setSessionPolicy(policy)
+        .build();
+    assertEquals(policy,
+        context.getSessionPolicy(),
+        "sessionPolicy should be set via builder"
+    );
+
+    context = new RequestContext("host",
+        null,
+        null,
+        "serviceId",
+        IAccessAuthorizer.ACLIdentityType.GROUP,
+        IAccessAuthorizer.ACLType.CREATE,
+        "owner",
+        true,
+        policy
+    );
+    assertTrue(context.isRecursiveAccessCheck(), "recursiveAccessCheck should be true");
+    assertEquals(policy,
+        context.getSessionPolicy(),
+        "sessionPolicy should be set via constructor"
+    );
+
+    context = RequestContext.getBuilder(UserGroupInformation.createRemoteUser("user1"),
+            null,
+            null,
+            IAccessAuthorizer.ACLType.CREATE,
+            "volume1",
+            true
+        )
+        .setSessionPolicy(policy)
+        .build();
+    assertEquals(policy,
+        context.getSessionPolicy(),
+        "sessionPolicy should be set via getBuilder + builder"
+    );
+
+    context = RequestContext.getBuilder(UserGroupInformation.createRemoteUser("user1"),
+            null,
+            null,
+            IAccessAuthorizer.ACLType.CREATE,
+            "volume1",
+            true,
+            policy
+        )
+        .build();
+    assertEquals(policy,
+        context.getSessionPolicy(),
+        "sessionPolicy should be set via getBuilder (all params) + builder"
+    );
+  }
+
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
       boolean recursiveAccessCheck) throws IOException {
@@ -96,4 +158,3 @@ public class TestRequestContext {
             type, ownerName).build();
   }
 }
-
