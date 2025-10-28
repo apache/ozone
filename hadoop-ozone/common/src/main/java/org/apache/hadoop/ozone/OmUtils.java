@@ -106,6 +106,7 @@ public final class OmUtils {
 
   /**
    * Retrieve the socket address that is used by OM.
+   * 
    * @param conf
    * @return Target InetSocketAddress for the SCM service endpoint.
    */
@@ -141,6 +142,7 @@ public final class OmUtils {
 
   /**
    * Retrieve the socket address that is used by OM.
+   * 
    * @param conf
    * @return Target InetSocketAddress for the SCM service endpoint.
    */
@@ -155,7 +157,8 @@ public final class OmUtils {
   /**
    * Retrieve the socket address that is used by OM as specified by the confKey.
    * Return null if the specified conf key is not set.
-   * @param conf configuration
+   * 
+   * @param conf    configuration
    * @param confKey configuration key to lookup address from
    * @return Target InetSocketAddress for the OM RPC server.
    */
@@ -165,7 +168,7 @@ public final class OmUtils {
 
     if (host.isPresent()) {
       return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+          .orElse(OZONE_OM_PORT_DEFAULT);
     } else {
       // The specified confKey is not set
       return null;
@@ -175,6 +178,7 @@ public final class OmUtils {
   /**
    * Retrieve the socket address that should be used by clients to connect
    * to OM.
+   * 
    * @param conf
    * @return Target InetSocketAddress for the OM service endpoint.
    */
@@ -196,9 +200,10 @@ public final class OmUtils {
 
   /**
    * Returns true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty.
+   * 
    * @param conf Configuration
    * @return true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty;
-   * else false.
+   *         else false.
    */
   public static boolean isServiceIdsDefined(ConfigurationSource conf) {
     String val = conf.get(OZONE_OM_SERVICE_IDS_KEY);
@@ -207,7 +212,8 @@ public final class OmUtils {
 
   /**
    * Returns true if HA for OzoneManager is configured for the given service id.
-   * @param conf Configuration
+   * 
+   * @param conf      Configuration
    * @param serviceId OM HA cluster service ID
    * @return true if HA is configured in the configuration; else false.
    */
@@ -225,6 +231,7 @@ public final class OmUtils {
 
   /**
    * Checks if the OM request is read only or not.
+   * 
    * @param omRequest OMRequest proto
    * @return True if its readOnly, false otherwise.
    */
@@ -232,123 +239,123 @@ public final class OmUtils {
       OzoneManagerProtocolProtos.OMRequest omRequest) {
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
     switch (cmdType) {
-    case CheckVolumeAccess:
-    case InfoVolume:
-    case ListVolume:
-    case InfoBucket:
-    case ListBuckets:
-    case LookupKey:
-    case ListKeys:
-    case ListKeysLight:
-    case ListTrash:
-      // ListTrash is deprecated by HDDS-11251. Keeping this in here
-      // As protobuf currently doesn't support deprecating enum fields
-      // TODO: Remove once migrated to proto3 and mark fields in proto
-      // as deprecated
-    case ServiceList:
-    case ListOpenFiles:
-    case ListMultiPartUploadParts:
-    case GetFileStatus:
-    case LookupFile:
-    case ListStatus:
-    case ListStatusLight:
-    case GetAcl:
-    case DBUpdates:
-    case ListMultipartUploads:
-    case FinalizeUpgradeProgress:
-    case PrepareStatus:
-    case GetS3VolumeContext:
-    case ListTenant:
-    case TenantGetUserInfo:
-    case TenantListUser:
-    case ListSnapshot:
-    case RefetchSecretKey:
-    case RangerBGSync:
-      // RangerBGSync is a read operation in the sense that it doesn't directly
-      // write to OM DB. And therefore it doesn't need a OMClientRequest.
-      // Although indirectly the Ranger sync service task could invoke write
-      // operation SetRangerServiceVersion.
-    case GetKeyInfo:
-    case SnapshotDiff:
-    case CancelSnapshotDiff:
-    case ListSnapshotDiffJobs:
-    case TransferLeadership:
-    case SetSafeMode:
-    case PrintCompactionLogDag:
-      // printCompactionLogDag is deprecated by HDDS-12053,
-      // keeping it here for compatibility
-    case GetSnapshotInfo:
-    case GetObjectTagging:
-    case GetQuotaRepairStatus:
-    case StartQuotaRepair:
-      return true;
-    case CreateVolume:
-    case SetVolumeProperty:
-    case DeleteVolume:
-    case CreateBucket:
-    case SetBucketProperty:
-    case DeleteBucket:
-    case CreateKey:
-    case RenameKey:
-    case RenameKeys:
-    case DeleteKey:
-    case DeleteKeys:
-    case CommitKey:
-    case AllocateBlock:
-    case InitiateMultiPartUpload:
-    case CommitMultiPartUpload:
-    case CompleteMultiPartUpload:
-    case AbortMultiPartUpload:
-    case GetS3Secret:
-    case GetDelegationToken:
-    case RenewDelegationToken:
-    case CancelDelegationToken:
-    case CreateDirectory:
-    case CreateFile:
-    case RemoveAcl:
-    case SetAcl:
-    case AddAcl:
-    case PurgeKeys:
-    case RecoverTrash:
-      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
-      // As protobuf currently doesn't support deprecating enum fields
-      // TODO: Remove once migrated to proto3 and mark fields in proto
-      // as deprecated
-    case FinalizeUpgrade:
-    case Prepare:
-    case CancelPrepare:
-    case DeleteOpenKeys:
-    case SetS3Secret:
-    case RevokeS3Secret:
-    case PurgeDirectories:
-    case PurgePaths:
-    case CreateTenant:
-    case DeleteTenant:
-    case TenantAssignUserAccessId:
-    case TenantRevokeUserAccessId:
-    case TenantAssignAdmin:
-    case TenantRevokeAdmin:
-    case SetRangerServiceVersion:
-    case CreateSnapshot:
-    case DeleteSnapshot:
-    case RenameSnapshot:
-    case SnapshotMoveDeletedKeys:
-    case SnapshotMoveTableKeys:
-    case SnapshotPurge:
-    case RecoverLease:
-    case SetTimes:
-    case AbortExpiredMultiPartUploads:
-    case SetSnapshotProperty:
-    case QuotaRepair:
-    case PutObjectTagging:
-    case DeleteObjectTagging:
-    case UnknownCommand:
-      return false;
-    case EchoRPC:
-      return omRequest.getEchoRPCRequest().getReadOnly();
-    default:
-      LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
-      return false;
+      case CheckVolumeAccess:
+      case InfoVolume:
+      case ListVolume:
+      case InfoBucket:
+      case ListBuckets:
+      case LookupKey:
+      case ListKeys:
+      case ListKeysLight:
+      case ListTrash:
+        // ListTrash is deprecated by HDDS-11251. Keeping this in here
+        // As protobuf currently doesn't support deprecating enum fields
+        // TODO: Remove once migrated to proto3 and mark fields in proto
+        // as deprecated
+      case ServiceList:
+      case ListOpenFiles:
+      case ListMultiPartUploadParts:
+      case GetFileStatus:
+      case LookupFile:
+      case ListStatus:
+      case ListStatusLight:
+      case GetAcl:
+      case DBUpdates:
+      case ListMultipartUploads:
+      case FinalizeUpgradeProgress:
+      case PrepareStatus:
+      case GetS3VolumeContext:
+      case ListTenant:
+      case TenantGetUserInfo:
+      case TenantListUser:
+      case ListSnapshot:
+      case RefetchSecretKey:
+      case RangerBGSync:
+        // RangerBGSync is a read operation in the sense that it doesn't directly
+        // write to OM DB. And therefore it doesn't need a OMClientRequest.
+        // Although indirectly the Ranger sync service task could invoke write
+        // operation SetRangerServiceVersion.
+      case GetKeyInfo:
+      case SnapshotDiff:
+      case CancelSnapshotDiff:
+      case ListSnapshotDiffJobs:
+      case TransferLeadership:
+      case SetSafeMode:
+      case PrintCompactionLogDag:
+        // printCompactionLogDag is deprecated by HDDS-12053,
+        // keeping it here for compatibility
+      case GetSnapshotInfo:
+      case GetObjectTagging:
+      case GetQuotaRepairStatus:
+      case StartQuotaRepair:
+        return true;
+      case CreateVolume:
+      case SetVolumeProperty:
+      case DeleteVolume:
+      case CreateBucket:
+      case SetBucketProperty:
+      case DeleteBucket:
+      case CreateKey:
+      case RenameKey:
+      case RenameKeys:
+      case DeleteKey:
+      case DeleteKeys:
+      case CommitKey:
+      case AllocateBlock:
+      case InitiateMultiPartUpload:
+      case CommitMultiPartUpload:
+      case CompleteMultiPartUpload:
+      case AbortMultiPartUpload:
+      case GetS3Secret:
+      case GetDelegationToken:
+      case RenewDelegationToken:
+      case CancelDelegationToken:
+      case CreateDirectory:
+      case CreateFile:
+      case RemoveAcl:
+      case SetAcl:
+      case AddAcl:
+      case PurgeKeys:
+      case RecoverTrash:
+        // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
+        // As protobuf currently doesn't support deprecating enum fields
+        // TODO: Remove once migrated to proto3 and mark fields in proto
+        // as deprecated
+      case FinalizeUpgrade:
+      case Prepare:
+      case CancelPrepare:
+      case DeleteOpenKeys:
+      case SetS3Secret:
+      case RevokeS3Secret:
+      case PurgeDirectories:
+      case PurgePaths:
+      case CreateTenant:
+      case DeleteTenant:
+      case TenantAssignUserAccessId:
+      case TenantRevokeUserAccessId:
+      case TenantAssignAdmin:
+      case TenantRevokeAdmin:
+      case SetRangerServiceVersion:
+      case CreateSnapshot:
+      case DeleteSnapshot:
+      case RenameSnapshot:
+      case SnapshotMoveDeletedKeys:
+      case SnapshotMoveTableKeys:
+      case SnapshotPurge:
+      case RecoverLease:
+      case SetTimes:
+      case AbortExpiredMultiPartUploads:
+      case SetSnapshotProperty:
+      case QuotaRepair:
+      case PutObjectTagging:
+      case DeleteObjectTagging:
+      case UnknownCommand:
+        return false;
+      case EchoRPC:
+        return omRequest.getEchoRPCRequest().getReadOnly();
+      default:
+        LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
+        return false;
     }
   }
 
@@ -371,11 +378,9 @@ public final class OmUtils {
       String omServiceId) {
     String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
     Collection<String> nodeIds = conf.getTrimmedStringCollection(nodeIdsKey);
-    String decommissionNodesKeyWithServiceIdSuffix =
-        ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
-            omServiceId);
-    Collection<String> decommissionedNodeIds =
-        getDecommissionedNodeIds(conf, decommissionNodesKeyWithServiceIdSuffix);
+    String decommissionNodesKeyWithServiceIdSuffix = ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
+        omServiceId);
+    Collection<String> decommissionedNodeIds = getDecommissionedNodeIds(conf, decommissionNodesKeyWithServiceIdSuffix);
     nodeIds.removeAll(decommissionedNodeIds);
 
     return nodeIds;
@@ -450,10 +455,9 @@ public final class OmUtils {
 
   /**
    * @return <code>coll</code> if it is non-null and non-empty. Otherwise,
-   * returns a list with a single null value.
+   *         returns a list with a single null value.
    */
-  public static Collection<String> emptyAsSingletonNull(Collection<String>
-      coll) {
+  public static Collection<String> emptyAsSingletonNull(Collection<String> coll) {
     if (coll == null || coll.isEmpty()) {
       return Collections.singletonList(null);
     } else {
@@ -463,8 +467,9 @@ public final class OmUtils {
 
   /**
    * Returns the http address of peer OM node.
-   * @param conf Configuration
-   * @param omNodeId peer OM node ID
+   * 
+   * @param conf           Configuration
+   * @param omNodeId       peer OM node ID
    * @param omNodeHostAddr peer OM node host address
    * @return http address of peer OM node in the format <hostName>:<port>
    */
@@ -489,8 +494,9 @@ public final class OmUtils {
 
   /**
    * Returns the https address of peer OM node.
-   * @param conf Configuration
-   * @param omNodeId peer OM node ID
+   * 
+   * @param conf           Configuration
+   * @param omNodeId       peer OM node ID
    * @param omNodeHostAddr peer OM node host address
    * @return https address of peer OM node in the format <hostName>:<port>
    */
@@ -530,8 +536,9 @@ public final class OmUtils {
    * create a new instance to include this key, else we update the existing
    * repeatedOmKeyInfo instance.
    * 3. Set the updateID to the transactionLogIndex.
-   * @param keyInfo args supplied by client
-   * @param bucketId bucket id
+   * 
+   * @param keyInfo      args supplied by client
+   * @param bucketId     bucket id
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
@@ -545,8 +552,7 @@ public final class OmUtils {
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
     if (Boolean.parseBoolean(
-            keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
-    ) {
+        keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
@@ -556,7 +562,7 @@ public final class OmUtils {
     // Set the updateID
     keyInfo.setUpdateID(trxnLogIndex);
 
-    //The key doesn't exist in deletedTable, so create a new instance.
+    // The key doesn't exist in deletedTable, so create a new instance.
     return new RepeatedOmKeyInfo(keyInfo, bucketId);
   }
 
@@ -635,11 +641,12 @@ public final class OmUtils {
 
   /**
    * Get the valid base object id given the transaction id.
+   * 
    * @param epoch a 2 bit epoch number. The 2 most significant bits of the
    *              object will be set to this epoch.
-   * @param txId of the transaction. This value cannot exceed 2^54 - 1 as
-   *           out of the 64 bits for a long, 2 are reserved for the epoch
-   *           and 8 for recursive directory creation.
+   * @param txId  of the transaction. This value cannot exceed 2^54 - 1 as
+   *              out of the 64 bits for a long, 2 are reserved for the epoch
+   *              and 8 for recursive directory creation.
    * @return base object id allocated against the transaction
    */
   public static long getObjectIdFromTxId(long epoch, long txId) {
@@ -667,20 +674,19 @@ public final class OmUtils {
    */
   @VisibleForTesting
   public static long getTxIdFromObjectId(long objectId) {
-    return ((Long.MAX_VALUE >> REVERSE_EPOCH_ID_SHIFT) & objectId)
-        >> TRANSACTION_ID_SHIFT;
+    return (0x3FFFFFFFFFFFFFFFL & objectId) >> TRANSACTION_ID_SHIFT;
   }
 
   /**
    * Verify key name is a valid name.
    */
   public static void validateKeyName(String keyName)
-          throws OMException {
+      throws OMException {
     try {
       HddsClientUtils.verifyKeyName(keyName);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
-              OMException.ResultCodes.INVALID_KEY_NAME);
+          OMException.ResultCodes.INVALID_KEY_NAME);
     }
   }
 
@@ -711,9 +717,10 @@ public final class OmUtils {
 
   /**
    * Verify if key name contains snapshot reserved word.
-   * This is similar to verifyKeyNameWithSnapshotReservedWord. The only difference is exception message.
+   * This is similar to verifyKeyNameWithSnapshotReservedWord. The only difference
+   * is exception message.
    */
-  public static void verifyKeyNameWithSnapshotReservedWordForDeletion(String keyName)  throws OMException {
+  public static void verifyKeyNameWithSnapshotReservedWordForDeletion(String keyName) throws OMException {
     if (keyName != null &&
         keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
       if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
@@ -739,6 +746,7 @@ public final class OmUtils {
    * If count(ozone.om.service.ids) == 1, return that id.
    * If count(ozone.om.service.ids) &gt; 1 throw exception
    * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
+   * 
    * @param conf configuration
    * @return OM service ID.
    * @throws IOException on error.
@@ -750,13 +758,14 @@ public final class OmUtils {
         OZONE_OM_SERVICE_IDS_KEY);
     if (localOMServiceId == null) {
       LOG.info("{} is not defined, falling back to {} to find serviceID for "
-              + "OzoneManager if it is HA enabled cluster",
+          + "OzoneManager if it is HA enabled cluster",
           OZONE_OM_INTERNAL_SERVICE_ID, OZONE_OM_SERVICE_IDS_KEY);
       if (omServiceIds.size() > 1) {
         throw new IOException(String.format(
             "More than 1 OzoneManager ServiceID (%s) " +
                 "configured : %s, but %s is not " +
-                "configured.", OZONE_OM_SERVICE_IDS_KEY,
+                "configured.",
+            OZONE_OM_SERVICE_IDS_KEY,
             omServiceIds.toString(), OZONE_OM_INTERNAL_SERVICE_ID));
       }
     } else if (!omServiceIds.contains(localOMServiceId)) {
@@ -780,9 +789,10 @@ public final class OmUtils {
   /**
    * Normalize the key name. This method used {@link Path} to
    * normalize the key name.
+   * 
    * @param keyName
    * @param preserveTrailingSlash - if True preserves trailing slash, else
-   * does not preserve.
+   *                              does not preserve.
    * @return normalized key name.
    */
   public static String normalizeKey(String keyName,
@@ -867,12 +877,13 @@ public final class OmUtils {
 
   /**
    * For a given service ID, return list of configured OM hosts.
-   * @param conf configuration
+   * 
+   * @param conf        configuration
    * @param omServiceId service id
    * @return Set of hosts.
    */
   public static Set<String> getOmHostsFromConfig(OzoneConfiguration conf,
-                                                 String omServiceId) {
+      String omServiceId) {
     Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
         omServiceId);
     Set<String> omHosts = new HashSet<>();
@@ -900,8 +911,8 @@ public final class OmUtils {
       omNodeIds = OmUtils.getActiveOMNodeIds(conf, omServiceId);
     }
     Collection<String> decommissionedNodeIds = getDecommissionedNodeIds(conf,
-            ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
-                    omServiceId));
+        ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
+            omServiceId));
     Collection<String> listenerNodeIds = conf.getTrimmedStringCollection(
         ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY,
             omServiceId));
@@ -967,9 +978,9 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -980,7 +991,8 @@ public final class OmUtils {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
         String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
+            ? "LEADER"
+            : "FOLLOWER";
         List<String> omInfo = new ArrayList<>();
         omInfo.add(info.getHostname());
         omInfo.add(info.getOmRoleInfo().getNodeId());
@@ -996,9 +1008,10 @@ public final class OmUtils {
   /**
    * @param omHost
    * @param omPort
-   * If the authority in the URI is not one of the service ID's,
-   * it is treated as a hostname. Check if this hostname can be resolved
-   * and if it's reachable.
+   *               If the authority in the URI is not one of the service ID's,
+   *               it is treated as a hostname. Check if this hostname can be
+   *               resolved
+   *               and if it's reachable.
    */
   public static void resolveOmHost(String omHost, int omPort)
       throws IOException {
