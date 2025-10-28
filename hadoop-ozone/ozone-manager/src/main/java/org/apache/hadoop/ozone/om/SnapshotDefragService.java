@@ -92,7 +92,7 @@ public class SnapshotDefragService extends BackgroundService
     snapshotsDefraggedCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
     IOzoneManagerLock omLock = ozoneManager.getMetadataManager().getLock();
-    this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true);
+    this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true, 1);
   }
 
   @Override
