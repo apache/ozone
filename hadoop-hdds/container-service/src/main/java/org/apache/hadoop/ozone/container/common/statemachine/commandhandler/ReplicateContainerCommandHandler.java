@@ -48,8 +48,6 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   private ContainerReplicator pushReplicator;
 
-  private String metricsName;
-
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
@@ -61,7 +59,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   }
 
   public String getMetricsName() {
-    return this.metricsName;
+    return ReplicationTask.METRIC_NAME;
   }
 
   @Override
@@ -84,16 +82,12 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
             downloadReplicator : pushReplicator;
 
     ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
-    if (metricsName == null) {
-      metricsName = task.getMetricName();
-    }
     supervisor.addTask(task);
   }
 
   @Override
   public int getQueuedCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationQueuedCount(metricsName);
+    return (int) this.supervisor.getReplicationQueuedCount(ReplicationTask.METRIC_NAME);
   }
 
   @Override
@@ -103,19 +97,16 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestCount(metricsName);
+    return (int) this.supervisor.getReplicationRequestCount(ReplicationTask.METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestAvgTime(metricsName);
+    return (int) this.supervisor.getReplicationRequestAvgTime(ReplicationTask.METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return this.metricsName == null ? 0 : this.supervisor
-        .getReplicationRequestTotalTime(metricsName);
+    return this.supervisor.getReplicationRequestTotalTime(ReplicationTask.METRIC_NAME);
   }
 }

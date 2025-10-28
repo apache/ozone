@@ -36,7 +36,6 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;
-  private String metricsName;
 
   public ReconstructECContainersCommandHandler(ConfigurationSource conf,
       ReplicationSupervisor supervisor,
@@ -55,14 +54,11 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
         new ECReconstructionCommandInfo(ecContainersCommand);
     ECReconstructionCoordinatorTask task = new ECReconstructionCoordinatorTask(
         coordinator, reconstructionCommandInfo);
-    if (this.metricsName == null) {
-      this.metricsName = task.getMetricName();
-    }
     this.supervisor.addTask(task);
   }
 
   public String getMetricsName() {
-    return this.metricsName;
+    return ECReconstructionCoordinatorTask.METRIC_NAME;
   }
 
   @Override
@@ -72,26 +68,22 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestCount(metricsName);
+    return (int) this.supervisor.getReplicationRequestCount(ECReconstructionCoordinatorTask.METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestAvgTime(metricsName);
+    return (int) this.supervisor.getReplicationRequestAvgTime(ECReconstructionCoordinatorTask.METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return this.metricsName == null ? 0 : this.supervisor
-        .getReplicationRequestTotalTime(metricsName);
+    return this.supervisor.getReplicationRequestTotalTime(ECReconstructionCoordinatorTask.METRIC_NAME);
   }
 
   @Override
   public int getQueuedCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationQueuedCount(metricsName);
+    return (int) this.supervisor.getReplicationQueuedCount(ECReconstructionCoordinatorTask.METRIC_NAME);
   }
 
   public ConfigurationSource getConf() {
