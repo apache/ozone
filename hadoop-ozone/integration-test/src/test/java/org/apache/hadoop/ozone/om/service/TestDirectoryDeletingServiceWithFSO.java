@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +42,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -623,9 +625,9 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return null;
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), any(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
-        anyLong());
+        anyLong(), any(AtomicInteger.class));
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);

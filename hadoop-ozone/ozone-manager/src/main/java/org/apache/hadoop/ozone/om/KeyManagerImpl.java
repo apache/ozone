@@ -2264,49 +2264,38 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      long remainingBufLimit) throws IOException {
+  public List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter) throws IOException {
     return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getDirectoryTable(),
         kv -> Table.newKeyValue(metadataManager.getOzoneDeletePathKey(kv.getValue().getObjectID(), kv.getKey()),
             OMFileRequest.getKeyInfoWithFullPath(parentInfo, kv.getValue())),
-        filter, remainingBufLimit);
+        filter);
   }
 
-  private <T extends WithParentObjectId> DeleteKeysResult gatherSubPathsWithIterator(
+  private <T extends WithParentObjectId> List<OmKeyInfo> gatherSubPathsWithIterator(
       long volumeId, long bucketId, OmKeyInfo parentInfo,
       Table<String, T> table,
       CheckedFunction<KeyValue<String, T>, KeyValue<String, OmKeyInfo>, IOException> deleteKeyTransformer,
-      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> deleteKeyFilter,
-      long remainingBufLimit) throws IOException {
+      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> deleteKeyFilter) throws IOException {
     List<OmKeyInfo> keyInfos = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
-    long consumedSize = 0;
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
-      while (iterator.hasNext() && remainingBufLimit > 0) {
+      while (iterator.hasNext()) {
         KeyValue<String, T> entry = iterator.next();
-        final long objectSerializedSize = entry.getValueByteSize();
-        // No need to check the table again as the value in cache and iterator would be same when directory
-        // deleting service runs.
-        if (remainingBufLimit - objectSerializedSize < 0) {
-          break;
-        }
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
         if (deleteKeyFilter.apply(keyInfo)) {
           keyInfos.add(keyInfo.getValue());
-          remainingBufLimit -= objectSerializedSize;
-          consumedSize += objectSerializedSize;
         }
       }
-      return new DeleteKeysResult(keyInfos, consumedSize, !iterator.hasNext());
+      return keyInfos;
     }
   }
 
   @Override
-  public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
+  public List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
       long bucketId, OmKeyInfo parentInfo,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, long remainingBufLimit)
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter)
           throws IOException {
     CheckedFunction<KeyValue<String, OmKeyInfo>, KeyValue<String, OmKeyInfo>, IOException> tranformer = kv -> {
       OmKeyInfo keyInfo = OMFileRequest.getKeyInfoWithFullPath(parentInfo, kv.getValue());
@@ -2315,7 +2304,7 @@ public class KeyManagerImpl implements KeyManager {
       return Table.newKeyValue(deleteKey, keyInfo);
     };
     return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getFileTable(), tranformer,
-        filter, remainingBufLimit);
+        filter);
   }
 
   public boolean isBucketFSOptimized(String volName, String buckName)

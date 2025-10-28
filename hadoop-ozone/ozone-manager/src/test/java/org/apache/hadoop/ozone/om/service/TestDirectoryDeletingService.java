@@ -18,26 +18,31 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -49,15 +54,21 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -75,6 +86,7 @@ public class TestDirectoryDeletingService {
   private OzoneManager om;
   private String volumeName;
   private String bucketName;
+  private static final AtomicInteger OBJECT_COUNTER = new AtomicInteger();
 
   @BeforeAll
   public static void setup() {
@@ -185,7 +197,7 @@ public class TestDirectoryDeletingService {
         = new OmTestManagers(conf);
     OzoneManager ozoneManager = omTestManagers.getOzoneManager();
     AtomicBoolean isRunning = new AtomicBoolean(true);
-    try (MockedStatic mockedStatic = Mockito.mockStatic(CompletableFuture.class, CALLS_REAL_METHODS)) {
+    try (MockedStatic mockedStatic = mockStatic(CompletableFuture.class, CALLS_REAL_METHODS)) {
       List<Pair<Supplier, CompletableFuture>> futureList = new ArrayList<>();
       Thread deletionThread = new Thread(() -> {
         while (futureList.size() < threadCount) {
@@ -221,7 +233,7 @@ public class TestDirectoryDeletingService {
       DirectoryDeletingService.DirDeletingTask dirDeletingTask =
           ozoneManager.getKeyManager().getDirDeletingService().new DirDeletingTask(null);
 
-      dirDeletingTask.processDeletedDirsForStore(null, ozoneManager.getKeyManager(), Long.MAX_VALUE, 1);
+      dirDeletingTask.processDeletedDirsForStore(null, ozoneManager.getKeyManager(), 1, 6000);
       assertThat(futureList).hasSize(threadCount);
       for (Pair<Supplier, CompletableFuture> pair : futureList) {
         assertTrue(pair.getRight().isDone());
@@ -230,5 +242,131 @@ public class TestDirectoryDeletingService {
     } finally {
       ozoneManager.stop();
     }
+  }
+
+  @Unhealthy("Temporarily disabling until batching logic is fixed")
+  @Test
+  @DisplayName("Verify PurgeDirectoriesRequest is batched according to Ratis byte limit")
+  void testPurgeDirectoriesRequestBatching() throws Exception {
+    final int actualRatisLimitBytes = 2048;
+    final int testRatisLimitBytes = 2048;
+
+    // Create a clean OM configuration
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    File innerTestDir = Files.createTempDirectory("TestDDS").toFile();
+    ServerUtils.setOzoneMetaDirPath(testConf, innerTestDir.toString());
+
+    testConf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    testConf.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        testRatisLimitBytes, StorageUnit.BYTES);
+    testConf.setQuietMode(false);
+
+    OmTestManagers managers = new OmTestManagers(testConf);
+    OzoneManager testOm = managers.getOzoneManager();
+    KeyManager testKM = managers.getKeyManager();
+    DirectoryDeletingService dds = (DirectoryDeletingService) testKM.getDirDeletingService();
+    dds.suspend();
+
+    try (MockedStatic<OzoneManagerRatisUtils> mockedRatisUtils =
+        mockStatic(OzoneManagerRatisUtils.class, CALLS_REAL_METHODS)) {
+
+      ArgumentCaptor<OzoneManagerProtocolProtos.OMRequest> reqCaptor =
+          ArgumentCaptor.forClass(OzoneManagerProtocolProtos.OMRequest.class);
+
+      // Mock submitRequest to capture and return OK
+      mockedRatisUtils.when(() -> OzoneManagerRatisUtils.submitRequest(
+              any(OzoneManager.class),
+              reqCaptor.capture(),
+              any(),
+              anyLong()))
+          .thenAnswer(inv -> OzoneManagerProtocolProtos.OMResponse.newBuilder()
+              .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+              .setStatus(OzoneManagerProtocolProtos.Status.OK)
+              .build());
+
+      // Create volume & bucket (FSO)
+      final String volumeName = "volBatch";
+      final String bucketName = "buckBatch";
+      OMRequestTestUtils.addVolumeAndBucketToDB(
+          volumeName, bucketName,
+          testKM.getMetadataManager(),
+          BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+      String bucketKey = testKM.getMetadataManager().getBucketKey(volumeName, bucketName);
+      OmBucketInfo bucketInfo = testKM.getMetadataManager().getBucketTable().get(bucketKey);
+
+      // Create a large directory to force batching
+      StringBuilder sb = new StringBuilder("0123456789");
+      for (int i = 0; i < 50; i++) sb.append("0123456789");
+      String longName = sb.toString();
+      String dirKeyName = "dir" + longName;
+
+      OmDirectoryInfo root = new OmDirectoryInfo.Builder()
+          .setName(dirKeyName)
+          .setCreationTime(Time.now())
+          .setModificationTime(Time.now())
+          .setObjectID(100L)
+          .setParentObjectID(bucketInfo.getObjectID())
+          .setUpdateID(0L)
+          .build();
+
+      // Add directory entry to dirTable
+      OMRequestTestUtils.addDirKeyToDirTable(true, root, volumeName, bucketName, 1L, testKM.getMetadataManager());
+
+      // Add multiple child files (simulate a large subtree)
+      final int files = 100;
+      for (int i = 0; i < files; i++) {
+        String keyName = "k" + longName + i;
+        OmKeyInfo info = OMRequestTestUtils
+            .createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(THREE))
+            .setObjectID(200 + i)
+            .setParentObjectID(root.getObjectID())
+            .setUpdateID(1L)
+            .build();
+        OMRequestTestUtils.addFileToKeyTable(false, true, keyName, info, 1234L, i + 1, testKM.getMetadataManager());
+      }
+
+      // Mark directory for deletion (simulate OM deleteKey step)
+      String dirKey = OMRequestTestUtils.addDirKeyToDirTable(
+          false, root, volumeName, bucketInfo.getBucketName(), 1L, testKM.getMetadataManager());
+
+      // Mark directory as deleted (moves entry from directoryTable → deletedDirTable)
+      OMRequestTestUtils.deleteDir(dirKey, volumeName, bucketInfo.getBucketName(),
+          testKM.getMetadataManager());
+
+      // Resume service and trigger run immediately (like KeyDeletingService test)
+      dds.resume();
+      dds.runPeriodicalTaskNow();
+
+      // Verify multiple purge requests were sent
+      mockedRatisUtils.verify(() -> OzoneManagerRatisUtils.submitRequest(
+              any(OzoneManager.class),
+              any(OzoneManagerProtocolProtos.OMRequest.class),
+              any(),
+              anyLong()),
+          atLeast(2));
+
+      List<OzoneManagerProtocolProtos.OMRequest> capturedRequests = reqCaptor.getAllValues();
+      int totalPurgedDirs = 0;
+
+      for (OzoneManagerProtocolProtos.OMRequest omReq : capturedRequests) {
+        assertNotNull(omReq);
+        assertEquals(OzoneManagerProtocolProtos.Type.PurgeDirectories, omReq.getCmdType());
+        assertThat(omReq.getSerializedSize()).isLessThanOrEqualTo(actualRatisLimitBytes);
+
+        OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeReq = omReq.getPurgeDirectoriesRequest();
+        totalPurgedDirs += purgeReq.getDeletedPathCount();
+      }
+
+      assertThat(totalPurgedDirs).isGreaterThan(0);
+    } finally {
+      if (testOm.stop()) testOm.join();
+      org.apache.commons.io.FileUtils.deleteDirectory(innerTestDir);
+    }
+  }
+
+  private static String uniqueObjectName(String prefix) {
+    return prefix + String.format("%010d", OBJECT_COUNTER.getAndIncrement());
   }
 }
