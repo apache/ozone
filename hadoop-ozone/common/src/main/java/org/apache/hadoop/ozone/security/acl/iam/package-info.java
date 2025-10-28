@@ -16,6 +16,6 @@
  */
 
 /**
- * Classes related to ozone REST interface.
+ * Classes related to Ozone IAM policy processing.
  */
 package org.apache.hadoop.ozone.security.acl.iam;
