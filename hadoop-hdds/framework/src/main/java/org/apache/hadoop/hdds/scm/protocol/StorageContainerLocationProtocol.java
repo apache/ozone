@@ -64,15 +64,19 @@ public interface StorageContainerLocationProtocol extends Closeable {
   long versionID = 1L;
 
   /**
-   * Admin command should take effect on all SCM instance.
-   * This includes both write operations (that must be synchronized across HA)
-   * and read-only operations that are safe to execute on followers.
+   * Admin commands that should broadcast to all SCM instances in HA.
    */
   Set<Type> ADMIN_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
       Type.StartReplicationManager,
       Type.StopReplicationManager,
-      Type.ForceExitSafeMode,
-      Type.InSafeMode,                    
+      Type.ForceExitSafeMode));
+
+  /**
+   * Read-only commands that can execute on followers without leader check.
+   * These commands respect the --scm parameter and query the specified SCM.
+   */
+  Set<Type> FOLLOWER_READABLE_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
+      Type.InSafeMode,
       Type.GetSafeModeRuleStatuses));     
 
   /**
