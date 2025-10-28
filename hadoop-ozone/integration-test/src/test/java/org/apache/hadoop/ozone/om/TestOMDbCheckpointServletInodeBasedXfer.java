@@ -228,7 +228,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .thenReturn(lock);
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());

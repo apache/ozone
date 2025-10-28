@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -40,7 +41,6 @@ public class TestOzoneSnapshot {
     when(snapshotInfo.getSnapshotStatus()).thenReturn(SNAPSHOT_ACTIVE);
     when(snapshotInfo.getSnapshotId()).thenReturn(snapshotId);
     when(snapshotInfo.getSnapshotPath()).thenReturn("volume/bucket");
-    when(snapshotInfo.getCheckpointDir()).thenReturn("checkpointDir");
     when(snapshotInfo.getReferencedSize()).thenReturn(1000L);
     when(snapshotInfo.getReferencedReplicatedSize()).thenReturn(3000L);
     when(snapshotInfo.getExclusiveSize()).thenReturn(4000L);
@@ -57,7 +57,7 @@ public class TestOzoneSnapshot {
     OzoneSnapshot ozoneSnapshot = OzoneSnapshot.fromSnapshotInfo(snapshotInfo);
     OzoneSnapshot expectedOzoneSnapshot = new OzoneSnapshot(
         "volume", "bucket", "snap", 1000L, SNAPSHOT_ACTIVE, snapshotId,
-        "volume/bucket", "checkpointDir", 1000L, 3000L, 6000L, 18000L);
+        "volume/bucket", OM_SNAPSHOT_SEPARATOR + snapshotId, 1000L, 3000L, 6000L, 18000L);
     assertEquals(expectedOzoneSnapshot, ozoneSnapshot);
   }
 }

@@ -192,7 +192,7 @@ public class OzoneSnapshot {
         snapshotInfo.getSnapshotStatus(),
         snapshotInfo.getSnapshotId(),
         snapshotInfo.getSnapshotPath(),
-        snapshotInfo.getCheckpointDir(),
+        snapshotInfo.getCheckpointDirName(0),
         snapshotInfo.getReferencedSize(),
         snapshotInfo.getReferencedReplicatedSize(),
         snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning(),

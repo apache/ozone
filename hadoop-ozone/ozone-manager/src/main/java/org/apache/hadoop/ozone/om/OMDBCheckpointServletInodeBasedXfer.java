@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
@@ -69,7 +70,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -210,6 +210,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     DBCheckpoint checkpoint = null;
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     OMMetadataManager omMetadataManager = om.getMetadataManager();
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     boolean includeSnapshotData = includeSnapshotData(request);
     AtomicLong maxTotalSstSize = new AtomicLong(getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT));
@@ -219,7 +220,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     if (!includeSnapshotData) {
       maxTotalSstSize.set(Long.MAX_VALUE);
     } else {
-      snapshotPaths = getSnapshotDirs(omMetadataManager);
+      snapshotPaths = getSnapshotDirs(omMetadataManager, omMetadataManager, snapshotLocalDataManager);
     }
 
     if (sstFilesToExclude.isEmpty()) {
@@ -382,18 +383,21 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   /**
    * Collects paths to all snapshot databases.
    *
-   * @param omMetadataManager OMMetadataManager instance
+   * @param activeOMMetadataManager OMMetadataManager instance
    * @return Set of paths to snapshot databases
    * @throws IOException if an I/O error occurs
    */
-  Set<Path> getSnapshotDirs(OMMetadataManager omMetadataManager) throws IOException {
+  Set<Path> getSnapshotDirs(OMMetadataManager activeOMMetadataManager, OMMetadataManager omMetadataManager,
+      OmSnapshotLocalDataManager localDataManager) throws IOException {
     Set<Path> snapshotPaths = new HashSet<>();
     SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
     for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
-      String snapshotDir =
-          OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
-      Path path = Paths.get(snapshotDir);
-      snapshotPaths.add(path);
+      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapLocalMeta =
+               localDataManager.getOmSnapshotLocalDataMeta(snapInfo.getSnapshotId())) {
+        Path snapshotDir = getSnapshotPath(activeOMMetadataManager,
+            snapInfo.getSnapshotId(), snapLocalMeta.getMeta().getVersion());
+        snapshotPaths.add(snapshotDir);
+      }
     }
     return snapshotPaths;
   }

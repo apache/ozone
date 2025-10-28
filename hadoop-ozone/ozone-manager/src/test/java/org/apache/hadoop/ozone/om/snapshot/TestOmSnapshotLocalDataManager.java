@@ -250,7 +250,7 @@ public class TestOmSnapshotLocalDataManager {
 
   private void mockSnapshotStore(UUID snapshotId, List<LiveFileMetaData> sstFiles) throws RocksDatabaseException {
     // Setup snapshot store mock
-    File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId).toFile();
+    File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId, 0).toFile();
     assertTrue(snapshotDbLocation.exists() || snapshotDbLocation.mkdirs());
 
     when(snapshotStore.getDbLocation()).thenReturn(snapshotDbLocation);
@@ -580,7 +580,7 @@ public class TestOmSnapshotLocalDataManager {
     SnapshotInfo snapshotInfo = createMockSnapshotInfo(snapshotId, null);
     
     // Setup snapshot store mock
-    File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId).toFile();
+    File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId, 0).toFile();
     assertTrue(snapshotDbLocation.exists() || snapshotDbLocation.mkdirs());
 
     List<LiveFileMetaData> sstFiles = new ArrayList<>();

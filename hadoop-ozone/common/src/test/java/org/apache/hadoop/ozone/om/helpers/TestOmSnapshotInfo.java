@@ -60,7 +60,6 @@ public class TestOmSnapshotInfo {
         .setPathPreviousSnapshotId(PATH_PREVIOUS_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotId(GLOBAL_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath(SNAPSHOT_PATH)
-        .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
         .setSstFiltered(false)

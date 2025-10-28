@@ -314,7 +314,7 @@ class TestOmSnapshotManager {
     when(mockedDb.getLiveFilesMetaData()).thenReturn(mockedLiveFiles);
 
     Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
-    when(mockedStore.getDbLocation()).thenReturn(getSnapshotPath(omMetadataManager, snapshotInfo).toFile());
+    when(mockedStore.getDbLocation()).thenReturn(getSnapshotPath(omMetadataManager, snapshotInfo, 0).toFile());
     // Create an existing YAML file for the snapshot
     assertTrue(snapshotYaml.toFile().createNewFile());
     assertEquals(0, Files.size(snapshotYaml));

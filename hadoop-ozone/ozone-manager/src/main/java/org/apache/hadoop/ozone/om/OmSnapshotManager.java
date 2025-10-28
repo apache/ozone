@@ -415,8 +415,12 @@ public final class OmSnapshotManager implements AutoCloseable {
                 "' with txnId : '" + TransactionInfo.fromByteString(snapshotInfo.getCreateTransactionInfo()) +
                 "' has not been flushed yet. Please wait a few more seconds before retrying", TIMEOUT);
           }
-          snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb);
+          try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapshotLocalDataProvider =
+                   snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+            snapshotMetadataManager = new OmMetadataManagerImpl(conf,
+                snapshotInfo.getCheckpointDirName(snapshotLocalDataProvider.getMeta().getVersion()),
+                maxOpenSstFilesInSnapshotDb);
+          }
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
           throw e;
@@ -505,14 +509,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     boolean snapshotDirExist = false;
     // Create DB checkpoint for snapshot
-    String checkpointPrefix = store.getDbLocation().getName();
-    Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
+    Path snapshotDirPath = getSnapshotPath(omMetadataManager, snapshotInfo, 0);
     if (Files.exists(snapshotDirPath)) {
       snapshotDirExist = true;
       dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
     } else {
-      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName(0));
     }
     OmSnapshotManager omSnapshotManager =
         ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
@@ -796,27 +798,23 @@ public final class OmSnapshotManager implements AutoCloseable {
         snapshotName + OM_KEY_PREFIX;
   }
 
-  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, int version) {
+    return getSnapshotPath(omMetadataManager, snapshotInfo.getSnapshotId(), version);
+  }
+
+  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, UUID snapshotId, int version) {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     return Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
-  }
-
-  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, UUID snapshotId) {
-    RDBStore store = (RDBStore) omMetadataManager.getStore();
-    String checkpointPrefix = store.getDbLocation().getName();
-    return Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotId));
+        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotId, version));
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-      SnapshotInfo snapshotInfo) {
-    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
+      SnapshotInfo snapshotInfo, int version) {
+    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName(version));
   }
 
-  public static String getSnapshotPath(OzoneConfiguration conf,
-      String checkpointDirName) {
+  private static String getSnapshotPath(OzoneConfiguration conf, String checkpointDirName) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
         OM_DB_NAME + checkpointDirName;

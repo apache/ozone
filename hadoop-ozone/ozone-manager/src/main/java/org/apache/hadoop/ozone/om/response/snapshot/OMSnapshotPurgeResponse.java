@@ -119,7 +119,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
    * Deletes the checkpoint directory for a snapshot.
    */
   private void deleteCheckpointDirectory(OmSnapshotLocalDataManager snapshotLocalDataManager,
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) throws IOException {
     // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
     // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
     // directory can run in parallel along with this operation.
@@ -127,14 +127,18 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         .acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
     boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
     if (acquiredSnapshotLock) {
-      Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
-      try {
-        FileUtils.deleteDirectory(snapshotDirPath.toFile());
-      } catch (IOException ex) {
-        LOG.error("Failed to delete snapshot directory {} for snapshot {}",
-            snapshotDirPath, snapshotInfo.getTableKey(), ex);
-      } finally {
-        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
+      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+               snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+        Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo,
+            snapMetaProvider.getMeta().getVersion());
+        try {
+          FileUtils.deleteDirectory(snapshotDirPath.toFile());
+        } catch (IOException ex) {
+          LOG.error("Failed to delete snapshot directory {} for snapshot {}",
+              snapshotDirPath, snapshotInfo.getTableKey(), ex);
+        } finally {
+          omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
+        }
       }
     }
   }
