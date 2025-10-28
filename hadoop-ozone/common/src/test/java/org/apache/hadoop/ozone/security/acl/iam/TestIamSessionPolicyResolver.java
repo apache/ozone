@@ -1,12 +1,12 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +40,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Test class for {@link IamSessionPolicyResolver}.
+ * */
 public class TestIamSessionPolicyResolver {
 
   private static final String VOLUME = "s3v";
@@ -1089,57 +1092,57 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-      final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromNativeAuthorizer =
-          IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
-      final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromRangerAuthorizer =
-          IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromNativeAuthorizer =
+        IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromRangerAuthorizer =
+        IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
 
-      // Ensure what we got is what we expected
-      final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedNative =
-          new LinkedHashSet<>();
+    // Ensure what we got is what we expected
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedNative =
+        new LinkedHashSet<>();
 
-      // Expected for native: READ, LIST bucket acls
-      final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    // Expected for native: READ, LIST bucket acls
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
 
-      final Set<ACLType> bucketAcls = acls(READ, LIST);
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
 
-      expectedResolvedNative.add(new AbstractMap.SimpleImmutableEntry<>(bucketSet, bucketAcls));
+    expectedResolvedNative.add(new AbstractMap.SimpleImmutableEntry<>(bucketSet, bucketAcls));
 
-      // Expected for native: READ acl on prefix "" under bucket
-      final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
+    // Expected for native: READ acl on prefix "" under bucket
+    final Set<IOzoneObj> keyPrefixSet = objSet(prefix("my-bucket", ""));
 
-      final Set<ACLType> keyAcl = acls(READ);
+    final Set<ACLType> keyAcl = acls(READ);
 
-      expectedResolvedNative.add(new AbstractMap.SimpleImmutableEntry<>(keyPrefixSet, keyAcl));
+    expectedResolvedNative.add(new AbstractMap.SimpleImmutableEntry<>(keyPrefixSet, keyAcl));
 
-      // Native authorizer assertion
-      assertThat(resolvedFromNativeAuthorizer.stream()
-          .map(TestIamSessionPolicyResolver::stringifyEntry)
-          .collect(Collectors.toSet())
-      ).isEqualTo(expectedResolvedNative.stream()
-          .map(TestIamSessionPolicyResolver::stringifyEntry)
-          .collect(Collectors.toSet())
-      );
+    // Native authorizer assertion
+    assertThat(resolvedFromNativeAuthorizer.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    ).isEqualTo(expectedResolvedNative.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    );
 
-      final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedRanger =
-          new LinkedHashSet<>();
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedRanger =
+        new LinkedHashSet<>();
 
-      // Expected for Ranger: READ, LIST bucket acls
-      expectedResolvedRanger.add(new AbstractMap.SimpleImmutableEntry<>(bucketSet, bucketAcls));
+    // Expected for Ranger: READ, LIST bucket acls
+    expectedResolvedRanger.add(new AbstractMap.SimpleImmutableEntry<>(bucketSet, bucketAcls));
 
-      // Expected for Ranger: READ key acl for resource type KEY with key name "*"
-      final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
+    // Expected for Ranger: READ key acl for resource type KEY with key name "*"
+    final Set<IOzoneObj> rangerKeySet = objSet(key("my-bucket", "*"));
 
-      expectedResolvedRanger.add(new AbstractMap.SimpleImmutableEntry<>(rangerKeySet, keyAcl));
+    expectedResolvedRanger.add(new AbstractMap.SimpleImmutableEntry<>(rangerKeySet, keyAcl));
 
-      // Ranger authorizer assertion
-      assertThat(resolvedFromRangerAuthorizer.stream()
-          .map(TestIamSessionPolicyResolver::stringifyEntry)
-          .collect(Collectors.toSet())
-      ).isEqualTo(expectedResolvedRanger.stream()
-          .map(TestIamSessionPolicyResolver::stringifyEntry)
-          .collect(Collectors.toSet())
-      );
+    // Ranger authorizer assertion
+    assertThat(resolvedFromRangerAuthorizer.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    ).isEqualTo(expectedResolvedRanger.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    );
   }
 
   @Test
@@ -1761,7 +1764,7 @@ public class TestIamSessionPolicyResolver {
    */
   private static String buildTooManyStatementsString() {
     final StringBuilder stringBuilder = new StringBuilder();
-    for (int i=0; i<120; i++) {
+    for (int i = 0; i < 120; i++) {
       stringBuilder.append("    {\n" +
           "      \"Effect\": \"Allow\",\n" +
           "      \"Action\": \"s3:*\",\n" +
@@ -1777,7 +1780,7 @@ public class TestIamSessionPolicyResolver {
    */
   private static String buildTooManyActionsString() {
     final StringBuilder stringBuilder = new StringBuilder();
-    for (int i=0; i<120; i++) {
+    for (int i = 0; i < 120; i++) {
       stringBuilder.append("\"s3:GetObject\",\n");
     }
     return stringBuilder.toString();
@@ -1788,7 +1791,7 @@ public class TestIamSessionPolicyResolver {
    */
   private static String buildTooManyResourcesString() {
     final StringBuilder stringBuilder = new StringBuilder();
-    for (int i=0; i<120; i++) {
+    for (int i = 0; i < 120; i++) {
       stringBuilder.append("\"arn:aws:s3:::my-bucket/*\",\n");
     }
     return stringBuilder.toString();
