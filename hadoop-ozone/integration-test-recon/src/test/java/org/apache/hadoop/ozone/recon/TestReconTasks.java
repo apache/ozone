@@ -48,7 +48,9 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainersV2;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -337,6 +339,67 @@ public class TestReconTasks {
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0L, Optional.empty(), 1000);
+      return (allMissingContainers.isEmpty());
+    });
+
+    IOUtils.closeQuietly(client);
+  }
+
+  @Test
+  public void testContainerHealthTaskV2WithSCMSync() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            recon.getReconServer().getReconStorageContainerManager();
+
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
+    PipelineManager scmPipelineManager = scm.getPipelineManager();
+
+    // Make sure Recon's pipeline state is initialized.
+    LambdaTestUtils.await(60000, 5000,
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
+
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+
+    // Create a container in SCM
+    ContainerInfo containerInfo =
+        scmContainerManager.allocateContainer(
+            RatisReplicationConfig.getInstance(ONE), "test");
+    long containerID = containerInfo.getContainerID();
+
+    Pipeline pipeline =
+        scmPipelineManager.getPipeline(containerInfo.getPipelineID());
+    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+    runTestOzoneContainerViaDataNode(containerID, client);
+
+    // Make sure Recon got the container report with new container.
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
+
+    // Bring down the Datanode that had the container replica.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+    // V2 task should detect MISSING container from SCM
+    LambdaTestUtils.await(120000, 6000, () -> {
+      List<UnhealthyContainersV2> allMissingContainers =
+          reconContainerManager.getContainerSchemaManagerV2()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+                  0L, Optional.empty(), 1000);
+      return (allMissingContainers.size() == 1);
+    });
+
+    // Restart the Datanode to make sure we remove the missing container.
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+
+    LambdaTestUtils.await(120000, 10000, () -> {
+      List<UnhealthyContainersV2> allMissingContainers =
+          reconContainerManager.getContainerSchemaManagerV2()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
                   0L, Optional.empty(), 1000);
       return (allMissingContainers.isEmpty());
     });
