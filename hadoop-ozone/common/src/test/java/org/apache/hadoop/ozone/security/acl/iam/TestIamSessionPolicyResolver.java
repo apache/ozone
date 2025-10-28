@@ -1543,6 +1543,138 @@ public class TestIamSessionPolicyResolver {
     }
   }
 
+  @Test
+  public void testInvalidJsonThrows() {
+    final String invalidJson = "{[{{}]\"\"";
+
+    // Native authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(invalidJson, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON (most likely JSON structure is incorrect)");
+    }
+
+    // Ranger authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(invalidJson, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON (most likely JSON structure is incorrect)");
+    }
+  }
+
+  @Test
+  public void testTooManyStatementsThrows() {
+    final String tooManyStatements = buildTooManyStatementsString();
+
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        tooManyStatements +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": \"s3:*\",\n" +
+        "      \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    // Native authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Statements. Max is: 100");
+    }
+
+    // Ranger authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Statements. Max is: 100");
+    }
+  }
+
+  @Test
+  public void testTooManyActionsThrows() {
+    final String tooManyActions = buildTooManyActionsString();
+
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Sid\": \"AllowListingOfDataLakeFolder\",\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+                tooManyActions +
+        "        \"s3:ListBucketMultipartUploads\"\n" +
+        "      ],\n" +
+        "      \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
+        "      \"Condition\": {\n" +
+        "        \"StringEquals\": {\n" +
+        "          \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "        }\n" +
+        "      }\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    // Native authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Actions. Max is: 100");
+    }
+
+    // Ranger authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Actions. Max is: 100");
+    }
+  }
+
+  @Test
+  public void testTooManyResourcesThrows() {
+    final String tooManyResources = buildTooManyResourcesString();
+
+    final String json = "{\n" +
+        "  \"Version\": \"2012-10-17\",\n" +
+        "  \"Statement\": [\n" +
+        "    {\n" +
+        "      \"Effect\": \"Allow\",\n" +
+        "      \"Action\": [\n" +
+        "        \"s3:*\"\n" +
+        "      ],\n" +
+        "      \"Resource\": [\n" +
+                tooManyResources +
+        "        \"arn:aws:s3:::my-bucket/*\"\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}";
+
+    // Native authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Resources. Max is: 100");
+    }
+
+    // Ranger authorizer assertion
+    try {
+      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Resources. Max is: 100");
+    }
+  }
+
   private static IOzoneObj key(String bucket, String key) {
     return OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.KEY)
@@ -1622,6 +1754,44 @@ public class TestIamSessionPolicyResolver {
           "Wildcard bucket patterns are not supported for Ozone native authorizer"
       );
     }
+  }
+
+  /**
+   * Builds String with too many Statement objects.
+   */
+  private static String buildTooManyStatementsString() {
+    final StringBuilder stringBuilder = new StringBuilder();
+    for (int i=0; i<120; i++) {
+      stringBuilder.append("    {\n" +
+          "      \"Effect\": \"Allow\",\n" +
+          "      \"Action\": \"s3:*\",\n" +
+          "      \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
+          "    },\n"
+      );
+    }
+    return stringBuilder.toString();
+  }
+
+  /**
+   * Builds String with too many Action objects.
+   */
+  private static String buildTooManyActionsString() {
+    final StringBuilder stringBuilder = new StringBuilder();
+    for (int i=0; i<120; i++) {
+      stringBuilder.append("\"s3:GetObject\",\n");
+    }
+    return stringBuilder.toString();
+  }
+
+  /**
+   * Builds String with too many Resource objects.
+   */
+  private static String buildTooManyResourcesString() {
+    final StringBuilder stringBuilder = new StringBuilder();
+    for (int i=0; i<120; i++) {
+      stringBuilder.append("\"arn:aws:s3:::my-bucket/*\",\n");
+    }
+    return stringBuilder.toString();
   }
 }
 

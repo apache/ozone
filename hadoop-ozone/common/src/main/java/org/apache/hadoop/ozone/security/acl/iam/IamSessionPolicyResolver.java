@@ -68,6 +68,10 @@ public final class IamSessionPolicyResolver {
 
   private static final String AWS_S3_ARN_PREFIX = "arn:aws:s3:::";
 
+  private static final int MAX_NUM_OF_STATEMENTS = 100;
+  private static final int MAX_NUM_OF_ACTIONS = 100;
+  private static final int MAX_NUM_OF_RESOURCES = 100;
+
   private IamSessionPolicyResolver() {
   }
 
@@ -107,7 +111,15 @@ public final class IamSessionPolicyResolver {
       validateEffectInJsonStatement(stmt);
 
       final List<String> actions = readStringOrArray(stmt.get("Action"));
+      if (actions.size() > MAX_NUM_OF_ACTIONS) {
+        throw new IllegalArgumentException("Invalid policy JSON - too many Actions. Max is: " +
+            MAX_NUM_OF_ACTIONS);
+      }
       final List<String> resources = readStringOrArray(stmt.get("Resource"));
+      if (resources.size() > MAX_NUM_OF_RESOURCES) {
+        throw new IllegalArgumentException("Invalid policy JSON - too many Resources. Max is: " +
+            MAX_NUM_OF_RESOURCES);
+      }
 
       // Parse prefixes from conditions, if any
       final List<String> prefixes = parsePrefixesFromConditions(stmt);
@@ -157,7 +169,7 @@ public final class IamSessionPolicyResolver {
     try {
       root = MAPPER.readTree(policyJson);
     } catch (Exception e) {
-      throw new IllegalArgumentException("Invalid policy JSON", e);
+      throw new IllegalArgumentException("Invalid policy JSON (most likely JSON structure is incorrect)", e);
     }
 
     final JsonNode statementsNode = root.path("Statement");
@@ -165,6 +177,12 @@ public final class IamSessionPolicyResolver {
       throw new IllegalArgumentException("Invalid policy JSON - missing Statement");
     }
     final List<JsonNode> statements = new ArrayList<>();
+
+    if (statementsNode.size() > MAX_NUM_OF_STATEMENTS) {
+      throw new IllegalArgumentException("Invalid policy JSON - too many Statements. Max is: " +
+          MAX_NUM_OF_STATEMENTS);
+    }
+
     if (statementsNode.isArray()) {
       statementsNode.forEach(statements::add);
     } else {
