@@ -466,6 +466,18 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>ozone.client.elastic.byte.buffer.pool.max.size</name>
+    <value>16GB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum total size of buffers that can be cached in the client-side
+      ByteBufferPool. This pool is used heavily during EC read and write operations.
+      Setting a limit prevents unbounded memory growth in long-lived rpc clients
+      like the S3 Gateway. Once this limit is reached, used buffers are not
+      put back to the pool and will be garbage collected.
+    </description>
+  </property>
+  <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>50000</value>
     <tag>OM, PERFORMANCE</tag>
