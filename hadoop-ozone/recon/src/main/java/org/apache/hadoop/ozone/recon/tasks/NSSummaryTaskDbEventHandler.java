@@ -141,7 +141,7 @@ public class NSSummaryTaskDbEventHandler {
     int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
     long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
 
-    if (curNSSummary == null) {
+    if (!directoryAlreadyExists) {
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
@@ -154,6 +154,8 @@ public class NSSummaryTaskDbEventHandler {
       parentNSSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
     if (parentNSSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       parentNSSummary = new NSSummary();
     }
 

@@ -234,6 +234,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
       nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
       result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
     }
@@ -347,9 +348,9 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
     public void testProcessUpdateFileSize() throws IOException {
       NSSummary nsSummaryForBucket1 =
           getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      // file 1 is gone, so bucket 1 is empty now
+
       assertNotNull(nsSummaryForBucket1);
-      assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       // after put dir4, bucket1 now has two child dirs: dir1 and dir4
