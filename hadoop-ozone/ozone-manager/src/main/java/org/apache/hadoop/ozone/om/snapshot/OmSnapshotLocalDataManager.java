@@ -156,11 +156,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    */
   public void createNewOmSnapshotLocalDataFile(RDBStore snapshotStore, SnapshotInfo snapshotInfo) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
-        new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
-            () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                OmSnapshotManager.getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId(),
-                    null),
-                null))) {
+             new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
+                 () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
+                         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId(),
+                         null),
+                     null))) {
       snapshotLocalData.commit();
     }
   }
