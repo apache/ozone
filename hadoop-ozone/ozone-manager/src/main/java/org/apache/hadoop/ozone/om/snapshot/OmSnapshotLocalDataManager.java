@@ -74,6 +74,23 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
+  // In-memory DAG of snapshot-version dependencies. Each node represents a
+  // specific (snapshotId, version) pair, and a directed edge points to the
+  // corresponding (previousSnapshotId, previousSnapshotVersion) it depends on.
+  // The durable state is stored in each snapshot's YAML (previousSnapshotId and
+  // VersionMeta.previousSnapshotVersion). This graph mirrors that persisted
+  // structure to validate adds/removes and to resolve versions across chains.
+  // This graph is maintained only in memory and is not persisted to disk.
+  // Example (linear chain, arrows point to previous):
+  //   (S0, v1)  <-  (S1, v4)  <-  (S2, v5)  <-  (S3, v7)
+  // where each node is (snapshotId, version) and each arrow points to its
+  // corresponding (previousSnapshotId, previousSnapshotVersion) dependency.
+  //
+  // Example (multiple versions for a single snapshotId S2):
+  //   (S1, v4)  <-  (S2, v6)  <-  (S3, v8)
+  //   (S1, v3)  <-  (S2, v5)
+  // Here S2 has two distinct versions (v6 and v5), each represented as its own
+  // node, and each version can depend on a different previousSnapshotVersion on S1.
   private final MutableGraph<LocalDataVersionNode> localDataGraph;
   private final Map<UUID, SnapshotVersionsMeta> versionNodeMap;
   private final OMMetadataManager omMetadataManager;
