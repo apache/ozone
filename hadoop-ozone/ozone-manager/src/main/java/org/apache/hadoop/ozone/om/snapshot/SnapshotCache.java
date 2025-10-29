@@ -288,14 +288,26 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    */
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
     return lock(() -> lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK),
-        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK));
+        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK), () -> cleanup(true));
   }
 
-  private UncheckedAutoCloseableSupplier<OMLockDetails> lock(
-      Supplier<OMLockDetails> lockFunction, Supplier<OMLockDetails> unlockFunction) {
+  /**
+   * Acquires a write lock on a specific snapshot database and returns an auto-closeable supplier for lock details.
+   * The lock ensures that the operations accessing the snapshot database are performed in a thread safe manner. The
+   * returned supplier automatically releases the lock acquired when closed, preventing potential resource
+   * contention or deadlocks.
+   */
+  public UncheckedAutoCloseableSupplier<OMLockDetails> lock(UUID snapshotId) {
+    return lock(() -> lock.acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
+        () -> lock.releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
+        () -> cleanup(snapshotId));
+  }
+
+  private UncheckedAutoCloseableSupplier<OMLockDetails> lock(Supplier<OMLockDetails> lockFunction,
+      Supplier<OMLockDetails> unlockFunction, Supplier<Void> cleanupFunction) {
     AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(lockFunction.get());
     if (lockDetails.get().isLockAcquired()) {
-      cleanup(true);
+      cleanupFunction.get();
       if (!dbMap.isEmpty()) {
         lockDetails.set(unlockFunction.get());
       }
@@ -324,43 +336,49 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * If cache size exceeds soft limit, attempt to clean up and close the
      instances that has zero reference count.
    */
-  private synchronized void cleanup(boolean force) {
+  private synchronized Void cleanup(boolean force) {
     if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
-        ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
-        if (snapshot != null && snapshot.getTotalRefCount() == 0) {
-          try {
-            compactSnapshotDB(snapshot.get());
-          } catch (IOException e) {
-            LOG.warn("Failed to compact snapshot DB for snapshotId {}: {}",
-                evictionKey, e.getMessage());
-          }
-        }
-
-        dbMap.compute(evictionKey, (k, v) -> {
-          pendingEvictionQueue.remove(k);
-          if (v == null) {
-            throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
-                "instance of the Snapshot may not be closed properly.");
-          }
-
-          if (v.getTotalRefCount() > 0) {
-            LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
-            return v;
-          } else {
-            LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
-            // Close the instance, which also closes its DB handle.
-            try {
-              v.get().close();
-            } catch (IOException ex) {
-              throw new IllegalStateException("Error while closing snapshot DB.", ex);
-            }
-            omMetrics.decNumSnapshotCacheSize();
-            return null;
-          }
-        });
+        cleanup(evictionKey);
       }
     }
+    return null;
+  }
+
+  private synchronized Void cleanup(UUID evictionKey) {
+    ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
+    if (snapshot != null && snapshot.getTotalRefCount() == 0) {
+      try {
+        compactSnapshotDB(snapshot.get());
+      } catch (IOException e) {
+        LOG.warn("Failed to compact snapshot DB for snapshotId {}: {}",
+            evictionKey, e.getMessage());
+      }
+    }
+
+    dbMap.compute(evictionKey, (k, v) -> {
+      pendingEvictionQueue.remove(k);
+      if (v == null) {
+        throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
+            "instance of the Snapshot may not be closed properly.");
+      }
+
+      if (v.getTotalRefCount() > 0) {
+        LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
+        return v;
+      } else {
+        LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
+        // Close the instance, which also closes its DB handle.
+        try {
+          v.get().close();
+        } catch (IOException ex) {
+          throw new IllegalStateException("Error while closing snapshot DB.", ex);
+        }
+        omMetrics.decNumSnapshotCacheSize();
+        return null;
+      }
+    });
+    return null;
   }
 
   /**
