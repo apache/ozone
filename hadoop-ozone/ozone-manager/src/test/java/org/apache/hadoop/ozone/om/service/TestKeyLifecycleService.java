@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,6 +49,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1500,14 +1502,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
-      LOG.info("expiry date {}", date.toInstant().toEpochMilli());
+      LOG.info("expiry date {}", date.toInstant());
 
-      GenericTestUtils.waitFor(() -> date.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
+      ZonedDateTime endDate = date.plus(SERVICE_INTERVAL, ChronoUnit.MILLIS);
+      GenericTestUtils.waitFor(() -> endDate.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
 
       // rename a key under directory to change directory's Modification time
       if (updateDirModificationTime) {
         writeClient.renameKey(keyList1.get(0), keyList1.get(0).getKeyName() + "-new");
         LOG.info("Dir {} refreshes its modification time", dirName);
+        KeyInfoWithVolumeContext keyInfo2 = getDirectory(volumeName, bucketName, dirName);
+        assertNotEquals(keyInfo.getKeyInfo().getModificationTime(), keyInfo2.getKeyInfo().getModificationTime());
       }
 
       // resume KeyLifecycleService bucket scan

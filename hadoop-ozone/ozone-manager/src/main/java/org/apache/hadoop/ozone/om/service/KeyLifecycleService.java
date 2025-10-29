@@ -554,27 +554,32 @@ public class KeyLifecycleService extends BackgroundService {
         //    and fromKey is also in table
         long numKeysUnderDir = 0;
         long numKeysExpired = 0;
-        HashSet<String> deletedKeySet = new HashSet();
+        HashSet<String> deletedKeySetInCache = new HashSet();
+        HashSet<String> keySetInCache = new HashSet();
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
           OmKeyInfo key = entry.getValue().getCacheValue();
           if (key == null) {
-            deletedKeySet.add(entry.getKey().getCacheKey());
+            deletedKeySetInCache.add(entry.getKey().getCacheKey());
             continue;
           }
-          numKeysUnderDir++;
-          String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
-              currentDirPath + OM_KEY_PREFIX + key.getKeyName();
-          for (OmLCRule rule : ruleList) {
-            if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
-              // mark key as expired, check next key
-              if (keyList.isFull()) {
-                // if keyList is full, send delete/rename request for expired keys
-                handleAndClearFullList(bucket, keyList, false);
+          if (key.getParentObjectID() == currentDirObjID) {
+            numKeysUnderDir++;
+            keySetInCache.add(entry.getKey().getCacheKey());
+            String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
+                currentDirPath + OM_KEY_PREFIX + key.getKeyName();
+            for (OmLCRule rule : ruleList) {
+              if (rule.match(key, keyPath)) {
+                // mark key as expired, check next key
+                if (keyList.isFull()) {
+                  // if keyList is full, send delete/rename request for expired keys
+                  handleAndClearFullList(bucket, keyList, false);
+                }
+                keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
+                numKeysExpired++;
+                break;
               }
-              keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
-              numKeysExpired++;
             }
           }
         }
@@ -587,7 +592,7 @@ public class KeyLifecycleService extends BackgroundService {
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
             numKeyIterated++;
-            if (deletedKeySet.contains(keyValue.getKey())) {
+            if (deletedKeySetInCache.remove(keyValue.getKey()) || keySetInCache.remove(keyValue.getKey())) {
               continue;
             }
             numKeysUnderDir++;
