@@ -283,7 +283,7 @@ public class TestOmUtils {
     // Verify bit structure
     long result = OmUtils.addEpochToTxId(2, 0x123456789ABCDL);
     assertEquals(2L, result >>> 62);
-    assertEquals(0x123456789ABCDL, (result & 0x3FFFFFFFFFFFFFL) >>> 8);
+    assertEquals(0x123456789ABCDL, (result & 0x3FFFFFFFFFFFFFFFL) >>> 8);
   }
 
   @Test
@@ -315,13 +315,13 @@ public class TestOmUtils {
     for (long e = 0; e <= 3; e++) {
       long result = OmUtils.getObjectIdFromTxId(e, txId);
       assertEquals(e, result >>> 62);
-      assertEquals(txId, (result & 0x3FFFFFFFFFFFFFL) >>> 8);
+      assertEquals(txId, (result & 0x3FFFFFFFFFFFFFFFL) >>> 8);
     }
 
     long maxTxId = OmUtils.MAX_TRXN_ID;
     long maxResult = OmUtils.getObjectIdFromTxId(epoch, maxTxId);
     assertEquals(epoch, maxResult >>> 62);
-    assertEquals(maxTxId, (maxResult & 0x3FFFFFFFFFFFFFL) >>> 8);
+    assertEquals(maxTxId, (maxResult & 0x3FFFFFFFFFFFFFFFL) >>> 8);
   }
 
   @Test
