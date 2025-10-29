@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATA_DISTRIBUTION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -147,7 +146,7 @@ public class TestBlockDeletionService {
     bucket.deleteKey(keyName);
     // Step 4: Verify deleteBlocks call and capture argument
     verify(spyManagerBefore, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
-    verifyAndAssertQuota(replicationConfig, captor, false);
+    verifyAndAssertQuota(replicationConfig, captor);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 1, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
 
@@ -172,7 +171,7 @@ public class TestBlockDeletionService {
     BlockManager spyManagerAfter = injectSpyBlockManager(cluster);
     bucket.deleteKey(keyName);
     verify(spyManagerAfter, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
-    verifyAndAssertQuota(replicationConfig, captor, true);
+    verifyAndAssertQuota(replicationConfig, captor);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 2, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
   }
@@ -193,7 +192,7 @@ public class TestBlockDeletionService {
     bucket.deleteKey(keyName);
     // Step 4: Verify deleteBlocks call and capture argument
     verify(spyManagerBefore, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
-    verifyAndAssertQuota(replicationConfig, captor, true);
+    verifyAndAssertQuota(replicationConfig, captor);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 1, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
   }
@@ -218,8 +217,7 @@ public class TestBlockDeletionService {
   }
 
   private void verifyAndAssertQuota(ReplicationConfig replicationConfig,
-                                    ArgumentCaptor<List<BlockGroup>> captor,
-                                    boolean isIncludeBlockSize) throws IOException {
+                                    ArgumentCaptor<List<BlockGroup>> captor) throws IOException {
     int index = captor.getAllValues().size() - 1;
     List<BlockGroup> blockGroups = captor.getAllValues().get(index);
 
@@ -232,8 +230,7 @@ public class TestBlockDeletionService {
         .mapToLong(DeletedBlock::getSize).sum();
 
     assertEquals(1, blockGroups.get(0).getAllDeletedBlocks().size());
-    assertEquals(isIncludeBlockSize ?
-        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : SIZE_NOT_AVAILABLE, totalUsedBytes);
-    assertEquals(isIncludeBlockSize ? KEY_SIZE : SIZE_NOT_AVAILABLE, totalUnreplicatedBytes);
+    assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig), totalUsedBytes);
+    assertEquals(KEY_SIZE, totalUnreplicatedBytes);
   }
 }
