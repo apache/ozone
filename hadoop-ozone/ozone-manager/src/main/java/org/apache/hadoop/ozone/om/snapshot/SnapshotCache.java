@@ -294,7 +294,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   /**
    * Acquires a write lock on a specific snapshot database and returns an auto-closeble supplier for lock details.
    * The lock ensures that the operations accessing the snapshot database are perfromed in a thread safe manner. The
-   * returned supplier automatically releases the lock acquired when closed, preveneting potential resource
+   * returned supplier automatically releases the lock acquired when closed, preventing potential resource
    * contention or deadlocks.
    */
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock(UUID snapshotId) {
