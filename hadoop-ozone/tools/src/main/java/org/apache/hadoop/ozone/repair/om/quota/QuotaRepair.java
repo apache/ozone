@@ -44,7 +44,7 @@ import picocli.CommandLine;
         QuotaStatus.class,
         QuotaTrigger.class,
     },
-    description = "Operational tool to repair quota in OM DB." + " OM should be running for this tool.")
+    description = "Operational tool to repair quota in OM DB. OM should be running for this tool.")
 public class QuotaRepair extends AbstractSubcommand {
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(

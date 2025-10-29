@@ -27,8 +27,8 @@ import picocli.CommandLine;
  * Ozone Repair Command line tool.
  */
 @CommandLine.Command(name = "ozone repair",
-    description = "Advanced tool to repair Ozone. Check subcommand help for respective" +
-        " role status requirements.",
+    description = "Advanced tool to repair Ozone. Check the --help output of the subcommand " +
+        "for the respective role status requirements.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
