@@ -416,7 +416,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .build();
   }
 
-  private static DBStoreBuilder newDBStoreBuilder(OzoneConfiguration conf, String name, File dir) {
+  public static DBStoreBuilder newDBStoreBuilder(OzoneConfiguration conf, String name, File dir) {
     return DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), name, dir.toPath());
   }
 

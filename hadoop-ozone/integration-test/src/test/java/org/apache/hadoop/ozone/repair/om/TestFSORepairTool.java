@@ -405,12 +405,12 @@ public class TestFSORepairTool {
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
-        report.getUnreachable().getDirs(),
-        report.getUnreachable().getFiles(),
-        report.getUnreachable().getBytes(),
-        report.getUnreferenced().getDirs(),
-        report.getUnreferenced().getFiles(),
-        report.getUnreferenced().getBytes()
+        report.getPendingToDelete().getDirs(),
+        report.getPendingToDelete().getFiles(),
+        report.getPendingToDelete().getBytes(),
+        report.getOrphaned().getDirs(),
+        report.getOrphaned().getFiles(),
+        report.getOrphaned().getBytes()
     );
   }
 
@@ -462,14 +462,14 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol-empty/bucket-empty"));
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -507,14 +507,14 @@ public class TestFSORepairTool {
 
     FSORepairTool.ReportStatistics reachableCount = 
         new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
         new FSORepairTool.ReportStatistics(1, 2, fileSize * 2L);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
         new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -581,15 +581,15 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    // dir1 does not count towards the unreferenced directories the tool
+    // dir1 does not count towards the orphaned directories the tool
     // will see. It was deleted completely so the tool will never see it.
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
