@@ -623,7 +623,6 @@ public class TestStorageContainerManager {
       ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
       assertEquals(clusterId, scmInfo.getClusterId());
       assertEquals(scmId, scmInfo.getScmId());
-      assertTrue(scmInfo.getMetaDataLayoutVersion() >= 0);
 
       String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
       String actualVersion = scm.getSoftwareVersion();

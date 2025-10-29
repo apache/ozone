@@ -145,18 +145,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
       case DeleteScmKeyBlocks:
-        if (scm.getLayoutVersionManager().needsFinalization() &&
-            !scm.getLayoutVersionManager()
-                .isAllowed(HDDSLayoutFeature.DATA_DISTRIBUTION)
-        ) {
-          boolean isRequestHasNewData = request.getDeleteScmKeyBlocksRequest().getKeyBlocksList().stream()
-              .anyMatch(keyBlocks -> keyBlocks.getDeletedBlocksCount() > 0);
-
-          if (isRequestHasNewData) {
-            throw new SCMException("Cluster is not finalized yet, it is"
-                + " not enabled to to handle data distribution feature",
-                SCMException.ResultCodes.INTERNAL_ERROR);
-          }
+        boolean hasOldProtoType = request.getDeleteScmKeyBlocksRequest().getKeyBlocksList().stream()
+            .anyMatch(keyBlocks -> keyBlocks.getBlocksCount() > 0);
+        if (hasOldProtoType) {
+          throw new SCMException("Received delete request with an unsupported protocol version.",
+              SCMException.ResultCodes.INTERNAL_ERROR);
         }
         response.setDeleteScmKeyBlocksResponse(
             deleteScmKeyBlocks(request.getDeleteScmKeyBlocksRequest()));
@@ -264,7 +257,6 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .setMetaDataLayoutVersion(scmInfo.getMetaDataLayoutVersion())
         .build();
   }
 

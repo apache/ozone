@@ -81,7 +81,6 @@ public class TestScmBlockLocationProtocolClientSideTranslatorPB {
     // Verify
     assertEquals("test-cluster-id", result.getClusterId());
     assertEquals("test-scm-id", result.getScmId());
-    assertEquals(1, result.getMetaDataLayoutVersion());
     verify(mockRpcProxy).send(any(), any(SCMBlockLocationRequest.class));
   }
 
@@ -108,7 +107,6 @@ public class TestScmBlockLocationProtocolClientSideTranslatorPB {
     // Verify
     assertEquals("test-cluster-id", result.getClusterId());
     assertEquals("test-scm-id", result.getScmId());
-    assertEquals(0, result.getMetaDataLayoutVersion());
     verify(mockRpcProxy).send(any(), any(SCMBlockLocationRequest.class));
   }
 

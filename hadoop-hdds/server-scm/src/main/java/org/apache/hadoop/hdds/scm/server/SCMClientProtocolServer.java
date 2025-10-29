@@ -909,8 +909,7 @@ public class SCMClientProtocolServer implements
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
               .setScmId(scm.getScmStorageConfig().getScmId())
-              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles())
-              .setMetaDataLayoutVersion(scm.getLayoutVersionManager().getMetadataLayoutVersion());
+              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
       ScmInfo info = builder.build();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.GET_SCM_INFO, null));

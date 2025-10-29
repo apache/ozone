@@ -47,14 +47,6 @@ public final class BlockGroup {
   }
 
   public KeyBlocks getProto() {
-    return getProtoForDeletedBlock();
-  }
-
-  public KeyBlocks getProto(boolean isIncludeBlockSize) {
-    return isIncludeBlockSize ? getProtoForDeletedBlock() : getProtoForBlockID();
-  }
-
-  private KeyBlocks getProtoForDeletedBlock() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : deletedBlocks) {
       ScmBlockLocationProtocolProtos.DeletedBlock deletedBlock = ScmBlockLocationProtocolProtos.DeletedBlock
@@ -64,14 +56,6 @@ public final class BlockGroup {
           .setReplicatedSize(block.getReplicatedSize())
           .build();
       kbb.addDeletedBlocks(deletedBlock);
-    }
-    return kbb.setKey(groupID).build();
-  }
-
-  private KeyBlocks getProtoForBlockID() {
-    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    for (DeletedBlock block : deletedBlocks) {
-      kbb.addBlocks(block.getBlockID().getProtobuf());
     }
     return kbb.setKey(groupID).build();
   }

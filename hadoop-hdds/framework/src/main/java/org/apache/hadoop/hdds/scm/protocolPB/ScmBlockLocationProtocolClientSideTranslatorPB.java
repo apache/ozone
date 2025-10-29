@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
@@ -249,10 +248,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    boolean useDataDistribution = getScmInfoSafe().getMetaDataLayoutVersion() >=
-        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
     List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(blockGroup -> blockGroup.getProto(useDataDistribution))
+        .map(BlockGroup::getProto)
         .collect(Collectors.toList());
     List<DeleteBlockGroupResult> allResults = new ArrayList<>();
     List<KeyBlocks> batch = new ArrayList<>();
@@ -304,14 +301,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     return results;
   }
 
-  private synchronized ScmInfo getScmInfoSafe() throws IOException {
-    if (scmInfo == null || scmInfo.getMetaDataLayoutVersion() <
-        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion()) {
-      getScmInfo(); // refresh cached scmInfo
-    }
-    return scmInfo;
-  }
-
   /**
    * Gets the cluster Id and Scm Id from SCM.
    * @return ScmInfo
@@ -333,11 +322,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     resp = wrappedResponse.getGetScmInfoResponse();
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
-        .setScmId(resp.getScmId())
-        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ?
-            resp.getMetaDataLayoutVersion() : HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    scmInfo = builder.build();
-    return scmInfo;
+        .setScmId(resp.getScmId());
+    return  builder.build();
   }
 
   /**

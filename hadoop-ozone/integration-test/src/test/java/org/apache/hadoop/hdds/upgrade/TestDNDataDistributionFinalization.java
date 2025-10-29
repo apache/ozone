@@ -119,7 +119,8 @@ public class TestDNDataDistributionFinalization {
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(), scmClient.getScmInfo().getMetaDataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Create Volume and Bucket
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
@@ -145,7 +146,7 @@ public class TestDNDataDistributionFinalization {
 
     // Verify initial state - DATA_DISTRIBUTION should not be finalized yet
     assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Create some data and delete operations to trigger pending deletion logic
     String keyName1 = "testKey1";
@@ -183,7 +184,7 @@ public class TestDNDataDistributionFinalization {
 
     // Verify finalization completed
     assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Create more data and deletions to test post-finalization behavior
     String keyName3 = "testKey3";
@@ -228,7 +229,7 @@ public class TestDNDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
 
     assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Verify the system can handle scenarios where pendingDeleteBlockCount
     // might be missing and needs recalculation

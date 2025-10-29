@@ -135,13 +135,14 @@ public class TestScmDataDistributionFinalization {
         .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
-            .build());
+        .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+        .build());
     this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(), scmClient.getScmInfo().getMetaDataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Create Volume and Bucket
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
@@ -190,7 +191,7 @@ public class TestScmDataDistributionFinalization {
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -329,8 +330,7 @@ public class TestScmDataDistributionFinalization {
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
-
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
