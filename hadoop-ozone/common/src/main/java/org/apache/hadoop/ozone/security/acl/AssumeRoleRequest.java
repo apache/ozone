@@ -27,7 +27,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 /**
  * Represents an S3 AssumeRole request that needs to be authorized by an IAccessAuthorizer.
  * The grants parameter can be null if the access must not be limited beyond the role.
- * Note that if the grants is parameter is the empty set, this means the access should
+ * Note that if the grants parameter is the empty set, this means the access should
  * be the intersection of the role and the empty set, meaning no access will be granted.
  */
 @Immutable
