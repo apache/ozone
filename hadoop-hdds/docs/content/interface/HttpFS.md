@@ -45,7 +45,7 @@ HttpFS has built-in security supporting Hadoop pseudo authentication and Kerbero
 
 HttpFS service itself is a Jetty based web-application that uses the Hadoop FileSystem API to talk to the cluster, it is a separate service which provides access to Ozone via a REST APIs. It should be started in addition to other regular Ozone components.
 
-To try it out, follow the instruction from the link below and start the Ozone cluster with Docker Compose. 
+To try it out, follow the instructions from the link below to start the Ozone cluster with Docker Compose. 
 
 https://ozone.apache.org/docs/edge/start/startfromdockerhub.html
 
