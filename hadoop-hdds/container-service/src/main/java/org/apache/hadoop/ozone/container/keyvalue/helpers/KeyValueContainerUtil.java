@@ -31,7 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -48,7 +47,6 @@ import org.apache.hadoop.ozone.container.keyvalue.PendingDelete;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -369,10 +367,8 @@ public final class KeyValueContainerUtil {
     Long pendingDeletionBlockBytes = metadataTable.get(kvContainerData.getPendingDeleteBlockBytesKey());
     Long pendingDeleteBlockCount = metadataTable.get(kvContainerData.getPendingDeleteBlockCountKey());
 
-    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
-      return handlePreDataDistributionFeature(pendingDeleteBlockCount, metadataTable, store, kvContainerData);
-    } else if (pendingDeleteBlockCount != null) {
-      return handlePostDataDistributionFeature(pendingDeleteBlockCount, pendingDeletionBlockBytes,
+    if (pendingDeleteBlockCount != null) {
+      return handlePendingDeletionBlockCountAndBytes(pendingDeleteBlockCount, pendingDeletionBlockBytes,
           metadataTable, store, kvContainerData);
     } else {
       LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
@@ -381,20 +377,7 @@ public final class KeyValueContainerUtil {
     }
   }
 
-  private static PendingDelete handlePreDataDistributionFeature(
-      Long pendingDeleteBlockCount, Table<String, Long> metadataTable,
-      DatanodeStore store, KeyValueContainerData kvContainerData) throws IOException {
-
-    if (pendingDeleteBlockCount != null) {
-      return new PendingDelete(pendingDeleteBlockCount, 0L);
-    } else {
-      LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
-          metadataTable.getName());
-      return getAggregatePendingDelete(store, kvContainerData, kvContainerData.getSchemaVersion());
-    }
-  }
-
-  private static PendingDelete handlePostDataDistributionFeature(
+  private static PendingDelete handlePendingDeletionBlockCountAndBytes(
       Long pendingDeleteBlockCount, Long pendingDeletionBlockBytes,
       Table<String, Long> metadataTable, DatanodeStore store,
       KeyValueContainerData kvContainerData) throws IOException {

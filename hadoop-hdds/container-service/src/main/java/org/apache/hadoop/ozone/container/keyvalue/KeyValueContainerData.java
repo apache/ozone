@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -59,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.yaml.snakeyaml.nodes.Tag;
 
 /**
@@ -387,10 +385,8 @@ public class KeyValueContainerData extends ContainerData {
     metadataTable.putWithBatch(batchOperation, getBlockCountKey(), b.getCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
         b.getPendingDeletion() - deletedBlockCount);
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
-      metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
-          b.getPendingDeletionBytes() - releasedBytes);
-    }
+    metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
+        b.getPendingDeletionBytes() - releasedBytes);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
@@ -401,9 +397,7 @@ public class KeyValueContainerData extends ContainerData {
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
-      metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
-    }
+    metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
   }
 
   // NOTE: Below are some helper functions to format keys according
