@@ -60,7 +60,7 @@ import org.mockito.verification.VerificationMode;
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class TestContainerScannersAbstract {
 
-  private static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
+  protected static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
 
   @Mock
   protected Container<ContainerData> healthy;

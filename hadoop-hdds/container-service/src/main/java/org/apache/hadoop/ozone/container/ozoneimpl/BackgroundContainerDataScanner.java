@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
@@ -62,6 +64,15 @@ public class BackgroundContainerDataScanner extends
   @Override
   public void scanContainer(Container<?> c)
       throws IOException, InterruptedException {
+    // It is possible that the container was marked deleted after it was added to the
+    // list of containers to scan. In that case, we should avoid a race condition with
+    // the DiskBalancerService, which can mark the container as DELETED and remove its files.
+    if (c.getContainerState() == DELETED) {
+      LOG.debug("Skipping data scan of container {} as it is marked as DELETED",
+          c.getContainerData().getContainerID());
+      return;
+    }
+
     // There is one background container data scanner per volume.
     // If the volume fails, its scanning thread should terminate.
     if (volume.isFailed()) {

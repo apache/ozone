@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +33,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mockStatic;
@@ -287,5 +291,64 @@ public class TestBackgroundContainerDataScanner extends
       verify(controller, times(1))
           .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
+  }
+
+  /**
+   * Test that containers marked as DELETED are skipped by the scanner
+   * to avoid race conditions when container files deletion is in progress.
+   */
+  @Test
+  public void testContainerMarkedDeletedIsSkipped() throws Exception {
+    // Create a container that will be marked as DELETED
+    Container<?> containerToMarkDeleted = mockKeyValueContainer();
+
+    // Set up the container as healthy initially
+    when(containerToMarkDeleted.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(containerToMarkDeleted.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    setScannedTimestampOld((Container<ContainerData>) containerToMarkDeleted);
+    
+    // Initially the container is CLOSED
+    when(containerToMarkDeleted.getContainerState()).thenReturn(CLOSED);
+
+    // First iteration: all containers are scanned normally
+    setContainers(healthy, containerToMarkDeleted);
+    scanner.runIteration();
+    
+    verify(healthy, atLeastOnce()).scanData(any(), any());
+    verify(containerToMarkDeleted, atLeastOnce()).scanData(any(), any());
+    
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    assertEquals(1, metrics.getNumScanIterations());
+    assertEquals(2, metrics.getNumContainersScanned());
+    
+    // Mark the container as DELETED
+    when(containerToMarkDeleted.getContainerState()).thenReturn(DELETED);
+    when(containerToMarkDeleted.getContainerData().getState()).thenReturn(DELETED);
+    
+    // Clear previous invocations to track only new calls
+    clearInvocations(healthy, containerToMarkDeleted, controller);
+    
+    // Second iteration: DELETED container should be skipped
+    scanner.runIteration();
+    
+    // Verify that the healthy container is still scanned
+    verify(healthy, atLeastOnce()).scanData(any(), any());
+    
+    // Verify that the container marked as DELETED was NOT scanned
+    // This prevents "chunks dir does not exist" errors when parallel deletion
+    // of container files are in progress for containers marked as DELETED.
+    verify(containerToMarkDeleted, never()).scanData(any(), any());
+    verify(containerToMarkDeleted, never()).scanMetaData();
+    
+    // Verify no timestamp or checksum update for deleted container
+    verify(controller, never())
+        .updateDataScanTimestamp(eq(containerToMarkDeleted.getContainerData().getContainerID()), any());
+    verify(controller, never())
+        .updateContainerChecksum(eq(containerToMarkDeleted.getContainerData().getContainerID()), any());
+    
+    // Verify metrics - only the healthy container was scanned in second iteration
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(3, metrics.getNumContainersScanned()); // 2 from first iteration + 1 from second
   }
 }
