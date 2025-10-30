@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
@@ -34,25 +36,37 @@ public class TestAssumeRoleRequest {
   @Test
   public void testConstructorAndGetters() {
     final UserGroupInformation ugi = UserGroupInformation.createRemoteUser("om");
+    final Set<AssumeRoleRequest.OzoneGrant> grants = new HashSet<>();
+    grants.add(new AssumeRoleRequest.OzoneGrant(
+        Collections.singleton(
+            OzoneObjInfo.Builder.newBuilder()
+                .setResType(OzoneObj.ResourceType.BUCKET)
+                .setStoreType(OzoneObj.StoreType.OZONE)
+                .setVolumeName("s3v")
+                .setBucketName("myBucket")
+                .build()
+        ),
+        Collections.singleton(IAccessAuthorizer.ACLType.READ)
+    ));
 
     final AssumeRoleRequest assumeRoleRequest1 = new AssumeRoleRequest("host",
         null,
         ugi,
         "roleA",
-        Collections.emptySet()
+        grants
     );
     final AssumeRoleRequest assumeRoleRequest2 = new AssumeRoleRequest("host",
         null,
         ugi,
         "roleA",
-        Collections.emptySet()
+        grants
     );
 
     assertEquals("host", assumeRoleRequest1.getHost());
     assertNull(assumeRoleRequest1.getIp());
     assertSame(ugi, assumeRoleRequest1.getClientUgi());
     assertEquals("roleA", assumeRoleRequest1.getTargetRoleName());
-    assertEquals(Collections.emptySet(), assumeRoleRequest1.getGrants());
+    assertEquals(grants, assumeRoleRequest1.getGrants());
 
     assertEquals(assumeRoleRequest1, assumeRoleRequest2);
     assertEquals(assumeRoleRequest1.hashCode(), assumeRoleRequest2.hashCode());
