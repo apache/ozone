@@ -638,6 +638,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         if (existingVersionsMeta == null || !Objects.equals(versionsToBeAdded.getPreviousSnapshotId(),
             existingVersionsMeta.getPreviousSnapshotId())) {
           setDirty();
+          snapshotLocalData.setNeedsDefrag(true);  // PATCHED from HDDS-13785. https://github.com/apache/ozone/pull/9150
         }
         return versionsToBeAdded;
       } finally {
