@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import java.net.InetAddress;
-import java.util.AbstractMap;
 import java.util.Objects;
 import java.util.Set;
 import net.jcip.annotations.Immutable;
@@ -36,14 +35,14 @@ public class AssumeRoleRequest {
   private final InetAddress ip;
   private final UserGroupInformation clientUgi;
   private final String targetRoleName;
-  private final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<IAccessAuthorizer.ACLType>>> grants;
+  private final Set<OzoneGrant> grants;
 
   public AssumeRoleRequest(
       String host,
       InetAddress ip,
       UserGroupInformation clientUgi,
       String targetRoleName,
-      Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<IAccessAuthorizer.ACLType>>> grants
+      Set<OzoneGrant> grants
   ) {
 
     this.host = host;
@@ -69,7 +68,7 @@ public class AssumeRoleRequest {
     return targetRoleName;
   }
 
-  public Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<IAccessAuthorizer.ACLType>>> getGrants() {
+  public Set<OzoneGrant> getGrants() {
     return grants;
   }
 
@@ -90,5 +89,44 @@ public class AssumeRoleRequest {
   @Override
   public int hashCode() {
     return Objects.hash(host, ip, clientUgi, targetRoleName, grants);
+  }
+
+  /**
+   * Encapsulates the IOzoneObj and associated permissions.
+   */
+  @Immutable
+  public static class OzoneGrant {
+    private final Set<IOzoneObj> objects;
+    private final Set<IAccessAuthorizer.ACLType> permissions;
+
+    public OzoneGrant(Set<IOzoneObj> objects,
+                      Set<IAccessAuthorizer.ACLType> permissions) {
+      this.objects = objects;
+      this.permissions = permissions;
+    }
+
+    public Set<IOzoneObj> getObjects() {
+      return objects;
+    }
+
+    public Set<IAccessAuthorizer.ACLType> getPermissions() {
+      return permissions;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      final OzoneGrant that = (OzoneGrant) o;
+      return Objects.equals(objects, that.objects) &&
+          Objects.equals(permissions, that.permissions);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(objects, permissions);
+    }
   }
 }

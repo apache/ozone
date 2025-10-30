@@ -56,12 +56,12 @@ public interface IAccessAuthorizer {
    * use the Role permissions and the session policy permissions to determine if
    * the attempted action should be allowed for the given STS token.
    * <p>
-   * The user making this call must have the {@link ACLType#GEN_ACCESS_TOKEN} permission.
+   * The user making this call must have the {@link ACLType#ASSUME_ROLE} permission.
    *
    * @param assumeRoleRequest   the AssumeRole request containing role and optional limited scope policy grants
    * @return                    a String representing the permissions granted according to the authorizer.
    * @throws OMException        if the caller is not authorized, either for the role and/or policy or for the
-   *                            {@link ACLType#GEN_ACCESS_TOKEN} permission
+   *                            {@link ACLType#ASSUME_ROLE} permission
    */
   default String generateAssumeRoleSessionPolicy(AssumeRoleRequest assumeRoleRequest) throws OMException {
     return null;
@@ -87,7 +87,7 @@ public interface IAccessAuthorizer {
     WRITE_ACL,
     ALL,
     NONE,
-    GEN_ACCESS_TOKEN;   // ability to create STS tokens
+    ASSUME_ROLE;   // ability to create STS tokens
 
     private static int length = ACLType.values().length;
     static {
@@ -142,6 +142,8 @@ public interface IAccessAuthorizer {
         return ACLType.ALL;
       case OzoneConsts.OZONE_ACL_NONE:
         return ACLType.NONE;
+      case OzoneConsts.OZONE_ACL_ASSUME_ROLE:
+        return ACLType.ASSUME_ROLE;
       default:
         throw new IllegalArgumentException("[" + type + "] ACL right is not " +
             "recognized");
@@ -182,6 +184,8 @@ public interface IAccessAuthorizer {
         return OzoneConsts.OZONE_ACL_ALL;
       case NONE:
         return OzoneConsts.OZONE_ACL_NONE;
+      case ASSUME_ROLE:
+        return OzoneConsts.OZONE_ACL_ASSUME_ROLE;
       default:
         throw new IllegalArgumentException("ACL right is not recognized");
       }
