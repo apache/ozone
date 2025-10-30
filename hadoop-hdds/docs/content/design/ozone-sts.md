@@ -80,6 +80,21 @@ However, certain object wildcards be accepted.   For example, ResourceArn `arn:a
 will be accepted but `arn:aws:s3:::myBucket/file*.txt`
 will not be accepted.
 
+A sample IAM policy that allows read access to all objects in the `example-bucket` bucket is shown below:
+```JSON
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::example-bucket/*"
+        }
+    ]
+}
+
+```
+
 ## 3.3 SessionToken Format
 
 As mentioned above, one of the return values from the AssumeRole call will be the sessionToken. To support not
