@@ -20,13 +20,11 @@ package org.apache.hadoop.ozone.recon.codec;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.ShortCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -37,14 +35,9 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 public final class NSSummaryCodec implements Codec<NSSummary> {
 
   private static final Codec<NSSummary> INSTANCE = new NSSummaryCodec();
-
-  private final Codec<Integer> integerCodec = IntegerCodec.get();
-  private final Codec<Short> shortCodec = ShortCodec.get();
-  private final Codec<Long> longCodec = LongCodec.get();
   private final Codec<String> stringCodec = StringCodec.get();
 
   private NSSummaryCodec() {
-    // singleton
   }
 
   public static Codec<NSSummary> get() {
@@ -57,98 +50,147 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
   }
 
   @Override
-  public byte[] toPersistedFormatImpl(NSSummary object) throws IOException {
-    final byte[] dirName = stringCodec.toPersistedFormat(object.getDirName());
-    Set<Long> childDirs = object.getChildDir();
-    int numOfChildDirs = childDirs.size();
+  public byte[] toPersistedFormatImpl(NSSummary o) throws IOException {
+    // Pre-size buffer conservatively to reduce BAOS growth
+    final byte[] dirNameBytes = stringCodec.toPersistedFormat(o.getDirName());
+    final int[] buckets = o.getFileSizeBucket(); // returns a COPY (safe)
+    final Set<Long> childDirs = o.getChildDir();
+    final int numChild = childDirs.size();
 
-    // int: 1 field (numOfFiles) + 2 sizes (childDirs, dirName) + NUM_OF_FILE_SIZE_BINS (fileSizeBucket)
-    final int resSize = (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) * Integer.BYTES
-        + (numOfChildDirs + 1) * Long.BYTES // 1 long field for parentId + list size
-        + Short.BYTES // 2 dummy shorts to track length
-        + dirName.length // directory name length
-        + 2 * Long.BYTES; // Added space for parentId serialization and replicated size of files
+    // Rough capacity: headers + buckets + child list + dir bytes + parentId + replSize
+    final int cap =
+        Integer.BYTES            // numOfFiles
+            + Long.BYTES               // sizeOfFiles
+            + Short.BYTES              // bucket len
+            + (ReconConstants.NUM_OF_FILE_SIZE_BINS * Integer.BYTES)
+            + Integer.BYTES            // child list size
+            + (numChild * Long.BYTES)  // child ids
+            + Integer.BYTES            // dir name len
+            + dirNameBytes.length      // dir name
+            + Long.BYTES               // parentId
+            + Long.BYTES;              // replicatedSizeOfFiles
 
-    ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
-    out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
-    out.write(longCodec.toPersistedFormat(object.getSizeOfFiles()));
-    out.write(shortCodec.toPersistedFormat(
-        (short) ReconConstants.NUM_OF_FILE_SIZE_BINS));
-    int[] fileSizeBucket = object.getFileSizeBucket();
-    for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-      out.write(integerCodec.toPersistedFormat(fileSizeBucket[i]));
+    ByteArrayOutputStream baos = new ByteArrayOutputStream(cap);
+    DataOutputStream out = new DataOutputStream(baos);
+
+    // totals
+    out.writeInt(o.getNumOfFiles());
+    out.writeLong(o.getSizeOfFiles());
+
+    // buckets
+    out.writeShort((short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
+    for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; i++) {
+      out.writeInt(buckets[i]);
     }
-    out.write(integerCodec.toPersistedFormat(numOfChildDirs));
-    for (long childDirId : childDirs) {
-      out.write(longCodec.toPersistedFormat(childDirId));
-    }
-    out.write(integerCodec.toPersistedFormat(dirName.length));
-    out.write(dirName);
-    out.write(longCodec.toPersistedFormat(object.getParentId()));
-    out.write(longCodec.toPersistedFormat(object.getReplicatedSizeOfFiles()));
 
-    return out.toByteArray();
+    // children
+    out.writeInt(numChild);
+    if (numChild > 0) {
+      for (long id : childDirs) {
+        out.writeLong(id);
+      }
+    }
+
+    // dir name
+    out.writeInt(dirNameBytes.length);
+    if (dirNameBytes.length > 0) {
+      out.write(dirNameBytes);
+    }
+
+    // parent + replicated totals
+    out.writeLong(o.getParentId());
+    out.writeLong(o.getReplicatedSizeOfFiles());
+
+    out.flush();
+    return baos.toByteArray();
   }
 
   @Override
-  public NSSummary fromPersistedFormatImpl(byte[] rawData) throws IOException {
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(rawData));
+  public NSSummary fromPersistedFormatImpl(byte[] raw) throws IOException {
+    DataInputStream in = new DataInputStream(new ByteArrayInputStream(raw));
     NSSummary res = new NSSummary();
+
+    // totals
     res.setNumOfFiles(in.readInt());
     res.setSizeOfFiles(in.readLong());
+
+    // buckets
     short len = in.readShort();
-    assert (len == (short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
-    int[] fileSizeBucket = new int[len];
-    for (int i = 0; i < len; ++i) {
-      fileSizeBucket[i] = in.readInt();
+    if (len != (short) ReconConstants.NUM_OF_FILE_SIZE_BINS) {
+      // tolerate older/newer sizes by reading min(len, expected) and discarding/zero-filling rest
+      int[] buf = new int[len];
+      for (int i = 0; i < len; i++) {
+        buf[i] = in.readInt();
+      }
+      int[] normalized = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+      System.arraycopy(buf, 0, normalized, 0, Math.min(buf.length, normalized.length));
+      res.setFileSizeBucket(normalized);
+    } else {
+      int[] bucket = new int[len];
+      for (int i = 0; i < len; i++) {
+        bucket[i] = in.readInt();
+      }
+      res.setFileSizeBucket(bucket);
     }
-    res.setFileSizeBucket(fileSizeBucket);
 
+    // children
     int listSize = in.readInt();
-    Set<Long> childDir = new HashSet<>();
-    for (int i = 0; i < listSize; ++i) {
-      childDir.add(in.readLong());
+    if (listSize > 0) {
+      Set<Long> childDir = new HashSet<>(Math.max(16, listSize * 2));
+      for (int i = 0; i < listSize; i++) {
+        childDir.add(in.readLong());
+      }
+      res.setChildDir(childDir);
+    } else {
+      res.setChildDir(null); // keep lazy/empty
     }
-    res.setChildDir(childDir);
 
+    // dir name
     int strLen = in.readInt();
-    if (strLen == 0) {
-      //we need to read even though dir name is empty
-      readParentIdAndReplicatedSize(in, res);
-      return res;
+    if (strLen > 0) {
+      byte[] nameBytes = new byte[strLen];
+      int read = in.read(nameBytes);
+      if (read != strLen) {
+        throw new IOException("Corrupt NSSummary: expected " + strLen + " bytes, got " + read);
+      }
+      res.setDirName(stringCodec.fromPersistedFormat(nameBytes));
+    } else {
+      res.setDirName("");
     }
-    byte[] buffer = new byte[strLen];
-    int bytesRead = in.read(buffer);
-    assert (bytesRead == strLen);
-    String dirName = stringCodec.fromPersistedFormat(buffer);
-    res.setDirName(dirName);
+
+    // parentId + replicatedSizeOfFiles (handle legacy rows)
     readParentIdAndReplicatedSize(in, res);
     return res;
   }
 
   @Override
-  public NSSummary copyObject(NSSummary object) {
-    NSSummary copy = new NSSummary();
-    copy.setNumOfFiles(object.getNumOfFiles());
-    copy.setSizeOfFiles(object.getSizeOfFiles());
-    copy.setReplicatedSizeOfFiles(object.getReplicatedSizeOfFiles());
-    copy.setFileSizeBucket(object.getFileSizeBucket());
-    copy.setChildDir(object.getChildDir());
-    copy.setDirName(object.getDirName());
-    copy.setParentId(object.getParentId());
-    return copy;
+  public NSSummary copyObject(NSSummary o) {
+    // Deep copy the mutable parts; public getters are safe (perform copies where needed)
+    NSSummary c = new NSSummary(
+        o.getNumOfFiles(),
+        o.getSizeOfFiles(),
+        o.getReplicatedSizeOfFiles(),
+        o.getFileSizeBucket(),
+        o.getChildDir(),
+        o.getDirName(),
+        o.getParentId()
+    );
+    return c;
   }
 
-  private void readParentIdAndReplicatedSize(DataInputStream input, NSSummary output) throws IOException {
-    if (input.available() >= 2 * Long.BYTES) {
-      output.setParentId(input.readLong());
-      output.setReplicatedSizeOfFiles(input.readLong());
-    } else if (input.available() >= Long.BYTES) {
-      output.setParentId(input.readLong());
-      output.setReplicatedSizeOfFiles(-1);
+  private static void readParentIdAndReplicatedSize(DataInputStream in, NSSummary out)
+      throws IOException {
+    // Legacy tolerance: these may be absent in older rows.
+    int avail = in.available();
+    if (avail >= Long.BYTES * 2) {
+      out.setParentId(in.readLong());
+      out.setReplicatedSizeOfFiles(in.readLong());
+    } else if (avail >= Long.BYTES) {
+      out.setParentId(in.readLong());
+      out.setReplicatedSizeOfFiles(-1L);
     } else {
-      output.setParentId(-1);
-      output.setReplicatedSizeOfFiles(-1);
+      out.setParentId(-1L);
+      out.setReplicatedSizeOfFiles(-1L);
     }
   }
 }
