@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.reset;
@@ -124,7 +125,7 @@ public class TestOmSnapshotLocalDataManager {
   private AutoCloseable mocks;
 
   private File snapshotsDir;
-  private MockedStatic<SnapshotUtils> snapshotUtilMock;
+  private MockedStatic<OmSnapshotManager> snapshotUtilMock;
 
   private static final String READ_LOCK_MESSAGE_ACQUIRE = "readLock acquire";
   private static final String READ_LOCK_MESSAGE_UNLOCK = "readLock unlock";
@@ -169,7 +170,7 @@ public class TestOmSnapshotLocalDataManager {
 
     when(rdbStore.getSnapshotsParentDir()).thenReturn(snapshotsDir.getAbsolutePath());
     when(rdbStore.getDbLocation()).thenReturn(dbLocation);
-    this.snapshotUtilMock = mockStatic(SnapshotUtils.class);
+    this.snapshotUtilMock = mockStatic(OmSnapshotManager.class, CALLS_REAL_METHODS);
     purgedSnapshotIdMap.clear();
     snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
         .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
@@ -519,6 +520,32 @@ public class TestOmSnapshotLocalDataManager {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testWriteWithChainUpdate(boolean previousSnapshotExisting) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3 + (previousSnapshotExisting ? 1 : 0));
+    int snapshotIdx = 1 + (previousSnapshotExisting ? 1 : 0);
+    for (UUID snapshotId : snapshotIds) {
+      addVersionsToLocalData(localDataManager, snapshotId, ImmutableMap.of(1, 1));
+    }
+
+    UUID snapshotId = snapshotIds.get(snapshotIdx);
+    UUID toUpdatePreviousSnapshotId = snapshotIdx - 2 >= 0 ? snapshotIds.get(snapshotIdx - 2) : null;
+
+    try (WritableOmSnapshotLocalDataProvider snap =
+             localDataManager.getWritableOmSnapshotLocalData(snapshotId, toUpdatePreviousSnapshotId)) {
+      assertFalse(snap.needsDefrag());
+      snap.commit();
+      assertTrue(snap.needsDefrag());
+    }
+    try (ReadableOmSnapshotLocalDataProvider snap =
+             localDataManager.getOmSnapshotLocalData(snapshotId)) {
+      assertEquals(toUpdatePreviousSnapshotId, snap.getSnapshotLocalData().getPreviousSnapshotId());
+      assertTrue(snap.needsDefrag());
+    }
+  }
+
   /**
    * Validates write-time version propagation and removal rules when the previous
    * snapshot already has a concrete version recorded.
@@ -717,6 +744,8 @@ public class TestOmSnapshotLocalDataManager {
       OmSnapshotLocalData.VersionMeta expectedVersionMeta =
           new OmSnapshotLocalData.VersionMeta(0, sstFileInfos);
       assertEquals(expectedVersionMeta, versionMeta);
+      // New Snapshot create needs to be defragged always.
+      assertTrue(snapshotLocalData.needsDefrag());
     }
   }
 
