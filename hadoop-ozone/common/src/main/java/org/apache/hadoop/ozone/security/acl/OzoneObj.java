@@ -154,16 +154,13 @@ public abstract class OzoneObj implements IOzoneObj {
     } else if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    
+
     final OzoneObj that = (OzoneObj) o;
-    return resType == that.resType &&
-        storeType == that.storeType &&
-        Objects.equals(getPath(), that.getPath());
+    return resType == that.resType && storeType == that.storeType;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(resType, storeType, getPath());
+    return Objects.hash(resType, storeType);
   }
-
 }
