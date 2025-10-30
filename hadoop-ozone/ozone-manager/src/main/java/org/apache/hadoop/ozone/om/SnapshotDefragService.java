@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -285,10 +286,11 @@ public class SnapshotDefragService extends BackgroundService
       }
       LOG.info("Completed compaction of defragmented DB for snapshot: {}", snapshotInfo.getName());
 
-      // TODO: Create a new version in YAML metadata, which also indicates that the defragmentation is complete
-
-      // 5. Verify data integrity between original and defragmented DBs
+      // 5. Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
       verifyDbIntegrity(originalDb, defraggedDb, snapshotInfo);
+
+      // 6. Create a new version in YAML metadata, which also indicates that the defragmentation is complete
+      updateSnapshotMetadataAfterDefrag((RDBStore) defraggedStore, snapshotInfo);
 
       // Close the defragmented DB
       defraggedStore.close();
@@ -356,6 +358,16 @@ public class SnapshotDefragService extends BackgroundService
           .setOpenReadOnly(true)
           .setCreateCheckpointDirs(false);
 
+      /* Got logs in build() but nothing seems to be broken, to investigate later:
+2025-10-30 13:06:49,979 [om1-SnapshotDefragService#0] ERROR db.DBStoreBuilder (DBStoreBuilder.java:
+getCfOptionsFromFile(440)) - Error while trying to read ColumnFamilyOptions from file:
+/proj/hadoop-ozone/integration-test/target/test-dir/MiniOzoneClusterImpl-56d84c7d-ccb4-4e14-b881-7bd22db88684/
+om/data/db.snapshots/checkpointStateDefragged
+
+2025-10-30 13:06:49,981 [om1-SnapshotDefragService#0] ERROR db.DBStoreBuilder (DBStoreBuilder.java:
+getDefaultDBOptions(397)) - Error trying to use dbOptions from file: null
+       */
+
       // Add tracked column families
       for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
         previousDbBuilder.addTable(cfName);
@@ -408,8 +420,11 @@ public class SnapshotDefragService extends BackgroundService
 //      }
 //      LOG.info("Completed compaction of incrementally defragmented DB");
 
-      // 5. Verify data integrity
+      // 5. Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
       verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshot);
+
+      // 6. Create a new version in YAML metadata, which also indicates that the defragmentation is complete
+      updateSnapshotMetadataAfterDefrag((RDBStore) currentDefraggedStore, currentSnapshot);
 
       // Close the defragmented DB. TODO: Close in finally block instead
       currentDefraggedStore.close();
@@ -726,6 +741,35 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
       LOG.warn("Failed to extract key from path: {} for column family: {}, volume: {}, bucket: {}, error: {}",
           path, columnFamily, volume, bucket, e.getMessage(), e);
       return null;
+    }
+  }
+
+  /**
+   * Updates the snapshot metadata in the YAML file after defragmentation.
+   * Creates a new version in the metadata with the defragmented SST file list,
+   * marks the snapshot as no longer needing defragmentation, and sets the last defrag time.
+   */
+  private void updateSnapshotMetadataAfterDefrag(RDBStore defraggedStore, SnapshotInfo snapshotInfo)
+      throws IOException {
+    LOG.info("Updating snapshot metadata for defragmented snapshot: {}", snapshotInfo.getName());
+
+    final OmSnapshotLocalDataManager localDataManager =
+        ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager();
+    try (WritableOmSnapshotLocalDataProvider writableProvider =
+             localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
+      // Add a new version with the defragmented SST file list
+      writableProvider.addSnapshotVersion(defraggedStore);
+      // Get the snapshot local data to update flags
+      OmSnapshotLocalData snapshotLocalData = writableProvider.getSnapshotLocalData();
+      snapshotLocalData.setNeedsDefrag(false);
+      snapshotLocalData.setLastDefragTime(System.currentTimeMillis());
+      writableProvider.commit();
+
+      LOG.info("Successfully updated snapshot metadata for snapshot: {} with new version: {}",
+          snapshotInfo.getName(), snapshotLocalData.getVersion());
+    } catch (IOException e) {
+      LOG.error("Failed to update snapshot metadata for snapshot: {}", snapshotInfo.getName(), e);
+      throw e;
     }
   }
 
