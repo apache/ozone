@@ -75,6 +75,8 @@ public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractNSSummaryTaskT
 
     @BeforeEach
     public void setUp() throws IOException {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTaskWithLegacy.clearCache();
       List<NSSummary> result = commonSetUpTestReprocess(() ->
           nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager()),
           BUCKET_ONE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
@@ -141,6 +143,8 @@ public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractNSSummaryTaskT
 
     @BeforeEach
     public void setUp() throws IOException {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTaskWithLegacy.clearCache();
       // reinit Recon RocksDB's namespace CF.
       getReconNamespaceSummaryManager().clearNSSummaryTable();
       nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager());

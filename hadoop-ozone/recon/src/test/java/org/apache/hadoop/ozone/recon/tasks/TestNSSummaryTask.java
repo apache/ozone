@@ -78,6 +78,8 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws Exception {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTask.clearCache();
       List<NSSummary> result = commonSetUpTestReprocess(
           () -> nSSummaryTask.reprocess(getReconOMMetadataManager()),
           BUCKET_ONE_OBJECT_ID,
@@ -139,6 +141,8 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTask.clearCache();
       nSSummaryTask.reprocess(getReconOMMetadataManager());
       nSSummaryTask.process(processEventBatch(), Collections.emptyMap());
 

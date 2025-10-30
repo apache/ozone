@@ -220,7 +220,7 @@ public class NSSummary {
   }
 
   /**
-   * Bucket decrement for immediate files; bounds & underflow-safe.
+   * Bucket decrement for immediate files; bounds &amp; underflow-safe.
    */
   public void decBucket(int idx) {
     if (idx >= 0 && idx < fileSizeBucket.length && fileSizeBucket[idx] > 0) {

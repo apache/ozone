@@ -97,6 +97,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTaskWithFso.clearCache();
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       List<NSSummary> result =
@@ -234,6 +236,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      // Clear LRU cache to ensure clean state between tests
+      nSSummaryTaskWithFso.clearCache();
       getReconNamespaceSummaryManager().clearNSSummaryTable();
       nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
       result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
@@ -461,6 +465,11 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       Field managerField = NSSummaryTaskDbEventHandler.class.getDeclaredField("reconNamespaceSummaryManager");
       managerField.setAccessible(true);
       managerField.set(task, mockReconNamespaceSummaryManager);
+
+      // Initialize the dbReadCache field to avoid NullPointerException
+      Field cacheField = NSSummaryTaskDbEventHandler.class.getDeclaredField("dbReadCache");
+      cacheField.setAccessible(true);
+      cacheField.set(task, new java.util.LinkedHashMap<Long, org.apache.hadoop.ozone.recon.api.types.NSSummary>());
 
       // Mock the OMUpdateEventBatch and its iterator
       OMUpdateEventBatch events = mock(OMUpdateEventBatch.class);

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -70,6 +71,16 @@ public class NSSummaryTaskDbEventHandler {
 
   public ReconOMMetadataManager getReconOMMetadataManager() {
     return reconOMMetadataManager;
+  }
+
+  /**
+   * Clear the LRU cache. Useful for testing to ensure clean state between test runs.
+   */
+  @VisibleForTesting
+  public void clearCache() {
+    synchronized (dbReadCache) {
+      dbReadCache.clear();
+    }
   }
 
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)

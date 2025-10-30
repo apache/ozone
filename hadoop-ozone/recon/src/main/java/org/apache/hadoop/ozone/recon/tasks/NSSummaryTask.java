@@ -115,6 +115,16 @@ public class NSSummaryTask implements ReconOmTask {
         reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
   }
 
+  /**
+   * Clear the LRU cache in all sub-tasks. Useful for testing to ensure clean state between test runs.
+   */
+  @VisibleForTesting
+  public void clearCache() {
+    nsSummaryTaskWithFSO.clearCache();
+    nsSummaryTaskWithLegacy.clearCache();
+    nsSummaryTaskWithOBS.clearCache();
+  }
+
   @Override
   public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
       throws IOException {
