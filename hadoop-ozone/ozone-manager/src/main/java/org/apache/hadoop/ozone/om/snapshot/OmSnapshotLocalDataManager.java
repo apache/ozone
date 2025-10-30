@@ -158,8 +158,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
              new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
                  () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId(),
-                         null),
+                         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore),
+                         snapshotInfo.getPathPreviousSnapshotId(), null),
                      null))) {
       snapshotLocalData.commit();
     }
