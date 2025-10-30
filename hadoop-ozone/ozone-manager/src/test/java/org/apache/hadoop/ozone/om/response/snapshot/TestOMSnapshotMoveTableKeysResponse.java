@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.response.snapshot;
 
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -177,7 +177,7 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       nextMetadataManager.getDeletedTable().iterator().forEachRemaining(entry -> {
         count.getAndIncrement();
         int maxCount = count.get() >= 6 && count.get() <= 8 ? 20 : 10;
-        Assertions.assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
+        assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
         List<Long> versions = entry.getValue().getOmKeyInfoList().stream().map(OmKeyInfo::getKeyLocationVersions)
             .map(omKeyInfo -> omKeyInfo.get(0).getVersion()).collect(Collectors.toList());
         List<Long> expectedVersions = new ArrayList<>();
@@ -185,20 +185,20 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
           expectedVersions.addAll(LongStream.range(10, 20).boxed().collect(Collectors.toList()));
         }
         expectedVersions.addAll(LongStream.range(0, 10).boxed().collect(Collectors.toList()));
-        Assertions.assertEquals(expectedVersions, versions);
+        assertEquals(expectedVersions, versions);
       });
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
       count.set(0);
 
       nextMetadataManager.getDeletedDirTable().iterator().forEachRemaining(entry -> count.getAndIncrement());
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
       count.set(0);
       nextMetadataManager.getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
         String expectedValue = renameEntries.getOrDefault(entry.getKey(), entry.getValue());
-        Assertions.assertEquals(expectedValue, entry.getValue());
+        assertEquals(expectedValue, entry.getValue());
         count.getAndIncrement();
       });
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
     }
 
   }
