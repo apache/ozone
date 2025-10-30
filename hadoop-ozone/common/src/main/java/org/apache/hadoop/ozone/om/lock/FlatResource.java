@@ -27,8 +27,11 @@ public enum FlatResource implements Resource {
   SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK"),
   // Lock acquired on a Snapshot's RocksDB Handle.
   SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK"),
+  // Lock acquired on a Snapshot's Local Data.
+  SNAPSHOT_LOCAL_DATA_LOCK("SNAPSHOT_LOCAL_DATA_LOCK"),
   // Lock acquired on a Snapshot's RockDB contents.
   SNAPSHOT_DB_CONTENT_LOCK("SNAPSHOT_DB_CONTENT_LOCK");
+
 
   private String name;
   private IOzoneManagerLock.ResourceManager resourceManager;

@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,11 +131,10 @@ public class SnapshotDefragService extends BackgroundService
     String snapshotPath = OmSnapshotManager.getSnapshotPath(
         ozoneManager.getConfiguration(), snapshotInfo);
 
-    try {
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
+             ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
-      OmSnapshotLocalData snapshotLocalData = ozoneManager.getOmSnapshotManager()
-          .getSnapshotLocalDataManager()
-          .getOmSnapshotLocalData(snapshotInfo);
+      OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
 
       // Check if snapshot needs compaction (defragmentation)
       boolean needsDefrag = snapshotLocalData.getNeedsDefrag();

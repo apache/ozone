@@ -127,7 +127,8 @@ public class NSSummaryTaskDbEventHandler {
     long objectId = directoryInfo.getObjectID();
     // write the dir name to the current directory
     String dirName = directoryInfo.getName();
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+
+    // Get or create the directory's NSSummary
     NSSummary curNSSummary = nsSummaryMap.get(objectId);
     if (curNSSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
@@ -140,34 +141,32 @@ public class NSSummaryTaskDbEventHandler {
     int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
     long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
 
-    if (curNSSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
+    if (!directoryAlreadyExists) {
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
-    // Set the parent directory ID
     curNSSummary.setParentId(parentObjectId);
     nsSummaryMap.put(objectId, curNSSummary);
 
-    // Write the child dir list to the parent directory
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
-    if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    // Get or create the parent's NSSummary
+    NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNSSummary == null) {
+      parentNSSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
-    if (nsSummary == null) {
+    if (parentNSSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
-      nsSummary = new NSSummary();
+      parentNSSummary = new NSSummary();
     }
-    nsSummary.addChildDir(objectId);
-    nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Add child directory to parent
+    parentNSSummary.addChildDir(objectId);
+    nsSummaryMap.put(parentObjectId, parentNSSummary);
 
     // If the directory already existed with content, propagate its totals upward
+    // propagateSizeUpwards will update parent, grandparent, etc.
     if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
-      propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
+      propagateSizeUpwards(objectId, existingSizeOfFiles,
           existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
     }
   }
@@ -233,32 +232,25 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    // If deleted directory exists, decrement its totals from parent and propagate
+    // Remove the deleted directory ID from parent's childDir set
+    parentNsSummary.removeChildDir(deletedDirObjectId);
+    nsSummaryMap.put(parentObjectId, parentNsSummary);
+
+    // If deleted directory exists, propagate its totals upward (as negative deltas)
+    // propagateSizeUpwards will update parent, grandparent, etc.
     if (deletedDirSummary != null) {
-      // Decrement parent's totals by the deleted directory's totals
-      parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
-      parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
-      long parentReplSize = parentNsSummary.getReplicatedSizeOfFiles();
       long deletedReplSize = deletedDirSummary.getReplicatedSizeOfFiles();
-      if (parentReplSize >= 0 && deletedReplSize >= 0) {
-        parentNsSummary.setReplicatedSizeOfFiles(parentReplSize - deletedReplSize);
-      }
-      
-      // Propagate the decrements upwards to all ancestors
       if (deletedReplSize < 0) {
         deletedReplSize = 0;
       }
-      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(),
+      
+      propagateSizeUpwards(deletedDirObjectId, -deletedDirSummary.getSizeOfFiles(),
           -deletedReplSize, -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
       
       // Set the deleted directory's parentId to 0 (unlink it)
       deletedDirSummary.setParentId(0);
       nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
     }
-
-    // Remove the deleted directory ID from parent's childDir set
-    parentNsSummary.removeChildDir(deletedDirObjectId);
-    nsSummaryMap.put(parentObjectId, parentNsSummary);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {

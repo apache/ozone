@@ -163,7 +163,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the defragged SST file list.
    * @param versionSstFileInfos Map of version to defragged SST file list
    */
-  public void setVersionSstFileInfos(Map<Integer, VersionMeta> versionSstFileInfos) {
+  void setVersionSstFileInfos(Map<Integer, VersionMeta> versionSstFileInfos) {
     this.versionSstFileInfos.clear();
     this.versionSstFileInfos.putAll(versionSstFileInfos);
   }
@@ -184,9 +184,14 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Adds an entry to the defragged SST file list.
    * @param sstFiles SST file name
    */
-  public void addVersionSSTFileInfos(List<SstFileInfo> sstFiles, int previousSnapshotVersion) {
+  public void addVersionSSTFileInfos(List<LiveFileMetaData> sstFiles, int previousSnapshotVersion) {
     version++;
-    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
+    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles.stream()
+        .map(SstFileInfo::new).collect(Collectors.toList())));
+  }
+
+  public void removeVersionSSTFileInfos(int snapshotVersion) {
+    this.versionSstFileInfos.remove(snapshotVersion);
   }
 
   /**
@@ -274,7 +279,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * maintain immutability.
    */
   public static class VersionMeta implements CopyObject<VersionMeta> {
-    private final int previousSnapshotVersion;
+    private int previousSnapshotVersion;
     private final List<SstFileInfo> sstFiles;
 
     public VersionMeta(int previousSnapshotVersion, List<SstFileInfo> sstFiles) {
@@ -284,6 +289,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
 
     public int getPreviousSnapshotVersion() {
       return previousSnapshotVersion;
+    }
+
+    public void setPreviousSnapshotVersion(int previousSnapshotVersion) {
+      this.previousSnapshotVersion = previousSnapshotVersion;
     }
 
     public List<SstFileInfo> getSstFiles() {
