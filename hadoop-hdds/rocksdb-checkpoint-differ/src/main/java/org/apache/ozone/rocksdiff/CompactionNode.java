@@ -17,6 +17,7 @@
 
 package org.apache.ozone.rocksdiff;
 
+import java.util.Objects;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 
@@ -70,5 +71,17 @@ public class CompactionNode extends SstFileInfo {
 
   public void addCumulativeKeysReverseTraversal(long diff) {
     this.cumulativeKeysReverseTraversal += diff;
+  }
+
+  // Not changing previous behaviour.
+  @Override
+  public final boolean equals(Object o) {
+    return this == o;
+  }
+
+  // Having hashcode only on the basis of the filename.
+  @Override
+  public int hashCode() {
+    return Objects.hash(getFileName());
   }
 }

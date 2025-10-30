@@ -139,10 +139,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    * @param snapshotInfo snapshot metadata
    * @return the path to the snapshot's local property YAML file
    */
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(SnapshotInfo snapshotInfo) {
     return getSnapshotLocalPropertyYamlPath(snapshotInfo.getSnapshotId());
   }
 
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(UUID snapshotId) {
     Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId);
     return getSnapshotLocalPropertyYamlPath(snapshotPath);
@@ -191,7 +193,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return new WritableOmSnapshotLocalDataProvider(snapshotId);
   }
 
-  public OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
+  OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
     return snapshotLocalDataSerializer.load(snapshotDataPath);
   }
 
