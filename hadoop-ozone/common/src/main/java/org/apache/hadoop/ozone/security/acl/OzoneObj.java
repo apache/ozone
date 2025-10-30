@@ -151,10 +151,10 @@ public abstract class OzoneObj implements IOzoneObj {
   public boolean equals(Object o) {
     if (this == o) {
       return true;
-    }
-    if (!(o instanceof OzoneObj)) {
+    } else if (o == null || getClass() != o.getClass()) {
       return false;
     }
+    
     final OzoneObj that = (OzoneObj) o;
     return resType == that.resType &&
         storeType == that.storeType &&
