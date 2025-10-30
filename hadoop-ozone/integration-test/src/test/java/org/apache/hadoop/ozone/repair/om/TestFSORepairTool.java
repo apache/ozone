@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -367,6 +368,17 @@ public class TestFSORepairTool {
     return execute(true, args);
   }
 
+  private int executeWithDb(boolean dryRun, String omDbPath, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", omDbPath));
+    if (dryRun) {
+      argList.add("--dry-run");
+    }
+    argList.addAll(Arrays.asList(args));
+
+    return withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
+  }
+
   private int execute(boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
     if (dryRun) {
@@ -376,6 +388,30 @@ public class TestFSORepairTool {
 
     return withTextFromSystemIn("y")
         .execute(() -> cmd.execute(argList.toArray(new String[0])));
+  }
+
+  @Order(2)
+  @Test
+  public void testAlternateOmDbDirNameDryRun() throws Exception {
+    File original = new File(OMStorage.getOmDbDir(cluster.getConf()), OM_DB_NAME);
+    File backup = new File(OMStorage.getOmDbDir(cluster.getConf()), "om-db-backup");
+
+    if (backup.exists()) {
+      FileUtils.deleteDirectory(backup);
+    }
+    FileUtils.copyDirectory(original, backup);
+
+    out.clearOutput();
+    int exitCode = executeWithDb(true, backup.getPath());
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertThat(reportOutput).contains("Reachable:");
+    assertThat(reportOutput).contains("Unreachable (Pending to delete):");
+    assertThat(reportOutput).contains("Unreferenced (Orphaned):");
+
+    FileUtils.deleteDirectory(backup);
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
