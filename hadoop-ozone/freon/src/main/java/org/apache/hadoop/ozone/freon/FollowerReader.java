@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.freon;
 
+import com.codahale.metrics.Timer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
