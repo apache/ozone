@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.util.TimeDuration;
 
 /**
@@ -262,6 +263,15 @@ public final class OMConfigKeys {
       "ozone.om.ratis.server.close.threshold";
   public static final TimeDuration OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT =
       TimeDuration.valueOf(60, TimeUnit.SECONDS);
+
+  public static final String OZONE_OM_RATIS_SERVER_READ_OPTION
+      = "ozone.om.ratis.server.read.option";
+  public static final Read.Option OZONE_OM_RATIS_SERVER_READ_OPTION_DEFAULT
+      = Read.Option.DEFAULT;
+  public static final String OZONE_OM_RATIS_SERVER_READ_LEADER_LEASE_ENABLED
+      = "ozone.om.ratis.server.read.leader.lease.enabled";
+  public static final boolean OZONE_OM_RATIS_SERVER_READ_LEADER_LEASE_ENABLED_DEFAULT
+      = false;
 
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =

@@ -2267,6 +2267,19 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.server.read.option</name>
+    <value>DEFAULT</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>Select the Ratis server read option.
+      Possible values are:
+      DEFAULT      - Directly query statemachine (non-linearizable).
+      Only the leader can serve read requests.
+      LINEARIZABLE - Use ReadIndex (see Raft Paper section 6.4) to maintain linearizability.
+      Both the leader and the followers can serve read requests.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
