@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 
 /**

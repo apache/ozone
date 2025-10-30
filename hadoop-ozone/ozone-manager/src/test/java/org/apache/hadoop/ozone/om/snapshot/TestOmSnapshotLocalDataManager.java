@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
@@ -70,7 +71,7 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.util.YamlSerializer;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -591,7 +592,10 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7"));
     sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7"));
     List<SstFileInfo> sstFileInfos = IntStream.range(0, sstFiles.size() - 1)
-        .mapToObj(sstFiles::get).map(SstFileInfo::new).collect(Collectors.toList());
+        .mapToObj(sstFiles::get).map(lfm ->
+            new SstFileInfo(lfm.fileName().replace(".sst", ""),
+            bytes2String(lfm.smallestKey()),
+            bytes2String(lfm.largestKey()), bytes2String(lfm.columnFamilyName()))).collect(Collectors.toList());
     when(snapshotStore.getDbLocation()).thenReturn(snapshotDbLocation);
     RocksDatabase rocksDatabase = mock(RocksDatabase.class);
     when(snapshotStore.getDb()).thenReturn(rocksDatabase);

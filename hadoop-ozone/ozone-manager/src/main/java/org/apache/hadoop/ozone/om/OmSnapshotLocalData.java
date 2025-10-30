@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.util.WithChecksum;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
 
