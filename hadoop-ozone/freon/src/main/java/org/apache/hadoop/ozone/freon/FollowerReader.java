@@ -40,6 +40,7 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
+@SuppressWarnings("PMD.UnusedReturnedValue")
 public class FollowerReader extends BaseFreonGenerator
     implements Callable<Void> {
 
