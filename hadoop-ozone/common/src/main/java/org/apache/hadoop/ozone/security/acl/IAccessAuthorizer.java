@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -64,7 +66,7 @@ public interface IAccessAuthorizer {
    *                            {@link ACLType#ASSUME_ROLE} permission
    */
   default String generateAssumeRoleSessionPolicy(AssumeRoleRequest assumeRoleRequest) throws OMException {
-    return null;
+    throw new OMException("The generateAssumeRoleSessionPolicy call is not supported", NOT_SUPPORTED_OPERATION);
   }
 
   /**

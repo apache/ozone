@@ -74,7 +74,9 @@ public class AssumeRoleRequest {
 
   @Override
   public boolean equals(Object o) {
-    if (o == null || getClass() != o.getClass()) {
+    if (this == o) {
+      return true;
+    } else if (o == null || getClass() != o.getClass()) {
       return false;
     }
 
@@ -115,7 +117,9 @@ public class AssumeRoleRequest {
 
     @Override
     public boolean equals(final Object o) {
-      if (o == null || getClass() != o.getClass()) {
+      if (this == o) {
+        return true;
+      } else if (o == null || getClass() != o.getClass()) {
         return false;
       }
 
