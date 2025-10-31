@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
@@ -44,17 +45,16 @@ import org.junit.jupiter.api.Test;
  */
 public class TestScmBlockLocationProtocolClientSideTranslatorPB {
 
-  private SCMBlockLocationFailoverProxyProvider mockProxyProvider;
   private ScmBlockLocationProtocolPB mockRpcProxy;
   private ScmBlockLocationProtocolClientSideTranslatorPB translator;
 
   @BeforeEach
   public void setUp() {
-    mockProxyProvider = mock(SCMBlockLocationFailoverProxyProvider.class);
+    SCMBlockLocationFailoverProxyProvider mockProxyProvider = mock(SCMBlockLocationFailoverProxyProvider.class);
     mockRpcProxy = mock(ScmBlockLocationProtocolPB.class);
     when(mockProxyProvider.getInterface()).thenReturn(ScmBlockLocationProtocolPB.class);
     when(mockProxyProvider.getProxy()).thenReturn(new FailoverProxyProvider.ProxyInfo<>(mockRpcProxy, null));
-    translator = new ScmBlockLocationProtocolClientSideTranslatorPB(mockProxyProvider);
+    translator = new ScmBlockLocationProtocolClientSideTranslatorPB(mockProxyProvider, new OzoneConfiguration());
   }
 
   @Test

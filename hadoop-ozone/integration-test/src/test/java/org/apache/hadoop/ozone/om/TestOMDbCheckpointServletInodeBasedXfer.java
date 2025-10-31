@@ -27,19 +27,24 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
@@ -59,6 +64,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,6 +73,8 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -74,6 +82,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -94,6 +103,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -132,11 +144,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private void setupCluster() throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     om = cluster.getOzoneManager();
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
   }
 
   private void setupMocks() throws Exception {
@@ -169,7 +181,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     omDbCheckpointServletMock = mock(OMDBCheckpointServletInodeBasedXfer.class);
 
-    BootstrapStateHandler.Lock lock = new OMDBCheckpointServlet.Lock(om);
+    BootstrapStateHandler.Lock lock = null;
+    if (om != null) {
+      lock = new OMDBCheckpointServlet.Lock(om);
+    }
     doCallRealMethod().when(omDbCheckpointServletMock).init();
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
 
@@ -195,6 +210,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .writeDBToArchive(any(), any(), any(), any(), any(), any(), anyBoolean());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -208,12 +225,44 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
   }
 
-  @Test
-  void testContentsOfTarballWithSnapshot() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testTarballBatching(boolean includeSnapshots) throws Exception {
     String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
-    setupClusterAndMocks(volumeName, bucketName, realCheckpoint);
+    setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshots);
+    long maxFileSizeLimit = 4096;
+    om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxFileSizeLimit);
+    // Get the tarball.
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    String testDirName = folder.resolve("testDir").toString();
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    File newDbDir = new File(newDbDirName);
+    assertTrue(newDbDir.mkdirs());
+    FileUtil.unTar(tempFile, newDbDir);
+    long totalSize;
+    try (Stream<Path> list = Files.list(newDbDir.toPath())) {
+      totalSize = list.mapToLong(path -> path.toFile().length()).sum();
+    }
+    boolean obtainedFilesUnderMaxLimit = totalSize < maxFileSizeLimit;
+    if (!includeSnapshots) {
+      // If includeSnapshotData flag is set to false , it always sends all data
+      // in one batch and doesn't respect the max size config. This is how Recon
+      // uses it today.
+      assertFalse(obtainedFilesUnderMaxLimit);
+    } else {
+      assertTrue(obtainedFilesUnderMaxLimit);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testContentsOfTarballWithSnapshot(boolean includeSnapshot) throws Exception {
+    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
+    setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshot);
     DBStore dbStore = om.getMetadataManager().getStore();
     // Get the tarball.
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
@@ -227,7 +276,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
     Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
-    Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -237,16 +285,19 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         String inode = getInode(file.getName());
         inodesFromTarball.add(inode);
-        allPathsInTarball.add(p);
       }
     }
     Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
     Path checkpointLocation = realCheckpoint.get().getCheckpointLocation();
     populateInodesOfFilesInDirectory(dbStore, checkpointLocation,
         inodesFromOmDataDir, hardLinkMapFromOmData);
-    for (String snapshotPath : snapshotPaths) {
-      populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
-          inodesFromOmDataDir, hardLinkMapFromOmData);
+    int numSnapshots = 0;
+    if (includeSnapshot) {
+      for (String snapshotPath : snapshotPaths) {
+        populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
+            inodesFromOmDataDir, hardLinkMapFromOmData);
+        numSnapshots++;
+      }
     }
     populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
         inodesFromOmDataDir, hardLinkMapFromOmData);
@@ -268,11 +319,30 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertFalse(inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
+    long actualYamlFiles = Files.list(newDbDir.toPath())
+        .filter(f -> f.getFileName().toString()
+            .endsWith(".yaml")).count();
+    assertEquals(numSnapshots, actualYamlFiles,
+        "Number of generated YAML files should match the number of snapshots.");
+
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
-    for (Path old : allPathsInTarball) {
-      assertTrue(old.toFile().delete());
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
+
+    if (includeSnapshot) {
+      List<String> yamlRelativePaths = snapshotPaths.stream().map(path -> {
+        int startIndex = path.indexOf("db.snapshots");
+        if (startIndex != -1) {
+          return path.substring(startIndex) + ".yaml";
+        }
+        return path + ".yaml";
+      }).collect(Collectors.toList());
+
+      for (String yamlRelativePath : yamlRelativePaths) {
+        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
+        assertTrue(Files.exists(Paths.get(yamlFileName)));
+      }
     }
+
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
@@ -285,7 +355,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
-    setupClusterAndMocks(volumeName, bucketName, realCheckpoint);
+    setupClusterAndMocks(volumeName, bucketName, realCheckpoint, true);
     List<OzoneSnapshot> snapshots = new ArrayList<>();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshots::add);
@@ -301,7 +371,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     FileUtil.unTar(tempFile, newDbDir);
     Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
@@ -311,6 +381,61 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
+    setupMocks();
+    Path dbDir = folder.resolve("db_data");
+    Files.createDirectories(dbDir);
+    // Create dummy files: one SST, one non-SST
+    Path sstFile = dbDir.resolve("test.sst");
+    Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
+
+    Path nonSstFile = dbDir.resolve("test.log");
+    Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
+    Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
+    Path tmpDir = folder.resolve("tmp");
+    Files.createDirectories(tmpDir);
+    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    List<String> fileNames = new ArrayList<>();
+    try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
+      archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
+        // Get the actual mockArchiveOutputStream passed from writeDBToArchive
+        TarArchiveOutputStream aos = invocation.getArgument(2);
+        File sourceFile = invocation.getArgument(0);
+        String fileId = invocation.getArgument(1);
+        fileNames.add(sourceFile.getName());
+        aos.putArchiveEntry(new TarArchiveEntry(sourceFile, fileId));
+        aos.write(new byte[100], 0, 100); // Simulate writing
+        aos.closeArchiveEntry();
+        return 100L;
+      });
+      boolean success = omDbCheckpointServletMock.writeDBToArchive(
+          sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
+              tmpDir, hardLinkFileMap, expectOnlySstFiles);
+      assertTrue(success);
+      verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
+      verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
+      verify(mockArchiveOutputStream, times(fileNames.size())).write(any(byte[].class), anyInt(),
+          anyInt()); // verify write was called once
+
+      boolean containsNonSstFile = false;
+      for (String fileName : fileNames) {
+        if (expectOnlySstFiles) {
+          assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
+        } else {
+          containsNonSstFile = true;
+        }
+      }
+
+      if (!expectOnlySstFiles) {
+        assertTrue(containsNonSstFile, "SST File is not expected");
+      }
+    }
   }
 
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
@@ -354,11 +479,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   }
 
   private void setupClusterAndMocks(String volumeName, String bucketName,
-      AtomicReference<DBCheckpoint> realCheckpoint) throws Exception {
+      AtomicReference<DBCheckpoint> realCheckpoint, boolean includeSnapshots) throws Exception {
     setupCluster();
     setupMocks();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn(String.valueOf(includeSnapshots));
     // Create a "spy" dbstore keep track of the checkpoint.
     writeData(volumeName, bucketName, true);
     DBStore dbStore = om.getMetadataManager().getStore();

@@ -521,6 +521,20 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  /**
+   * Normalizes the key path based on the bucket layout.  This should be used for existing keys. 
+   * For new key creation, please see {@link #validateAndNormalizeKey(boolean, String, BucketLayout)}
+   *
+   * @return normalized key path
+   */
+  public static String normalizeKeyPath(boolean enableFileSystemPaths,
+      String keyPath, BucketLayout bucketLayout) throws OMException {
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+      keyPath = OmUtils.normalizeKey(keyPath, false);
+    }
+    return keyPath;
+  }
+  
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);

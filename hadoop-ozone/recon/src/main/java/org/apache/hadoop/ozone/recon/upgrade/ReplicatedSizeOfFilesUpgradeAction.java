@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.recon.upgrade;
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,10 +43,16 @@ public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
       if (injector == null) {
         throw new IllegalStateException("Guice injector is not initialized. Cannot perform NSSummary rebuild.");
       }
-      ReconNamespaceSummaryManager nsSummaryManager = injector.getInstance(ReconNamespaceSummaryManager.class);
-      ReconOMMetadataManager omMetadataManager = injector.getInstance(ReconOMMetadataManager.class);
+      ReconTaskController reconTaskController = injector.getInstance(ReconTaskController.class);
       LOG.info("Starting full rebuild of NSSummary for REPLICATED_SIZE_OF_FILES upgrade...");
-      nsSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+      ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+      if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+        LOG.error(
+            "Failed to queue reinitialization event for manual trigger (result: {}), failing the reinitialization " +
+                "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
+                "scheduler task.", result);
+      }
       LOG.info("Completed full rebuild of NSSummary for REPLICATED_SIZE_OF_FILES upgrade.");
     } catch (Exception e) {
       LOG.error("Error during NSSummary rebuild for REPLICATED_SIZE_OF_FILES upgrade.", e);

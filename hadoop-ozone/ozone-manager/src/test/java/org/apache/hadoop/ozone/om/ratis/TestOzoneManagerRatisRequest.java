@@ -57,14 +57,13 @@ public class TestOzoneManagerRatisRequest {
   private OzoneManager ozoneManager;
   private final OzoneConfiguration ozoneConfiguration =
       new OzoneConfiguration();
-  private OMMetadataManager omMetadataManager;
 
   @Test
   public void testRequestWithNonExistentBucket() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.resolve("om").toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
@@ -105,7 +104,7 @@ public class TestOzoneManagerRatisRequest {
     ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.resolve("om").toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     OMExecutionFlow omExecutionFlow = new OMExecutionFlow(ozoneManager);

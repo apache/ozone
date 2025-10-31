@@ -29,7 +29,7 @@ public class PendingDelete {
   private final long count;
   private final long bytes;
 
-  PendingDelete(long count, long bytes) {
+  public PendingDelete(long count, long bytes) {
     this.count = count;
     this.bytes = bytes;
   }

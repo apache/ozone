@@ -201,10 +201,12 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private ReplicationConfig replicationConfig;
 
+  @SuppressWarnings("PMD.SingularField")
   private int threadPoolSize;
 
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
+  @SuppressWarnings("PMD.SingularField")
   private ExecutorService executor;
 
   private long startTime;
@@ -241,6 +243,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private ArrayList<Histogram> histograms = new ArrayList<>();
 
   private OzoneConfiguration ozoneConfiguration;
+  @SuppressWarnings("PMD.SingularField")
   private ProgressBar progressbar;
 
   public RandomKeyGenerator() {

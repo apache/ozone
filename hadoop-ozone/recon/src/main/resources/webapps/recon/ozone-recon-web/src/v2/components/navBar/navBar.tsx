@@ -132,10 +132,10 @@ const NavBar: React.FC<NavBarProps> = ({
       </Menu.Item>
     </Menu.SubMenu>
   ), (
-    <Menu.Item key='/DiskUsage'
+    <Menu.Item key='/NamespaceUsage'
       icon={<PieChartOutlined />}>
       <span>Namespace Usage</span>
-      <Link to='/DiskUsage' />
+      <Link to='/NamespaceUsage' />
     </Menu.Item>
   ), (
     <Menu.Item key='/Capacity'

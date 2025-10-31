@@ -117,7 +117,6 @@ public class TestNSSummaryEndpointWithLegacy {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration conf;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -356,7 +355,7 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @BeforeEach
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve(
             "JunitOmDBDir")).toFile(), conf);

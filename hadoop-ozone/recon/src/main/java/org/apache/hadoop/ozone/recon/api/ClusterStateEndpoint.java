@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -99,7 +100,7 @@ public class ClusterStateEndpoint {
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-            0, MISSING_CONTAINER_COUNT_LIMIT);
+            0L, Optional.empty(), MISSING_CONTAINER_COUNT_LIMIT);
 
     containerStateCounts.setMissingContainerCount(
         missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?
@@ -118,10 +119,14 @@ public class ClusterStateEndpoint {
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
 
     SCMNodeStat stats = nodeManager.getStats();
-    DatanodeStorageReport storageReport =
-        new DatanodeStorageReport(stats.getCapacity().get(),
-            stats.getScmUsed().get(), stats.getRemaining().get(),
-            stats.getCommitted().get());
+
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(stats.getCapacity().get())
+        .setCommitted(stats.getCommitted().get())
+        .setUsed(stats.getScmUsed().get())
+        .setMinimumFreeSpace(stats.getFreeSpaceToSpare().get())
+        .setRemaining(stats.getRemaining().get())
+        .build();
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(

@@ -93,7 +93,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
-  private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   // Object names in FSO-enabled format
   private static final String VOL = "volume1";
@@ -146,7 +145,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
             .withReconOm(reconOMMetadataManager)
             .withContainerDB()
             .build();
-    reconNamespaceSummaryManager = reconTestInjector.getInstance(
+    ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
 
     omTableInsightTask = new OmTableInsightTask(

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,6 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final long DELAY_MS = 2000;
-  private static long sourceKeyLastModificationTime;
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
@@ -99,10 +99,10 @@ public class TestMultipartUploadWithCopy {
       stream.write(keyContent);
     }
 
-    sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
+    long sourceKeyLastModificationTime = CLIENT.getObjectStore()
+                                             .getS3Bucket(OzoneConsts.S3_BUCKET)
+                                             .getKey(EXISTING_KEY)
+                                             .getModificationTime().toEpochMilli();
     beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =
@@ -129,6 +129,9 @@ public class TestMultipartUploadWithCopy {
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
     REST.setRequestIdentifier(new RequestIdentifier());
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    REST.setSignatureInfo(signatureInfo);
   }
 
   @Test
