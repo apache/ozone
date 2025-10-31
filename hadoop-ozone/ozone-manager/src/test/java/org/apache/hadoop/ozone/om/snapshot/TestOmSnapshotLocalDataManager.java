@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
@@ -177,7 +177,7 @@ public class TestOmSnapshotLocalDataManager {
     purgedSnapshotIdMap.clear();
     snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
         .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
-    conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, -1);
+    conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, -1);
   }
 
   @AfterEach

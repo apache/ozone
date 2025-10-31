@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -315,7 +315,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       increamentOrphanCheckCount(snapshotId);
     }
     long snapshotLocalDataManagerServiceInterval = configuration.getTimeDuration(
-        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT,
+        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     if (snapshotLocalDataManagerServiceInterval > 0) {
       this.scheduler = new Scheduler(LOCAL_DATA_MANAGER_SERVICE_NAME, true, 1);
