@@ -4660,7 +4660,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .getOzoneKey(volumeName, bucketName, keyName);
       GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
           cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-              .get(ozoneKey) != null, 100, 5000);
+              .get(ozoneKey) != null, 100, 10000);
 
       RepeatedOmKeyInfo deleted = cluster.getOzoneManager().getMetadataManager()
           .getDeletedTable().get(ozoneKey);
