@@ -1168,16 +1168,15 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   @VisibleForTesting
   @SuppressWarnings("checkstyle:ParameterNumber")
-  Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
-                            OmSnapshot toSnapshot,
-                            List<String> tablesToLookUp,
-                            SnapshotInfo fsInfo,
-                            SnapshotInfo tsInfo,
-                            boolean useFullDiff,
-                            Map<String, String> tablePrefixes,
-                            String diffDir, String jobKey)
+  public Set<String> getDeltaFiles(
+      OmSnapshot fromSnapshot, OmSnapshot toSnapshot,
+      List<String> tablesToLookUp,
+      SnapshotInfo fsInfo, SnapshotInfo tsInfo,
+      boolean useFullDiff,
+      Map<String, String> tablePrefixes,
+      String diffDir, String jobKey)
       throws IOException {
-    // TODO: [SNAPSHOT] Refactor the parameter list
+
     Optional<Set<String>> deltaFiles = Optional.empty();
 
     // Check if compaction DAG is available, use that if so
@@ -1587,6 +1586,11 @@ public class SnapshotDiffManager implements AutoCloseable {
   synchronized void recordActivity(String jobKey,
       SnapshotDiffResponse.SubStatus subStatus) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    if (snapshotDiffJob == null) {
+      // TODO: Record activity for defrag jobs as well somehow
+      LOG.warn("Snapshot diff job not found for jobKey = {}", jobKey);
+      return;
+    }
     snapshotDiffJob.setSubStatus(subStatus);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
     if (LOG.isDebugEnabled()) {

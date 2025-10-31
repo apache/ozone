@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -36,14 +37,18 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -51,7 +56,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -61,8 +65,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -70,9 +72,10 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,7 +225,7 @@ public class SnapshotDefragService extends BackgroundService
     final int maxOpenSstFilesInSnapshotDb = conf.getInt(
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-    String snapshotDirName = checkpointDirName.substring(OM_DB_NAME.length());
+    final String snapshotDirName = checkpointDirName.substring(OM_DB_NAME.length());
     try (OMMetadataManager defragDbMetadataManager = new OmMetadataManagerImpl(
         conf, snapshotDirName, maxOpenSstFilesInSnapshotDb, true)) {
       LOG.info("Opened checkpoint DB for defragmentation");
@@ -275,12 +278,12 @@ public class SnapshotDefragService extends BackgroundService
    * Steps:
    * 1. Take checkpoint of current DB
    * 2. Create checkpoint MetadataManager after taking a checkpoint
-   * 3. DeleteRange KeyTable from ["", keyTablePrefix) +
+   * 3. DeleteRange KeyTable from ["", obsPrefix) +
    *    [lexicographicalHigherString(keyTablePrefix), lexicographicalHigherString("/")]
-   * 4. DeleteRange DirectoryTable from ["", FSOPrefix) +
-   *    [lexicographicalHigherString(FSOPrefix), lexicographicalHigherString("/")]
-   * 5. DeleteRange FileTable from ["", FSOPrefix) +
-   *    [lexicographicalHigherString(FSOPrefix), lexicographicalHigherString("/")]
+   * 4. DeleteRange DirectoryTable from ["", fsoPrefix) +
+   *    [lexicographicalHigherString(fsoPrefix), lexicographicalHigherString("/")]
+   * 5. DeleteRange FileTable from ["", fsoPrefix) +
+   *    [lexicographicalHigherString(fsoPrefix), lexicographicalHigherString("/")]
    * 6. Force compact all tables in the checkpoint.
    */
   private void performFullDefragmentation(SnapshotInfo snapshotInfo,
@@ -343,19 +346,19 @@ public class SnapshotDefragService extends BackgroundService
         ozoneManager.getConfiguration(), previousDefraggedSnapshot);
 
     // Fix path construction similar to performFullDefragmentation
-    String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().toString();
+    String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().getParent().toString();
     String previousCheckpointDirName = Paths.get(previousSnapshotPath).getFileName().toString();
     // TODO: Append version number
     String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         previousCheckpointDirName).toString();
 
-    String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
+    String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().getParent().toString();
     String currentCheckpointDirName = Paths.get(currentSnapshotPath).getFileName().toString();
     // TODO: Append version number as well. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
     String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         currentCheckpointDirName).toString();
 
-    LOG.info("Starting incremental defragmentation for snapshot: {} using previous: {}",
+    LOG.info("Starting incremental defragmentation for snapshot: {} using previous defragged snapshot: {}",
         currentSnapshot.getName(), previousDefraggedSnapshot.getName());
     LOG.info("Previous defragmented DB: {}", previousDefraggedDbPath);
     LOG.info("Current target DB: {}", currentDefraggedDbPath);
@@ -366,86 +369,72 @@ public class SnapshotDefragService extends BackgroundService
     try {
       // Check if previous defragmented DB exists
       if (!Files.exists(Paths.get(previousDefraggedDbPath))) {
+        // TODO: Should err and quit instead of falling back to full defrag
         LOG.warn("Previous defragmented DB not found at {}, falling back to full defragmentation",
             previousDefraggedDbPath);
         performFullDefragmentation(currentSnapshot, currentOmSnapshot);
         return;
       }
 
-      // 1. Create a checkpoint from the previous defragmented DB directly at target location
+      // Create a checkpoint from the previous defragmented DB directly at target location
       LOG.info("Creating checkpoint from previous defragmented DB directly to target location");
 
-      // Open the previous defragmented DB to create checkpoint.
-      // TODO: Use metadataManager
-      DBStoreBuilder previousDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
-          .setName(previousCheckpointDirName)
-          .setPath(Paths.get(previousDefraggedDbPath).getParent())
-          .setOpenReadOnly(true)
-          .setCreateCheckpointDirs(false);
+      final OmSnapshotManager snapshotManager = ozoneManager.getOmSnapshotManager();
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> prevSnapshotSupplier =
+               snapshotManager.getSnapshot(previousDefraggedSnapshot.getSnapshotId())) {
+        LOG.info("Opened previous (defragged) snapshot: {}", previousDefraggedSnapshot.getName());
+        OmSnapshot prevSnapshot = prevSnapshotSupplier.get();
+        // Sanity check: Ensure previous snapshot is marked as defragmented
+        if (needsDefragmentation(previousDefraggedSnapshot)) {
+          LOG.error("Previous snapshot {} is not marked as defragmented. Something is wrong.",
+              previousDefraggedSnapshot.getName());
+          return;
+        }
+        RDBStore prevStore = (RDBStore) prevSnapshot.getMetadataManager().getStore();
+        RocksDatabase prevDb = prevStore.getDb();
+        assert !prevDb.isClosed();
 
-      // Add tracked column families
-      for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
-        previousDbBuilder.addTable(cfName);
-      }
-
-      try (RDBStore previousDefraggedStore = previousDbBuilder.build()) {
-        RocksDatabase previousDefraggedDb = previousDefraggedStore.getDb();
-
-        // Create checkpoint directly at the target location
-        try (RocksDatabase.RocksCheckpoint checkpoint = previousDefraggedDb.createCheckpoint()) {
+        try (RocksDatabase.RocksCheckpoint checkpoint = prevDb.createCheckpoint()) {
           checkpoint.createCheckpoint(Paths.get(currentDefraggedDbPath));
-          LOG.info("Created checkpoint directly at target: {}", currentDefraggedDbPath);
+          LOG.info("Created checkpoint at: {}", currentDefraggedDbPath);
         }
       }
 
-      // 2. Open the checkpoint as our working defragmented DB and apply incremental changes
-      DBStoreBuilder currentDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
-          .setName(currentCheckpointDirName)
-          .setPath(Paths.get(currentDefraggedDbPath).getParent())
-          .setCreateCheckpointDirs(false);
+      final String volumeName = currentSnapshot.getVolumeName();
+      final String bucketName = currentSnapshot.getBucketName();
+      OzoneConfiguration conf = ozoneManager.getConfiguration();
+      final int maxOpenSstFilesInSnapshotDb = conf.getInt(
+          OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-      // Add tracked column families
-      for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
-        currentDbBuilder.addTable(cfName);
+      final String currSnapshotDirName = currentCheckpointDirName.substring(OM_DB_NAME.length());
+      try (OMMetadataManager currDefragDbMetadataManager = new OmMetadataManagerImpl(
+          conf, currSnapshotDirName, maxOpenSstFilesInSnapshotDb, true)) {
+        LOG.info("Opened OMMetadataManager for checkpoint DB for incremental update");
+        try (RDBStore currentDefraggedStore = (RDBStore) currDefragDbMetadataManager.getStore()) {
+          try (RocksDatabase currentDefraggedDb = currentDefraggedStore.getDb()) {
+            LOG.info("Opened checkpoint as working defragmented DB for incremental update");
+
+            // Apply incremental changes from current snapshot
+            RDBStore currentSnapshotStore = (RDBStore) currentOmSnapshot.getMetadataManager().getStore();
+            RocksDatabase currentSnapshotDb = currentSnapshotStore.getDb();
+
+            long incrementalKeysCopied = applyIncrementalChanges(currentSnapshotDb, currentDefraggedStore,
+                currentSnapshot, previousDefraggedSnapshot);
+
+            LOG.info("Applied {} incremental changes for snapshot: {}",
+                incrementalKeysCopied, currentSnapshot.getName());
+
+            // Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
+            verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshot);
+
+            // Create a new version in YAML metadata, which also indicates that the defragmentation is complete
+            updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshot);
+
+            LOG.info("Successfully completed incremental defragmentation for snapshot: {} with {} incremental changes",
+                currentSnapshot.getName(), incrementalKeysCopied);
+          }
+        }
       }
-
-      // Build DB from the checkpoint
-      RDBStore currentDefraggedStore = currentDbBuilder.build();
-      RocksDatabase currentDefraggedDb = currentDefraggedStore.getDb();
-
-      LOG.info("Opened checkpoint as working defragmented DB for incremental update");
-
-      // 3. Apply incremental changes from current snapshot
-      RDBStore currentSnapshotStore = (RDBStore) currentOmSnapshot.getMetadataManager().getStore();
-      RocksDatabase currentSnapshotDb = currentSnapshotStore.getDb();
-
-      long incrementalKeysCopied = applyIncrementalChanges(currentSnapshotDb, currentDefraggedStore,
-          currentSnapshot, previousDefraggedSnapshot);
-
-      LOG.info("Applied {} incremental changes for snapshot: {}",
-          incrementalKeysCopied, currentSnapshot.getName());
-
-      // 4. Perform compaction on the updated DB
-//      LOG.info("Starting compaction of incrementally defragmented DB for snapshot: {}",
-//          currentSnapshot.getName());
-//      try (ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions()) {
-//        compactOptions.setChangeLevel(true);
-//        compactOptions.setTargetLevel(1);
-//        currentDefraggedDb.compactDB(compactOptions);
-//      }
-//      LOG.info("Completed compaction of incrementally defragmented DB");
-
-      // 5. Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
-      verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshot);
-
-      // 6. Create a new version in YAML metadata, which also indicates that the defragmentation is complete
-      updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshot);
-
-      // Close the defragmented DB. TODO: Close in finally block instead
-      currentDefraggedStore.close();
-
-      LOG.info("Successfully completed incremental defragmentation for snapshot: {} with {} incremental changes",
-          currentSnapshot.getName(), incrementalKeysCopied);
 
     } catch (RocksDatabaseException e) {
       LOG.error("RocksDB error during incremental defragmentation of snapshot: {}",
@@ -461,15 +450,15 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   /**
-   * Applies incremental changes by using snapshotDiff to compute the diff list,
-   * then iterating that diff list against the current snapshot checkpoint DB.
+   * Applies incremental changes by using SnapshotDiffManager#getDeltaFiles() to get SST files,
+   * then iterating through keys using SstFileSetReader with byte-level comparison.
    * Uses RDBSstFileWriter to directly write changes to SST files and then ingests them.
    */
   @SuppressWarnings("checkstyle:MethodLength")
   private long applyIncrementalChanges(RocksDatabase currentSnapshotDb, DBStore targetStore,
-      SnapshotInfo currentSnapshot, SnapshotInfo previousSnapshot) throws RocksDatabaseException {
+      SnapshotInfo currentSnapshot, SnapshotInfo previousSnapshot) throws IOException {
 
-    LOG.info("Applying incremental changes for snapshot: {} since: {} using snapshotDiff approach",
+    LOG.info("Applying incremental changes for snapshot: {} since: {} using delta files approach",
         currentSnapshot.getName(), previousSnapshot.getName());
 
     long totalChanges = 0;
@@ -479,89 +468,51 @@ public class SnapshotDefragService extends BackgroundService
         ozoneManager.getConfiguration(), currentSnapshot);
     String parentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
     String tempSstDir = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, TEMP_DIFF_DIR).toString();
+    String diffDir = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, "deltaFilesDiff-" +
+        UUID.randomUUID()).toString();
 
     try {
       Files.createDirectories(Paths.get(tempSstDir));
       LOG.info("Created temporary SST directory: {}", tempSstDir);
+      Files.createDirectories(Paths.get(diffDir));
+      LOG.info("Created diff directory: {}", diffDir);
 
-      // Use snapshotDiff to compute the diff list between previous and current snapshot
-      LOG.info("Computing snapshot diff between {} and {}",
-          previousSnapshot.getName(), currentSnapshot.getName());
+      // Get OmSnapshotManager
+      OmSnapshotManager snapshotManager = ozoneManager.getOmSnapshotManager();
 
-      SnapshotDiffResponse diffResponse;
-      try {
-        // Call snapshotDiff to get the diff list
-        diffResponse = ozoneManager.snapshotDiff(
+      // Get OmSnapshot instances for previous and current snapshots
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshotSupplier =
+               snapshotManager.getSnapshot(previousSnapshot.getSnapshotId());
+           UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshotSupplier =
+               snapshotManager.getSnapshot(currentSnapshot.getSnapshotId())) {
+
+        OmSnapshot previousOmSnapshot = previousSnapshotSupplier.get();
+        OmSnapshot currentOmSnapshot = currentSnapshotSupplier.get();
+
+        // Get the SnapshotDiffManager
+        SnapshotDiffManager diffManager = snapshotManager.getSnapshotDiffManager();
+
+        // Get column family to key prefix map for filtering SST files
+        Map<String, String> tablePrefixes = getColumnFamilyToKeyPrefixMap(
+            ozoneManager.getMetadataManager(),
             currentSnapshot.getVolumeName(),
-            currentSnapshot.getBucketName(),
-            previousSnapshot.getName(),
-            currentSnapshot.getName(),
-            null, // token - start from beginning
-            0,    // pageSize - get all diffs at once
-            false, // forceFullDiff
-            false  // disableNativeDiff
-        );
+            currentSnapshot.getBucketName());
 
-        // Wait for snapshotDiff computation to complete if it's still in progress
-        while (diffResponse.getJobStatus() == SnapshotDiffResponse.JobStatus.IN_PROGRESS ||
-            diffResponse.getJobStatus() == SnapshotDiffResponse.JobStatus.QUEUED) {
-          LOG.info("Snapshot diff computation in progress, waiting {} ms...",
-              diffResponse.getWaitTimeInMs());
-          // TODO: This can be improved by triggering snapdiff first, before any locks are grabbed,
-          //  so that we don't have to wait here
-          Thread.sleep(diffResponse.getWaitTimeInMs());
+        // Get table references for target database
+        RDBStore targetRdbStore = (RDBStore) targetStore;
+        RocksDatabase targetDb = targetRdbStore.getDb();
 
-          // Poll for updated status
-          diffResponse = ozoneManager.snapshotDiff(
-              currentSnapshot.getVolumeName(),
-              currentSnapshot.getBucketName(),
-              previousSnapshot.getName(),
-              currentSnapshot.getName(),
-              null, // token
-              0,    // pageSize
-              false, // forceFullDiff
-              false  // disableNativeDiff
-          );
-        }
+        RDBStore previousDefraggedStore = (RDBStore) targetStore; // The previous defragged DB is our target base
+        RocksDatabase previousDefraggedDb = previousDefraggedStore.getDb();
 
-        if (diffResponse.getJobStatus() != SnapshotDiffResponse.JobStatus.DONE) {
-          throw new RocksDatabaseException("Snapshot diff computation failed with status: " +
-              diffResponse.getJobStatus() + ", reason: " + diffResponse.getReason());
-        }
-
-        LOG.info("Snapshot diff computation completed successfully");
-
-      } catch (Exception e) {
-        throw new RocksDatabaseException("Failed to compute snapshot diff", e);
-      }
-
-      SnapshotDiffReportOzone diffReport = diffResponse.getSnapshotDiffReport();
-      if (diffReport == null || diffReport.getDiffList() == null) {
-        LOG.info("No differences found between snapshots, no changes to apply");
-        return 0;
-      }
-
-      // TODO: Handle pagination when diffList is bigger than server page size
-      // 2025-08-16 09:10:52,500 [IPC Server handler 1 on default port 9862] INFO
-      //  om.SnapshotDefragService: Found 1000 differences to process
-      LOG.info("Found {} differences to process", diffReport.getDiffList().size());
-
-      // Get table references for target database
-      RDBStore targetRdbStore = (RDBStore) targetStore;
-      RocksDatabase targetDb = targetRdbStore.getDb();
-
-      int nextToken = 0;
-      while (diffReport.getDiffList() != null && !diffReport.getDiffList().isEmpty()) {
-        final List<DiffReportEntry> diffList = diffReport.getDiffList();
-
-        // Group diff entries by column family and process each CF separately
-        // TODO: Use bucket layout to determine which column families to process
+        // Process each column family
         for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
           RocksDatabase.ColumnFamily currentCf = currentSnapshotDb.getColumnFamily(cfName);
+          RocksDatabase.ColumnFamily previousCf = previousDefraggedDb.getColumnFamily(cfName);
           RocksDatabase.ColumnFamily targetCf = targetDb.getColumnFamily(cfName);
 
-          if (currentCf == null || targetCf == null) {
-            LOG.warn("Column family {} not found, skipping incremental changes", cfName);
+          if (currentCf == null || previousCf == null || targetCf == null) {
+            LOG.warn("Column family {} not found in one of the databases, skipping incremental changes", cfName);
             continue;
           }
 
@@ -571,90 +522,79 @@ public class SnapshotDefragService extends BackgroundService
             continue;
           }
 
-          long cfChanges = 0;
+          // Get delta files for this column family
+          List<String> tablesToLookUp = Collections.singletonList(cfName);
+          Set<String> deltaFiles;
+          try {
+            deltaFiles = diffManager.getDeltaFiles(
+                previousOmSnapshot, currentOmSnapshot,
+                tablesToLookUp,
+                previousSnapshot, currentSnapshot,
+                false,  // useFullDiff = false
+                tablePrefixes,
+                diffDir,
+                "defrag-" + currentSnapshot.getSnapshotId()  // jobKey
+            );
+            LOG.info("Got {} delta SST files for column family: {}", deltaFiles.size(), cfName);
+          } catch (Exception e) {
+            LOG.error("Failed to get delta files for column family {}: {}", cfName, e.getMessage(), e);
+            continue;
+          }
+
+          if (deltaFiles.isEmpty()) {
+            LOG.info("No delta files for column family {}, skipping", cfName);
+            continue;
+          }
+
+          AtomicLong cfChanges = new AtomicLong(0);
           String sstFileName = cfName + "_" + currentSnapshot.getSnapshotId() + ".sst";
           File sstFile = new File(tempSstDir, sstFileName);
 
           LOG.debug("Creating SST file for column family {} changes: {}", cfName, sstFile.getAbsolutePath());
 
-          // Use RDBSstFileWriter to write changes to SST file
+          // Use SstFileSetReader to read keys from delta files
+          SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
+
           try (RDBSstFileWriter sstWriter = new RDBSstFileWriter(sstFile)) {
 
-            // Iterate through the diff list and process each entry
-            for (DiffReportEntry diffEntry : diffList) {
-              String sourcePath = new String(diffEntry.getSourcePath(), StandardCharsets.UTF_8);
+            // Get key stream with tombstones from delta files
+            try (Stream<String> keysToCheck = sstFileReader.getKeyStreamWithTombstone(null, null)) {
 
-              // Extract the key from the path using volume and bucket from snapshot context
-              byte[] key = extractKeyFromPath(sourcePath, cfName,
-                  currentSnapshot.getVolumeName(), currentSnapshot.getBucketName());
-              if (key == null) {
-                continue; // Skip if this entry doesn't belong to current column family
-              }
+              keysToCheck.forEach(keyStr -> {
+                try {
+                  byte[] key = keyStr.getBytes(StandardCharsets.UTF_8);
 
-              DiffType diffType = diffEntry.getType();
+                  // Get values from previous defragmented snapshot and current snapshot
+                  byte[] previousValue = previousDefraggedDb.get(previousCf, key);
+                  byte[] currentValue = currentSnapshotDb.get(currentCf, key);
 
-              switch (diffType) {
-              case CREATE:
-              case MODIFY:
-                // Key was created or modified - get current value and write to SST
-                byte[] currentValue = currentSnapshotDb.get(currentCf, key);
-                if (currentValue != null) {
-                  sstWriter.put(key, currentValue);
-                  cfChanges++;
-
-                  if (cfChanges % 10000 == 0) {
-                    LOG.debug("Written {} changes to SST file for column family {} so far",
-                        cfChanges, cfName);
-                  }
-                }
-                break;
-
-              case DELETE:
-                // Key was deleted - write tombstone to SST
-                /* TODO: Sort keys before writing to SST file?
-Caused by: org.rocksdb.RocksDBException: Keys must be added in strict ascending order.
-at org.rocksdb.SstFileWriter.delete(Native Method)
-at org.rocksdb.SstFileWriter.delete(SstFileWriter.java:178)
-at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java:65)
-                * */
-                sstWriter.delete(key);
-                cfChanges++;
-
-                if (cfChanges % 10000 == 0) {
-                  LOG.debug("Written {} changes (including deletions) to SST file for column family {} so far",
-                      cfChanges, cfName);
-                }
-                break;
-
-              case RENAME:
-                // Handle rename - delete old key and create new key
-                if (diffEntry.getTargetPath() != null) {
-                  String targetPath = new String(diffEntry.getTargetPath(), StandardCharsets.UTF_8);
-                  byte[] newKey = extractKeyFromPath(targetPath, cfName,
-                      currentSnapshot.getVolumeName(), currentSnapshot.getBucketName());
-
-                  if (newKey != null) {
-                    // Delete old key
-                    sstWriter.delete(key);
-
-                    // Add new key with current value
-                    byte[] newValue = currentSnapshotDb.get(currentCf, newKey);
-                    if (newValue != null) {
-                      sstWriter.put(newKey, newValue);
+                  // Byte-level comparison: only write if values are different
+                  if (!Arrays.equals(previousValue, currentValue)) {
+                    if (currentValue != null) {
+                      // Key exists in current snapshot - write the new value
+                      sstWriter.put(key, currentValue);
+                    } else {
+                      // Key doesn't exist in current snapshot (deleted) - write tombstone
+                      sstWriter.delete(key);
                     }
-                    cfChanges += 2; // Count both delete and put
-                  }
-                }
-                break;
 
-              default:
-                LOG.warn("Unknown diff type: {}, skipping entry", diffType);
-                break;
-              }
+                    // Increment change counter
+                    cfChanges.getAndIncrement();
+                  }
+                } catch (Exception e) {
+                  LOG.error("Error processing key {} for column family {}: {}",
+                      keyStr, cfName, e.getMessage(), e);
+                  throw new RuntimeException(e);
+                }
+              });
+
+            } catch (RocksDBException e) {
+              LOG.error("RocksDB error reading keys from delta files for column family {}: {}",
+                  cfName, e.getMessage(), e);
             }
 
             LOG.debug("Finished writing {} changes for column family: {} to SST file",
-                cfChanges, cfName);
+                cfChanges.get(), cfName);
 
           } catch (Exception e) {
             LOG.error("Error processing column family {} for snapshot {}: {}",
@@ -662,7 +602,7 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
           }
 
           // Ingest SST file into target database if there were changes
-          if (cfChanges > 0 && sstFile.exists() && sstFile.length() > 0) {
+          if (sstFile.exists() && sstFile.length() > 0) {
             try {
               targetTable.loadFromFile(sstFile);
               LOG.info("Successfully ingested SST file for column family {}: {} changes",
@@ -684,36 +624,12 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
             LOG.warn("Failed to clean up SST file: {}", sstFile.getAbsolutePath(), e);
           }
 
-          totalChanges += cfChanges;
+          totalChanges += cfChanges.get();
           LOG.debug("Applied {} incremental changes for column family: {}", cfChanges, cfName);
         }
-
-
-//        String lastToken = new String(diffList.get(diffList.size() - 1).getSourcePath(), StandardCharsets.UTF_8);
-        nextToken += diffList.size();
-        LOG.debug("Retrieving next page of snapshot diff with token: {}", nextToken);
-        diffResponse = ozoneManager.snapshotDiff(
-            currentSnapshot.getVolumeName(),
-            currentSnapshot.getBucketName(),
-            previousSnapshot.getName(),
-            currentSnapshot.getName(),
-            String.valueOf(nextToken), // token
-            0,    // pageSize
-            false, // forceFullDiff
-            false  // disableNativeDiff
-        );
-
-        if (diffResponse.getJobStatus() != SnapshotDiffResponse.JobStatus.DONE) {
-          throw new RocksDatabaseException("Expecting DONE but got unexpected snapshot diff status: " +
-              diffResponse.getJobStatus() + ", reason: " + diffResponse.getReason());
-        }
-
-        LOG.info("Retrieved next page of snapshot diff, size: {}",
-            diffResponse.getSnapshotDiffReport().getDiffList().size());
-        diffReport = diffResponse.getSnapshotDiffReport();
       }
 
-      // Clean up temporary directory
+      // Clean up temporary directories
       try {
         Files.deleteIfExists(Paths.get(tempSstDir));
         LOG.debug("Cleaned up temporary SST directory: {}", tempSstDir);
@@ -721,42 +637,19 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
         LOG.warn("Failed to clean up temporary SST directory: {}", tempSstDir, e);
       }
 
-    } catch (IOException e) {
-      throw new RocksDatabaseException("Failed to create temporary SST directory: " + tempSstDir, e);
-    }
-
-    LOG.info("Applied {} total incremental changes using snapshotDiff approach", totalChanges);
-    return totalChanges;
-  }
-
-  /**
-   * Extracts the database key from a diff report path for a specific column family.
-   * This method converts paths from snapshot diff reports into database keys.
-   */
-  private byte[] extractKeyFromPath(String path, String columnFamily, String volume, String bucket) {
-    try {
-      if (KEY_TABLE.equals(columnFamily)) {
-        // For keyTable, use OmMetadataManagerImpl#getOzoneKey
-        // Path in diff report contains just the key part (after volume/bucket)
-        String dbKey = ozoneManager.getMetadataManager().getOzoneKey(volume, bucket, path);
-        return dbKey.getBytes(StandardCharsets.UTF_8);
-      } else if (FILE_TABLE.equals(columnFamily)) {
-        // TODO: Test FSO code path
-        // For fileTable, use OmMetadataManagerImpl#getOzoneKeyFSO
-        // Path in diff report contains just the key part (after volume/bucket)
-        String dbKey = ozoneManager.getMetadataManager().getOzoneKeyFSO(volume, bucket, path);
-        return dbKey.getBytes(StandardCharsets.UTF_8);
+      try {
+        org.apache.commons.io.FileUtils.deleteDirectory(new File(diffDir));
+        LOG.debug("Cleaned up diff directory: {}", diffDir);
+      } catch (IOException e) {
+        LOG.warn("Failed to clean up diff directory: {}", diffDir, e);
       }
 
-      // If we can't extract a valid key for this column family, return null
-      // This will cause the entry to be skipped for this column family
-      return null;
-
-    } catch (Exception e) {
-      LOG.warn("Failed to extract key from path: {} for column family: {}, volume: {}, bucket: {}, error: {}",
-          path, columnFamily, volume, bucket, e.getMessage(), e);
-      return null;
+    } catch (IOException e) {
+      throw new IOException("applyIncrementalChanges failed", e);
     }
+
+    LOG.info("Applied {} total incremental changes using delta files approach", totalChanges);
+    return totalChanges;
   }
 
   /**
@@ -1039,8 +932,8 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
               break;
             }
 
-            performIncrementalDefragmentation(snapshotToDefrag,
-                previousDefraggedSnapshot, omSnapshot);
+            performIncrementalDefragmentation(
+                snapshotToDefrag, previousDefraggedSnapshot, omSnapshot);
           }
 
           // TODO: Update snapshot metadata here?

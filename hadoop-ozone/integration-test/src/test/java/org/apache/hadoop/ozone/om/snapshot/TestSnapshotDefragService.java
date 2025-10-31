@@ -51,13 +51,10 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -98,7 +95,7 @@ public class TestSnapshotDefragService {
 
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 3000000);
-    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 1);  // TODO: Increase this to 3
+    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 3);
 
     conf.setQuietMode(false);
 
