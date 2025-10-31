@@ -1779,7 +1779,7 @@ public class TestIamSessionPolicyResolver {
     }
     jsonBuilder.append("\"\n");
     jsonBuilder.append("  }]\n");
-    jsonBuilder.append("}");
+    jsonBuilder.append('}');
 
     return jsonBuilder.toString();
   }
@@ -1794,7 +1794,7 @@ public class TestIamSessionPolicyResolver {
     // Add characters to reach exactly 2048 (accounting for closing brackets and newlines)
     // Closing part: "\"\n  }]\n}" = 8 chars
     while (jsonBuilder.length() < 2048 - 8) {
-      jsonBuilder.append("a");
+      jsonBuilder.append('a');
     }
     jsonBuilder.append("\"\n  }]\n}");
 
