@@ -6892,7 +6892,7 @@
             },
             "OM": {
                 "pendingKeyBytes": 1254500,
-                "pendingBytes": 4464500,
+                "totalBytes": 4464500,
                 "pendingDirectoryBytes": 3210000
             }
         }
@@ -6900,28 +6900,54 @@
     },
     "dataNodeUsage": [
       {
-        "uuid": "1477a674-b86c-43b9-ae84-1586c5720125",
-        "capacity": 1080992018248,
-        "used": 4398612,
-        "remaining": 1019728228844,
-        "committed": 1073725932,
-        "pendingDeletion": 1013125932
+          "datanodeUuid": "ec4d37e4-04d7-4d1b-b0bb-aafa05d86b3c",
+          "hostName": "ozone-datanode-2.ozone_default",
+          "capacity": 125645656770,
+          "used": 4382720,
+          "remaining": 104675287040,
+          "committed": 0,
+          "pendingDeletion": 0,
+          "minimumFreeSpace": 125645664
       },
       {
-        "uuid": "c040c145-b44f-42a8-a3a3-b18171c8c01c",
-        "capacity": 1080992018248,
-        "used": 4382720,
-        "remaining": 1019728248832,
-        "committed": 0,
-        "pendingDeletion": 11025932
+          "datanodeUuid": "ed34b38a-88b0-4dde-8ef6-6d158339064e",
+          "hostName": "ozone-datanode-4.ozone_default",
+          "capacity": 125645656770,
+          "used": 4382720,
+          "remaining": 104675291136,
+          "committed": 0,
+          "pendingDeletion": 0,
+          "minimumFreeSpace": 125645664
       },
       {
-        "uuid": "1d076fc9-ece2-43e7-9fca-bb1e8646a56d",
-        "capacity": 1080992018248,
-        "used": 4382720,
-        "remaining": 1019728248832,
-        "committed": 1023725932,
-        "pendingDeletion": 21125932
+          "datanodeUuid": "49d5a41b-ffb4-426f-bd46-93d9263296ef",
+          "hostName": "ozone-datanode-5.ozone_default",
+          "capacity": 125645656770,
+          "used": 4382720,
+          "remaining": 104675291136,
+          "committed": 0,
+          "pendingDeletion": 0,
+          "minimumFreeSpace": 125645664
+      },
+      {
+          "datanodeUuid": "08b69287-6fd0-42e0-b944-f5d527607ac9",
+          "hostName": "ozone-datanode-1.ozone_default",
+          "capacity": 125645656770,
+          "used": 4382720,
+          "remaining": 104675282944,
+          "committed": 0,
+          "pendingDeletion": 0,
+          "minimumFreeSpace": 125645664
+      },
+      {
+          "datanodeUuid": "3be0d2dc-b068-46c9-a6df-ff086e94fec5",
+          "hostName": "ozone-datanode-3.ozone_default",
+          "capacity": 125645656770,
+          "used": 4382720,
+          "remaining": 104675282944,
+          "committed": 0,
+          "pendingDeletion": 0,
+          "minimumFreeSpace": 125645664
       }
     ]
   }

@@ -18,7 +18,7 @@
 
 import { EChart } from '@/components/eChart/eChart';
 import { GraphLegendIcon } from '@/utils/themeIcons';
-import { cardBodyStyle, cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
+import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
 import { Card, Divider, Row, Select, Statistic } from 'antd';
 import filesize from 'filesize';
 import React from 'react';
@@ -47,9 +47,8 @@ const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem)
       bottom: 0
     },
     xAxis: {
-      // We are using a log scale to make the chart more readable in case there are some value
-      // which are too small or too large to be displayed in the chart
-      type: 'log',
+      // Use linear scale to support zero values safely
+      type: 'value',
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false }
@@ -77,12 +76,10 @@ const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem)
     barGap: '2px'
   }));
 
-  console.log(series);
-
   return {
     ...option,
     series
-  }
+  } as any
 }
 
 
@@ -99,7 +96,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
     <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading}>
       { showDropdown && options.length > 0 &&
         <div className='node-select-container'>
-          Node Select:
+          <strong>Node Selector:</strong>
           <Select
             defaultValue={options?.[0]?.value}
             options={options}

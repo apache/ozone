@@ -101,7 +101,7 @@ const Capacity: React.FC<object> = () => {
       // setGlobalNamespace(utilizationResponse.globalNamespace);
       setUsageBreakdown(utilizationResponse.usedSpaceBreakdown);
       setDatanodeUsage(utilizationResponse.dataNodeUsage);
-      setSelectedDatanode(utilizationResponse.dataNodeUsage[0].uuid);
+      setSelectedDatanode(utilizationResponse.dataNodeUsage[0].hostName);
       setState({
         loading: false,
         lastUpdated: Number(moment())
@@ -128,8 +128,9 @@ const Capacity: React.FC<object> = () => {
   }, []);
 
   const selectedDNDetails: DataNodeUsage = React.useMemo(() => {
-    return datanodeUsage.find(datanode => datanode.uuid === selectedDatanode) ?? {
-      uuid: "xxxx-xxxx-xxxx-xxxx",
+    return datanodeUsage.find(datanode => datanode.hostName === selectedDatanode) ?? {
+      datanodeUuid: "unknown-uuid",
+      hostName: "unknown-host",
       capacity: 0,
       used: 0,
       remaining: 0,
@@ -237,7 +238,7 @@ const Capacity: React.FC<object> = () => {
             showDropdown={false}
             dataDetails={[{
               title: 'OZONE MANAGER',
-              size: usageBreakdown.deletionPendingBytes.byStage.OM.pendingBytes,
+              size: usageBreakdown.deletionPendingBytes.byStage.OM.totalBytes ?? 0,
               breakdown: [{
                 label: 'KEYS',
                 value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingKeyBytes,
@@ -274,29 +275,29 @@ const Capacity: React.FC<object> = () => {
             loading={state.loading}
             showDropdown={true}
             handleSelect={setSelectedDatanode}
-            dropdownItems={datanodeUsage.map(datanode => datanode.uuid)}
+            dropdownItems={datanodeUsage.map(datanode => datanode.hostName)}
             dataDetails={[{
               title: 'USED SPACE',
-              size: selectedDNDetails.used + selectedDNDetails.pendingDeletion,
+              size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingDeletion ?? 0),
               breakdown: [{
                 label: 'PENDING DELETION',
-                value: selectedDNDetails.pendingDeletion,
+                value: selectedDNDetails.pendingDeletion ?? 0,
                 color: '#f4a233'
               }, {
                 label: 'OZONE USED',
-                value: selectedDNDetails.used,
+                value: selectedDNDetails.used ?? 0,
                 color: '#10073b'
               }]
             }, {
               title: 'FREE SPACE',
-              size: selectedDNDetails.remaining + selectedDNDetails.committed,
+              size: (selectedDNDetails.remaining ?? 0) + (selectedDNDetails.committed ?? 0),
               breakdown: [{
                 label: unusedSpaceBreakdown,
-                value: selectedDNDetails.remaining,
+                value: selectedDNDetails.remaining ?? 0,
                 color: '#f4a233'
               }, {
                 label: 'OZONE PRE-ALLOCATED',
-                value: selectedDNDetails.committed,
+                value: selectedDNDetails.committed ?? 0,
                 color: '#10073b'
               }]
             }]} />
