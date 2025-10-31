@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.security.acl.iam;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -48,7 +51,7 @@ public class TestIamSessionPolicyResolver {
   private static final String VOLUME = "s3v";
 
   @Test
-  public void testAllowGetPutOnKey() {
+  public void testAllowGetPutOnKey() throws OMException {
     final String json = "{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [{\n" +
@@ -93,7 +96,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testAllActionsForKey() {
+  public void testAllActionsForKey() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -146,7 +149,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testAllActionsForBucket() {
+  public void testAllActionsForBucket() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -190,7 +193,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testMultipleResourcesInSeparateStatements() {
+  public void testMultipleResourcesInSeparateStatements() throws OMException {
     final String json = "{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
@@ -265,7 +268,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testMultipleResourcesInOneStatement() {
+  public void testMultipleResourcesInOneStatement() throws OMException {
     final String json = "{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
@@ -336,7 +339,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testMultipleResourcesWithDifferentBucketsAndDeepPathsInOneStatement() {
+  public void testMultipleResourcesWithDifferentBucketsAndDeepPathsInOneStatement() throws OMException {
     final String json = "{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
@@ -406,7 +409,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testUnsupportedActionIgnoredWhenItIsTheOnlyAction() {
+  public void testUnsupportedActionIgnoredWhenItIsTheOnlyAction() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -444,16 +447,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Condition operator - StringLike");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Condition operator - StringLike");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
@@ -472,16 +477,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Condition attribute - aws:SourceArn");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Condition attribute - aws:SourceArn");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
@@ -499,18 +506,20 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Resource Arn - " +
           "arn:aws:dynamodb:us-east-2:123456789012:table/example-table");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Resource Arn - " +
           "arn:aws:dynamodb:us-east-2:123456789012:table/example-table");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
@@ -528,21 +537,23 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Effect - Deny");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Unsupported Effect - Deny");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
   @Test
-  public void testListBucketWithWildcard() {
+  public void testListBucketWithWildcard() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -579,7 +590,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testListBucketOperationsWithNoPrefixes() {
+  public void testListBucketOperationsWithNoPrefixes() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [\n" +
         "    {\n" +
@@ -628,7 +639,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testIgnoresUnsupportedActionsWhenSupportedActionsAreIncluded() {
+  public void testIgnoresUnsupportedActionsWhenSupportedActionsAreIncluded() throws OMException {
     final String json = "{\n" +
         "  \"Version\": \"2012-10-17\",\n" +
         "  \"Statement\": [\n" +
@@ -697,7 +708,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testMultiplePrefixesWithWildcards() {
+  public void testMultiplePrefixesWithWildcards() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -759,7 +770,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testObjectResourceWithWildcardInMiddle() {
+  public void testObjectResourceWithWildcardInMiddle() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -772,11 +783,12 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo(
           "Wildcard prefix patterns are not supported for Ozone native " +
               "authorizer if wildcard is not at the end"
       );
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromRangerAuthorizer =
@@ -804,7 +816,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testBucketActionOnAllResources() {
+  public void testBucketActionOnAllResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -851,7 +863,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testObjectActionOnAllResources() {
+  public void testObjectActionOnAllResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -888,7 +900,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testAllActionsOnAllResources() {
+  public void testAllActionsOnAllResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -939,7 +951,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testAllActionsOnAllBucketResources() {
+  public void testAllActionsOnAllBucketResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -976,7 +988,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testAllActionsOnAllObjectResources() {
+  public void testAllActionsOnAllObjectResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1013,7 +1025,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testWildcardActionGroupGetStar() {
+  public void testWildcardActionGroupGetStar() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1079,7 +1091,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testWildcardActionGroupListStar() {
+  public void testWildcardActionGroupListStar() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1146,7 +1158,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testWildcardActionGroupPutStar() {
+  public void testWildcardActionGroupPutStar() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1212,7 +1224,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testWildcardActionGroupDeleteStar() {
+  public void testWildcardActionGroupDeleteStar() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1278,7 +1290,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testMismatchedActionAndResourceReturnsEmpty() {
+  public void testMismatchedActionAndResourceReturnsEmpty() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
         "    \"Effect\": \"Allow\",\n" +
@@ -1316,16 +1328,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - missing Statement");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - missing Statement");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1343,16 +1357,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Resource Arn - arn:aws:s3:::");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Resource Arn - arn:aws:s3:::");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1370,20 +1386,22 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Effect in JSON policy " +
           "(must be a String) - [\"Allow\"]"
       );
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Effect in JSON policy " +
           "(must be a String) - [\"Allow\"]"
       );
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1400,16 +1418,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Effect is missing from JSON policy");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Effect is missing from JSON policy");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1441,16 +1461,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Only one Condition is supported");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Only one Condition is supported");
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
@@ -1471,20 +1493,22 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Condition (must have " +
           "operator StringEquals and attribute s3:prefix) - [\"RandomCondition\"]"
       );
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Condition (must have " +
           "operator StringEquals and attribute s3:prefix) - [\"RandomCondition\"]"
       );
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1503,16 +1527,18 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Missing Condition attribute - StringEquals");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Missing Condition attribute - StringEquals");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1531,18 +1557,20 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Condition attribute structure - " +
           "[{\"s3:prefix\":\"folder/\"}]");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid Condition attribute structure - " +
           "[{\"s3:prefix\":\"folder/\"}]");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
@@ -1554,128 +1582,53 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(invalidJson, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON (most likely JSON structure is incorrect)");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(invalidJson, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON (most likely JSON structure is incorrect)");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
   @Test
-  public void testTooManyStatementsThrows() {
-    final String tooManyStatements = buildTooManyStatementsString();
-
-    final String json = "{\n" +
-        "  \"Version\": \"2012-10-17\",\n" +
-        "  \"Statement\": [\n" +
-        tooManyStatements +
-        "    {\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Action\": \"s3:*\",\n" +
-        "      \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}";
+  public void testJsonExceedsMaxLengthThrows() {
+    final String json = createJsonStringLargerThan2048Characters();
 
     // Native authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Statements. Max is: 100");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - exceeds maximum length of 2048 characters");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
 
     // Ranger authorizer assertion
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
       throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Statements. Max is: 100");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - exceeds maximum length of 2048 characters");
+      assertThat(ex.getResult()).isEqualTo(INVALID_REQUEST);
     }
   }
 
   @Test
-  public void testTooManyActionsThrows() {
-    final String tooManyActions = buildTooManyActionsString();
+  public void testJsonAtMaxLengthSucceeds() throws OMException {
+    // Create a JSON string that is exactly 2048 characters
+    final String json = create2048CharJsonString();
+    assertThat(json.length()).isEqualTo(2048);
 
-    final String json = "{\n" +
-        "  \"Version\": \"2012-10-17\",\n" +
-        "  \"Statement\": [\n" +
-        "    {\n" +
-        "      \"Sid\": \"AllowListingOfDataLakeFolder\",\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Action\": [\n" +
-                tooManyActions +
-        "        \"s3:ListBucketMultipartUploads\"\n" +
-        "      ],\n" +
-        "      \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
-        "      \"Condition\": {\n" +
-        "        \"StringEquals\": {\n" +
-        "          \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
-        "        }\n" +
-        "      }\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}";
-
-    // Native authorizer assertion
-    try {
-      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
-      throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Actions. Max is: 100");
-    }
-
-    // Ranger authorizer assertion
-    try {
-      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
-      throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Actions. Max is: 100");
-    }
-  }
-
-  @Test
-  public void testTooManyResourcesThrows() {
-    final String tooManyResources = buildTooManyResourcesString();
-
-    final String json = "{\n" +
-        "  \"Version\": \"2012-10-17\",\n" +
-        "  \"Statement\": [\n" +
-        "    {\n" +
-        "      \"Effect\": \"Allow\",\n" +
-        "      \"Action\": [\n" +
-        "        \"s3:*\"\n" +
-        "      ],\n" +
-        "      \"Resource\": [\n" +
-                tooManyResources +
-        "        \"arn:aws:s3:::my-bucket/*\"\n" +
-        "      ]\n" +
-        "    }\n" +
-        "  ]\n" +
-        "}";
-
-    // Native authorizer assertion
-    try {
-      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
-      throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Resources. Max is: 100");
-    }
-
-    // Ranger authorizer assertion
-    try {
-      IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
-      throw new AssertionError("Expected exception not thrown");
-    } catch (IllegalArgumentException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Invalid policy JSON - too many Resources. Max is: 100");
-    }
+    // Must not throw an exception
+    IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+    IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
   }
 
   private static IOzoneObj key(String bucket, String key) {
@@ -1752,49 +1705,47 @@ public class TestIamSessionPolicyResolver {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
       throw new AssertionError("Expected exception not thrown");
-    } catch (UnsupportedOperationException ex) {
+    } catch (OMException ex) {
       assertThat(ex.getMessage()).isEqualTo(
           "Wildcard bucket patterns are not supported for Ozone native authorizer"
       );
+      assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
 
-  /**
-   * Builds String with too many Statement objects.
-   */
-  private static String buildTooManyStatementsString() {
-    final StringBuilder stringBuilder = new StringBuilder();
-    for (int i = 0; i < 120; i++) {
-      stringBuilder.append("    {\n" +
-          "      \"Effect\": \"Allow\",\n" +
-          "      \"Action\": \"s3:*\",\n" +
-          "      \"Resource\": \"arn:aws:s3:::my-bucket/*\"\n" +
-          "    },\n"
-      );
+  private static String createJsonStringLargerThan2048Characters() {
+    final StringBuilder jsonBuilder = new StringBuilder();
+    jsonBuilder.append("{\n");
+    jsonBuilder.append("  \"Statement\": [{\n");
+    jsonBuilder.append("    \"Effect\": \"Allow\",\n");
+    jsonBuilder.append("    \"Action\": \"s3:ListBucket\",\n");
+    jsonBuilder.append("    \"Resource\": \"arn:aws:s3:::");
+    // Add enough characters to exceed 2048
+    while (jsonBuilder.length() < 2048) {
+      jsonBuilder.append("very-long-bucket-name-that-exceeds-the-limit-");
     }
-    return stringBuilder.toString();
+    jsonBuilder.append("\"\n");
+    jsonBuilder.append("  }]\n");
+    jsonBuilder.append("}");
+
+    return jsonBuilder.toString();
   }
 
-  /**
-   * Builds String with too many Action objects.
-   */
-  private static String buildTooManyActionsString() {
-    final StringBuilder stringBuilder = new StringBuilder();
-    for (int i = 0; i < 120; i++) {
-      stringBuilder.append("\"s3:GetObject\",\n");
+  private static String create2048CharJsonString() {
+    final StringBuilder jsonBuilder = new StringBuilder();
+    jsonBuilder.append("{\n");
+    jsonBuilder.append("  \"Statement\": [{\n");
+    jsonBuilder.append("    \"Effect\": \"Allow\",\n");
+    jsonBuilder.append("    \"Action\": \"s3:ListBucket\",\n");
+    jsonBuilder.append("    \"Resource\": \"arn:aws:s3:::");
+    // Add characters to reach exactly 2048 (accounting for closing brackets and newlines)
+    // Closing part: "\"\n  }]\n}" = 8 chars
+    while (jsonBuilder.length() < 2048 - 8) {
+      jsonBuilder.append("a");
     }
-    return stringBuilder.toString();
-  }
+    jsonBuilder.append("\"\n  }]\n}");
 
-  /**
-   * Builds String with too many Resource objects.
-   */
-  private static String buildTooManyResourcesString() {
-    final StringBuilder stringBuilder = new StringBuilder();
-    for (int i = 0; i < 120; i++) {
-      stringBuilder.append("\"arn:aws:s3:::my-bucket/*\",\n");
-    }
-    return stringBuilder.toString();
+    return jsonBuilder.toString();
   }
 }
 
