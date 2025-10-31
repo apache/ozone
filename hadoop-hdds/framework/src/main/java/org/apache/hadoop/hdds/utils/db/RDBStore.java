@@ -202,6 +202,10 @@ public class RDBStore implements DBStore {
     return snapshotsParentDir;
   }
 
+  public String getDefraggedSnapshotsParentDir() {
+    return defraggedSnapshotsParentDir;
+  }
+
   @Override
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
