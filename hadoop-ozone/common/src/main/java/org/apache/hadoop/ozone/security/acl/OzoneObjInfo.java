@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.security.acl;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import java.util.Objects;
 
 /**
  * Class representing an ozone object.
