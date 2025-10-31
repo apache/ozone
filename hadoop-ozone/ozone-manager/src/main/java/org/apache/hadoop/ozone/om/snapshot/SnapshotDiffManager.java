@@ -1166,7 +1166,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @VisibleForTesting
   @SuppressWarnings("checkstyle:ParameterNumber")
   public Set<String> getDeltaFiles(
       OmSnapshot fromSnapshot, OmSnapshot toSnapshot,

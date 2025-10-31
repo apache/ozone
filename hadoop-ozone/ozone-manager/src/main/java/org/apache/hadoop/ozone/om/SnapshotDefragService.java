@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -99,7 +101,6 @@ public class SnapshotDefragService extends BackgroundService
   // Use only a single thread for snapshot defragmentation to avoid conflicts
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
   private static final String CHECKPOINT_STATE_DEFRAGGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
-  private static final String TEMP_DIFF_DIR = "tempDiffSstFiles";  // TODO: Put this in OzoneConsts?
 
   private final OzoneManager ozoneManager;
   // Number of snapshots to be processed in a single iteration
@@ -214,8 +215,8 @@ public class SnapshotDefragService extends BackgroundService
   /**
    * Processes the checkpoint DB: deletes unwanted ranges and compacts.
    */
-  private void processCheckpointDb(String defraggedDbPath, String checkpointDirName,
-      RocksDatabase originalDb, SnapshotInfo snapshotInfo) {
+  private void processCheckpointDb(
+      String checkpointDirName, RocksDatabase originalDb, SnapshotInfo snapshotInfo) throws IOException {
     // Step 2: Create checkpoint MetadataManager after taking a checkpoint
     LOG.info("Step 2: Opening checkpoint DB for defragmentation. checkpointDirName = {}", checkpointDirName);
 
@@ -268,8 +269,11 @@ public class SnapshotDefragService extends BackgroundService
           updateSnapshotMetadataAfterDefrag(rdbStore, snapshotInfo);
         }
       }
+    } catch (IOException e) {
+      throw new IOException("Failed to process checkpoint DB", e);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      // Handle Exception from AutoCloseable.close()
+      throw new IOException("Failed to process checkpoint DB", e);
     }
   }
 
@@ -289,12 +293,11 @@ public class SnapshotDefragService extends BackgroundService
   private void performFullDefragmentation(SnapshotInfo snapshotInfo,
       OmSnapshot omSnapshot) throws IOException {
 
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), snapshotInfo);
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
 
     // For defraggedDbPath, we need to go up to the parent directory and use checkpointStateDefragged
-    String parentDir = Paths.get(snapshotPath).getParent().getParent().getParent().toString();
-    String checkpointDirName = Paths.get(snapshotPath).getFileName().toString();
+    String parentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
+    String checkpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
     // TODO: Append version number to defraggedDbPath after defrag. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
     String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
 
@@ -305,6 +308,9 @@ public class SnapshotDefragService extends BackgroundService
     // Get snapshot checkpoint DB
     RDBStore originalStore = (RDBStore) omSnapshot.getMetadataManager().getStore();
     RocksDatabase originalDb = originalStore.getDb();
+    if (originalDb == null) {
+      throw new IOException("Failed to get RocksDatabase from original snapshot store");
+    }
     assert !originalDb.isClosed();
 
     try {
@@ -319,7 +325,7 @@ public class SnapshotDefragService extends BackgroundService
       }
 
       // Steps 2-6: Process checkpoint DB (delete ranges and compact)
-      processCheckpointDb(defraggedDbPath, checkpointDirName, originalDb, snapshotInfo);
+      processCheckpointDb(checkpointDirName, originalDb, snapshotInfo);
 
       LOG.info("Successfully completed full defragmentation for snapshot: {}",
           snapshotInfo.getName());
@@ -340,20 +346,15 @@ public class SnapshotDefragService extends BackgroundService
       SnapshotInfo previousDefraggedSnapshot, OmSnapshot currentOmSnapshot)
       throws IOException {
 
-    String currentSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), currentSnapshot);
-    String previousSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), previousDefraggedSnapshot);
-
     // Fix path construction similar to performFullDefragmentation
-    String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().getParent().toString();
-    String previousCheckpointDirName = Paths.get(previousSnapshotPath).getFileName().toString();
+    String previousParentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
+    String previousCheckpointDirName = OM_DB_NAME + previousDefraggedSnapshot.getCheckpointDirName();
     // TODO: Append version number
     String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         previousCheckpointDirName).toString();
 
-    String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().getParent().toString();
-    String currentCheckpointDirName = Paths.get(currentSnapshotPath).getFileName().toString();
+    String currentParentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
+    String currentCheckpointDirName = OM_DB_NAME + currentSnapshot.getCheckpointDirName();
     // TODO: Append version number as well. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
     String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         currentCheckpointDirName).toString();
@@ -392,6 +393,9 @@ public class SnapshotDefragService extends BackgroundService
         }
         RDBStore prevStore = (RDBStore) prevSnapshot.getMetadataManager().getStore();
         RocksDatabase prevDb = prevStore.getDb();
+        if (prevDb == null) {
+          throw new IOException("Failed to get RocksDatabase from previous defragmented snapshot store");
+        }
         assert !prevDb.isClosed();
 
         try (RocksDatabase.RocksCheckpoint checkpoint = prevDb.createCheckpoint()) {
@@ -400,8 +404,6 @@ public class SnapshotDefragService extends BackgroundService
         }
       }
 
-      final String volumeName = currentSnapshot.getVolumeName();
-      final String bucketName = currentSnapshot.getBucketName();
       OzoneConfiguration conf = ozoneManager.getConfiguration();
       final int maxOpenSstFilesInSnapshotDb = conf.getInt(
           OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
@@ -464,12 +466,11 @@ public class SnapshotDefragService extends BackgroundService
     long totalChanges = 0;
 
     // Create temporary directory for SST files
-    String currentSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), currentSnapshot);
-    String parentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
-    String tempSstDir = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, TEMP_DIFF_DIR).toString();
-    String diffDir = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, "deltaFilesDiff-" +
-        UUID.randomUUID()).toString();
+    String parentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
+    String omSnapshotDir = Paths.get(parentDir, OM_SNAPSHOT_DIR).toString();
+    String tempSstDir = Paths.get(omSnapshotDir, OzoneConsts.TEMP_DIFF_SST_FILES_DIR).toString();
+    String diffDir = Paths.get(omSnapshotDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
+        "deltaFilesDiff-" + UUID.randomUUID()).toString();
 
     try {
       Files.createDirectories(Paths.get(tempSstDir));
@@ -501,9 +502,15 @@ public class SnapshotDefragService extends BackgroundService
         // Get table references for target database
         RDBStore targetRdbStore = (RDBStore) targetStore;
         RocksDatabase targetDb = targetRdbStore.getDb();
+        if (targetDb == null) {
+          throw new IOException("Failed to get RocksDatabase from target store");
+        }
 
         RDBStore previousDefraggedStore = (RDBStore) targetStore; // The previous defragged DB is our target base
         RocksDatabase previousDefraggedDb = previousDefraggedStore.getDb();
+        if (previousDefraggedDb == null) {
+          throw new IOException("Failed to get RocksDatabase from previous defragmented store");
+        }
 
         // Process each column family
         for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
@@ -799,7 +806,7 @@ public class SnapshotDefragService extends BackgroundService
               cfName, fullCheckErrors, fullCheckCount);
         }
 
-      } catch (Exception e) {
+      } catch (IOException e) {
         LOG.error("Error during verification of column family {} for snapshot {}: {}",
             cfName, snapshotInfo.getName(), e.getMessage(), e);
         verificationPassed = false;
@@ -936,12 +943,10 @@ public class SnapshotDefragService extends BackgroundService
                 snapshotToDefrag, previousDefraggedSnapshot, omSnapshot);
           }
 
-          // TODO: Update snapshot metadata here?
-
           // Close and evict the original snapshot DB from SnapshotCache
-          // TODO: Implement proper eviction from SnapshotCache
-          LOG.info("Defragmentation completed for snapshot: {}",
-              snapshotToDefrag.getName());
+          // TODO: Check if there are any SnapshotCache clean up to be done?
+
+          LOG.info("Defragmentation completed for snapshot: {}", snapshotToDefrag.getName());
 
           snapshotLimit--;
           snapshotsDefraggedCount.getAndIncrement();
@@ -953,6 +958,7 @@ public class SnapshotDefragService extends BackgroundService
           } else {
             LOG.error("OMException during snapshot defragmentation for: {}",
                 snapshotToDefrag.getName(), ome);
+            return false;
           }
         }
 

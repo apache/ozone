@@ -29,9 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -143,8 +145,8 @@ public class TestSnapshotDefragService {
 
       try (OzoneOutputStream outputStream = bucket.createKey(keyName, data.length(),
           StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-          java.util.Collections.emptyMap(), java.util.Collections.emptyMap())) {
-        outputStream.write(data.getBytes());
+          Collections.emptyMap(), Collections.emptyMap())) {
+        outputStream.write(data.getBytes(StandardCharsets.UTF_8));
       }
     }
     LOG.info("Created {} keys in bucket {}/{}", keyCount, volumeName, bucketName);
