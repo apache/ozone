@@ -40,7 +40,6 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
-@SuppressWarnings("PMD.UnusedReturnedValue")
 public class FollowerReader extends BaseFreonGenerator
     implements Callable<Void> {
 
@@ -88,7 +87,7 @@ public class FollowerReader extends BaseFreonGenerator
   private void readKeySize(long counter) throws Exception {
     int clientIdx = (int) (counter % rpcClients.size());
     timer.time(() -> {
-      rpcClients.get(clientIdx).getObjectStore().getVolume(volumeName)
+      long unused = rpcClients.get(clientIdx).getObjectStore().getVolume(volumeName)
           .getBucket(bucketName).getKey(keyName).getDataSize();
       return null;
     });
