@@ -98,7 +98,7 @@ public class TestSnapshotDefragService {
 
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 3000000);
-    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 5);
+    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 1);  // TODO: Increase this to 3
 
     conf.setQuietMode(false);
 
@@ -351,7 +351,7 @@ public class TestSnapshotDefragService {
 
     // Wait for the service to process snapshots
     try {
-      await(30000, 1000, () -> {
+      await(20000, 1000, () -> {
         long currentCount = defragService.getSnapshotsDefraggedCount().get();
         LOG.info("Current defragmented count: {}", currentCount);
         return currentCount > initialDefragCount;

@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
@@ -149,9 +151,6 @@ public class SnapshotDefragService extends BackgroundService
    */
   @VisibleForTesting
   public boolean needsDefragmentation(SnapshotInfo snapshotInfo) {
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), snapshotInfo);
-
     try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
              ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
@@ -171,8 +170,107 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   /**
+   * Returns a lexicographically higher string by appending a byte with maximum value.
+   * For example, "/" -> "/\xFF"
+   */
+  private String getLexicographicallyHigherString(String str) {
+    return str + "\uFFFF";
+  }
+
+  /**
+   * Deletes unwanted key ranges from a column family.
+   * Deletes ranges: ["", prefix) and [lexHigher(prefix), lexHigher("/")]
+   */
+  private void deleteUnwantedRanges(RocksDatabase db, RocksDatabase.ColumnFamily cf,
+      String prefix, String cfName) throws RocksDatabaseException {
+    if (cf == null) {
+      LOG.warn("Column family {} not found, skipping range deletion", cfName);
+      return;
+    }
+
+    try (ManagedWriteBatch writeBatch = new ManagedWriteBatch()) {
+      // Delete range ["", prefix)
+      byte[] emptyKey = "".getBytes(StandardCharsets.UTF_8);
+      byte[] prefixBytes = prefix.getBytes(StandardCharsets.UTF_8);
+      cf.batchDeleteRange(writeBatch, emptyKey, prefixBytes);
+
+      // Delete range [lexicographicalHigherString(prefix), lexicographicalHigherString("/")]
+      String highPrefixStr = getLexicographicallyHigherString(prefix);
+      byte[] highPrefix = highPrefixStr.getBytes(StandardCharsets.UTF_8);
+      byte[] highSlash = getLexicographicallyHigherString("/").getBytes(StandardCharsets.UTF_8);
+      cf.batchDeleteRange(writeBatch, highPrefix, highSlash);
+
+      db.batchWrite(writeBatch);
+      LOG.info("Deleted unwanted ranges from {}", cfName);
+    }
+  }
+
+  /**
+   * Processes the checkpoint DB: deletes unwanted ranges and compacts.
+   */
+  private void processCheckpointDb(String defraggedDbPath, String checkpointDirName,
+      RocksDatabase originalDb, SnapshotInfo snapshotInfo) throws IOException, RocksDatabaseException {
+    // Step 2: Create checkpoint MetadataManager after taking a checkpoint
+    LOG.info("Step 2: Opening checkpoint DB for defragmentation");
+    DBStoreBuilder checkpointDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
+        .setName(checkpointDirName)
+        .setPath(Paths.get(defraggedDbPath).getParent())
+        .setCreateCheckpointDirs(false);
+
+    // Add all the tracked column families. TODO: Remove all other CFs
+    for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
+      checkpointDbBuilder.addTable(cfName);
+    }
+
+    // Build the checkpoint database
+    try (RDBStore checkpointStore = checkpointDbBuilder.build()) {
+      try (RocksDatabase checkpointDb = checkpointStore.getDb()) {
+        LOG.info("Opened checkpoint DB for defragmentation");
+
+        // Step 3-5: DeleteRange from tables
+        LOG.info("Step 3: Deleting unwanted ranges from KeyTable");
+        deleteUnwantedRanges(checkpointDb, checkpointDb.getColumnFamily(KEY_TABLE),
+            OM_KEY_PREFIX, KEY_TABLE);
+
+        LOG.info("Step 4: Deleting unwanted ranges from DirectoryTable");
+        deleteUnwantedRanges(checkpointDb, checkpointDb.getColumnFamily(DIRECTORY_TABLE),
+            OM_KEY_PREFIX, DIRECTORY_TABLE);
+
+        LOG.info("Step 5: Deleting unwanted ranges from FileTable");
+        deleteUnwantedRanges(checkpointDb, checkpointDb.getColumnFamily(FILE_TABLE),
+            OM_KEY_PREFIX, FILE_TABLE);
+
+        // Step 6: Force compact all tables in the checkpoint
+        LOG.info("Step 6: Force compacting all tables in checkpoint DB");
+        try (ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions()) {
+          compactOptions.setChangeLevel(true);
+          compactOptions.setBottommostLevelCompaction(
+              ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+          checkpointDb.compactDB(compactOptions);
+        }
+        LOG.info("Completed force compaction of all tables");
+
+        // Verify defrag DB integrity
+        verifyDbIntegrity(originalDb, checkpointDb, snapshotInfo);
+
+        // Update snapshot metadata to mark defragmentation as complete
+        updateSnapshotMetadataAfterDefrag(checkpointStore, snapshotInfo);
+      }
+    }
+  }
+
+  /**
    * Performs full defragmentation for the first snapshot in the chain.
-   * This is a simplified implementation that demonstrates the concept.
+   * Steps:
+   * 1. Take checkpoint of current DB
+   * 2. Create checkpoint MetadataManager after taking a checkpoint
+   * 3. DeleteRange KeyTable from ["", keyTablePrefix) +
+   *    [lexicographicalHigherString(keyTablePrefix), lexicographicalHigherString("/")]
+   * 4. DeleteRange DirectoryTable from ["", FSOPrefix) +
+   *    [lexicographicalHigherString(FSOPrefix), lexicographicalHigherString("/")]
+   * 5. DeleteRange FileTable from ["", FSOPrefix) +
+   *    [lexicographicalHigherString(FSOPrefix), lexicographicalHigherString("/")]
+   * 6. Force compact all tables in the checkpoint.
    */
   private void performFullDefragmentation(SnapshotInfo snapshotInfo,
       OmSnapshot omSnapshot) throws IOException {
@@ -181,8 +279,9 @@ public class SnapshotDefragService extends BackgroundService
         ozoneManager.getConfiguration(), snapshotInfo);
 
     // For defraggedDbPath, we need to go up to the parent directory and use checkpointStateDefragged
-    String parentDir = Paths.get(snapshotPath).getParent().getParent().toString();
+    String parentDir = Paths.get(snapshotPath).getParent().getParent().getParent().toString();
     String checkpointDirName = Paths.get(snapshotPath).getFileName().toString();
+    // TODO: Append version number to defraggedDbPath after defrag. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
     String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
 
     LOG.info("Starting full defragmentation for snapshot: {} at path: {}",
@@ -190,113 +289,44 @@ public class SnapshotDefragService extends BackgroundService
     LOG.info("Target defragmented DB path: {}", defraggedDbPath);
 
     // Create defragmented directory
-    Files.createDirectories(Paths.get(defraggedDbPath));
+//    Files.createDirectories(Paths.get(defraggedDbPath));
 
-    // TODO: Get snapshot checkpoint DB via SnapshotCache
+    // Get snapshot checkpoint DB
     RDBStore originalStore = (RDBStore) omSnapshot.getMetadataManager().getStore();
     RocksDatabase originalDb = originalStore.getDb();
+//    assert !originalDb.isClosed();
 
-    LOG.info("Starting defragmentation process for snapshot: {}", snapshotInfo.getName());
-    LOG.info("Original DB path: {}", snapshotPath);
-    LOG.info("Defragmented DB path: {}", defraggedDbPath);
+    // Open the original snapshot DB directly from filesystem to ensure it's initialized
+//    LOG.info("Opening original snapshot DB from path: {}", snapshotPath);
+//    DBStoreBuilder originalDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
+//        .setName(checkpointDirName)
+//        .setPath(Paths.get(snapshotPath).getParent())
+//        .setOpenReadOnly(true)
+//        .setCreateCheckpointDirs(false);
+//
+//    // Add all the tracked column families
+//    for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
+//      originalDbBuilder.addTable(cfName);
+//    }
 
-    // Implement actual RocksDB defragmentation
     try {
-      // 1. Create a new RocksDB instance at defraggedDbPath
-      DBStoreBuilder defraggedDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
-          .setName(checkpointDirName)
-          .setPath(Paths.get(defraggedDbPath).getParent())
-          .setCreateCheckpointDirs(false);
+      LOG.info("Starting defragmentation process for snapshot: {}", snapshotInfo.getName());
+      LOG.info("Defragmented DB path: {}", defraggedDbPath);
 
-      // Add all the tracked column families to the new DB
-      for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
-        defraggedDbBuilder.addTable(cfName);
-        LOG.debug("Added column family {} to defragmented DB", cfName);
+      // Step 1: Take checkpoint of current DB
+      LOG.info("Step 1: Creating checkpoint from original DB to defragmented path");
+//      DBCheckpoint dbCheckpoint = originalStore.getCheckpoint(defraggedDbPath, true);
+//      LOG.info("Created checkpoint at: {}. dbCheckpoint = {}", defraggedDbPath, dbCheckpoint);
+      try (RocksDatabase.RocksCheckpoint checkpoint = originalDb.createCheckpoint()) {
+        checkpoint.createCheckpoint(Paths.get(defraggedDbPath));
+        LOG.info("Created checkpoint at: {}", defraggedDbPath);
       }
 
-      // Build the new defragmented database
-      DBStore defraggedStore = defraggedDbBuilder.build();
-      RocksDatabase defraggedDb = ((RDBStore) defraggedStore).getDb();
+      // Steps 2-6: Process checkpoint DB (delete ranges and compact)
+      processCheckpointDb(defraggedDbPath, checkpointDirName, originalDb, snapshotInfo);
 
-      LOG.info("Created new defragmented DB instance for snapshot: {}", snapshotInfo.getName());
-
-      // 2. & 3. Iterate through tracked column families and copy all key-value pairs
-      long totalKeysCopied = 0;
-      for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
-        LOG.info("Starting defragmentation of column family: {} for snapshot: {}",
-            cfName, snapshotInfo.getName());
-
-        RocksDatabase.ColumnFamily originalCf = originalDb.getColumnFamily(cfName);
-        RocksDatabase.ColumnFamily defraggedCf = defraggedDb.getColumnFamily(cfName);
-
-        if (originalCf == null) {
-          LOG.warn("Column family {} not found in original DB, skipping", cfName);
-          continue;
-        }
-
-        if (defraggedCf == null) {
-          LOG.warn("Column family {} not found in defragmented DB, skipping", cfName);
-          continue;
-        }
-
-        long cfKeysCopied = 0;
-        try (ManagedWriteBatch writeBatch = new ManagedWriteBatch();
-             ManagedRocksIterator iterator = originalDb.newIterator(originalCf)) {
-
-          iterator.get().seekToFirst();
-
-          while (iterator.get().isValid()) {
-            byte[] key = iterator.get().key();
-            byte[] value = iterator.get().value();
-
-            // Add to batch for efficient writing
-            defraggedCf.batchPut(writeBatch, key, value);
-            cfKeysCopied++;
-
-            // Commit batch every 1000 keys to avoid memory issues
-            if (cfKeysCopied % 1000 == 0) {
-              defraggedDb.batchWrite(writeBatch);
-              writeBatch.clear();
-              LOG.debug("Copied {} keys for column family {} so far", cfKeysCopied, cfName);
-            }
-
-            iterator.get().next();
-          }
-
-          // Commit any remaining keys in the batch
-          if (writeBatch.count() > 0) {
-            defraggedDb.batchWrite(writeBatch);
-          }
-
-          totalKeysCopied += cfKeysCopied;
-          LOG.info("Completed copying {} keys for column family: {} in snapshot: {}",
-              cfKeysCopied, cfName, snapshotInfo.getName());
-        }
-      }
-
-      LOG.info("Copied total of {} keys across all column families for snapshot: {}",
-          totalKeysCopied, snapshotInfo.getName());
-
-      // 4. Perform compaction on the new DB to ensure it's fully defragmented
-      LOG.info("Starting compaction of defragmented DB for snapshot: {}", snapshotInfo.getName());
-      try (ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions()) {
-        compactOptions.setChangeLevel(true);
-        compactOptions.setTargetLevel(1);
-        defraggedDb.compactDB(compactOptions);
-      }
-      LOG.info("Completed compaction of defragmented DB for snapshot: {}", snapshotInfo.getName());
-
-      // 5. Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
-      verifyDbIntegrity(originalDb, defraggedDb, snapshotInfo);
-
-      // 6. Create a new version in YAML metadata, which also indicates that the defragmentation is complete
-      updateSnapshotMetadataAfterDefrag((RDBStore) defraggedStore, snapshotInfo);
-
-      // Close the defragmented DB
-      defraggedStore.close();
-
-      LOG.info("Successfully completed full defragmentation for snapshot: {} with {} keys copied",
-          snapshotInfo.getName(), totalKeysCopied);
+      LOG.info("Successfully completed full defragmentation for snapshot: {}",
+          snapshotInfo.getName());
 
     } catch (RocksDatabaseException e) {
       LOG.error("RocksDB error during defragmentation of snapshot: {}", snapshotInfo.getName(), e);
@@ -322,11 +352,13 @@ public class SnapshotDefragService extends BackgroundService
     // Fix path construction similar to performFullDefragmentation
     String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().toString();
     String previousCheckpointDirName = Paths.get(previousSnapshotPath).getFileName().toString();
+    // TODO: Append version number
     String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         previousCheckpointDirName).toString();
 
     String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
     String currentCheckpointDirName = Paths.get(currentSnapshotPath).getFileName().toString();
+    // TODO: Append version number as well. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
     String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         currentCheckpointDirName).toString();
 
@@ -373,8 +405,8 @@ getDefaultDBOptions(397)) - Error trying to use dbOptions from file: null
         previousDbBuilder.addTable(cfName);
       }
 
-      try (DBStore previousDefraggedStore = previousDbBuilder.build()) {
-        RocksDatabase previousDefraggedDb = ((RDBStore) previousDefraggedStore).getDb();
+      try (RDBStore previousDefraggedStore = previousDbBuilder.build()) {
+        RocksDatabase previousDefraggedDb = previousDefraggedStore.getDb();
 
         // Create checkpoint directly at the target location
         try (RocksDatabase.RocksCheckpoint checkpoint = previousDefraggedDb.createCheckpoint()) {
@@ -395,8 +427,8 @@ getDefaultDBOptions(397)) - Error trying to use dbOptions from file: null
       }
 
       // Build DB from the checkpoint
-      DBStore currentDefraggedStore = currentDbBuilder.build();
-      RocksDatabase currentDefraggedDb = ((RDBStore) currentDefraggedStore).getDb();
+      RDBStore currentDefraggedStore = currentDbBuilder.build();
+      RocksDatabase currentDefraggedDb = currentDefraggedStore.getDb();
 
       LOG.info("Opened checkpoint as working defragmented DB for incremental update");
 
@@ -424,7 +456,7 @@ getDefaultDBOptions(397)) - Error trying to use dbOptions from file: null
       verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshot);
 
       // 6. Create a new version in YAML metadata, which also indicates that the defragmentation is complete
-      updateSnapshotMetadataAfterDefrag((RDBStore) currentDefraggedStore, currentSnapshot);
+      updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshot);
 
       // Close the defragmented DB. TODO: Close in finally block instead
       currentDefraggedStore.close();

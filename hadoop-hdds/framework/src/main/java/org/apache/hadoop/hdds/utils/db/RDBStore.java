@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
@@ -66,6 +67,7 @@ public class RDBStore implements DBStore {
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
   private final String snapshotsParentDir;
+  private final String defraggedSnapshotsParentDir;
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
 
@@ -133,6 +135,7 @@ public class RDBStore implements DBStore {
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
         snapshotsParentDir = null;
+        defraggedSnapshotsParentDir = null;
       } else {
         Path checkpointsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
@@ -143,6 +146,12 @@ public class RDBStore implements DBStore {
             Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
         Files.createDirectories(snapshotsParentDirPath);
+
+        // TODO: Put this behind a feature flag
+        Path defraggedSnapshotsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR);
+        defraggedSnapshotsParentDir = defraggedSnapshotsParentDirPath.toString();
+        Files.createDirectories(defraggedSnapshotsParentDirPath);
       }
 
       if (enableCompactionDag) {

@@ -520,7 +520,8 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "checkpointState";
-  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = "checkpointStateDefragged";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointStateDefragged";
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
 
