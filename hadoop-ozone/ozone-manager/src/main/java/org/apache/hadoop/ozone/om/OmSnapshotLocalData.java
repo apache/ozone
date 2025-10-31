@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.util.WithChecksum;
 import org.apache.ozone.compaction.log.SstFileInfo;
@@ -63,6 +64,9 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Previous snapshotId based on which the snapshot local data is built.
   private UUID previousSnapshotId;
 
+  // Stores the transactionInfo corresponding to OM when the snaphot is purged.
+  private TransactionInfo transactionInfo;
+
   // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
   // checksum computation.
   private final LinkedHashMap<Integer, VersionMeta> versionSstFileInfos;
@@ -73,7 +77,8 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId,
+      TransactionInfo transactionInfo) {
     this.snapshotId = snapshotId;
     this.isSSTFiltered = false;
     this.lastDefragTime = 0L;
@@ -83,6 +88,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
         new VersionMeta(0, notDefraggedSSTFileList.stream().map(SstFileInfo::new).collect(Collectors.toList())));
     this.version = 0;
     this.previousSnapshotId = previousSnapshotId;
+    this.transactionInfo = transactionInfo;
     setChecksumTo0ByteArray();
   }
 
@@ -101,6 +107,15 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
     this.previousSnapshotId = source.previousSnapshotId;
     this.versionSstFileInfos = new LinkedHashMap<>();
     setVersionSstFileInfos(source.versionSstFileInfos);
+    this.transactionInfo = source.transactionInfo;
+  }
+
+  public TransactionInfo getTransactionInfo() {
+    return transactionInfo;
+  }
+
+  public void setTransactionInfo(TransactionInfo transactionInfo) {
+    this.transactionInfo = transactionInfo;
   }
 
   /**
