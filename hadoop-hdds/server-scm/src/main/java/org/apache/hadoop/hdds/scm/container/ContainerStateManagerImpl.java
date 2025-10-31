@@ -380,8 +380,6 @@ public final class ContainerStateManagerImpl
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
         
         // Synchronize sequenceId first
-        LOG.info("Testing Sequence id change, SeqID from raft: {}, SeqId from container{}",
-            sequenceId, containerInfo.getSequenceId());
         if (containerInfo.getSequenceId() < sequenceId) {
           containerInfo.updateSequenceId(sequenceId);
         }
