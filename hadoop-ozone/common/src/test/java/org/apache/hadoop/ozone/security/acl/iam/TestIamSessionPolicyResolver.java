@@ -816,6 +816,59 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testObjectResourceWithPrefixWildcard() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:GetObject\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::myBucket/file*\"\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromNativeAuthorizer =
+        IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> resolvedFromRangerAuthorizer =
+        IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedNative =
+        new LinkedHashSet<>();
+
+    // Expected for native: READ acl on prefix "file" under bucket
+    final Set<IOzoneObj> keyPrefixSet = objSet(prefix("myBucket", "file"));
+
+    final Set<ACLType> prefixAcls = acls(READ);
+
+    expectedResolvedNative.add(new AbstractMap.SimpleImmutableEntry<>(keyPrefixSet, prefixAcls));
+
+    // Native authorizer assertion
+    assertThat(resolvedFromNativeAuthorizer.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    ).isEqualTo(expectedResolvedNative.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    );
+
+    final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> expectedResolvedRanger =
+        new LinkedHashSet<>();
+
+    // Expected for Ranger: READ acl on key "file*"
+    final Set<IOzoneObj> rangerKeySet = objSet(key("myBucket", "file*"));
+
+    expectedResolvedRanger.add(new AbstractMap.SimpleImmutableEntry<>(rangerKeySet, prefixAcls));
+
+    // Ranger authorizer assertion
+    assertThat(resolvedFromRangerAuthorizer.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    ).isEqualTo(expectedResolvedRanger.stream()
+        .map(TestIamSessionPolicyResolver::stringifyEntry)
+        .collect(Collectors.toSet())
+    );
+  }
+
+  @Test
   public void testBucketActionOnAllResources() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
