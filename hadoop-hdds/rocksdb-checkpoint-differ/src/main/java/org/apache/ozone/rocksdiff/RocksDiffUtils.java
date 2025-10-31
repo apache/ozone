@@ -30,6 +30,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +107,7 @@ public final class RocksDiffUtils {
   }
 
   @VisibleForTesting
-  static boolean shouldSkipNode(CompactionNode node,
+  static boolean shouldSkipNode(SstFileInfo node,
                                 Map<String, String> columnFamilyToPrefixMap) {
     // This is for backward compatibility. Before the compaction log table
     // migration, startKey, endKey and columnFamily information is not persisted
