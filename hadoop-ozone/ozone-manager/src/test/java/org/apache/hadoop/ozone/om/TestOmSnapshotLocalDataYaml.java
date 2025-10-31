@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
