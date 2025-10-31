@@ -264,15 +264,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles,
-      boolean defragged) throws IOException {
+      int snapshotLocalDataVersion) throws IOException {
     try {
       lock = new OmReadOnlyLock();
       hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
       omEpoch = 0;
       String snapshotDir = OMStorage.getOmDbDir(conf) + OM_KEY_PREFIX +
-          (defragged ? OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR : OM_SNAPSHOT_CHECKPOINT_DIR);
+          (snapshotLocalDataVersion <= 0 ? OM_SNAPSHOT_CHECKPOINT_DIR : OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR);
       File metaDir = new File(snapshotDir);
       String dbName = OM_DB_NAME + snapshotDirName;
+      if (snapshotLocalDataVersion > 0) {
+        dbName += OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + snapshotLocalDataVersion;
+      }
       checkSnapshotDirExist(Paths.get(metaDir.toPath().toString(), dbName).toFile());
       final boolean enableRocksDBMetrics = conf.getBoolean(
           OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,

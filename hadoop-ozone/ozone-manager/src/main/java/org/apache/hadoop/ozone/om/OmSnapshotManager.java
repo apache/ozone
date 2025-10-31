@@ -102,6 +102,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -415,8 +416,9 @@ public final class OmSnapshotManager implements AutoCloseable {
                 "' with txnId : '" + TransactionInfo.fromByteString(snapshotInfo.getCreateTransactionInfo()) +
                 "' has not been flushed yet. Please wait a few more seconds before retrying", TIMEOUT);
           }
+          int snapshotLocalDataVersion = OmSnapshotUtils.getLocalDataVersion(ozoneManager, snapshotInfo);
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb, false);
+              snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb, snapshotLocalDataVersion);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
           throw e;
