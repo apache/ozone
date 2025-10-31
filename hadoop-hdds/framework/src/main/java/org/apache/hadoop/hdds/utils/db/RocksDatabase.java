@@ -159,8 +159,9 @@ public final class RocksDatabase implements Closeable {
     List<ColumnFamilyDescriptor> descriptors = null;
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
+    List<TableConfig> extra = null;
     try {
-      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
+      extra = getExtraColumnFamilies(dbFile, families);
       descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
@@ -178,6 +179,10 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
       throw toRocksDatabaseException(RocksDatabase.class, "open " + dbFile, e);
+    } finally {
+      if (extra != null) {
+        extra.forEach(TableConfig::close);
+      }
     }
   }
 
