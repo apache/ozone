@@ -573,6 +573,19 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       }
     }
 
+    public boolean needsDefrag() {
+      if (snapshotLocalData.getNeedsDefrag()) {
+        return true;
+      }
+      if (resolvedPreviousSnapshotId != null) {
+        int snapshotVersion = snapshotLocalData.getVersion();
+        int previousResolvedSnapshotVersion = snapshotLocalData.getVersionSstFileInfos().get(snapshotVersion)
+            .getPreviousSnapshotVersion();
+        return previousResolvedSnapshotVersion < getVersionNodeMap().get(resolvedPreviousSnapshotId).getVersion();
+      }
+      return false;
+    }
+
     @Override
     public void close() throws IOException {
       if (previousLock != null) {
@@ -640,6 +653,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         if (existingVersionsMeta == null || !Objects.equals(versionsToBeAdded.getPreviousSnapshotId(),
             existingVersionsMeta.getPreviousSnapshotId())) {
           setDirty();
+          // Set the needsDefrag if the new previous snapshotId is different from the existing one or if this is a new
+          // snapshot yaml file.
+          snapshotLocalData.setNeedsDefrag(true);
         }
         return versionsToBeAdded;
       } finally {
@@ -652,6 +668,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
           previousSnapshotLocalData.getVersion());
+      this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.
       setDirty();
     }

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -431,6 +432,32 @@ public class TestOmSnapshotLocalDataManager {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testWriteWithChainUpdate(boolean previousSnapshotExisting) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 3 + (previousSnapshotExisting ? 1 : 0));
+    int snapshotIdx = 1 + (previousSnapshotExisting ? 1 : 0);
+    for (UUID snapshotId : snapshotIds) {
+      addVersionsToLocalData(localDataManager, snapshotId, ImmutableMap.of(1, 1));
+    }
+
+    UUID snapshotId = snapshotIds.get(snapshotIdx);
+    UUID toUpdatePreviousSnapshotId = snapshotIdx - 2 >= 0 ? snapshotIds.get(snapshotIdx - 2) : null;
+
+    try (WritableOmSnapshotLocalDataProvider snap =
+             localDataManager.getWritableOmSnapshotLocalData(snapshotId, toUpdatePreviousSnapshotId)) {
+      assertFalse(snap.needsDefrag());
+      snap.commit();
+      assertTrue(snap.needsDefrag());
+    }
+    try (ReadableOmSnapshotLocalDataProvider snap =
+             localDataManager.getOmSnapshotLocalData(snapshotId)) {
+      assertEquals(toUpdatePreviousSnapshotId, snap.getSnapshotLocalData().getPreviousSnapshotId());
+      assertTrue(snap.needsDefrag());
+    }
+  }
+
   /**
    * Validates write-time version propagation and removal rules when the previous
    * snapshot already has a concrete version recorded.
@@ -532,6 +559,26 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3})
+  public void testNeedsDefrag(int previousVersion) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    for (UUID snapshotId : snapshotIds) {
+      try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotId)) {
+        assertTrue(snap.needsDefrag());
+      }
+    }
+    addVersionsToLocalData(localDataManager, snapshotIds.get(0), ImmutableMap.of(1, 1, 2, 2, 3, 3));
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(0))) {
+      assertFalse(snap.needsDefrag());
+    }
+    addVersionsToLocalData(localDataManager, snapshotIds.get(1), ImmutableMap.of(1, 3, 2, previousVersion));
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(1))) {
+      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().getVersion(), snap.needsDefrag());
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testVersionResolution(boolean read) throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
@@ -629,6 +676,8 @@ public class TestOmSnapshotLocalDataManager {
       OmSnapshotLocalData.VersionMeta expectedVersionMeta =
           new OmSnapshotLocalData.VersionMeta(0, sstFileInfos);
       assertEquals(expectedVersionMeta, versionMeta);
+      // New Snapshot create needs to be defragged always.
+      assertTrue(snapshotLocalData.needsDefrag());
     }
   }
 
