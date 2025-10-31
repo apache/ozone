@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
@@ -101,6 +102,7 @@ public class SnapshotDefragService extends BackgroundService
   // Use only a single thread for snapshot defragmentation to avoid conflicts
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
   private static final String CHECKPOINT_STATE_DEFRAGGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
+  private static final String VERSION_SUFFIX_PREFIX = "-v";
 
   private final OzoneManager ozoneManager;
   // Number of snapshots to be processed in a single iteration
@@ -158,7 +160,7 @@ public class SnapshotDefragService extends BackgroundService
    */
   @VisibleForTesting
   public boolean needsDefragmentation(SnapshotInfo snapshotInfo) {
-    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
+    try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
              ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
       OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
@@ -173,6 +175,29 @@ public class SnapshotDefragService extends BackgroundService
       LOG.warn("Failed to read YAML metadata for snapshot {}, assuming defrag needed",
           snapshotInfo.getName(), e);
       return true;
+    }
+  }
+
+  /**
+   * Retrieves the local data version for the given snapshot.
+   * <p>
+   * The version is read from the snapshot's local data YAML metadata file.
+   * This version is used to track the state of defragmentation operations
+   * on the snapshot.
+   *
+   * @param snapshotInfo SnapshotInfo object
+   * @return the version number from the snapshot's local data, or 0 if the
+   *         metadata cannot be read
+   */
+  int getLocalDataVersion(SnapshotInfo snapshotInfo) {
+    try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
+             ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
+      OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
+      return snapshotLocalData.getVersion();
+    } catch (IOException e) {
+      LOG.warn("Failed to read YAML metadata for snapshot {}, assuming version 0",
+          snapshotInfo.getName(), e);
+      return 0;
     }
   }
 
@@ -235,13 +260,11 @@ public class SnapshotDefragService extends BackgroundService
 
           // Step 3-5: DeleteRange from tables
           final String obsPrefix = defragDbMetadataManager.getOzoneKey(volumeName, bucketName, OM_KEY_PREFIX);
-          // TODO: Double check OBS prefix calculation
           LOG.info("Step 3: Deleting unwanted ranges from KeyTable. obsPrefix = {}", obsPrefix);
           deleteUnwantedRanges(checkpointDb, checkpointDb.getColumnFamily(KEY_TABLE),
               obsPrefix, KEY_TABLE);
 
           final String fsoPrefix = defragDbMetadataManager.getOzoneKeyFSO(volumeName, bucketName, OM_KEY_PREFIX);
-          // TODO: Double check FSO prefix calculation
           LOG.info("Step 4: Deleting unwanted ranges from DirectoryTable. fsoPrefix = {}", fsoPrefix);
           deleteUnwantedRanges(checkpointDb, checkpointDb.getColumnFamily(DIRECTORY_TABLE),
               fsoPrefix, DIRECTORY_TABLE);
@@ -293,14 +316,16 @@ public class SnapshotDefragService extends BackgroundService
   private void performFullDefragmentation(SnapshotInfo snapshotInfo,
       OmSnapshot omSnapshot) throws IOException {
 
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
+    int nextVersion = getLocalDataVersion(snapshotInfo) + 1;
+    String versionSuffix = VERSION_SUFFIX_PREFIX + nextVersion;
 
-    // For defraggedDbPath, we need to go up to the parent directory and use checkpointStateDefragged
+    String checkpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName() + versionSuffix;
+    // parent dir of db.snapshots
     String parentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
-    String checkpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
-    // TODO: Append version number to defraggedDbPath after defrag. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
-    String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
+    String defraggedDbPath =
+        Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
 
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
     LOG.info("Starting full defragmentation for snapshot: {} at path: {}",
         snapshotInfo.getName(), snapshotPath);
     LOG.info("Target defragmented DB path: {}", defraggedDbPath);
@@ -330,6 +355,8 @@ public class SnapshotDefragService extends BackgroundService
       LOG.info("Successfully completed full defragmentation for snapshot: {}",
           snapshotInfo.getName());
 
+      // TODO: Delete old DB, if any
+
     } catch (RocksDatabaseException e) {
       LOG.error("RocksDB error during defragmentation of snapshot: {}", snapshotInfo.getName(), e);
       throw new IOException("Failed to defragment snapshot: " + snapshotInfo.getName(), e);
@@ -342,25 +369,28 @@ public class SnapshotDefragService extends BackgroundService
   /**
    * Performs incremental defragmentation using diff from previous defragmented snapshot.
    */
-  private void performIncrementalDefragmentation(SnapshotInfo currentSnapshot,
-      SnapshotInfo previousDefraggedSnapshot, OmSnapshot currentOmSnapshot)
+  private void performIncrementalDefragmentation(SnapshotInfo currentSnapshotInfo,
+      SnapshotInfo previousSnapshotInfo, OmSnapshot currentOmSnapshot)
       throws IOException {
 
-    // Fix path construction similar to performFullDefragmentation
+    // previous snapshot's current version
+    int previousCurrVersion = getLocalDataVersion(previousSnapshotInfo);
+    String previousVersionSuffix = VERSION_SUFFIX_PREFIX + previousCurrVersion;
+    String previousCheckpointDirName = OM_DB_NAME + previousSnapshotInfo.getCheckpointDirName() + previousVersionSuffix;
     String previousParentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
-    String previousCheckpointDirName = OM_DB_NAME + previousDefraggedSnapshot.getCheckpointDirName();
-    // TODO: Append version number
-    String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
-        previousCheckpointDirName).toString();
+    String previousDefraggedDbPath =
+        Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, previousCheckpointDirName).toString();
 
+    // current snapshot's next version
+    int currentNextVersion = getLocalDataVersion(currentSnapshotInfo) + 1;
+    String currentVersionSuffix = VERSION_SUFFIX_PREFIX + currentNextVersion;
+    String currentCheckpointDirName = OM_DB_NAME + currentSnapshotInfo.getCheckpointDirName() + currentVersionSuffix;
     String currentParentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
-    String currentCheckpointDirName = OM_DB_NAME + currentSnapshot.getCheckpointDirName();
-    // TODO: Append version number as well. e.g. om.db-fef74426-d01b-4c67-b20b-7750376c17dd-v1
-    String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
-        currentCheckpointDirName).toString();
+    String currentDefraggedDbPath =
+        Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, currentCheckpointDirName).toString();
 
     LOG.info("Starting incremental defragmentation for snapshot: {} using previous defragged snapshot: {}",
-        currentSnapshot.getName(), previousDefraggedSnapshot.getName());
+        currentSnapshotInfo.getName(), previousSnapshotInfo.getName());
     LOG.info("Previous defragmented DB: {}", previousDefraggedDbPath);
     LOG.info("Current target DB: {}", currentDefraggedDbPath);
 
@@ -373,7 +403,7 @@ public class SnapshotDefragService extends BackgroundService
         // TODO: Should err and quit instead of falling back to full defrag
         LOG.warn("Previous defragmented DB not found at {}, falling back to full defragmentation",
             previousDefraggedDbPath);
-        performFullDefragmentation(currentSnapshot, currentOmSnapshot);
+        performFullDefragmentation(currentSnapshotInfo, currentOmSnapshot);
         return;
       }
 
@@ -382,13 +412,13 @@ public class SnapshotDefragService extends BackgroundService
 
       final OmSnapshotManager snapshotManager = ozoneManager.getOmSnapshotManager();
       try (UncheckedAutoCloseableSupplier<OmSnapshot> prevSnapshotSupplier =
-               snapshotManager.getSnapshot(previousDefraggedSnapshot.getSnapshotId())) {
-        LOG.info("Opened previous (defragged) snapshot: {}", previousDefraggedSnapshot.getName());
+               snapshotManager.getSnapshot(previousSnapshotInfo.getSnapshotId())) {
+        LOG.info("Opened previous (defragged) snapshot: {}", previousSnapshotInfo.getName());
         OmSnapshot prevSnapshot = prevSnapshotSupplier.get();
         // Sanity check: Ensure previous snapshot is marked as defragmented
-        if (needsDefragmentation(previousDefraggedSnapshot)) {
+        if (needsDefragmentation(previousSnapshotInfo)) {
           LOG.error("Previous snapshot {} is not marked as defragmented. Something is wrong.",
-              previousDefraggedSnapshot.getName());
+              previousSnapshotInfo.getName());
           return;
         }
         RDBStore prevStore = (RDBStore) prevSnapshot.getMetadataManager().getStore();
@@ -421,33 +451,33 @@ public class SnapshotDefragService extends BackgroundService
             RocksDatabase currentSnapshotDb = currentSnapshotStore.getDb();
 
             long incrementalKeysCopied = applyIncrementalChanges(currentSnapshotDb, currentDefraggedStore,
-                currentSnapshot, previousDefraggedSnapshot);
+                currentSnapshotInfo, previousSnapshotInfo);
 
             LOG.info("Applied {} incremental changes for snapshot: {}",
-                incrementalKeysCopied, currentSnapshot.getName());
+                incrementalKeysCopied, currentSnapshotInfo.getName());
 
             // Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
-            verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshot);
+            verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshotInfo);
 
             // Create a new version in YAML metadata, which also indicates that the defragmentation is complete
-            updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshot);
+            updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshotInfo);
 
             LOG.info("Successfully completed incremental defragmentation for snapshot: {} with {} incremental changes",
-                currentSnapshot.getName(), incrementalKeysCopied);
+                currentSnapshotInfo.getName(), incrementalKeysCopied);
+
+            // TODO: Delete old DB, if any
           }
         }
       }
 
     } catch (RocksDatabaseException e) {
       LOG.error("RocksDB error during incremental defragmentation of snapshot: {}",
-          currentSnapshot.getName(), e);
-//      LOG.warn("Falling back to full defragmentation due to error");
-//      performFullDefragmentation(currentSnapshot, currentOmSnapshot);
+          currentSnapshotInfo.getName(), e);
     } catch (Exception e) {
       LOG.error("Unexpected error during incremental defragmentation of snapshot: {}",
-          currentSnapshot.getName(), e);
+          currentSnapshotInfo.getName(), e);
       LOG.warn("Falling back to full defragmentation due to error");
-      performFullDefragmentation(currentSnapshot, currentOmSnapshot);
+      performFullDefragmentation(currentSnapshotInfo, currentOmSnapshot);
     }
   }
 
