@@ -550,26 +550,17 @@ public final class IamSessionPolicyResolver {
     for (S3Action action : mappedS3Actions) {
       if (action.kind == ActionKind.VOLUME || action == S3Action.ALL_S3) {
         final IOzoneObj volumeObj = volumeObj(volumeName);
-        final Set<ACLType> volumeAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.volumePerms;
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, volumeObj, volumeAcls);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, volumeObj, action.perms);
       }
 
       if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3) {
         final IOzoneObj bucketObj = bucketObj(volumeName, "*");
-        final Set<ACLType> bucketAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.bucketPerms;
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, bucketAcls);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, action.perms);
       }
 
       if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
         final IOzoneObj keyObj = keyObj(volumeName, "*", "*");
-        final Set<ACLType> objectAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.objectPerms;
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, objectAcls);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, action.perms);
       }
     }
   }
@@ -586,10 +577,7 @@ public final class IamSessionPolicyResolver {
     for (S3Action action : mappedS3Actions) {
       if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3) {
         final IOzoneObj bucketObj = bucketObj(volumeName, resourceSpec.bucket);
-        final Set<ACLType> bucketAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.bucketPerms;
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, bucketAcls);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, action.perms);
       }
     }
   }
@@ -607,10 +595,7 @@ public final class IamSessionPolicyResolver {
     for (S3Action action : mappedS3Actions) {
       if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
         final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, resourceSpec.key);
-        final Set<ACLType> objectAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.objectPerms;
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, objectAcls);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, action.perms);
       }
     }
   }
@@ -630,10 +615,6 @@ public final class IamSessionPolicyResolver {
     for (S3Action action : mappedS3Actions) {
       // Object actions apply to prefix/key resources
       if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
-        final Set<ACLType> objectAcls = action == S3Action.ALL_S3 ?
-            EnumSet.of(ACLType.ALL) :
-            action.objectPerms;
-
         if (prefixes != null && !prefixes.isEmpty()) {
           // Handle specific prefixes from conditions
           for (String prefix : prefixes) {
@@ -643,7 +624,7 @@ public final class IamSessionPolicyResolver {
                 prefix,
                 canonicalObjBySignature,
                 objToAclsMap,
-                objectAcls
+                action.perms
             );
           }
         } else {
@@ -653,7 +634,7 @@ public final class IamSessionPolicyResolver {
               resourceSpec,
               canonicalObjBySignature,
               objToAclsMap,
-              objectAcls
+              action.perms
           );
         }
       }
@@ -834,162 +815,59 @@ public final class IamSessionPolicyResolver {
   private enum S3Action {
     // Volume-scope
     // Used for ListBuckets api
-    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets",
-        ActionKind.VOLUME,
-        EnumSet.of(ACLType.READ, ACLType.LIST),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class)
-    ),
+    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(ACLType.READ, ACLType.LIST)),
 
     // Bucket-scope
-    CREATE_BUCKET("s3:CreateBucket",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.CREATE),
-        EnumSet.noneOf(ACLType.class)
-    ),
-    DELETE_BUCKET("s3:DeleteBucket",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.DELETE),
-        EnumSet.noneOf(ACLType.class)
-    ),
-    GET_BUCKET_ACL("s3:GetBucketAcl",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ, ACLType.READ_ACL),
-        EnumSet.noneOf(ACLType.class)
-    ),
-    GET_BUCKET_LOCATION("s3:GetBucketLocation",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ),
-        EnumSet.noneOf(ACLType.class)
-    ),
+    CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(ACLType.CREATE)),
+    DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(ACLType.DELETE)),
+    GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.READ_ACL)),
+    GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(ACLType.READ)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
-    LIST_BUCKET("s3:ListBucket",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ, ACLType.LIST),
-        EnumSet.noneOf(ACLType.class)
-    ),
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.LIST)),
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS(
         "s3:ListBucketMultipartUploads",
         ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ, ACLType.LIST),
-        EnumSet.noneOf(ACLType.class)
+        EnumSet.of(ACLType.READ, ACLType.LIST)
     ),
-    PUT_BUCKET_ACL("s3:PutBucketAcl",
-        ActionKind.BUCKET,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.WRITE_ACL),
-        EnumSet.noneOf(ACLType.class)
-    ),
+    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.WRITE_ACL)),
 
     // Object-scope
-    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.DELETE)
-    ),
+    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     // Used for DeleteObject (when versionId parameter is not supplied),
     // DeleteObjects (when versionId parameter is not supplied) APIs
-    DELETE_OBJECT("s3:DeleteObject",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.DELETE)
-    ),
-    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.DELETE)
-    ),
+    DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
+    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     // Used for DeleteObject (when versionId parameter is supplied),
     // DeleteObjects (when versionId parameter is supplied) APIs
-    DELETE_OBJECT_VERSION("s3:DeleteObjectVersion",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.DELETE)
-    ),
+    DELETE_OBJECT_VERSION("s3:DeleteObjectVersion", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
-    GET_OBJECT("s3:GetObject",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ)
-    ),
-    GET_OBJECT_TAGGING("s3:GetObjectTagging",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ)
-    ),
+    GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
+    GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     // Used for GetObject API when versionId parameter is supplied
-    GET_OBJECT_VERSION("s3:GetObjectVersion",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ)
-    ),
+    GET_OBJECT_VERSION("s3:GetObjectVersion", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     // Used for ListParts API
-    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.READ)
-    ),
+    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
     // CopyObject (for destination bucket), PutObject APIs
-    PUT_OBJECT("s3:PutObject",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.CREATE, ACLType.WRITE)
-    ),
-    PUT_OBJECT_TAGGING("s3:PutObjectTagging",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.WRITE)
-    ),
+    PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(ACLType.CREATE, ACLType.WRITE)),
+    PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.WRITE)),
     // Used for PutObjectTagging (with versionId parameter) API
-    PUT_OBJECT_VERSION_TAGGING("s3:PutObjectVersionTagging",
-        ActionKind.OBJECT,
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.noneOf(ACLType.class),
-        EnumSet.of(ACLType.WRITE)
-    ),
+    PUT_OBJECT_VERSION_TAGGING("s3:PutObjectVersionTagging", ActionKind.OBJECT, EnumSet.of(ACLType.WRITE)),
 
     // Wildcard all
-    ALL_S3("s3:*",
-        ActionKind.ALL,
-        EnumSet.of(ACLType.ALL),
-        EnumSet.of(ACLType.ALL),
-        EnumSet.of(ACLType.ALL)
-    );
+    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL));
 
     private final String name;
     private final ActionKind kind;
-    private final Set<ACLType> volumePerms;
-    private final Set<ACLType> bucketPerms;
-    private final Set<ACLType> objectPerms;
+    private final Set<ACLType> perms;
 
     S3Action(String name,
              ActionKind kind,
-             Set<ACLType> volumePerms,
-             Set<ACLType> bucketPerms,
-             Set<ACLType> objectPerms) {
+             Set<ACLType> perms) {
       this.name = name;
       this.kind = kind;
-      this.volumePerms = volumePerms;
-      this.bucketPerms = bucketPerms;
-      this.objectPerms = objectPerms;
+      this.perms = perms;
     }
   }
 
