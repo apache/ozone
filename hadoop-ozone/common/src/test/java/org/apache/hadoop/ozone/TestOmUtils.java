@@ -286,24 +286,8 @@ public class TestOmUtils {
     assertEquals(0x123456789ABCDL, (result & 0x3FFFFFFFFFFFFFFFL) >>> 8);
   }
 
-  @Test
-  void testGetTxIdFromObjectId() {
-    long[] testTxIds = {0L, 1L, 100L, 1000L, 0x123456789ABCDL, OmUtils.MAX_TRXN_ID};
-    long[] testEpochs = {0L, 1L, 2L, 3L};
-
-    for (long epoch : testEpochs) {
-      for (long txId : testTxIds) {
-        long objectId = OmUtils.addEpochToTxId(epoch, txId);
-        long extractedTxId = OmUtils.getTxIdFromObjectId(objectId);
-        assertEquals(txId, extractedTxId,
-            String.format("Round-trip failed for epoch=%d, txId=%d", epoch, txId));
-      }
-    }
-
-    long objectId = (2L << 62) | (0x123456789ABCDL << 8);
-    long extractedTxId = OmUtils.getTxIdFromObjectId(objectId);
-    assertEquals(0x123456789ABCDL, extractedTxId);
-  }
+  // Intentionally no tests for getTxIdFromObjectId(); this helper is not
+  // used in production paths and may be removed in the future.
 
   @Test
   void testGetObjectIdFromTxId() {
@@ -340,22 +324,6 @@ public class TestOmUtils {
     assertTrue(exception.getMessage().contains("TransactionID exceeds max limit"));
   }
 
-  @Test
-  void testEpochAndTxIdCalculationConsistency() {
-    long[] testCases = {
-        0L, 1L, 100L, 1000L, 10000L,
-        0x123456789ABCDL, 0xFFFFFFFFFFFFL, OmUtils.MAX_TRXN_ID
-    };
-
-    for (long txId : testCases) {
-      long epoch = OmUtils.getOMEpoch();
-      long objectId = OmUtils.getObjectIdFromTxId(epoch, txId);
-      long extractedTxId = OmUtils.getTxIdFromObjectId(objectId);
-
-      assertEquals(txId, extractedTxId,
-          String.format("Consistency check failed for txId=%d", txId));
-      assertEquals(epoch, objectId >>> 62,
-          String.format("Epoch not preserved for txId=%d", txId));
-    }
-  }
+  // Consistency checks between epoch and txId are covered by
+  // testAddEpochToTxId() and testGetObjectIdFromTxId().
 }

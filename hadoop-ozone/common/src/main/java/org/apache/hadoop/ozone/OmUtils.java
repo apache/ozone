@@ -667,7 +667,7 @@ public final class OmUtils {
    */
   @VisibleForTesting
   public static long getTxIdFromObjectId(long objectId) {
-    return (0x3FFFFFFFFFFFFFFFL & objectId) >> TRANSACTION_ID_SHIFT;
+    return ((Long.MAX_VALUE >> REVERSE_EPOCH_ID_SHIFT) & objectId) >> TRANSACTION_ID_SHIFT;
   }
 
   /**
