@@ -179,7 +179,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private ColumnFamilyHandle compactionLogTableCFHandle;
   private ManagedRocksDB activeRocksDB;
-  private final ConcurrentMap<String, CompactionFileInfo> inflightCompactions;
+  private final ConcurrentMap<String, CompactionFileInfo> inflightCompactionFiles;
+  private final ConcurrentMap<Integer, Boolean> inflightCompactionJob;
   private Queue<byte[]> pruneQueue = null;
 
   /**
@@ -277,7 +278,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } else {
       this.scheduler = null;
     }
-    this.inflightCompactions = new ConcurrentHashMap<>();
+    this.inflightCompactionFiles = new ConcurrentHashMap<>();
+    this.inflightCompactionJob = new ConcurrentHashMap<>();
     this.compactionDag = new CompactionDag();
   }
 
@@ -455,7 +457,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             compactionJobInfo.outputFiles())) {
           return;
         }
-
+        inflightCompactionJob.put(compactionJobInfo.jobId(), false);
         synchronized (this) {
           if (closed) {
             return;
@@ -467,7 +469,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             return;
           }
         }
-        inflightCompactions.putAll(toFileInfoList(compactionJobInfo.inputFiles(), db));
+        inflightCompactionJob.put(compactionJobInfo.jobId(), true);
+        inflightCompactionFiles.putAll(toFileInfoList(compactionJobInfo.inputFiles(), db));
         for (String file : compactionJobInfo.inputFiles()) {
           createLink(Paths.get(sstBackupDir, new File(file).getName()),
               Paths.get(file));
@@ -490,16 +493,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         long trxId = db.getLatestSequenceNumber();
         Map<String, CompactionFileInfo> inputFileCompactions = toFileInfoList(compactionJobInfo.inputFiles(), db);
         CompactionLogEntry.Builder builder;
+        boolean trackedCompactionJob = inflightCompactionJob.getOrDefault(compactionJobInfo.jobId(), false);
+        inflightCompactionJob.remove(compactionJobInfo.jobId());
         builder = new CompactionLogEntry.Builder(trxId,
             System.currentTimeMillis(),
             inputFileCompactions.keySet().stream()
                 .map(inputFile -> {
-                  if (!inflightCompactions.containsKey(inputFile)) {
+                  if (trackedCompactionJob && !inflightCompactionFiles.containsKey(inputFile)) {
                     LOG.warn("Input file not found in inflightCompactionsMap : {} which should have been added on " +
                             "compactionBeginListener.",
                         inputFile);
                   }
-                  return inflightCompactions.getOrDefault(inputFile, inputFileCompactions.get(inputFile));
+                  return inflightCompactionFiles.getOrDefault(inputFile, inputFileCompactions.get(inputFile));
                 })
                 .collect(Collectors.toList()),
             new ArrayList<>(toFileInfoList(compactionJobInfo.outputFiles(), db).values()));
@@ -530,7 +535,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());
           for (String inputFile : inputFileCompactions.keySet()) {
-            inflightCompactions.remove(inputFile);
+            inflightCompactionFiles.remove(inputFile);
           }
         }
         // Add the compaction log entry to the prune queue
@@ -1446,8 +1451,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return response;
   }
 
-  ConcurrentMap<String, CompactionFileInfo> getInflightCompactions() {
-    return inflightCompactions;
+  ConcurrentMap<String, CompactionFileInfo> getInflightCompactionFiles() {
+    return inflightCompactionFiles;
+  }
+
+  ConcurrentMap<Integer, Boolean> getInflightCompactionJob() {
+    return inflightCompactionJob;
   }
 
   @VisibleForTesting

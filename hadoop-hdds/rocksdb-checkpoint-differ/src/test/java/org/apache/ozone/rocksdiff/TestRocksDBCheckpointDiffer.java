@@ -862,7 +862,9 @@ public class TestRocksDBCheckpointDiffer {
       Assertions.assertNotNull(compactionNode.getStartKey());
       Assertions.assertNotNull(compactionNode.getEndKey());
     });
-    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000,
+    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactionJob().isEmpty(), 1000,
+        10000);
+    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactionFiles().isEmpty(), 1000,
         10000);
     if (LOG.isDebugEnabled()) {
       rocksDBCheckpointDiffer.dumpCompactionNodeTable();
