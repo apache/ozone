@@ -134,12 +134,9 @@ public class SnapshotDefragService extends BackgroundService
     try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
              ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
-      OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
-
       // Check if snapshot needs compaction (defragmentation)
-      boolean needsDefrag = snapshotLocalData.getNeedsDefrag();
-      LOG.debug("Snapshot {} needsDefragmentation field value: {}",
-          snapshotInfo.getName(), needsDefrag);
+      boolean needsDefrag = readableOmSnapshotLocalDataProvider.needsDefrag();
+      LOG.debug("Snapshot {} needsDefragmentation field value: {}", snapshotInfo.getName(), needsDefrag);
 
       return needsDefrag;
     } catch (IOException e) {
