@@ -4650,6 +4650,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
+      // Wait for deleted key to become visible in deletedTable
+      GenericTestUtils.waitFor(() -> {
+        List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+            = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+            .getRangeKVs(null, 100,
+                cluster.getOzoneManager().getMetadataManager()
+                .getOzoneKey(volumeName, bucketName, keyName));
+        return rangeKVs.size() > 0;
+      }, 100, 5000);
+
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
           .getRangeKVs(null, 100,
