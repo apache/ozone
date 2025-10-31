@@ -265,13 +265,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private void increamentOrphanCheckCount(UUID snapshotId) {
+  private void incrementOrphanCheckCount(UUID snapshotId) {
     if (snapshotId != null) {
       this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> v == null ? 1 : (v + 1));
     }
   }
 
-  private void decreamentOrphanCheckCount(UUID snapshotId, int decrementBy) {
+  private void decrementOrphanCheckCount(UUID snapshotId, int decrementBy) {
     this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> {
       if (v == null) {
         return null;
@@ -312,7 +312,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       addVersionNodeWithDependents(snapshotLocalData);
     }
     for (UUID snapshotId : versionNodeMap.keySet()) {
-      increamentOrphanCheckCount(snapshotId);
+      incrementOrphanCheckCount(snapshotId);
     }
     long snapshotLocalDataManagerServiceInterval = configuration.getTimeDuration(
         OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT,
@@ -337,7 +337,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       UUID snapshotId = entry.getKey();
       int countBeforeCheck = entry.getValue();
       checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
-      decreamentOrphanCheckCount(snapshotId, countBeforeCheck);
+      decrementOrphanCheckCount(snapshotId, countBeforeCheck);
     }
   }
 
@@ -855,14 +855,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           // version removals)
           if (versionsRemoved || !Objects.equals(existingSnapVersions.getPreviousSnapshotId(),
               snapshotVersions.getPreviousSnapshotId())) {
-            increamentOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
+            incrementOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
           }
           // If the transactionInfo set this means the snapshot has been purged and the entire yaml file could have
           // become an orphan if the version is also updated it
           // could mean that there could be some orphan version present within the
           // same snapshot.
           if (transactionInfoSet || existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
-            increamentOrphanCheckCount(snapshotId);
+            incrementOrphanCheckCount(snapshotId);
           }
         }
       } finally {
