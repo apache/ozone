@@ -25,7 +25,6 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
  * Node in the compaction DAG that represents an SST file.
  */
 public class CompactionNode extends SstFileInfo {
-  // Name of the SST file
   private final long snapshotGeneration;
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
