@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -66,6 +67,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -108,6 +110,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -149,6 +152,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
   }
 
   @AfterEach
@@ -596,11 +600,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    * Tests the full checkpoint servlet flow to ensure snapshot paths are read
    * from checkpoint metadata (frozen state) rather than live OM metadata (current state).
    * Scenario:
-   * 1. Create snapshots S1, S2
-   * 2. Create Snapshot S3
-   * 3. Checkpoint is created (freezes state with S1, S2)
-   * 4. S2 gets purged from live OM (after checkpoint creation)
-   * 5. Servlet processes checkpoint - should still include S2 data
+   * 1. Create snapshots S1, S2, S3
+   * 2. Purge S2
+   * 3. Checkpoint is created
+   * 4. S3 gets purged from live OM (after checkpoint creation)
+   * 5. Servlet processes checkpoint - should still include S1, S3 data as
+   *    checkpoint snapshotInfoTable has S1 S3
    */
   @Test
   public void testCheckpointIncludesSnapshotsFromFrozenState() throws Exception {
@@ -630,7 +635,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot3");
     om.getMetadataManager().getStore().flushDB();
 
-    // At this point: Live OM has snapshots S1, S2
+    // At this point: Live OM has snapshots S1, S2 , S3
     List<OzoneSnapshot> snapshotsBeforePurge = new ArrayList<>();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshotsBeforePurge::add);
@@ -644,11 +649,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
 
+    // purge snapshot S2
+    purgeSnapshot(volumeName, bucketName, snapshot2);
+
     // Setup servlet mocks for checkpoint processing
     setupMocks();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
 
-    // Create a checkpoint that captures current state (S1, S2)
+    // Create a checkpoint that captures current state (S1, S3)
     DBStore dbStore = om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
@@ -668,18 +676,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     // Process checkpoint servlet - this is where old vs new code differs
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    // Purge snapshot2 from live OM AFTER checkpoint creation but BEFORE servlet processing
-    String snapshot2TableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshot2.getName());
-    // Simulate the purge operation that removes from snapshotInfoTable
-    om.getMetadataManager().getSnapshotInfoTable().delete(snapshot2TableKey);
-    om.getMetadataManager().getStore().flushDB();
-
-    // Verify live OM now only sees 2 snapshots
+    // Purge snapshot3
+    purgeSnapshot(volumeName, bucketName, snapshot3);
+    // Verify live OM now only sees 1 snapshot
     List<OzoneSnapshot> snapshotsAfterPurge = new ArrayList<>();
     // simulating a purge here by only adding active snapshots
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshotsAfterPurge::add);
-    assertEquals(2, snapshotsAfterPurge.size(), "Should have 1 snapshot after purge");
+    assertEquals(1, snapshotsAfterPurge.size(), "Should have 1 snapshot after purge");
     // Extract tarball and verify contents
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
@@ -693,16 +697,29 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         OM_DB_NAME + "-" + snapshot3.getSnapshotId());
     boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);
     boolean snapshot3IncludedInCheckpoint = Files.exists(snapshot3DbDir);
-    // The critical assertion: checkpoint should include snapshot2 and snapshot3 data
-    // even though snapshot2 was purged from live OM after checkpoint creation
-    assertTrue(snapshot2IncludedInCheckpoint,
-        "Checkpoint should include snapshot2 data even though it was purged from live OM.");
+    assertFalse(snapshot2IncludedInCheckpoint,
+        "Checkpoint should not include snapshot2 as it was purged from live OM and captured in checkpoint.");
     assertTrue(snapshot3IncludedInCheckpoint,
-        "Checkpoint should include snapshot3 data");
+        "Checkpoint should include snapshot3 data even though purged as checkpoint has not captured the purge");
     // Cleanup
     if (capturedCheckpoint.get() != null) {
       capturedCheckpoint.get().cleanupCheckpoint();
     }
+  }
+
+  private void purgeSnapshot(String volumeName, String bucketName, OzoneSnapshot snapshot)
+      throws IOException, InterruptedException, TimeoutException {
+    String snapshotTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshot.getName());
+    // delete snapshot and wait for snapshot to be purged
+    client.getObjectStore().deleteSnapshot(volumeName, bucketName, snapshot.getName());
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return om.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey) == null;
+      } catch (Exception ex) {
+        LOG.error("Exception while querying snapshot info for key {}", snapshotTableKey, ex);
+        return false;
+      }
+    }, 100, 20_000);
   }
 
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
