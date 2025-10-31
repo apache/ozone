@@ -302,32 +302,10 @@ public class TestSnapshotDefragService {
   }
 
   /**
-   * Mark a snapshot as needing defragmentation for the test to run.
-   * This is not needed in production code.
-   */
-  private void markSnapshotAsNeedingDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
-    final OmSnapshotLocalDataManager localDataManager =
-        ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager();
-    try (WritableOmSnapshotLocalDataProvider dataProvider =
-             localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
-      OmSnapshotLocalData localData = dataProvider.getSnapshotLocalData();
-      localData.setNeedsDefrag(true);  // This does NOT work since it doesn't trigger dirty bit
-      dataProvider.commit();
-      LOG.info("Marking snapshot {} needsDefragmentation = true", snapshotInfo.getName());
-    }
-    try (ReadableOmSnapshotLocalDataProvider dataProvider =
-             localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
-      OmSnapshotLocalData localData = dataProvider.getSnapshotLocalData();
-      LOG.info("Got snapshot {} needsDefragmentation = {}", snapshotInfo.getName(), localData.getNeedsDefrag());
-    }
-    LOG.info("--------------------------------");
-  }
-
-  /**
    * Trigger the SnapshotDefragService by starting it and waiting for it to process snapshots.
    */
   private void triggerSnapshotDefragService() throws Exception {
-    LOG.info("Triggering SnapshotDefragService...");
+    LOG.info("Triggering SnapshotDefragService ...");
 
     // Mark all snapshots as needing defragmentation first
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -337,9 +315,8 @@ public class TestSnapshotDefragService {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         SnapshotInfo snapshotInfo = entry.getValue();
-        LOG.info("snapshot {} needsDefragmentation = {}", snapshotInfo.getName(), defragService.needsDefragmentation(snapshotInfo));
-//        markSnapshotAsNeedingDefragmentation(snapshotInfo);
-//        LOG.info("snapshot {} needsDefragmentation = {}", snapshotInfo.getName(), defragService.needsDefragmentation(snapshotInfo));
+        LOG.info("snapshot {}, needsDefragmentation = {}",
+            snapshotInfo.getName(), defragService.needsDefragmentation(snapshotInfo));
       }
     }
 

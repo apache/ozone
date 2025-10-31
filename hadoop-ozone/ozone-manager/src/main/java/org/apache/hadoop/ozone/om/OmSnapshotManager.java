@@ -416,7 +416,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                 "' has not been flushed yet. Please wait a few more seconds before retrying", TIMEOUT);
           }
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb);
+              snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb, false);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
           throw e;
