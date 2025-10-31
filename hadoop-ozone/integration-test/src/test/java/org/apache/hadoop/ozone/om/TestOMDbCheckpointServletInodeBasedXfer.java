@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -169,7 +170,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     om = cluster.getOzoneManager();
   }
 
-  private void setupMocks() throws Exception {
+  private void setupMocks(boolean useNoOpBootstrapLock) throws Exception {
     final Path tempPath = folder.resolve("temp" + COUNTER.incrementAndGet() + ".tar");
     tempFile = tempPath.toFile();
 
@@ -244,6 +245,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any());
+    if (useNoOpBootstrapLock) {
+      // Override the lock to be a no-op so purgeSnapshot can work inside the callback
+      BootstrapStateHandler.Lock noOpLock = new DBCheckpointServlet.Lock();
+      when(omDbCheckpointServletMock.getBootstrapStateLock())
+          .thenReturn(noOpLock);
+    }
   }
 
   @ParameterizedTest
@@ -407,7 +414,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
-    setupMocks();
+    setupMocks(false);
     Path dbDir = folder.resolve("db_data");
     Files.createDirectories(dbDir);
     // Create dummy files: one SST, one non-SST
@@ -632,28 +639,19 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     TestDataUtil.createKey(bucket, "key3",
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data3".getBytes(StandardCharsets.UTF_8));
-    client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot3");
-    om.getMetadataManager().getStore().flushDB();
 
     // At this point: Live OM has snapshots S1, S2 , S3
-    List<OzoneSnapshot> snapshotsBeforePurge = new ArrayList<>();
+    List<OzoneSnapshot> snapshots = new ArrayList<>();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
-        .forEachRemaining(snapshotsBeforePurge::add);
-    assertEquals(3, snapshotsBeforePurge.size(), "Should have 3 snapshots initially");
-    OzoneSnapshot snapshot2 = snapshotsBeforePurge.stream()
+        .forEachRemaining(snapshots::add);
+    assertEquals(2, snapshots.size(), "Should have 2 snapshots initially");
+    OzoneSnapshot snapshot2 = snapshots.stream()
         .filter(snap -> snap.getName().equals("snapshot2"))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
-    OzoneSnapshot snapshot3 = snapshotsBeforePurge.stream()
-        .filter(snap -> snap.getName().equals("snapshot3"))
-        .findFirst()
-        .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
-
-    // purge snapshot S2
-    purgeSnapshot(volumeName, bucketName, snapshot2);
 
     // Setup servlet mocks for checkpoint processing
-    setupMocks();
+    setupMocks(true);
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
 
     // Create a checkpoint that captures current state (S1, S3)
@@ -662,6 +660,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
 
     when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
+      // Purge snapshot2 before checkpoint
+      purgeSnapshot(volumeName, bucketName, snapshot2);
+      // create snapshot 3 before checkpoint
+      client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot3");
+      // Also wait for double buffer to flush to ensure all transactions are committed
+      om.awaitDoubleBufferFlush();
       DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
       doNothing().when(checkpoint).cleanupCheckpoint(); // Don't cleanup for verification
       capturedCheckpoint.set(checkpoint);
@@ -674,16 +678,16 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
         false, om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-    // Process checkpoint servlet - this is where old vs new code differs
+    // Process checkpoint servlet
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    // Purge snapshot3
-    purgeSnapshot(volumeName, bucketName, snapshot3);
-    // Verify live OM now only sees 1 snapshot
-    List<OzoneSnapshot> snapshotsAfterPurge = new ArrayList<>();
-    // simulating a purge here by only adding active snapshots
+    snapshots.clear();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
-        .forEachRemaining(snapshotsAfterPurge::add);
-    assertEquals(1, snapshotsAfterPurge.size(), "Should have 1 snapshot after purge");
+        .forEachRemaining(snapshots::add);
+    assertEquals(2, snapshots.size(), "Should have 2 snapshots");
+    OzoneSnapshot snapshot3 = snapshots.stream()
+        .filter(snap -> snap.getName().equals("snapshot3"))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
     // Extract tarball and verify contents
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
@@ -765,7 +769,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private void setupClusterAndMocks(String volumeName, String bucketName,
       AtomicReference<DBCheckpoint> realCheckpoint, boolean includeSnapshots) throws Exception {
     setupCluster();
-    setupMocks();
+    setupMocks(false);
     om.getKeyManager().getSnapshotSstFilteringService().pause();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn(String.valueOf(includeSnapshots));
