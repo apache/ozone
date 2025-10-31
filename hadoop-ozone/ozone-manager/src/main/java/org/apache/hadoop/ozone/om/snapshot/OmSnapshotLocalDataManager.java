@@ -45,6 +45,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
@@ -139,10 +140,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    * @param snapshotInfo snapshot metadata
    * @return the path to the snapshot's local property YAML file
    */
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(SnapshotInfo snapshotInfo) {
     return getSnapshotLocalPropertyYamlPath(snapshotInfo.getSnapshotId());
   }
 
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(UUID snapshotId) {
     Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId, 0);
     return getSnapshotLocalPropertyYamlPath(snapshotPath);
@@ -155,10 +158,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    */
   public void createNewOmSnapshotLocalDataFile(RDBStore snapshotStore, SnapshotInfo snapshotInfo) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
-        new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
-            () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                OmSnapshotManager.getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId()),
-                null))) {
+             new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
+                 () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
+                         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore),
+                         snapshotInfo.getPathPreviousSnapshotId(), null),
+                     null))) {
       snapshotLocalData.commit();
     }
   }
@@ -199,7 +203,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return new WritableOmSnapshotLocalDataProvider(snapshotId);
   }
 
-  public OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
+  OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
     return snapshotLocalDataSerializer.load(snapshotDataPath);
   }
 
@@ -693,6 +697,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     public void removeVersion(int version) {
       this.getSnapshotLocalData().removeVersionSSTFileInfos(version);
       // Set Dirty if a version is removed.
+      setDirty();
+    }
+
+    public void setTransactionInfo(TransactionInfo transactionInfo) {
+      this.getSnapshotLocalData().setTransactionInfo(transactionInfo);
+      // Set Dirty when the transactionInfo is set.
       setDirty();
     }
 

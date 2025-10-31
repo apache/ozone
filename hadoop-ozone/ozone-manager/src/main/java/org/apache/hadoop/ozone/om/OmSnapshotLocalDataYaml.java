@@ -24,9 +24,10 @@ import java.util.UUID;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
@@ -71,6 +72,8 @@ public final class OmSnapshotLocalDataYaml {
       this.addClassTag(SstFileInfo.class, SST_FILE_INFO_TAG);
       representers.put(SstFileInfo.class, new RepresentSstFileInfo());
       representers.put(VersionMeta.class, new RepresentVersionMeta());
+      representers.put(TransactionInfo.class, data -> new ScalarNode(Tag.STR, data.toString(), null, null,
+          DumperOptions.ScalarStyle.PLAIN));
       representers.put(UUID.class, data ->
           new ScalarNode(Tag.STR, data.toString(), null, null, DumperOptions.ScalarStyle.PLAIN));
     }
@@ -168,7 +171,10 @@ public final class OmSnapshotLocalDataYaml {
         UUID snapId = UUID.fromString(snapIdStr);
         final String prevSnapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID);
         UUID prevSnapId = prevSnapIdStr != null ? UUID.fromString(prevSnapIdStr) : null;
-        OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(), prevSnapId);
+        final String purgeTxInfoStr = (String) nodes.get(OzoneConsts.OM_SLD_TXN_INFO);
+        TransactionInfo transactionInfo = purgeTxInfoStr != null ? TransactionInfo.valueOf(purgeTxInfoStr) : null;
+        OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(), prevSnapId,
+            transactionInfo);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);

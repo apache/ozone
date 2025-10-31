@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,6 +39,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -48,7 +51,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -56,6 +61,7 @@ import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -70,7 +76,7 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.util.YamlSerializer;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -375,6 +381,25 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @Test
+  public void testUpdateTransactionInfo() throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
+    UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);
+    try (WritableOmSnapshotLocalDataProvider snap = localDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertNull(snapshotLocalData.getTransactionInfo());
+      snap.setTransactionInfo(transactionInfo);
+      snap.commit();
+    }
+
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotId)) {
+      OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+      assertEquals(transactionInfo, snapshotLocalData.getTransactionInfo());
+    }
+  }
+
+  @Test
   public void testAddVersionFromRDB() throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
@@ -575,13 +600,60 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @Test
+  public void testCreateNewSnapshotLocalYaml() throws IOException {
+    UUID snapshotId = UUID.randomUUID();
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(snapshotId, null);
+
+    Map<String, List<String>> expNotDefraggedSSTFileList = new TreeMap<>();
+    OmSnapshotLocalData.VersionMeta notDefraggedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
+        ImmutableList.of(new SstFileInfo("dt1", "k1", "k2", DIRECTORY_TABLE),
+            new SstFileInfo("dt2", "k1", "k2", DIRECTORY_TABLE),
+            new SstFileInfo("ft1", "k1", "k2", FILE_TABLE),
+            new SstFileInfo("ft2", "k1", "k2", FILE_TABLE),
+            new SstFileInfo("kt1", "k1", "k2", KEY_TABLE),
+            new SstFileInfo("kt2", "k1", "k2", KEY_TABLE)));
+    expNotDefraggedSSTFileList.put(KEY_TABLE, Stream.of("kt1", "kt2").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(FILE_TABLE, Stream.of("ft1", "ft2").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1", "dt2").collect(Collectors.toList()));
+
+    List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
+    for (Map.Entry<String, List<String>> entry : expNotDefraggedSSTFileList.entrySet()) {
+      String cfname = entry.getKey();
+      for (String fname : entry.getValue()) {
+        mockedLiveFiles.add(createMockLiveFileMetaData("/" + fname + ".sst", cfname, "k1", "k2"));
+      }
+    }
+    // Add some other column families and files that should be ignored
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot1.sst", "otherTable", "k1", "k2"));
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot2.sst", "otherTable", "k1", "k2"));
+
+    mockSnapshotStore(snapshotId, mockedLiveFiles);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    Path snapshotYaml = Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
+    // Create an existing YAML file for the snapshot
+    assertTrue(snapshotYaml.toFile().createNewFile());
+    assertEquals(0, Files.size(snapshotYaml));
+    // Create a new YAML file for the snapshot
+    localDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
+    // Verify that previous file was overwritten
+    assertTrue(Files.exists(snapshotYaml));
+    assertTrue(Files.size(snapshotYaml) > 0);
+    // Verify the contents of the YAML file
+    OmSnapshotLocalData localData = localDataManager.getOmSnapshotLocalData(snapshotYaml.toFile());
+    assertNotNull(localData);
+    assertEquals(0, localData.getVersion());
+    assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));
+    assertFalse(localData.getSstFiltered());
+    assertEquals(0L, localData.getLastDefragTime());
+    assertFalse(localData.getNeedsDefrag());
+    assertEquals(1, localData.getVersionSstFileInfos().size());
+  }
+
+  @Test
   public void testCreateNewOmSnapshotLocalDataFile() throws IOException {
     UUID snapshotId = UUID.randomUUID();
     SnapshotInfo snapshotInfo = createMockSnapshotInfo(snapshotId, null);
-    
     // Setup snapshot store mock
-    File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId, 0).toFile();
-    assertTrue(snapshotDbLocation.exists() || snapshotDbLocation.mkdirs());
 
     List<LiveFileMetaData> sstFiles = new ArrayList<>();
     sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7"));
@@ -591,11 +663,12 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7"));
     sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7"));
     List<SstFileInfo> sstFileInfos = IntStream.range(0, sstFiles.size() - 1)
-        .mapToObj(sstFiles::get).map(SstFileInfo::new).collect(Collectors.toList());
-    when(snapshotStore.getDbLocation()).thenReturn(snapshotDbLocation);
-    RocksDatabase rocksDatabase = mock(RocksDatabase.class);
-    when(snapshotStore.getDb()).thenReturn(rocksDatabase);
-    when(rocksDatabase.getLiveFilesMetaData()).thenReturn(sstFiles);
+        .mapToObj(sstFiles::get).map(lfm ->
+            new SstFileInfo(lfm.fileName().replace(".sst", ""),
+            bytes2String(lfm.smallestKey()),
+            bytes2String(lfm.largestKey()), bytes2String(lfm.columnFamilyName()))).collect(Collectors.toList());
+    mockSnapshotStore(snapshotId, sstFiles);
+
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
 
     localDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
@@ -774,7 +847,7 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file2.sst", "columnFamily1", "key3", "key10"));
     sstFiles.add(createMockLiveFileMetaData("file3.sst", "columnFamily2", "key1", "key8"));
     sstFiles.add(createMockLiveFileMetaData("file4.sst", "columnFamily2", "key0", "key10"));
-    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId);
+    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null);
   }
 
   private void createSnapshotLocalDataFile(UUID snapshotId, UUID previousSnapshotId)
