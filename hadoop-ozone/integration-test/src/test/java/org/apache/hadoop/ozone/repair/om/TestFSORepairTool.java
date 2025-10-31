@@ -390,9 +390,9 @@ public class TestFSORepairTool {
         .execute(() -> cmd.execute(argList.toArray(new String[0])));
   }
 
-  @Order(2)
+  @Order(ORDER_DRY_RUN)
   @Test
-  public void testAlternateOmDbDirNameDryRun() throws Exception {
+  public void testAlternateOmDbDirName() throws Exception {
     File original = new File(OMStorage.getOmDbDir(cluster.getConf()), OM_DB_NAME);
     // Place backup under a different parent directory to ensure we don't
     // accidentally open the original om.db due to path handling bugs.
@@ -412,14 +412,13 @@ public class TestFSORepairTool {
     FileUtils.copyDirectory(original, backup);
 
     out.reset();
+    String expectedOutput = serializeReport(fullReport);
     int exitCode = executeWithDb(true, backup.getPath());
-    assertEquals(0, exitCode);
+    assertEquals(0, exitCode, err.getOutput());
 
     String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
-    assertThat(reportOutput).contains("Reachable:");
-    assertThat(reportOutput).contains("Unreachable (Pending to delete):");
-    assertThat(reportOutput).contains("Unreferenced (Orphaned):");
+    assertEquals(expectedOutput, reportOutput);
 
     FileUtils.deleteDirectory(backupParent);
   }
