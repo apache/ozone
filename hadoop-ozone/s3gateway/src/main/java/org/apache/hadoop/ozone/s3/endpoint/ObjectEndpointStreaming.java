@@ -189,6 +189,8 @@ final class ObjectEndpointStreaming {
       }
       throw ex;
     }
-    return Response.ok().header(OzoneConsts.ETAG, eTag).build();
+    return Response.ok()
+        .header(OzoneConsts.ETAG, ObjectEndpoint.wrapInQuotes(eTag))
+        .build();
   }
 }

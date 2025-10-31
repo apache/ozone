@@ -112,6 +112,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientUtils;
@@ -138,6 +139,7 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -905,7 +907,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
 
       for (CompleteMultipartUploadRequest.Part part : partList) {
-        partsMap.put(part.getPartNumber(), part.getETag());
+        partsMap.put(part.getPartNumber(), stripQuotes(part.getETag()));
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Parts map {}", partsMap);
@@ -1065,6 +1067,10 @@ public class ObjectEndpoint extends EndpointBase {
                   new byte[getIOBufferSize(length)]);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
+              String raw = ozoneOutputStream.getMetadata().get(ETAG);
+              if (raw != null) {
+                ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
+              }
               outputStream = ozoneOutputStream;
             }
           }
@@ -1099,6 +1105,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (StringUtils.isEmpty(eTag)) {
         eTag = omMultipartCommitUploadPartInfo.getPartName();
       }
+      eTag = wrapInQuotes(eTag);
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
@@ -1516,6 +1523,13 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
+  }
+
+  static String stripQuotes(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.replaceAll("^\\\"|\\\"$", "");
   }
 
   static String wrapInQuotes(String value) {
