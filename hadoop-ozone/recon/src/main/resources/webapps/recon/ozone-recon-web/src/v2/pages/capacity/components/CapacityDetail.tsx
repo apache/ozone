@@ -18,7 +18,7 @@
 
 import { EChart } from '@/components/eChart/eChart';
 import { GraphLegendIcon } from '@/utils/themeIcons';
-import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
+import { cardBodyStyle, cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
 import { Card, Divider, Row, Select, Statistic } from 'antd';
 import filesize from 'filesize';
 import React from 'react';
@@ -38,7 +38,7 @@ type CapacityDetailProps = {
   loading: boolean;
 };
 
-const getEchartOptions = (data: DataDetailItem[]) => {
+const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem) => {
   const option = {
     grid: {
       left: 2,
@@ -62,24 +62,22 @@ const getEchartOptions = (data: DataDetailItem[]) => {
     },
   };
 
-  const series = data.flatMap(item => {
-    // Determine if this group should be stacked, i.e. if the breakdown has more than one item
-    const breakdownLen = item.breakdown.length;
+  const breakdownLen = data.breakdown.length;
+  const series = data.breakdown.map((breakdown, idx) => ({
+    type: 'bar',
+    ...(breakdownLen > 1 && { stack: title }),
+    itemStyle: {
+      ...(idx === breakdownLen - 1 && { borderRadius: [0, 50, 50, 0] }),
+      ...(idx === 0 && { borderRadius: [50, 0, 0, 50] }),
+      ...(breakdownLen === 1 && { borderRadius: [50, 50, 50, 50] }),
+      color: breakdown.color,
+    },
+    data: [breakdown.value],
+    barWidth: '10px',
+    barGap: '2px'
+  }));
 
-    return item.breakdown.map((breakdown, idx) => ({
-      type: 'bar',
-      ...(breakdownLen > 1 && { stack: item.title }),
-      itemStyle: {
-        ...(idx === breakdownLen - 1 && { borderRadius: [0, 50, 50, 0] }),
-        ...(idx === 0 && { borderRadius: [50, 0, 0, 50] }),
-        ...(breakdownLen === 1 && { borderRadius: [50, 50, 50, 50] }),
-        color: breakdown.color,
-      },
-      data: [breakdown.value],
-      barWidth: '10px',
-      barGap: '2px'
-    }));
-  });
+  console.log(series);
 
   return {
     ...option,
@@ -100,14 +98,17 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
   return (
     <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading}>
       { showDropdown && options.length > 0 &&
-        <Select
-          defaultValue={options?.[0]?.value}
-          options={options}
-          onChange={handleSelect}
-          style={{ marginBottom: '16px' }}
-        />
+        <div className='node-select-container'>
+          Node Select:
+          <Select
+            defaultValue={options?.[0]?.value}
+            options={options}
+            onChange={handleSelect}
+            style={{ marginBottom: '16px' }}
+          />
+        </div>
       }
-      <div className='cluster-card-data-container'>
+      <div className='cluster-card-data-container vertical-layout'>
         {dataDetails.map((data, idx) => {
           const size = filesize(data.size, { round: 1 }).split(' ');
           return (
@@ -119,7 +120,6 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
                 valueStyle={statisticValueStyle}
                 className='data-detail-statistic'
               />
-              <Divider />
               <Row className='data-detail-breakdown-container'>
                 {data.breakdown.map((item, idx) => (
                   <Statistic
@@ -130,14 +130,15 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
                     className='data-detail-breakdown-statistic'
                   />
                 ))}
+                <EChart
+                  option={getEchartOptions(data.title, data)}
+                  style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
+                {idx < dataDetails.length - 1 && <Divider />}
               </Row>
             </div>
           )
         })}
       </div>
-      <EChart
-        option={getEchartOptions(dataDetails)}
-        style={{ height: '100px', width: '100%', margin: '16px 0px' }} />
     </Card>
   );
 }

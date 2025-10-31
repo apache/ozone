@@ -35,10 +35,23 @@
     color: #1b2329;
   }
 
+  .node-select-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0px auto 0px;
+    height: 15em;
+  }
+
   .cluster-card-data-container {
     display: flex;
     justify-content: space-between;
     gap: 16px;
+
+    &.vertical-layout {
+      flex-direction: column;
+      gap: 0px;
+    }
 
     .cluster-card-statistic {
       flex: 2 1 10em;
@@ -52,11 +65,14 @@
       align-items: stretch;
       padding: 16px;
       border-radius: 3px;
-      background-color: #f4f5f6;
 
       .data-detail-breakdown-container {
+        justify-content: flex-end;
+        flex-wrap: wrap;
         .data-detail-breakdown-statistic {
-          flex: 1 0 10em;
+          flex: 0 0 50%;
+          max-width: 25%;
+          text-align: right;
         }
       }
     }
@@ -90,6 +106,19 @@
     height: 8px;
     border-radius: 100px;
     background-color: #f4f5f6;
+  }
+}
+
+.data-breakdown-section {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  justify-content: space-between;
+  align-items: stretch;
+
+  > .ant-card {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

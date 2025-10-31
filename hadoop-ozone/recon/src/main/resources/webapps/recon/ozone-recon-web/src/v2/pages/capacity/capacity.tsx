@@ -230,75 +230,77 @@ const Capacity: React.FC<object> = () => {
             color: '#10073b'
           }]}
         />
-        <CapacityDetail
-          title='Pending Deletion'
-          loading={state.loading}
-          showDropdown={false}
-          dataDetails={[{
-            title: 'OZONE MANAGER',
-            size: usageBreakdown.deletionPendingBytes.byStage.OM.pendingBytes,
-            breakdown: [{
-              label: 'KEYS',
-              value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingKeyBytes,
-              color: '#658df5'
+        <div className='data-breakdown-section'>
+          <CapacityDetail
+            title='Pending Deletion'
+            loading={state.loading}
+            showDropdown={false}
+            dataDetails={[{
+              title: 'OZONE MANAGER',
+              size: usageBreakdown.deletionPendingBytes.byStage.OM.pendingBytes,
+              breakdown: [{
+                label: 'KEYS',
+                value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingKeyBytes,
+                color: '#f4a233'
+              }, {
+                label: 'DIRECTORIES',
+                value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingDirectoryBytes,
+                color: '#10073b'
+              }]
             }, {
-              label: 'DIRECTORIES',
-              value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingDirectoryBytes,
-              color: '#4553ef'
-            }]
-          }, {
-            title: 'STORAGE CONTAINER MANAGER',
-            size: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
-            breakdown: [{
-              label: 'BLOCKS',
-              value: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
-              color: '#2c218e'
-            }]
-          }, {
-            title: (
-              <span>
-                DATANODES
-                <WrappedInfoIcon title={datanodesPendingDeletionDesc} />
-              </span>
-            ),
-            size: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
-            breakdown: [{
-              label: 'BLOCKS',
-              value: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
-              color: '#f47c2d'
-            }]
-          }]} />
-        <CapacityDetail
-          title='Datanode'
-          loading={state.loading}
-          showDropdown={true}
-          handleSelect={setSelectedDatanode}
-          dropdownItems={datanodeUsage.map(datanode => datanode.uuid)}
-          dataDetails={[{
-            title: 'USED SPACE',
-            size: selectedDNDetails.used + selectedDNDetails.pendingDeletion,
-            breakdown: [{
-              label: 'PENDING DELETION',
-              value: selectedDNDetails.pendingDeletion,
-              color: '#658df5'
+              title: 'STORAGE CONTAINER MANAGER',
+              size: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
+              breakdown: [{
+                label: 'BLOCKS',
+                value: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
+                color: '#f4a233'
+              }]
             }, {
-              label: 'OZONE USED',
-              value: selectedDNDetails.used,
-              color: '#4553ee'
-            }]
-          }, {
-            title: 'FREE SPACE',
-            size: selectedDNDetails.remaining + selectedDNDetails.committed,
-            breakdown: [{
-              label: unusedSpaceBreakdown,
-              value: selectedDNDetails.remaining,
-              color: '#7465f5'
+              title: (
+                <span>
+                  DATANODES
+                  <WrappedInfoIcon title={datanodesPendingDeletionDesc} />
+                </span>
+              ),
+              size: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
+              breakdown: [{
+                label: 'BLOCKS',
+                value: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
+                color: '#f4a233'
+              }]
+            }]} />
+          <CapacityDetail
+            title='Datanode'
+            loading={state.loading}
+            showDropdown={true}
+            handleSelect={setSelectedDatanode}
+            dropdownItems={datanodeUsage.map(datanode => datanode.uuid)}
+            dataDetails={[{
+              title: 'USED SPACE',
+              size: selectedDNDetails.used + selectedDNDetails.pendingDeletion,
+              breakdown: [{
+                label: 'PENDING DELETION',
+                value: selectedDNDetails.pendingDeletion,
+                color: '#f4a233'
+              }, {
+                label: 'OZONE USED',
+                value: selectedDNDetails.used,
+                color: '#10073b'
+              }]
             }, {
-              label: 'OZONE PRE-ALLOCATED',
-              value: selectedDNDetails.committed,
-              color: '#592cc6'
-            }]
-          }]} />
+              title: 'FREE SPACE',
+              size: selectedDNDetails.remaining + selectedDNDetails.committed,
+              breakdown: [{
+                label: unusedSpaceBreakdown,
+                value: selectedDNDetails.remaining,
+                color: '#f4a233'
+              }, {
+                label: 'OZONE PRE-ALLOCATED',
+                value: selectedDNDetails.committed,
+                color: '#10073b'
+              }]
+            }]} />
+        </div>
       </div>
     </>
 
