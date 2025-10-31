@@ -77,6 +77,11 @@ public final class IamSessionPolicyResolver {
 
   private static final int MAX_JSON_LENGTH = 2048;
 
+  // Used to group actions into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create*
+  private static final String[] S3_ACTION_PREFIXES = {"s3:Get", "s3:Put", "s3:List", "s3:Delete", "s3:Create"};
+
+  private static final Map<String, Set<S3Action>> S3_ACTION_MAP = buildS3ActionMap();
+
   private IamSessionPolicyResolver() {
   }
 
@@ -283,32 +288,32 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * Builds the S3Action map used for mapping policy actions to S3Action enum values.
+   * This map is built once and cached statically.
+   */
+  private static Map<String, Set<S3Action>> buildS3ActionMap() {
+    final Map<String, Set<S3Action>> s3ActionMap = new LinkedHashMap<>();
+    for (S3Action sa : S3Action.values()) {
+      s3ActionMap.put(sa.name, singleton(sa));
+
+      // Group into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create* based on action name prefix
+      for (String prefix : S3_ACTION_PREFIXES) {
+        if (sa.name.startsWith(prefix)) {
+          s3ActionMap.computeIfAbsent(prefix + "*", k -> new LinkedHashSet<>()).add(sa);
+          break;
+        }
+      }
+    }
+    return Collections.unmodifiableMap(s3ActionMap);
+  }
+
+  /**
    * Maps actions from JSON IAM policy to S3Action enum in order to determine what the
    * permissions should be.
    */
   private static Set<S3Action> mapPolicyActionsToS3Actions(List<String> actions) {
     if (actions == null || actions.isEmpty()) {
       return Collections.emptySet();
-    }
-
-    // Preprocess the S3Action enum values get the S3Actions keyed by the action
-    // name or grouped by prefixes like s3:Get* or s3:Put*
-    final Map<String, Set<S3Action>> s3ActionMap = new LinkedHashMap<>();
-    for (S3Action sa : S3Action.values()) {
-      s3ActionMap.put(sa.name, singleton(sa));
-
-      // Also group into s3:Get*, s3:Put*, s3:List* depending on the action name
-      if (sa.name.startsWith("s3:Get")) {
-        s3ActionMap.computeIfAbsent("s3:Get*", k -> new LinkedHashSet<>()).add(sa);
-      } else if (sa.name.startsWith("s3:Put")) {
-        s3ActionMap.computeIfAbsent("s3:Put*", k -> new LinkedHashSet<>()).add(sa);
-      } else if (sa.name.startsWith("s3:List")) {
-        s3ActionMap.computeIfAbsent("s3:List*", k -> new LinkedHashSet<>()).add(sa);
-      } else if (sa.name.startsWith("s3:Delete")) {
-        s3ActionMap.computeIfAbsent("s3:Delete*", k -> new LinkedHashSet<>()).add(sa);
-      } else if (sa.name.startsWith("s3:Create")) {
-        s3ActionMap.computeIfAbsent("s3:Create*", k -> new LinkedHashSet<>()).add(sa);
-      }
     }
 
     // Map the actions from the IAM policy to S3Action
@@ -319,12 +324,23 @@ public final class IamSessionPolicyResolver {
       }
 
       // Unsupported actions are silently ignored
-      if (s3ActionMap.containsKey(action)) {
-        mappedActions.addAll(s3ActionMap.get(action));
+      if (S3_ACTION_MAP.containsKey(action)) {
+        mappedActions.addAll(S3_ACTION_MAP.get(action));
       }
     }
 
     return mappedActions;
+  }
+
+  /**
+   * Validates that wildcard bucket patterns are not used with native authorizer.
+   */
+  private static void validateNativeAuthorizerBucketPattern(AuthorizerType authorizerType,
+                                                            String bucket) throws OMException {
+    if (authorizerType == AuthorizerType.NATIVE && bucket.contains("*")) {
+      throw new OMException("Wildcard bucket patterns are not " +
+          "supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+    }
   }
 
   /**
@@ -341,10 +357,7 @@ public final class IamSessionPolicyResolver {
     final List<ResourceSpec> resourceSpecs = new ArrayList<>();
     for (String resource : resources) {
       if ("*".equals(resource)) {
-        if (authorizerType == AuthorizerType.NATIVE) {
-          throw new OMException("Wildcard bucket patterns are not " +
-              "supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
-        }
+        validateNativeAuthorizerBucketPattern(authorizerType, "*");
         resourceSpecs.add(ResourceSpec.any());
         continue;
       }
@@ -359,23 +372,17 @@ public final class IamSessionPolicyResolver {
       }
 
       ResourceSpec spec = parseResourceSpec(suffix);
-      if (authorizerType == AuthorizerType.NATIVE && spec.type == S3ResourceType.BUCKET_WILDCARD) {
-        throw new OMException("Wildcard bucket patterns are not " +
-            "supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+      if (spec.type == S3ResourceType.BUCKET_WILDCARD) {
+        validateNativeAuthorizerBucketPattern(authorizerType, spec.bucket);
       }
 
       // This scenario can happen in the case of arn:aws:s3:::*/* or arn:aws:s3:::*/test.txt for
       // examples
-      if (authorizerType == AuthorizerType.NATIVE && spec.bucket.contains("*")) {
-        throw new OMException("Wildcard bucket patterns are not " +
-            "supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
-      }
+      validateNativeAuthorizerBucketPattern(authorizerType, spec.bucket);
 
       if (authorizerType == AuthorizerType.NATIVE && spec.type == S3ResourceType.OBJECT_PREFIX_WILDCARD) {
         if (spec.prefix.endsWith("*")) {
-          spec = ResourceSpec.objectPrefix(spec.bucket,
-              spec.prefix.substring(0, spec.prefix.length() - 1)
-          );
+          spec = ResourceSpec.objectPrefix(spec.bucket, spec.prefix.substring(0, spec.prefix.length() - 1));
         } else {
           throw new OMException("Wildcard prefix patterns are not " +
               "supported for Ozone native authorizer if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
@@ -430,26 +437,20 @@ public final class IamSessionPolicyResolver {
 
     final Map<GroupingKey, Set<IOzoneObj>> groupMap = new LinkedHashMap<>();
 
-    for (Map.Entry<IOzoneObj, Set<ACLType>> entry : objToAclsMap.entrySet()) {
-      final IOzoneObj obj = entry.getKey();
-      final Set<ACLType> acls = entry.getValue();
-
-      // Create grouping key based on ACLs and resource type
-      final GroupingKey key = new GroupingKey(acls, ((OzoneObj)obj).getResourceType());
+    // Group objects by their ACL sets and resource type
+    objToAclsMap.forEach((obj, acls) -> {
+      final GroupingKey key = new GroupingKey(acls, ((OzoneObj) obj).getResourceType());
       groupMap.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(obj);
-    }
+    });
 
-    // Convert to result format
+    // Convert to result format, filtering out entries with empty ACLs
     final Set<AbstractMap.SimpleImmutableEntry<Set<IOzoneObj>, Set<ACLType>>> result =
         new LinkedHashSet<>();
-    for (Map.Entry<GroupingKey, Set<IOzoneObj>> entry : groupMap.entrySet()) {
-      final GroupingKey key = entry.getKey();
-      final Set<IOzoneObj> objs = entry.getValue();
-
-      if (!key.acls.isEmpty() && !objs.isEmpty()) {
+    groupMap.forEach((key, objs) -> {
+      if (!key.acls.isEmpty()) {
         result.add(new AbstractMap.SimpleImmutableEntry<>(objs, key.acls));
       }
-    }
+    });
 
     return result;
   }
@@ -481,6 +482,30 @@ public final class IamSessionPolicyResolver {
     @Override
     public int hashCode() {
       return Objects.hash(acls, resourceType);
+    }
+  }
+
+  /**
+   * Functional interface for supplying IOzoneObj based on action.
+   */
+  @FunctionalInterface
+  private interface IOzoneObjSupplier {
+    IOzoneObj get(S3Action action);
+  }
+
+  /**
+   * Processes actions for a given ActionKind and adds resulting ACLs to the map.
+   */
+  private static void processActionsForKind(Set<S3Action> mappedS3Actions,
+                                           ActionKind targetKind,
+                                           Map<String, IOzoneObj> canonicalObjBySignature,
+                                           Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+                                           IOzoneObjSupplier objSupplier) {
+    for (S3Action action : mappedS3Actions) {
+      if (action.kind == targetKind || action == S3Action.ALL_S3) {
+        final IOzoneObj obj = objSupplier.get(action);
+        addAclsForObj(objToAclsMap, canonicalObjBySignature, obj, action.perms);
+      }
     }
   }
 
@@ -546,23 +571,26 @@ public final class IamSessionPolicyResolver {
                                              Set<S3Action> mappedS3Actions,
                                              Map<String, IOzoneObj> canonicalObjBySignature,
                                              Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
-    
-    for (S3Action action : mappedS3Actions) {
-      if (action.kind == ActionKind.VOLUME || action == S3Action.ALL_S3) {
-        final IOzoneObj volumeObj = volumeObj(volumeName);
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, volumeObj, action.perms);
-      }
+    processActionsForKind(mappedS3Actions,
+        ActionKind.VOLUME,
+        canonicalObjBySignature,
+        objToAclsMap,
+        action -> volumeObj(volumeName)
+    );
 
-      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3) {
-        final IOzoneObj bucketObj = bucketObj(volumeName, "*");
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, action.perms);
-      }
+    processActionsForKind(mappedS3Actions,
+        ActionKind.BUCKET,
+        canonicalObjBySignature,
+        objToAclsMap,
+        action -> bucketObj(volumeName, "*")
+    );
 
-      if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
-        final IOzoneObj keyObj = keyObj(volumeName, "*", "*");
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, action.perms);
-      }
-    }
+    processActionsForKind(mappedS3Actions,
+        ActionKind.OBJECT,
+        canonicalObjBySignature,
+        objToAclsMap,
+        action -> keyObj(volumeName, "*", "*")
+    );
   }
 
   /**
@@ -574,12 +602,12 @@ public final class IamSessionPolicyResolver {
                                             ResourceSpec resourceSpec,
                                             Map<String, IOzoneObj> canonicalObjBySignature,
                                             Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
-    for (S3Action action : mappedS3Actions) {
-      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3) {
-        final IOzoneObj bucketObj = bucketObj(volumeName, resourceSpec.bucket);
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, bucketObj, action.perms);
-      }
-    }
+    processActionsForKind(mappedS3Actions,
+        ActionKind.BUCKET,
+        canonicalObjBySignature,
+        objToAclsMap,
+        action -> bucketObj(volumeName, resourceSpec.bucket)
+    );
   }
 
   /**
@@ -591,13 +619,12 @@ public final class IamSessionPolicyResolver {
                                                  ResourceSpec resourceSpec,
                                                  Map<String, IOzoneObj> canonicalObjBySignature,
                                                  Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
-    
-    for (S3Action action : mappedS3Actions) {
-      if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
-        final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, resourceSpec.key);
-        addAclsForObj(objToAclsMap, canonicalObjBySignature, keyObj, action.perms);
-      }
-    }
+    processActionsForKind(mappedS3Actions,
+        ActionKind.OBJECT,
+        canonicalObjBySignature,
+        objToAclsMap,
+        action -> keyObj(volumeName, resourceSpec.bucket, resourceSpec.key)
+    );
   }
 
   /**
@@ -722,6 +749,9 @@ public final class IamSessionPolicyResolver {
     RANGER
   }
 
+  /**
+   * The type of resource the S3 action applies to.
+   */
   private enum ActionKind {
     VOLUME,
     BUCKET,
@@ -729,6 +759,9 @@ public final class IamSessionPolicyResolver {
     ALL
   }
 
+  /**
+   * The categorization possibilities of Resources in the IAM policy.
+   */
   private enum S3ResourceType {
     ANY,
     BUCKET,
