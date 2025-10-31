@@ -152,10 +152,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    * @param snapshotInfo snapshot metadata
    * @return the path to the snapshot's local property YAML file
    */
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(SnapshotInfo snapshotInfo) {
     return getSnapshotLocalPropertyYamlPath(snapshotInfo.getSnapshotId());
   }
 
+  @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(UUID snapshotId) {
     Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId);
     return getSnapshotLocalPropertyYamlPath(snapshotPath);
@@ -205,7 +207,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return new WritableOmSnapshotLocalDataProvider(snapshotId);
   }
 
-  public OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
+  OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
     return snapshotLocalDataSerializer.load(snapshotDataPath);
   }
 
@@ -769,6 +771,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
           previousSnapshotLocalData.getVersion());
+      // Adding a new snapshot version means it has been defragged thus the flag needs to be reset.
       this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.
       setDirty();

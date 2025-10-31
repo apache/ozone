@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.compaction.log;
+package org.apache.ozone.rocksdb.util;
+
+import static org.apache.commons.io.FilenameUtils.getBaseName;
 
 import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
@@ -39,7 +41,7 @@ public class SstFileInfo implements CopyObject<SstFileInfo> {
   }
 
   public SstFileInfo(LiveFileMetaData fileMetaData) {
-    this(fileMetaData.fileName(), StringUtils.bytes2String(fileMetaData.smallestKey()),
+    this(getBaseName(fileMetaData.fileName()), StringUtils.bytes2String(fileMetaData.smallestKey()),
         StringUtils.bytes2String(fileMetaData.largestKey()),
         StringUtils.bytes2String(fileMetaData.columnFamilyName()));
   }
