@@ -394,11 +394,18 @@ public class TestFSORepairTool {
   @Test
   public void testAlternateOmDbDirNameDryRun() throws Exception {
     File original = new File(OMStorage.getOmDbDir(cluster.getConf()), OM_DB_NAME);
-    File backup = new File(OMStorage.getOmDbDir(cluster.getConf()), "om-db-backup");
+    // Place backup under a different parent directory to ensure we don't
+    // accidentally open the original om.db due to path handling bugs.
+    File backupParent = new File(OMStorage.getOmDbDir(cluster.getConf()), "copy");
+    File backup = new File(backupParent, "om-db-backup");
 
     if (backup.exists()) {
       FileUtils.deleteDirectory(backup);
     }
+    if (backupParent.exists()) {
+      FileUtils.deleteDirectory(backupParent);
+    }
+    backupParent.mkdirs();
     FileUtils.copyDirectory(original, backup);
 
     out.reset();
@@ -411,7 +418,7 @@ public class TestFSORepairTool {
     assertThat(reportOutput).contains("Unreachable (Pending to delete):");
     assertThat(reportOutput).contains("Unreferenced (Orphaned):");
 
-    FileUtils.deleteDirectory(backup);
+    FileUtils.deleteDirectory(backupParent);
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
