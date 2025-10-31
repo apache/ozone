@@ -330,7 +330,7 @@ class TestOmSnapshotManager {
     assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));
     assertFalse(localData.getSstFiltered());
     assertEquals(0L, localData.getLastDefragTime());
-    assertFalse(localData.getNeedsDefrag());
+    assertTrue(localData.getNeedsDefrag());
     assertEquals(1, localData.getVersionSstFileInfos().size());
 
     // Cleanup
