@@ -668,6 +668,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
           previousSnapshotLocalData.getVersion());
+      // Adding a new snapshot version means it has been defragged thus the flag needs to be reset.
       this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.
       setDirty();
