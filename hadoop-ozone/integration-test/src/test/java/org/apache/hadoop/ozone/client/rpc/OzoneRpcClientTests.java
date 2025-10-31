@@ -4657,7 +4657,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
             .getRangeKVs(null, 100,
                 cluster.getOzoneManager().getMetadataManager()
                 .getOzoneKey(volumeName, bucketName, keyName));
-        return rangeKVs.size() > 0;
+        return !rangeKVs.isEmpty();
       }, 100, 5000);
 
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
@@ -4666,7 +4666,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
               cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
-      assertThat(rangeKVs.size()).isGreaterThan(0);
+      assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
