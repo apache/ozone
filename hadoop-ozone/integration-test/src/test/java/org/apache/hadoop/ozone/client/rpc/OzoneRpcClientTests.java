@@ -4651,7 +4651,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     if (expectedCount == 1) {
       // Wait for deleted key to become visible in deletedTable
-      GenericTestUtils.waitFor(() -> {
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
         List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
             = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
             .getRangeKVs(null, 100,
