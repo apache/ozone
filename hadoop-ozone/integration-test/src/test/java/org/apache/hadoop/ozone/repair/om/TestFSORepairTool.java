@@ -405,7 +405,10 @@ public class TestFSORepairTool {
     if (backupParent.exists()) {
       FileUtils.deleteDirectory(backupParent);
     }
-    backupParent.mkdirs();
+    boolean created = backupParent.mkdirs();
+    if (!created && !backupParent.exists()) {
+      throw new IOException("Failed to create backup parent directory: " + backupParent);
+    }
     FileUtils.copyDirectory(original, backup);
 
     out.reset();

@@ -587,7 +587,7 @@ public class FSORepairTool extends RepairTool {
 
     private void openTempDB() throws IOException {
       File tempDBFile = new File(new File(omDBPath).getParentFile(), "temp.db");
-      info("Creating database with reachable and unreachable tables at " + tempDBFile);
+      info("Creating database with reachable and pendingToDelete tables at " + tempDBFile);
       // Delete the DB from the last run if it exists.
       if (tempDBFile.exists()) {
         FileUtils.deleteDirectory(tempDBFile);
