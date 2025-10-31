@@ -647,6 +647,26 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3})
+  public void testNeedsDefrag(int previousVersion) throws IOException {
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    for (UUID snapshotId : snapshotIds) {
+      try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotId)) {
+        assertTrue(snap.needsDefrag());
+      }
+    }
+    addVersionsToLocalData(localDataManager, snapshotIds.get(0), ImmutableMap.of(1, 1, 2, 2, 3, 3));
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(0))) {
+      assertFalse(snap.needsDefrag());
+    }
+    addVersionsToLocalData(localDataManager, snapshotIds.get(1), ImmutableMap.of(1, 3, 2, previousVersion));
+    try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(1))) {
+      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().getVersion(), snap.needsDefrag());
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testVersionResolution(boolean read) throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, null, conf);
