@@ -43,13 +43,14 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 /**
  * Resolves a limited subset of AWS IAM session policies into Ozone ACL grants,
  * according to either the RangerOzoneAuthorizer or OzoneNativeAuthorizer constructs.
- * RangerOzoneAuthorizer doesn't currently use ResourceType.PREFIX for example,
- * whereas OzoneNativeAuthorizer does.  Also, OzoneNativeAuthorizer doesn't allow
- * wildcards in bucket names (ex. ResourceArn `arn:aws:s3:::*`, `arn:aws:s3:::bucket*` or `*`),
- * whereas RangerOzoneAuthorizer does.  Also, for OzoneNativeAuthorizer, certain object
- * wildcards be accepted.   For example, ResourceArn `arn:aws:s3:::myBucket/*` and
- * `arn:aws:s3:::myBucket/folder/logs/*` will be accepted but
- * `arn:aws:s3:::myBucket/file*.txt` will not be accepted.
+ * <p>
+ * Here are some differences between the RangerOzoneAuthorizer and OzoneNativeAuthorizer:
+ *    - RangerOzoneAuthorizer doesn't currently use ResourceType.PREFIX, whereas OzoneNativeAuthorizer does.
+ *    - OzoneNativeAuthorizer doesn't allow wildcards in bucket names (ex. ResourceArn `arn:aws:s3:::*`,
+ *    `arn:aws:s3:::bucket*` or `*`), whereas RangerOzoneAuthorizer does.
+ *    - For OzoneNativeAuthorizer, certain object wildcards are accepted.   For example, ResourceArn
+ *    `arn:aws:s3:::myBucket/*` and `arn:aws:s3:::myBucket/folder/logs/*` are accepted but not
+ *    `arn:aws:s3:::myBucket/file*.txt`.
  * <p>
  * The only supported ResourceArn has prefix arn:aws:s3::: - all others will throw
  * OMException with NOT_SUPPORTED_OPERATION.
@@ -497,10 +498,10 @@ public final class IamSessionPolicyResolver {
    * Processes actions for a given ActionKind and adds resulting ACLs to the map.
    */
   private static void processActionsForKind(Set<S3Action> mappedS3Actions,
-                                           ActionKind targetKind,
-                                           Map<String, IOzoneObj> canonicalObjBySignature,
-                                           Map<IOzoneObj, Set<ACLType>> objToAclsMap,
-                                           IOzoneObjSupplier objSupplier) {
+                                            ActionKind targetKind,
+                                            Map<String, IOzoneObj> canonicalObjBySignature,
+                                            Map<IOzoneObj, Set<ACLType>> objToAclsMap,
+                                            IOzoneObjSupplier objSupplier) {
     for (S3Action action : mappedS3Actions) {
       if (action.kind == targetKind || action == S3Action.ALL_S3) {
         final IOzoneObj obj = objSupplier.get(action);
