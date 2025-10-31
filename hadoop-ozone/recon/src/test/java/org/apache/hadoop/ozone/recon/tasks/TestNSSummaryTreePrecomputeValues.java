@@ -118,6 +118,12 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     populateComplexTree();
   }
 
+  @BeforeEach
+  void clearCacheBetweenTests() {
+    // Clear LRU cache to ensure clean state between tests
+    nSSummaryTaskWithFso.clearCache();
+  }
+
   /**
    * Overrides the inherited method to initialize OM metadata manager with custom IDs.
    * This ensures our test uses unique IDs for volumes and buckets.
