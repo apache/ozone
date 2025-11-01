@@ -512,7 +512,7 @@ public class TestOmSnapshotLocalDataManager {
     assertTrue(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId));
     localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null, secondSnapId);
     if (purgeSnapshot) {
-      NoSuchFileException e = assertThrows(NoSuchFileException.class,
+      assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
       assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
     } else {

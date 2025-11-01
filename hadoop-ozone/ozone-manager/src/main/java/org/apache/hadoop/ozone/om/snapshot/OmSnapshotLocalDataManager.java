@@ -284,6 +284,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     });
   }
 
+  @VisibleForTesting
   Map<UUID, Integer> getSnapshotToBeCheckedForOrphans() {
     return snapshotToBeCheckedForOrphans;
   }
@@ -315,7 +316,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       incrementOrphanCheckCount(snapshotId);
     }
     long snapshotLocalDataManagerServiceInterval = configuration.getTimeDuration(
-        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT,
+        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL,
+        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     if (snapshotLocalDataManagerServiceInterval > 0) {
       this.scheduler = new Scheduler(LOCAL_DATA_MANAGER_SERVICE_NAME, true, 1);
@@ -344,6 +346,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   @VisibleForTesting
   void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager,
       UUID snapshotId) throws IOException {
+    LOG.info("Checking orphan snapshot versions for snapshot {}", snapshotId);
     try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider = new WritableOmSnapshotLocalDataProvider(
         snapshotId)) {
       OmSnapshotLocalData snapshotLocalData = snapshotLocalDataProvider.getSnapshotLocalData();
@@ -361,6 +364,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
               && ((versionEntry.getVersion() != 0 && versionEntry.getVersion() != snapshotLocalData.getVersion())
               || isSnapshotPurged);
           if (toRemove) {
+            LOG.info("Removing snapshot Id : {} version: {} from local data, snapshotLocalDataVersion : {}, " +
+                    "snapshotPurged: {}, inDegree : {}", snapshotId, versionEntry.getVersion(),
+                snapshotLocalData.getVersion(), isSnapshotPurged, localDataGraph.inDegree(versionEntry));
             snapshotLocalDataProvider.removeVersion(versionEntry.getVersion());
           }
         } finally {
@@ -857,8 +863,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
               snapshotVersions.getPreviousSnapshotId())) {
             incrementOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
           }
-          // If the transactionInfo set this means the snapshot has been purged and the entire yaml file could have
-          // become an orphan if the version is also updated it
+          // If the transactionInfo set, this means the snapshot has been purged and the entire YAML file could have
+          // become an orphan. Otherwise if the version is updated it
           // could mean that there could be some orphan version present within the
           // same snapshot.
           if (transactionInfoSet || existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
