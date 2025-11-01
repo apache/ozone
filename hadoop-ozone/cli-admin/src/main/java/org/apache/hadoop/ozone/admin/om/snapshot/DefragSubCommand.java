@@ -52,7 +52,7 @@ public class DefragSubCommand implements Callable<Void> {
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM to trigger snapshot defragmentation.",
+      description = "NodeID of the OM to trigger snapshot defragmentation on.",
       required = false
   )
   private String nodeId;
@@ -72,6 +72,12 @@ public class DefragSubCommand implements Callable<Void> {
     OzoneConfiguration conf = omAdmin.getParent().getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
+
+    if (omNodeDetails == null) {
+      System.err.println("OMNodeDetails could not be determined with the given " +
+          "service ID and node ID.");
+      return null;
+    }
 
     try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
              OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
