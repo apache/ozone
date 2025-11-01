@@ -4673,7 +4673,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
-    } else{
+    } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
       RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
