@@ -436,7 +436,8 @@ public class SnapshotDefragService extends BackgroundService
         if (needsDefragmentation(previousSnapshotInfo)) {
           LOG.error("Previous snapshot {} is not marked as defragmented. Something is wrong.",
               previousSnapshotInfo.getName());
-          return;
+          throw new IOException("Previous snapshot " + previousSnapshotInfo.getName()
+              + " is not marked as defragmented. Cannot proceed with incremental defragmentation.");
         }
         RDBStore prevStore = (RDBStore) prevSnapshot.getMetadataManager().getStore();
         RocksDatabase prevDb = prevStore.getDb();
