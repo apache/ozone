@@ -820,7 +820,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
         } else if (snapshotLocalDataFile.exists()) {
-          LOG.info("Deleting Yaml file corresponding to snapshotId: {} in path : {}",
+          LOG.info("Deleting YAML file corresponding to snapshotId: {} in path : {}",
               super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
           if (!snapshotLocalDataFile.delete()) {
             throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
