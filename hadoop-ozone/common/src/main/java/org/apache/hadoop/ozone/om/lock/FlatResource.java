@@ -29,7 +29,7 @@ public enum FlatResource implements Resource {
   SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK"),
   // Lock acquired on a Snapshot's Local Data.
   SNAPSHOT_LOCAL_DATA_LOCK("SNAPSHOT_LOCAL_DATA_LOCK"),
-  // Lock acquired on a Snapshot's RockDB contents.
+  // Lock acquired on a Snapshot's RocksDB contents.
   SNAPSHOT_DB_CONTENT_LOCK("SNAPSHOT_DB_CONTENT_LOCK");
 
 
