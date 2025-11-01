@@ -276,7 +276,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       if (snapshotLocalDataVersion > 0) {
         dbName += OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + snapshotLocalDataVersion;
       }
-      LOG.debug("Final dbName = {}, snapshotLocalDataVersion = {}", dbName, snapshotLocalDataVersion);
+      LOG.debug("snapshotLocalDataVersion = {}. Final dbName = {}", snapshotLocalDataVersion, dbName);
       checkSnapshotDirExist(Paths.get(metaDir.toPath().toString(), dbName).toFile());
       final boolean enableRocksDBMetrics = conf.getBoolean(
           OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
