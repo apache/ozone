@@ -47,6 +47,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,6 +232,25 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
           "\', sent to " + omPrintInfo + " failed with error: " +
           response.getErrorMsg());
     }
+  }
+
+  @Override
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+    TriggerSnapshotDefragRequest request = TriggerSnapshotDefragRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+    TriggerSnapshotDefragResponse response;
+    try {
+      response = rpcProxy.triggerSnapshotDefrag(NULL_RPC_CONTROLLER, request);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    if (!response.getSuccess()) {
+      throwException("Request to trigger snapshot defragmentation" +
+          ", sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
+    }
+    return response.hasResult() ? response.getResult() : true;
   }
 
   private void throwException(String errorMsg)

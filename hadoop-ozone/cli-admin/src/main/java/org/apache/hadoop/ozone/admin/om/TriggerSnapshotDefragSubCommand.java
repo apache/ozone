@@ -17,9 +17,13 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 
 /**
@@ -52,6 +56,13 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
   private String omHost;
 
   @CommandLine.Option(
+      names = {"--node-id"},
+      description = "NodeID of the OM to trigger snapshot defragmentation.",
+      required = false
+  )
+  private String nodeId;
+
+  @CommandLine.Option(
       names = {"--no-wait"},
       description = "Do not wait for the defragmentation task to complete. " +
           "The command will return immediately after triggering the task.",
@@ -61,11 +72,15 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    boolean forceHA = false;
+    OzoneConfiguration conf = parent.getParent().getOzoneConf();
+    OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
+        conf, omServiceId, nodeId);
 
-    try (OzoneManagerProtocol client = parent.createOmClient(omServiceId, omHost, forceHA)) {
+    try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
+             OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
+                 UserGroupInformation.getCurrentUser(), omNodeDetails)) {
       System.out.println("Triggering Snapshot Defragmentation Service...");
-      boolean result = client.triggerSnapshotDefrag(noWait);
+      boolean result = omAdminProtocolClient.triggerSnapshotDefrag(noWait);
 
       if (noWait) {
         System.out.println("Snapshot defragmentation task has been triggered " +
@@ -78,10 +93,10 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
               "interrupted.");
         }
       }
-    } catch (Exception e) {
+    } catch (IOException ex) {
       System.err.println("Failed to trigger snapshot defragmentation: " +
-          e.getMessage());
-      throw e;
+          ex.getMessage());
+      throw ex;
     }
 
     return null;
