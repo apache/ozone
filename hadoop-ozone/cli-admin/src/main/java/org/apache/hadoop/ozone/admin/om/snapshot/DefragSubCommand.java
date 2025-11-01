@@ -75,7 +75,7 @@ public class DefragSubCommand implements Callable<Void> {
         conf, omServiceId, nodeId);
 
     if (omNodeDetails == null) {
-      System.err.println("OMNodeDetails could not be determined with the given " +
+      System.err.println("Error: OMNodeDetails could not be determined with given " +
           "service ID and node ID.");
       return null;
     }

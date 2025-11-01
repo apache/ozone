@@ -152,8 +152,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDefragRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDefragResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -261,11 +259,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         RangerBGSyncResponse rangerBGSyncResponse = triggerRangerBGSync(
             request.getRangerBGSyncRequest());
         responseBuilder.setRangerBGSyncResponse(rangerBGSyncResponse);
-        break;
-      case SnapshotDefrag:
-        SnapshotDefragResponse snapshotDefragResponse = triggerSnapshotDefrag(
-            request.getSnapshotDefragRequest());
-        responseBuilder.setSnapshotDefragResponse(snapshotDefragResponse);
         break;
       case DBUpdates:
         DBUpdatesResponse dbUpdatesResponse = getOMDBUpdates(
@@ -1082,14 +1075,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     boolean res = impl.triggerRangerBGSync(rangerBGSyncRequest.getNoWait());
 
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
-  }
-
-  private SnapshotDefragResponse triggerSnapshotDefrag(
-      SnapshotDefragRequest snapshotDefragRequest) throws IOException {
-
-    boolean res = impl.triggerSnapshotDefrag(snapshotDefragRequest.getNoWait());
-
-    return SnapshotDefragResponse.newBuilder().setRunSuccess(res).build();
   }
 
   private RefetchSecretKeyResponse refetchSecretKey() {
