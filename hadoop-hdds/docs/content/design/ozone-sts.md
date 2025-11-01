@@ -42,7 +42,7 @@ solutions that want to aggregate data across multiple cloud providers.
 # 3. How Ozone STS Works
 
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
-API from the AWS specification.  A new STS endpoint will be created to service STS requests in the S3 Gateway.
+API from the AWS specification.  A new STS endpoint `/sts` on port `9880` will be created to service STS requests in the S3 Gateway.
 
 ## 3.1 Capabilities
 
@@ -69,16 +69,17 @@ subset of its capabilities.  The restrictions are outlined below:
 of `*` is supported as well.
 - The only supported Condition operator is `StringEquals` - all others will be rejected.
 - The only supported Condition attribute is `s3:prefix` - all others will be rejected.
-- Only one Condition operator per Statement is supported - a Statement with more than one condition will be rejected.
+- Only one Condition operator per Statement is supported - a Statement with more than one Condition will be rejected.
 - The only supported Effect is `Allow` - all others will be rejected.
 - If a (currently) unsupported S3 action is requested, such as `s3:GetAccelerateConfiguration`, it will be silently ignored.
 Similarly, an invalid S3 action will be silently ignored.
 - Supported wildcard expansions in Actions are: `s3:*`, `s3:Get*`, `s3:Put*`, `s3:List*`,
 `s3:Create*`, and `s3:Delete*`.
-- If using OzoneNativeAuthorizer, bucket wildcards (ex. ResourceArn `arn:aws:s3:::*`, `arn:aws:s3:::bucket*` or `*`) will be rejected.
+- If using OzoneNativeAuthorizer, bucket wildcards (ex. ResourceArn `arn:aws:s3:::*`, `arn:aws:s3:::bucket*` or `*`) will be rejected,
+as wildcards are not supported for buckets for the OzoneNativeAuthorizer.
 However, certain object wildcards be accepted.   For example, ResourceArn `arn:aws:s3:::myBucket/*` and `arn:aws:s3:::myBucket/folder/logs/*`
 will be accepted but `arn:aws:s3:::myBucket/file*.txt`
-will not be accepted.
+will not be accepted. Again, these restrictions correspond to the capabilities of the OzoneNativeAuthorizer.
 
 A sample IAM policy that allows read access to all objects in the `example-bucket` bucket is shown below:
 ```JSON
@@ -121,11 +122,54 @@ In the rare event temporary credentials need to be revoked (ex. for security rea
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
 will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.
 
-## 3.6 Overall Flow
+## 3.6 Prerequisites
+
+A user must be configured with a Kerberos identity in Ozone and the S3 `getSecret` command
+must be called to issue permanent S3 credentials.  With these credentials, the AssumeRole API can be made.  
+Furthermore, when using RangerOzoneAuthorizer, a role must be configured in Ranger UI for each role the AssumeRole API
+can be used with.  The user making the AssumeRole call must be in this role, and this role must have access
+to the (new) `ASSUME_ROLE` permission in Ranger, in addition to the volumes/buckets/keys and other permissions (such as `READ`,
+`LIST`, etc.) that are required.
+
+### 3.6.1 Additions to RangerOzoneAuthorizer
+
+The `IAccessAuthorizer` interface that both the RangerOzoneAuthorizer and OzoneNativeAuthorizer implement, will have a
+new method: 
+
+```java
+default String generateAssumeRoleSessionPolicy(AssumeRoleRequest assumeRoleRequest) throws OMException {
+    throw new OMException("The generateAssumeRoleSessionPolicy call is not supported", NOT_SUPPORTED_OPERATION);
+}
+```
+
+When using RangerOzoneAuthorizer, the AssumeRole API call must invoke this method to ensure the caller is authorized to create
+temporary credentials, given the criteria in the AssumeRoleRequest.  The AssumeRoleRequest input parameter will have the
+components:
+- `String` host - hostname of caller
+- `InetAddress` ip - IP address of caller
+- `UserGroupInformation` ugi - the user making the call
+- `String` targetRoleName - what role is being assumed
+- `Set<OzoneGrant>` grants - further limiting the scope of the role according to the grants
+
+The grants parameter is optional, and would only be present if the AssumeRole API call had an IAM session policy JSON 
+parameter supplied.  A conversion utility, `IamSessionPolicyResolver` will process the IAM policy and convert it to a 
+`Set<OzoneGrant>`, in effect translating from S3 nomenclature for resources and actions to Ozone nomenclature of 
+`IOzoneObj` and `ACLType`.  Ranger would use all of this information to determine if the AssumeRole call should be 
+successfully authorized, and if so, it will return a String representation of the granted permissions and paths.  
+
+The format of this String is entirely up to the Ranger team.  What is required from the Ozone side is to supply this String to Ranger when any
+subsequent S3 API calls are made that use STS tokens.  In order to achieve this, the sessionPolicy String from Ranger will 
+be included in the sessionToken response to the AssumeRole API call (as mentioned above), and Ozone will supply this String
+to Ranger whenever STS tokens are used on S3 API calls via a new `RequestContext.sessionPolicy` field in the 
+`IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)` call.
+
+## 3.7 Overall Flow
 
 The following section outlines the overall flow when using STS in Ozone:
 
-- An authorized user (having permanent S3 credentials) makes the AssumeRole STS call to Ozone.
+- An authorized user for AssumeRole API calls must be configured in Ozone, and if using RangerOzoneAuthorizer, the role
+created in Ranger as per the Prerequisites above.
+- This authorized user (having permanent S3 credentials) makes the AssumeRole STS call to Ozone.
 - If successful, Ozone responds with the temporary credentials.
 - A client makes S3 API calls with the temporary credentials for up to as long as the credentials last.  
 - When Ozone receives an S3 api call using temporary credentials, it will perform the following checks:
@@ -136,12 +180,3 @@ The following section outlines the overall flow when using STS in Ozone:
   - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
 
 Assuming all these checks pass, the S3 API call will be invoked.
-
-# 4. Prerequisites
-
-A user must be configured with a Kerberos identity in Ozone and the S3 `getSecret` command
-must be called to issue permanent S3 credentials.  With these credentials, the AssumeRole API can be made.  
-Furthermore, when using RangerOzoneAuthorizer, a role must be configured in Ranger UI for each role the AssumeRole API 
-can be used with.  The user making the AssumeRole call must be in this role, and this role must have access 
-to the (new) `ASSUME_ROLE` permission in Ranger, in addition to the volumes/buckets/keys and other permissions (such as `READ`,
-`LIST`, etc.) that are required.
