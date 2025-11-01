@@ -81,6 +81,7 @@ public class TestSnapshotDefragService {
   private ObjectStore store;
   private OzoneManager ozoneManager;
   private SnapshotDefragService defragService;
+  private static int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_VALUE = 3;
 
   @BeforeAll
   void setup() throws Exception {
@@ -100,7 +101,7 @@ public class TestSnapshotDefragService {
 
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 3000000);
-    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 3);
+    conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, SNAPSHOT_DEFRAG_LIMIT_PER_TASK_VALUE);
 
     conf.setQuietMode(false);
 
@@ -330,10 +331,10 @@ public class TestSnapshotDefragService {
 
     // Wait for the service to process snapshots
     try {
-      await(20000, 1000, () -> {
+      await(30000, 1000, () -> {
         long currentCount = defragService.getSnapshotsDefraggedCount().get();
         LOG.info("Current defragmented count: {}", currentCount);
-        return currentCount > initialDefragCount;
+        return currentCount > initialDefragCount && currentCount >= SNAPSHOT_DEFRAG_LIMIT_PER_TASK_VALUE;
       });
     } catch (TimeoutException e) {
       LOG.warn("Timeout waiting for defragmentation to complete, continuing with test");
