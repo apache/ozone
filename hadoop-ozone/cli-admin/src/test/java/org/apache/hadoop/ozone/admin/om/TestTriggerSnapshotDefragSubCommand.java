@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.mockito.stubbing.Answer;
 import picocli.CommandLine;
 
 /**
@@ -80,6 +82,9 @@ public class TestTriggerSnapshotDefragSubCommand {
     when(parent.getParent()).thenReturn(ozoneAdmin);
     when(ozoneAdmin.getOzoneConf()).thenReturn(conf);
 
+    // Mock close() to do nothing - needed for try-with-resources
+    doNothing().when(omAdminClient).close();
+
     // Mock static methods
     OMNodeDetails omNodeDetails = mock(OMNodeDetails.class);
     mockedStaticOMNodeDetails = mockStatic(OMNodeDetails.class);
@@ -93,8 +98,8 @@ public class TestTriggerSnapshotDefragSubCommand {
 
     mockedStaticClient = mockStatic(OMAdminProtocolClientSideImpl.class);
     mockedStaticClient.when(() -> OMAdminProtocolClientSideImpl.createProxyForSingleOM(
-        any(OzoneConfiguration.class), any(UserGroupInformation.class), any(OMNodeDetails.class)))
-        .thenReturn(omAdminClient);
+        any(), any(), any()))
+        .thenAnswer((Answer<OMAdminProtocolClientSideImpl>) invocation -> omAdminClient);
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
@@ -219,7 +224,7 @@ public class TestTriggerSnapshotDefragSubCommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs();
 
-    Exception exception = assertThrows(Exception.class, () -> cmd.call());
+    assertThrows(Exception.class, () -> cmd.call());
 
     // Verify error message
     String errOutput = errContent.toString(DEFAULT_ENCODING);
