@@ -222,4 +222,22 @@ public class OzoneSnapshot {
     return Objects.hash(volumeName, bucketName, name, creationTime, snapshotStatus, snapshotId, snapshotPath,
         checkpointDir, referencedSize, referencedReplicatedSize, exclusiveSize, exclusiveReplicatedSize);
   }
+
+  @Override
+  public String toString() {
+    return "OzoneSnapshot{" +
+        "bucketName='" + bucketName + '\'' +
+        ", volumeName='" + volumeName + '\'' +
+        ", name='" + name + '\'' +
+        ", creationTime=" + creationTime +
+        ", snapshotStatus=" + snapshotStatus +
+        ", snapshotId=" + snapshotId +
+        ", snapshotPath='" + snapshotPath + '\'' +
+        ", checkpointDir='" + checkpointDir + '\'' +
+        ", referencedSize=" + referencedSize +
+        ", referencedReplicatedSize=" + referencedReplicatedSize +
+        ", exclusiveSize=" + exclusiveSize +
+        ", exclusiveReplicatedSize=" + exclusiveReplicatedSize +
+        '}';
+  }
 }
