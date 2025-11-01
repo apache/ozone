@@ -695,7 +695,7 @@ public class SnapshotDefragService extends BackgroundService
 
       // Clean up temporary directories
       try {
-        Files.deleteIfExists(Paths.get(tempSstDir));
+        FileUtils.deleteDirectory(new File(tempSstDir));
         LOG.debug("Cleaned up temporary SST directory: {}", tempSstDir);
       } catch (IOException e) {
         LOG.warn("Failed to clean up temporary SST directory: {}", tempSstDir, e);
