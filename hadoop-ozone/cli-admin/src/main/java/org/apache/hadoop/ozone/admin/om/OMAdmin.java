@@ -29,6 +29,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.admin.om.lease.LeaseSubCommand;
+import org.apache.hadoop.ozone.admin.om.snapshot.SnapshotSubCommand;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -60,7 +61,7 @@ import picocli.CommandLine;
         TransferOmLeaderSubCommand.class,
         FetchKeySubCommand.class,
         LeaseSubCommand.class,
-        TriggerSnapshotDefragSubCommand.class
+        SnapshotSubCommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class OMAdmin implements AdminSubcommand {

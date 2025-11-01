@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +35,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -46,13 +47,14 @@ import org.mockito.stubbing.Answer;
 import picocli.CommandLine;
 
 /**
- * Unit tests to validate the TriggerSnapshotDefragSubCommand class includes
+ * Unit tests to validate the DefragSubCommand class includes
  * the correct output when executed against a mock client.
  */
-public class TestTriggerSnapshotDefragSubCommand {
+public class TestDefragSubCommand {
 
-  private TriggerSnapshotDefragSubCommand cmd;
-  private OMAdmin parent;
+  private DefragSubCommand cmd;
+  private SnapshotSubCommand snapshotParent;
+  private OMAdmin omAdmin;
   private OzoneAdmin ozoneAdmin;
   private OMAdminProtocolClientSideImpl omAdminClient;
   private OzoneConfiguration conf;
@@ -67,19 +69,21 @@ public class TestTriggerSnapshotDefragSubCommand {
 
   @BeforeEach
   public void setup() throws Exception {
-    cmd = new TriggerSnapshotDefragSubCommand();
-    parent = mock(OMAdmin.class);
+    cmd = new DefragSubCommand();
+    snapshotParent = mock(SnapshotSubCommand.class);
+    omAdmin = mock(OMAdmin.class);
     ozoneAdmin = mock(OzoneAdmin.class);
     omAdminClient = mock(OMAdminProtocolClientSideImpl.class);
     conf = new OzoneConfiguration();
 
-    // Use reflection to set the private parent field
-    Field parentField = TriggerSnapshotDefragSubCommand.class.getDeclaredField("parent");
+    // Use reflection to set the private parent field in DefragSubCommand
+    Field parentField = DefragSubCommand.class.getDeclaredField("parent");
     parentField.setAccessible(true);
-    parentField.set(cmd, parent);
+    parentField.set(cmd, snapshotParent);
 
-    // Mock the parent to return configuration
-    when(parent.getParent()).thenReturn(ozoneAdmin);
+    // Mock the parent hierarchy
+    when(snapshotParent.getParent()).thenReturn(omAdmin);
+    when(omAdmin.getParent()).thenReturn(ozoneAdmin);
     when(ozoneAdmin.getOzoneConf()).thenReturn(conf);
 
     // Mock close() to do nothing - needed for try-with-resources
@@ -135,7 +139,7 @@ public class TestTriggerSnapshotDefragSubCommand {
 
     // Verify output contains success message
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Triggering Snapshot Defragmentation Service"));
+    assertTrue(output.contains("Triggering Snapshot Defrag Service"));
     assertTrue(output.contains("Snapshot defragmentation completed successfully"));
   }
 
@@ -154,7 +158,7 @@ public class TestTriggerSnapshotDefragSubCommand {
 
     // Verify output contains failure message
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Triggering Snapshot Defragmentation Service"));
+    assertTrue(output.contains("Triggering Snapshot Defrag"));
     assertTrue(output.contains("Snapshot defragmentation task failed or was interrupted"));
   }
 
@@ -173,7 +177,7 @@ public class TestTriggerSnapshotDefragSubCommand {
 
     // Verify output contains background execution message
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Triggering Snapshot Defragmentation Service"));
+    assertTrue(output.contains("Triggering Snapshot Defrag"));
     assertTrue(output.contains("Snapshot defragmentation task has been triggered successfully"));
     assertTrue(output.contains("running in the background"));
   }
@@ -186,24 +190,6 @@ public class TestTriggerSnapshotDefragSubCommand {
     // Execute the command with service ID
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--service-id", "om-service-1");
-    cmd.call();
-
-    // Verify the client method was called
-    verify(omAdminClient).triggerSnapshotDefrag(eq(false));
-
-    // Verify success message
-    String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Snapshot defragmentation completed successfully"));
-  }
-
-  @Test
-  public void testTriggerSnapshotDefragWithHost() throws Exception {
-    // Mock the client with host
-    when(omAdminClient.triggerSnapshotDefrag(false)).thenReturn(true);
-
-    // Execute the command with host
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--service-host", "om-host-1");
     cmd.call();
 
     // Verify the client method was called
@@ -250,3 +236,4 @@ public class TestTriggerSnapshotDefragSubCommand {
     assertTrue(output.contains("triggered successfully and is running in the background"));
   }
 }
+

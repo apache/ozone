@@ -15,22 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.om.snapshot;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 
 /**
- * Handler of ozone admin om triggerSnapshotDefrag command.
+ * Handler of ozone admin om snapshot defrag command.
  */
 @CommandLine.Command(
-    name = "triggerSnapshotDefrag",
+    name = "defrag",
     description = "Triggers the Snapshot Defragmentation Service to run " +
         "immediately. This command manually initiates the snapshot " +
         "defragmentation process which compacts snapshot data and removes " +
@@ -38,10 +39,10 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
+public class DefragSubCommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private OMAdmin parent;
+  private SnapshotSubCommand parent;
 
   @CommandLine.Option(
       names = {"-id", "--service-id"},
@@ -66,7 +67,9 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration conf = parent.getParent().getOzoneConf();
+    // Navigate up to get OMAdmin
+    OMAdmin omAdmin = getOMAdmin();
+    OzoneConfiguration conf = omAdmin.getParent().getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceId, nodeId);
 
@@ -94,5 +97,12 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
     }
 
     return null;
+  }
+
+  private OMAdmin getOMAdmin() {
+    // The parent hierarchy is: DefragSubCommand -> SnapshotSubCommand -> OMAdmin
+    // We need to use reflection or add a parent reference in SnapshotSubCommand
+    // For now, let's add a reference in SnapshotSubCommand
+    return parent.getParent();
   }
 }
