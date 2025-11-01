@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.ozone.OzoneAcl.LINK_BUCKET_DEFAULT_ACL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
@@ -71,6 +73,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -88,7 +91,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProv
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -110,6 +112,7 @@ import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.BoundedElasticByteBufferPool;
 import org.apache.hadoop.ozone.client.io.CipherOutputStreamOzone;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStream;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
@@ -318,7 +321,11 @@ public class RpcClient implements ClientProtocol {
             }
           }
         }).build();
-    this.byteBufferPool = new ElasticByteBufferPool();
+    long maxPoolSize = (long) conf.getStorageSize(
+        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE,
+        OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT,
+        StorageUnit.GB);
+    this.byteBufferPool = new BoundedElasticByteBufferPool(maxPoolSize);
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();

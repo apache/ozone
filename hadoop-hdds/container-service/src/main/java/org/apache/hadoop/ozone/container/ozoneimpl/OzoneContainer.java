@@ -610,11 +610,13 @@ public class OzoneContainer {
 
   public Long gatherContainerUsages(HddsVolume storageVolume) {
     AtomicLong usages = new AtomicLong();
-    containerSet.getContainerMapIterator().forEachRemaining(e -> {
-      if (e.getValue().getContainerData().getVolume().getStorageID().equals(storageVolume.getStorageID())) {
-        usages.addAndGet(e.getValue().getContainerData().getBytesUsed());
+    Iterator<Long> containerIdIterator = storageVolume.getContainerIterator();
+    while (containerIdIterator.hasNext()) {
+      Container<?> container = containerSet.getContainer(containerIdIterator.next());
+      if (container != null) {
+        usages.addAndGet(container.getContainerData().getBytesUsed());
       }
-    });
+    }
     return usages.get();
   }
   /**

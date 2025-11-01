@@ -25,9 +25,11 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -92,6 +94,8 @@ public class HddsVolume extends StorageVolume {
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
   private Function<HddsVolume, Long> gatherContainerUsages = (K) -> 0L;
+
+  private final ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
 
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
@@ -527,6 +531,22 @@ public class HddsVolume extends StorageVolume {
       return controller.getContainerCount(this);
     }
     return 0;
+  }
+
+  public void addContainer(long containerId) {
+    containerIds.add(containerId);
+  }
+
+  public void removeContainer(long containerId) {
+    containerIds.remove(containerId);
+  }
+
+  public Iterator<Long> getContainerIterator() {
+    return containerIds.iterator();
+  }
+
+  public long getContainerCount() {
+    return containerIds.size();
   }
 
   /**
