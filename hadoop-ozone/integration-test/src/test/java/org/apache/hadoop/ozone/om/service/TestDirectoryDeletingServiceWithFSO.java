@@ -657,6 +657,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     store.deleteSnapshot(testVolumeName, testBucketName, snap2);
     service.runPeriodicalTaskNow();
     store.deleteSnapshot(testVolumeName, testBucketName, snap1);
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
     assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
