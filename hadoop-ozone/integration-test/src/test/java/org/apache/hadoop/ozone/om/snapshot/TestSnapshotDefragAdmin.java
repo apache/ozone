@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -167,7 +168,7 @@ public class TestSnapshotDefragAdmin {
 
     // Capture output to verify command execution
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    PrintStream ps = new PrintStream(baos);
+    PrintStream ps = new PrintStream(baos, true, StandardCharsets.UTF_8.name());
     PrintStream oldOut = System.out;
     System.setOut(ps);
 
@@ -194,7 +195,7 @@ public class TestSnapshotDefragAdmin {
 
       int exitCode = ozoneAdmin.execute(args);
       System.out.flush();
-      String output = baos.toString();
+      String output = baos.toString(StandardCharsets.UTF_8.name());
 
       // Verify successful execution
       assertEquals(0, exitCode,
