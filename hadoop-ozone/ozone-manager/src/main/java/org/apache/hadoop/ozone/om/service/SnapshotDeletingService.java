@@ -117,7 +117,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
-    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, true);
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, true, 2);
     this.lockIds = new ArrayList<>(2);
   }
 
