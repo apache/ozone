@@ -50,12 +50,6 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host"
-  )
-  private String omHost;
-
-  @CommandLine.Option(
       names = {"--node-id"},
       description = "NodeID of the OM to trigger snapshot defragmentation.",
       required = false
@@ -79,7 +73,7 @@ public class TriggerSnapshotDefragSubCommand implements Callable<Void> {
     try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
              OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
                  UserGroupInformation.getCurrentUser(), omNodeDetails)) {
-      System.out.println("Triggering Snapshot Defragmentation Service...");
+      System.out.println("Triggering Snapshot Defrag Service ...");
       boolean result = omAdminProtocolClient.triggerSnapshotDefrag(noWait);
 
       if (noWait) {
