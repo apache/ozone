@@ -362,8 +362,9 @@ public class SnapshotDefragService extends BackgroundService
       // Step 1: Take checkpoint of current DB
       LOG.debug("Creating checkpoint from original DB to defragmented path");
       try (RocksDatabase.RocksCheckpoint checkpoint = originalDb.createCheckpoint()) {
-        checkpoint.createCheckpoint(Paths.get(defraggedDbPath + versionSuffix));
-        LOG.debug("Created checkpoint at: {}", defraggedDbPath);
+        final String dbPathWithVersionSuffix = defraggedDbPath + versionSuffix;
+        checkpoint.createCheckpoint(Paths.get(dbPathWithVersionSuffix));
+        LOG.debug("Created checkpoint at: {}", dbPathWithVersionSuffix);
       }
 
       // Steps 2-6: Process checkpoint DB (delete ranges and compact)
@@ -447,8 +448,9 @@ public class SnapshotDefragService extends BackgroundService
         assert !prevDb.isClosed();
 
         try (RocksDatabase.RocksCheckpoint checkpoint = prevDb.createCheckpoint()) {
-          checkpoint.createCheckpoint(Paths.get(currentDefraggedDbPath + currentVersionSuffix));
-          LOG.debug("Created checkpoint at: {}", currentDefraggedDbPath);
+          final String dbPathWithVersionSuffix = currentDefraggedDbPath + currentVersionSuffix;
+          checkpoint.createCheckpoint(Paths.get(dbPathWithVersionSuffix));
+          LOG.debug("Created checkpoint at: {}", dbPathWithVersionSuffix);
         }
       }
 
