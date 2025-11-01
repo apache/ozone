@@ -45,7 +45,6 @@ public class TestOmSnapshotInfo {
   private static final UUID GLOBAL_PREVIOUS_SNAPSHOT_ID =
       PATH_PREVIOUS_SNAPSHOT_ID;
   private static final String SNAPSHOT_PATH = "test/path";
-  private static final String CHECKPOINT_DIR = "checkpoint.testdir";
   private static final long DB_TX_SEQUENCE_NUMBER = 12345L;
 
   private SnapshotInfo createSnapshotInfo() {
