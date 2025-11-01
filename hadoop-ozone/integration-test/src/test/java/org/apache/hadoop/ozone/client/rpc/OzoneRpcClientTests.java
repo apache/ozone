@@ -129,6 +129,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -4658,15 +4659,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       // Wait for deleted key to become visible in deletedTable
       String ozoneKey = cluster.getOzoneManager().getMetadataManager()
           .getOzoneKey(volumeName, bucketName, keyName);
-      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
-          cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-              .get(ozoneKey) != null, 100, 10000);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+        List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+            = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+            .getRangeKVs(null, 100, ozoneKey);
+        return !rangeKVs.isEmpty();
+      }, 100, 30000);
 
-      RepeatedOmKeyInfo deleted = cluster.getOzoneManager().getMetadataManager()
-          .getDeletedTable().get(ozoneKey);
-      assertNotNull(deleted);
-      assertEquals(expectedCount, deleted.getOmKeyInfoList().size());
-    } else {
+      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+          .getRangeKVs(null, 100, ozoneKey);
+
+      assertThat(rangeKVs).isNotEmpty();
+      assertEquals(expectedCount,
+          rangeKVs.get(0).getValue().getOmKeyInfoList().size());
+    } else{
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
       RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
