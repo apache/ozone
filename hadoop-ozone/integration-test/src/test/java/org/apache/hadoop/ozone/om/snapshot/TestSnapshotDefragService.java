@@ -87,6 +87,7 @@ public class TestSnapshotDefragService {
     // Enable debug logging for SnapshotDefragService
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(SnapshotDefragService.class), Level.DEBUG);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(OmMetadataManagerImpl.class), Level.DEBUG);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(SnapshotCache.class), Level.DEBUG);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 30, TimeUnit.SECONDS);
