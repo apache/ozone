@@ -83,6 +83,7 @@ public final class OzoneManagerDoubleBuffer {
   private final Daemon daemon;
   /** Is the {@link #daemon} running? */
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
+  private final AtomicBoolean isPaused = new AtomicBoolean(false);
   /** Notify flush operations are completed by the {@link #daemon}. */
   private final FlushNotifier flushNotifier;
 
@@ -277,6 +278,18 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public void flushTransactions() {
     while (isRunning.get() && canFlush()) {
+      // Check if paused
+      synchronized (this) {
+        while (isPaused.get() && isRunning.get()) {
+          try {
+            this.wait();
+          } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+      }
+
       flushCurrentBuffer();
     }
   }
@@ -506,6 +519,22 @@ public final class OzoneManagerDoubleBuffer {
       }
     } else {
       LOG.info("OMDoubleBuffer flush thread is not running.");
+    }
+  }
+
+  @VisibleForTesting
+  public void pause() {
+    synchronized (this) {
+      isPaused.set(true);
+      this.notifyAll();
+    }
+  }
+
+  @VisibleForTesting
+  public void unpause() {
+    synchronized (this) {
+      isPaused.set(false);
+      this.notifyAll();
     }
   }
 

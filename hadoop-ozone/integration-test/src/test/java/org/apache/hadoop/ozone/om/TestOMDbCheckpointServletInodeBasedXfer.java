@@ -64,6 +64,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -90,10 +91,11 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Archiver;
-import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -153,7 +155,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
-    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
   }
 
   @AfterEach
@@ -170,7 +172,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     om = cluster.getOzoneManager();
   }
 
-  private void setupMocks(boolean useNoOpBootstrapLock) throws Exception {
+  private void setupMocks() throws Exception {
     final Path tempPath = folder.resolve("temp" + COUNTER.incrementAndGet() + ".tar");
     tempFile = tempPath.toFile();
 
@@ -245,12 +247,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any());
-    if (useNoOpBootstrapLock) {
-      // Override the lock to be a no-op so purgeSnapshot can work inside the callback
-      BootstrapStateHandler.Lock noOpLock = new DBCheckpointServlet.Lock();
-      when(omDbCheckpointServletMock.getBootstrapStateLock())
-          .thenReturn(noOpLock);
-    }
   }
 
   @ParameterizedTest
@@ -414,7 +410,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
-    setupMocks(false);
+    setupMocks();
     Path dbDir = folder.resolve("db_data");
     Files.createDirectories(dbDir);
     // Create dummy files: one SST, one non-SST
@@ -630,17 +626,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data1".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
-
-    // Create key before second snapshot
-    TestDataUtil.createKey(bucket, "key2",
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-        "data2".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot2");
-    TestDataUtil.createKey(bucket, "key3",
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-        "data3".getBytes(StandardCharsets.UTF_8));
 
-    // At this point: Live OM has snapshots S1, S2 , S3
+    // At this point: Live OM has snapshots S1, S2
     List<OzoneSnapshot> snapshots = new ArrayList<>();
     client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
         .forEachRemaining(snapshots::add);
@@ -650,9 +638,45 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
 
+    purgeSnapshot(volumeName, bucketName, snapshot2);
+
     // Setup servlet mocks for checkpoint processing
-    setupMocks(true);
+    setupMocks();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
+    // custom lock because the original lock waits for double buffer flush.
+    BootstrapStateHandler.Lock customLock = new BootstrapStateHandler.Lock() {
+      private final List<BootstrapStateHandler.Lock> serviceLocks;
+
+      {
+        OMDBCheckpointServlet.Lock realLock = new OMDBCheckpointServlet.Lock(om);
+        serviceLocks = Stream.of(
+                om.getKeyManager().getDeletingService(),
+                om.getKeyManager().getDirDeletingService(),
+                om.getKeyManager().getSnapshotSstFilteringService(),
+                om.getKeyManager().getSnapshotDeletingService(),
+                om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
+            )
+            .filter(Objects::nonNull)
+            .map(BootstrapStateHandler::getBootstrapStateLock)
+            .collect(Collectors.toList());
+      }
+
+      @Override
+      public BootstrapStateHandler.Lock lock() throws InterruptedException {
+        for (BootstrapStateHandler.Lock lock : serviceLocks) {
+          lock.lock();
+        }
+        // Skip awaitDoubleBufferFlush()
+        return this;
+      }
+
+      @Override
+      public void unlock() {
+        serviceLocks.forEach(BootstrapStateHandler.Lock::unlock);
+      }
+    };
+
+    when(omDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(customLock);
 
     // Create a checkpoint that captures current state (S1, S3)
     DBStore dbStore = om.getMetadataManager().getStore();
@@ -661,8 +685,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
       // Purge snapshot2 before checkpoint
-      purgeSnapshot(volumeName, bucketName, snapshot2);
       // create snapshot 3 before checkpoint
+      om.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer().unpause();
       client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot3");
       // Also wait for double buffer to flush to ensure all transactions are committed
       om.awaitDoubleBufferFlush();
@@ -713,17 +737,36 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private void purgeSnapshot(String volumeName, String bucketName, OzoneSnapshot snapshot)
       throws IOException, InterruptedException, TimeoutException {
+    // pauses the double buffer thread, waits for snapshot to be in deleted state
+    // and waits for SDS to pick up and purge the deleted snapshot.
+    om.awaitDoubleBufferFlush();
+    om.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer().pause();
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshot.getName());
     // delete snapshot and wait for snapshot to be purged
     client.getObjectStore().deleteSnapshot(volumeName, bucketName, snapshot.getName());
     GenericTestUtils.waitFor(() -> {
       try {
-        return om.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey) == null;
+        CacheValue<SnapshotInfo> cacheValue =
+            om.getMetadataManager().getSnapshotInfoTable().getCacheValue(new CacheKey<>(snapshotTableKey));
+        SnapshotInfo snapshotInfo = cacheValue != null ? cacheValue.getCacheValue() : null;
+        return snapshotInfo != null &&
+            snapshotInfo.getSnapshotStatus().name().equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED.name());
       } catch (Exception ex) {
-        LOG.error("Exception while querying snapshot info for key {}", snapshotTableKey, ex);
+        LOG.error("Exception while querying snapshot info for key in cache {}", snapshotTableKey, ex);
         return false;
       }
-    }, 100, 20_000);
+    }, 100, 30_000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return om.getMetadataManager().getSnapshotInfoTable().get(snapshotTableKey) == null;
+      } catch (Exception ex) {
+        LOG.error("Exception while querying snapshot info for key in cache {}", snapshotTableKey, ex);
+        return false;
+      }
+    }, 100, 40_000);
+    // Since DoubleBuffer thread is paused these are not committed to DB
+    assertNotNull(om.getMetadataManager()
+        .getSnapshotInfoTable().getSkipCache(snapshotTableKey));
   }
 
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
@@ -769,7 +812,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private void setupClusterAndMocks(String volumeName, String bucketName,
       AtomicReference<DBCheckpoint> realCheckpoint, boolean includeSnapshots) throws Exception {
     setupCluster();
-    setupMocks(false);
+    setupMocks();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn(String.valueOf(includeSnapshots));
