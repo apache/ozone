@@ -3606,12 +3606,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return true;
     } else {
       LOG.info("User '{}' manually triggered Snapshot Defragmentation and is waiting", ugi);
-      try {
-        return defragService.triggerSnapshotDefragOnce();
-      } catch (Exception e) {
-        LOG.error("Error during snapshot defragmentation", e);
-        return false;
-      }
+      return defragService.triggerSnapshotDefragOnce();
     }
   }
 

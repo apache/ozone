@@ -250,7 +250,14 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
           ", sent to " + omPrintInfo + " failed with error: " +
           response.getErrorMsg());
     }
-    return response.hasResult() ? response.getResult() : true;
+    if (response.hasResult()) {
+      return response.getResult();
+    } else {
+      throwException("Missing result in TriggerSnapshotDefragResponse from " + omPrintInfo +
+          ". This likely indicates a server error.");
+      // Unreachable, required for compilation
+      return false;
+    }
   }
 
   private void throwException(String errorMsg)

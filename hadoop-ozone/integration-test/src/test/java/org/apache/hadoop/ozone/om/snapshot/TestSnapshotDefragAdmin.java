@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -102,7 +103,7 @@ public class TestSnapshotDefragAdmin {
       }
     }
 
-    assertTrue(follower != null, "Should have at least one follower OM");
+    assertNotNull(follower, "Should have at least one follower OM");
     executeDefragCommand(follower.getOMNodeId(), false);
   }
 
@@ -150,7 +151,7 @@ public class TestSnapshotDefragAdmin {
       }
     }
 
-    assertTrue(follower != null, "Should have at least one follower OM");
+    assertNotNull(follower, "Should have at least one follower OM");
     executeDefragCommand(follower.getOMNodeId(), true);
   }
 

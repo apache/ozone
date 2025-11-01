@@ -116,8 +116,6 @@ public class DefragSubCommand implements Callable<Void> {
 
   private OMAdmin getOMAdmin() {
     // The parent hierarchy is: DefragSubCommand -> SnapshotSubCommand -> OMAdmin
-    // We need to use reflection or add a parent reference in SnapshotSubCommand
-    // For now, let's add a reference in SnapshotSubCommand
     return parent.getParent();
   }
 }
