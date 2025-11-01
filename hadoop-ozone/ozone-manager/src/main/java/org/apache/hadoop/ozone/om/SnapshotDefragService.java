@@ -420,11 +420,12 @@ public class SnapshotDefragService extends BackgroundService
     try {
       // Check if previous defragmented DB exists
       if (!Files.exists(Paths.get(previousDefraggedDbPath))) {
-        // TODO: Should err and quit instead of falling back to full defrag
-        LOG.warn("Previous defragmented DB not found at {}, falling back to full defragmentation",
-            previousDefraggedDbPath);
-        performFullDefragmentation(currentSnapshotInfo, currentOmSnapshot);
-        return;
+        // Fail fast: throw exception instead of falling back to full defragmentation
+        String errorMsg = String.format("Previous defragmented DB not found at '%s' for snapshot '%s'. " +
+                "Incremental defragmentation cannot proceed.",
+            previousDefraggedDbPath, previousSnapshotInfo.getName());
+        LOG.error(errorMsg);
+        throw new IOException(errorMsg);
       }
 
       // Create a checkpoint from the previous defragmented DB directly at target location
@@ -476,8 +477,11 @@ public class SnapshotDefragService extends BackgroundService
             LOG.info("Applied {} incremental changes for snapshot: {}",
                 incrementalKeysCopied, currentSnapshotInfo.getName());
 
-            // Verify defrag DB integrity. TODO: Abort and stop defrag service if verification fails?
-            verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshotInfo);
+            // Verify defrag DB integrity
+            if (!verifyDbIntegrity(currentSnapshotDb, currentDefraggedDb, currentSnapshotInfo)) {
+              throw new IOException("Defragmented DB integrity verification failed for snapshot: "
+                  + currentSnapshotInfo.getName());
+            }
 
             // Create a new version in YAML metadata, which also indicates that the defragmentation is complete
             updateSnapshotMetadataAfterDefrag(currentDefraggedStore, currentSnapshotInfo);
@@ -494,11 +498,13 @@ public class SnapshotDefragService extends BackgroundService
     } catch (RocksDatabaseException e) {
       LOG.error("RocksDB error during incremental defragmentation of snapshot: {}",
           currentSnapshotInfo.getName(), e);
+      throw new IOException("RocksDB error during incremental defragmentation of snapshot: "
+          + currentSnapshotInfo.getName(), e);
     } catch (Exception e) {
       LOG.error("Unexpected error during incremental defragmentation of snapshot: {}",
           currentSnapshotInfo.getName(), e);
-      LOG.warn("Falling back to full defragmentation due to error");
-      performFullDefragmentation(currentSnapshotInfo, currentOmSnapshot);
+      throw new IOException("Unexpected error during incremental defragmentation of snapshot: "
+          + currentSnapshotInfo.getName(), e);
     }
   }
 
@@ -744,7 +750,7 @@ public class SnapshotDefragService extends BackgroundService
    * Verifies DB integrity by comparing key counts and spot-checking keys/values
    * between the original and defragmented databases.
    */
-  private void verifyDbIntegrity(RocksDatabase originalDb, RocksDatabase defraggedDb,
+  private boolean verifyDbIntegrity(RocksDatabase originalDb, RocksDatabase defraggedDb,
       SnapshotInfo snapshotInfo) {
 
     LOG.info("Starting DB integrity verification for snapshot: {}", snapshotInfo.getName());
@@ -873,9 +879,8 @@ public class SnapshotDefragService extends BackgroundService
       LOG.error("DB integrity verification FAILED for snapshot: {} " +
               "(total original keys: {}, total defragmented keys: {})",
           snapshotInfo.getName(), totalOriginalKeys, totalDefraggedKeys);
-      // Consider throwing an exception here if verification failure should halt the process
-      // throw new IOException("DB integrity verification failed for snapshot: " + snapshotInfo.getName());
     }
+    return verificationPassed;
   }
 
   private final class SnapshotDefragTask implements BackgroundTask {
