@@ -668,6 +668,7 @@ public class SnapshotDefragService extends BackgroundService
                   cfName, cfChanges);
             } catch (Exception e) {
               LOG.error("Failed to ingest SST file for column family {}: {}", cfName, e.getMessage(), e);
+              throw new IOException("Failed to ingest SST file for column family: " + cfName, e);
             }
           } else {
             LOG.debug("No changes to ingest for column family {}", cfName);
