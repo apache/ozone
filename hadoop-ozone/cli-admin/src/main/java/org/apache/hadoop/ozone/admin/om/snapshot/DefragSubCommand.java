@@ -35,7 +35,8 @@ import picocli.CommandLine;
     description = "Triggers the Snapshot Defragmentation Service to run " +
         "immediately. This command manually initiates the snapshot " +
         "defragmentation process which compacts snapshot data and removes " +
-        "fragmentation to improve storage efficiency.",
+        "fragmentation to improve storage efficiency. " +
+        "This command works only on OzoneManager HA cluster.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
