@@ -61,6 +61,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.RemovalListener;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nonnull;
 import java.io.File;
@@ -528,14 +529,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // Snapshot create is processed as a single transaction and
     // transactions are flushed sequentially so, no need to take any lock as of now.
-    deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
-    // Clean up deletedDirectoryTable as well
-    deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
-    // Remove entries from snapshotRenamedTable
-    deleteKeysFromSnapRenamedTableInSnapshotScope(omMetadataManager,
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
+    for (Table<String, ?> table : ImmutableList.of(omMetadataManager.getDeletedTable(),
+        omMetadataManager.getDeletedDirTable(), omMetadataManager.getSnapshotRenamedTable())) {
+      deleteKeysFromTableWithBucketPrefix(omMetadataManager, table,
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
+    }
 
     if (snapshotDirExist) {
       LOG.info("Checkpoint: {} for snapshot {} already exists.",
@@ -552,49 +550,19 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Helper method to perform batch delete range operation on a given key prefix.
-   * @param prefix prefix of keys to be deleted
+   * @param metadataManager metadatManager instance
    * @param table table from which keys are to be deleted
+   * @param volume volume corresponding to the bucket
+   * @param bucket bucket corresponding to which keys need to be deleted from the table
    * @param batchOperation batch operation
    */
-  private static void deleteKeysFromTableWithPrefix(
-      String prefix, Table<String, ?> table, BatchOperation batchOperation) throws IOException {
+  private static void deleteKeysFromTableWithBucketPrefix(OMMetadataManager metadataManager,
+      Table<String, ?> table, String volume, String bucket, BatchOperation batchOperation) throws IOException {
+    String prefix = metadataManager.getTableBucketPrefix(table.getName(), volume, bucket);
     String endKey = getLexicographicallyHigherString(prefix);
     LOG.debug("Deleting key range from {} - startKey: {}, endKey: {}",
         table.getName(), prefix, endKey);
     table.deleteRangeWithBatch(batchOperation, prefix, endKey);
-  }
-
-  /**
-   * Helper method to delete DB keys in the snapshot scope (bucket)
-   * from active DB's deletedDirectoryTable.
-   * @param omMetadataManager OMMetadataManager instance
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @param batchOperation batch operation
-   */
-  private static void deleteKeysFromSnapRenamedTableInSnapshotScope(
-      OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, BatchOperation batchOperation) throws IOException {
-
-    final String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getSnapshotRenamedTable(), batchOperation);
-  }
-
-  /**
-   * Helper method to delete DB keys in the snapshot scope (bucket)
-   * from active DB's deletedDirectoryTable.
-   * @param omMetadataManager OMMetadataManager instance
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @param batchOperation batch operation
-   */
-  private static void deleteKeysFromDelDirTableInSnapshotScope(
-      OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, BatchOperation batchOperation) throws IOException {
-
-    // Range delete start key (inclusive)
-    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getDeletedDirTable(), batchOperation);
   }
 
   @VisibleForTesting
@@ -605,22 +573,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   @VisibleForTesting
   public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
     return snapshotDiffCleanupService;
-  }
-
-  /**
-   * Helper method to delete DB keys in the snapshot scope (bucket)
-   * from active DB's deletedTable.
-   * @param omMetadataManager OMMetadataManager instance
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @param batchOperation batch operation
-   */
-  private static void deleteKeysFromDelKeyTableInSnapshotScope(
-      OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, BatchOperation batchOperation) throws IOException {
-    // Range delete prefix (inclusive)
-    final String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getDeletedTable(), batchOperation);
   }
 
   /**

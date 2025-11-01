@@ -20,14 +20,12 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -181,11 +180,9 @@ public class SstFilteringService extends BackgroundService
 
             LOG.debug("Processing snapshot {} to filter relevant SST Files",
                 snapShotTableKey);
-
-            Map<String, String> columnFamilyNameToPrefixMap =
-                getColumnFamilyToKeyPrefixMap(ozoneManager.getMetadataManager(),
-                    snapshotInfo.getVolumeName(),
-                    snapshotInfo.getBucketName());
+            TablePrefixInfo bucketPrefixInfo =
+                ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName());
 
             try (
                 UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
@@ -199,7 +196,7 @@ public class SstFilteringService extends BackgroundService
               RocksDatabase db = rdbStore.getDb();
               try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
                   .lock()) {
-                db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
+                db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
               }
               markSSTFilteredFlagForSnapshot(snapshotInfo);
               snapshotLimit--;
