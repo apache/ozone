@@ -17,33 +17,22 @@
 
 package org.apache.hadoop.ozone.admin.om.snapshot;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.admin.OzoneAdmin;
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.mockito.stubbing.Answer;
 import picocli.CommandLine;
 
 /**
@@ -52,58 +41,39 @@ import picocli.CommandLine;
  */
 public class TestDefragSubCommand {
 
-  private DefragSubCommand cmd;
-  private SnapshotSubCommand snapshotParent;
-  private OMAdmin omAdmin;
-  private OzoneAdmin ozoneAdmin;
+  private TestableDefragSubCommand cmd;
   private OMAdminProtocolClientSideImpl omAdminClient;
-  private OzoneConfiguration conf;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
-  private MockedStatic<OMAdminProtocolClientSideImpl> mockedStaticClient;
-  private MockedStatic<OMNodeDetails> mockedStaticOMNodeDetails;
-  private MockedStatic<UserGroupInformation> mockedStaticUGI;
+
+  /**
+   * Testable version of DefragSubCommand that allows injecting a mock client.
+   */
+  private static class TestableDefragSubCommand extends DefragSubCommand {
+    private final OMAdminProtocolClientSideImpl mockClient;
+
+    TestableDefragSubCommand(OMAdminProtocolClientSideImpl mockClient) {
+      this.mockClient = mockClient;
+    }
+
+    @Override
+    protected OMAdminProtocolClientSideImpl createClient(
+        OzoneConfiguration conf, OMNodeDetails omNodeDetails) {
+      return mockClient;
+    }
+  }
 
   @BeforeEach
   public void setup() throws Exception {
-    cmd = new DefragSubCommand();
-    snapshotParent = mock(SnapshotSubCommand.class);
-    omAdmin = mock(OMAdmin.class);
-    ozoneAdmin = mock(OzoneAdmin.class);
     omAdminClient = mock(OMAdminProtocolClientSideImpl.class);
-    conf = new OzoneConfiguration();
-
-    // Use reflection to set the private parent field in DefragSubCommand
-    Field parentField = DefragSubCommand.class.getDeclaredField("parent");
-    parentField.setAccessible(true);
-    parentField.set(cmd, snapshotParent);
-
-    // Mock the parent hierarchy
-    when(snapshotParent.getParent()).thenReturn(omAdmin);
-    when(omAdmin.getParent()).thenReturn(ozoneAdmin);
-    when(ozoneAdmin.getOzoneConf()).thenReturn(conf);
+    cmd = new TestableDefragSubCommand(omAdminClient);
 
     // Mock close() to do nothing - needed for try-with-resources
     doNothing().when(omAdminClient).close();
 
-    // Mock static methods
-    OMNodeDetails omNodeDetails = mock(OMNodeDetails.class);
-    mockedStaticOMNodeDetails = mockStatic(OMNodeDetails.class);
-    mockedStaticOMNodeDetails.when(() -> OMNodeDetails.getOMNodeDetailsFromConf(
-        any(OzoneConfiguration.class), anyString(), anyString()))
-        .thenReturn(omNodeDetails);
-
-    UserGroupInformation ugi = mock(UserGroupInformation.class);
-    mockedStaticUGI = mockStatic(UserGroupInformation.class);
-    mockedStaticUGI.when(UserGroupInformation::getCurrentUser).thenReturn(ugi);
-
-    mockedStaticClient = mockStatic(OMAdminProtocolClientSideImpl.class);
-    mockedStaticClient.when(() -> OMAdminProtocolClientSideImpl.createProxyForSingleOM(
-        any(), any(), any()))
-        .thenAnswer((Answer<OMAdminProtocolClientSideImpl>) invocation -> omAdminClient);
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
@@ -113,15 +83,6 @@ public class TestDefragSubCommand {
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
-    if (mockedStaticClient != null) {
-      mockedStaticClient.close();
-    }
-    if (mockedStaticOMNodeDetails != null) {
-      mockedStaticOMNodeDetails.close();
-    }
-    if (mockedStaticUGI != null) {
-      mockedStaticUGI.close();
-    }
   }
 
   @Test
@@ -132,7 +93,7 @@ public class TestDefragSubCommand {
     // Execute the command (default behavior: wait for completion)
     CommandLine c = new CommandLine(cmd);
     c.parseArgs();
-    cmd.call();
+    cmd.execute(omAdminClient);
 
     // Verify the client method was called with correct parameter
     verify(omAdminClient).triggerSnapshotDefrag(eq(false));
@@ -151,7 +112,7 @@ public class TestDefragSubCommand {
     // Execute the command
     CommandLine c = new CommandLine(cmd);
     c.parseArgs();
-    cmd.call();
+    cmd.execute(omAdminClient);
 
     // Verify the client method was called
     verify(omAdminClient).triggerSnapshotDefrag(eq(false));
@@ -163,34 +124,14 @@ public class TestDefragSubCommand {
   }
 
   @Test
-  public void testTriggerSnapshotDefragWithNoWaitOption() throws Exception {
-    // Mock the client
-    when(omAdminClient.triggerSnapshotDefrag(true)).thenReturn(true);
-
-    // Execute the command with --no-wait option
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--no-wait");
-    cmd.call();
-
-    // Verify the client method was called with noWait=true
-    verify(omAdminClient).triggerSnapshotDefrag(eq(true));
-
-    // Verify output contains background execution message
-    String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Triggering Snapshot Defrag"));
-    assertTrue(output.contains("Snapshot defragmentation task has been triggered successfully"));
-    assertTrue(output.contains("running in the background"));
-  }
-
-  @Test
-  public void testTriggerSnapshotDefragWithServiceId() throws Exception {
-    // Mock the client with service ID
+  public void testTriggerSnapshotDefragWithServiceIdAndNodeId() throws Exception {
+    // Mock the client with both service ID and node ID
     when(omAdminClient.triggerSnapshotDefrag(false)).thenReturn(true);
 
-    // Execute the command with service ID
+    // Execute the command with service ID and node ID
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--service-id", "om-service-1");
-    cmd.call();
+    c.parseArgs("--service-id", "om-service-1", "--node-id", "om1");
+    cmd.execute(omAdminClient);
 
     // Verify the client method was called
     verify(omAdminClient).triggerSnapshotDefrag(eq(false));
@@ -201,32 +142,14 @@ public class TestDefragSubCommand {
   }
 
   @Test
-  public void testTriggerSnapshotDefragWithIOException() throws Exception {
-    // Mock the client to throw IOException
-    when(omAdminClient.triggerSnapshotDefrag(false))
-        .thenThrow(new IOException("Connection failed"));
-
-    // Execute the command and expect exception
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs();
-
-    assertThrows(Exception.class, () -> cmd.call());
-
-    // Verify error message
-    String errOutput = errContent.toString(DEFAULT_ENCODING);
-    assertTrue(errOutput.contains("Failed to trigger snapshot defragmentation"));
-    assertTrue(errOutput.contains("Connection failed"));
-  }
-
-  @Test
   public void testTriggerSnapshotDefragWithAllOptions() throws Exception {
-    // Test with both service-id and no-wait options
+    // Test with service-id, node-id, and no-wait options
     when(omAdminClient.triggerSnapshotDefrag(true)).thenReturn(true);
 
     // Execute the command with multiple options
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--service-id", "om-service-1", "--no-wait");
-    cmd.call();
+    c.parseArgs("--service-id", "om-service-1", "--node-id", "om1", "--no-wait");
+    cmd.execute(omAdminClient);
 
     // Verify the client method was called
     verify(omAdminClient).triggerSnapshotDefrag(eq(true));

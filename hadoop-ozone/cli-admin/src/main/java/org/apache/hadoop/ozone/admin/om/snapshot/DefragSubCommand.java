@@ -80,23 +80,8 @@ public class DefragSubCommand implements Callable<Void> {
       return null;
     }
 
-    try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
-             OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
-                 UserGroupInformation.getCurrentUser(), omNodeDetails)) {
-      System.out.println("Triggering Snapshot Defrag Service ...");
-      boolean result = omAdminProtocolClient.triggerSnapshotDefrag(noWait);
-
-      if (noWait) {
-        System.out.println("Snapshot defragmentation task has been triggered " +
-            "successfully and is running in the background.");
-      } else {
-        if (result) {
-          System.out.println("Snapshot defragmentation completed successfully.");
-        } else {
-          System.out.println("Snapshot defragmentation task failed or was " +
-              "interrupted.");
-        }
-      }
+    try (OMAdminProtocolClientSideImpl omAdminProtocolClient = createClient(conf, omNodeDetails)) {
+      execute(omAdminProtocolClient);
     } catch (IOException ex) {
       System.err.println("Failed to trigger snapshot defragmentation: " +
           ex.getMessage());
@@ -104,6 +89,29 @@ public class DefragSubCommand implements Callable<Void> {
     }
 
     return null;
+  }
+
+  protected OMAdminProtocolClientSideImpl createClient(
+      OzoneConfiguration conf, OMNodeDetails omNodeDetails) throws IOException {
+    return OMAdminProtocolClientSideImpl.createProxyForSingleOM(conf,
+        UserGroupInformation.getCurrentUser(), omNodeDetails);
+  }
+
+  protected void execute(OMAdminProtocolClientSideImpl omAdminProtocolClient)
+      throws IOException {
+    System.out.println("Triggering Snapshot Defrag Service ...");
+    boolean result = omAdminProtocolClient.triggerSnapshotDefrag(noWait);
+
+    if (noWait) {
+      System.out.println("Snapshot defragmentation task has been triggered " +
+          "successfully and is running in the background.");
+    } else {
+      if (result) {
+        System.out.println("Snapshot defragmentation completed successfully.");
+      } else {
+        System.out.println("Snapshot defragmentation task failed or was interrupted.");
+      }
+    }
   }
 
   private OMAdmin getOMAdmin() {
