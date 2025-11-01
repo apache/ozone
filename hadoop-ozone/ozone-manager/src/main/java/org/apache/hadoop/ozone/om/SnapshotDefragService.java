@@ -308,7 +308,9 @@ public class SnapshotDefragService extends BackgroundService
 
       try {
         if (Files.exists(Paths.get(oldDbPath))) {
-          // TODO: Make sure the DB is not open before deleting
+          // Invalidate SnapshotCache entry, otherwise the cache could hold on to the old DB handle and cause issues
+          ozoneManager.getOmSnapshotManager().invalidateCacheEntry(snapshotInfo.getSnapshotId());
+
           FileUtils.deleteDirectory(new File(oldDbPath));
           LOG.debug("Deleted old {} DB version {} at: {}",
               oldVersion == 0 ? "original" : "defragged", oldVersion, oldDbPath);
