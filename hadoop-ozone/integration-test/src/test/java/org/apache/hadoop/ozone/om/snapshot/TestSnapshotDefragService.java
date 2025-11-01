@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -85,6 +86,7 @@ public class TestSnapshotDefragService {
   void setup() throws Exception {
     // Enable debug logging for SnapshotDefragService
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger(SnapshotDefragService.class), Level.DEBUG);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(OmMetadataManagerImpl.class), Level.DEBUG);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 30, TimeUnit.SECONDS);
