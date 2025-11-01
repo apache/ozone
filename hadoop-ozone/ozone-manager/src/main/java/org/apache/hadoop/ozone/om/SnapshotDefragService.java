@@ -391,8 +391,8 @@ public class SnapshotDefragService extends BackgroundService
       throws IOException {
 
     // previous snapshot's current version
-//    int previousCurrVersion = OmSnapshotUtils.getLocalDataVersion(ozoneManager, previousSnapshotInfo);
-//    String previousVersionSuffix = OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + previousCurrVersion;
+    int previousCurrVersion = OmSnapshotUtils.getLocalDataVersion(ozoneManager, previousSnapshotInfo);
+    String previousVersionSuffix = OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + previousCurrVersion;
     String previousCheckpointDirNameWithoutSuffix = OM_DB_NAME + previousSnapshotInfo.getCheckpointDirName();
     String previousParentDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()).toString();
     String previousDefraggedDbPath =
@@ -415,7 +415,7 @@ public class SnapshotDefragService extends BackgroundService
 
     try {
       // Check if previous defragmented DB exists
-      if (!Files.exists(Paths.get(previousDefraggedDbPath))) {
+      if (!Files.exists(Paths.get(previousDefraggedDbPath + previousVersionSuffix))) {
         // Fail fast: throw exception instead of falling back to full defragmentation
         String errorMsg = String.format("Previous defragmented DB not found at '%s' for snapshot '%s'. " +
                 "Incremental defragmentation cannot proceed.",
