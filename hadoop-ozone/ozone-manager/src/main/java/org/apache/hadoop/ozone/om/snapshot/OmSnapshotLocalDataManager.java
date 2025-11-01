@@ -325,7 +325,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           () -> {
             try {
               checkOrphanSnapshotVersions(omMetadataManager, chainManager);
-            } catch (IOException e) {
+            } catch (Exception e) {
               LOG.error("Exception while checking orphan snapshot versions", e);
             }
           }, snapshotLocalDataManagerServiceInterval, snapshotLocalDataManagerServiceInterval, TimeUnit.MILLISECONDS);
