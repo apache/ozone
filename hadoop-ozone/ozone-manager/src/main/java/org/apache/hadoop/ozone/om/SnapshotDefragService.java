@@ -288,36 +288,40 @@ public class SnapshotDefragService extends BackgroundService
    * @param parentDir the parent directory containing the defragmented DBs
    */
   private void deleteOldDb(SnapshotInfo snapshotInfo, int newVersion, String parentDir) {
+
+    // Invalidate SnapshotCache entry, otherwise the cache could hold on to the old DB handle and cause issues
+    ozoneManager.getOmSnapshotManager().invalidateCacheEntry(snapshotInfo.getSnapshotId());
+
     int oldVersion = newVersion - 1;
-    if (oldVersion >= 0) {
-      String oldCheckpointDirName;
-      String oldDbPath;
+    if (oldVersion < 0) {
+      LOG.error("Invalid oldVersion: {}", oldVersion);
+      return;
+    }
 
-      if (oldVersion == 0) {
-        // Delete original DB from checkpointState/ directory
-        oldCheckpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
-        oldDbPath = Paths.get(parentDir, OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR,
-            oldCheckpointDirName).toString();
-      } else {
-        // Delete previous defragmented DB version from checkpointStateDefragged/ directory
-        String oldVersionSuffix = OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + oldVersion;
-        oldCheckpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName() + oldVersionSuffix;
-        oldDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
-            oldCheckpointDirName).toString();
+    String oldCheckpointDirName;
+    String oldDbPath;
+
+    if (oldVersion == 0) {
+      // Delete original DB from checkpointState/ directory
+      oldCheckpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+      oldDbPath = Paths.get(parentDir, OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR,
+          oldCheckpointDirName).toString();
+    } else {
+      // Delete previous defragmented DB version from checkpointStateDefragged/ directory
+      String oldVersionSuffix = OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + oldVersion;
+      oldCheckpointDirName = OM_DB_NAME + snapshotInfo.getCheckpointDirName() + oldVersionSuffix;
+      oldDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
+          oldCheckpointDirName).toString();
+    }
+
+    try {
+      if (Files.exists(Paths.get(oldDbPath))) {
+        FileUtils.deleteDirectory(new File(oldDbPath));
+        LOG.debug("Deleted old {} DB version {} at: {}",
+            oldVersion == 0 ? "original" : "defragged", oldVersion, oldDbPath);
       }
-
-      try {
-        if (Files.exists(Paths.get(oldDbPath))) {
-          // Invalidate SnapshotCache entry, otherwise the cache could hold on to the old DB handle and cause issues
-          ozoneManager.getOmSnapshotManager().invalidateCacheEntry(snapshotInfo.getSnapshotId());
-
-          FileUtils.deleteDirectory(new File(oldDbPath));
-          LOG.debug("Deleted old {} DB version {} at: {}",
-              oldVersion == 0 ? "original" : "defragged", oldVersion, oldDbPath);
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to delete old DB at: {}", oldDbPath, e);
-      }
+    } catch (IOException e) {
+      LOG.warn("Failed to delete old DB at: {}", oldDbPath, e);
     }
   }
 
@@ -1000,8 +1004,7 @@ public class SnapshotDefragService extends BackgroundService
                 snapshotToDefrag, previousDefraggedSnapshot, omSnapshot);
           }
 
-          // Close and evict the original snapshot DB from SnapshotCache
-          // TODO: Check if there are any SnapshotCache clean up to be done?
+          // Note: deleteOldDb() already invalidates the SnapshotCache entry for this snapshot
 
           LOG.info("Defragmentation completed for snapshot: {}", snapshotToDefrag.getName());
 

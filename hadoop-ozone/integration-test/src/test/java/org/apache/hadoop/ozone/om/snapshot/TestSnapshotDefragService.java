@@ -81,7 +81,7 @@ public class TestSnapshotDefragService {
   private ObjectStore store;
   private OzoneManager ozoneManager;
   private SnapshotDefragService defragService;
-  private static int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_VALUE = 3;
+  private static final int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_VALUE = 3;
 
   @BeforeAll
   void setup() throws Exception {
