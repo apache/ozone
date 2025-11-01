@@ -83,9 +83,16 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager, snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
       OMSnapshotMoveUtils.updateCache(ozoneManager, fromSnapshot, nextSnapshot, context);
-      omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), fromSnapshot, nextSnapshot,
-          nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs, omBucketInfo.getObjectID());
+      omClientResponse = new OMSnapshotMoveDeletedKeysResponse.Builder()
+          .setOmResponse(omResponse.build())
+          .setFromSnapshot(fromSnapshot)
+          .setNextSnapshot(nextSnapshot)
+          .setNextDBKeysList(nextDBKeysList)
+          .setReclaimKeysList(reclaimKeysList)
+          .setRenamedKeysList(renamedKeysList)
+          .setMovedDirs(movedDirs)
+          .setBucketId(omBucketInfo.getObjectID())
+          .build();
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

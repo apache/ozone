@@ -466,6 +466,18 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>ozone.client.elastic.byte.buffer.pool.max.size</name>
+    <value>16GB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum total size of buffers that can be cached in the client-side
+      ByteBufferPool. This pool is used heavily during EC read and write operations.
+      Setting a limit prevents unbounded memory growth in long-lived rpc clients
+      like the S3 Gateway. Once this limit is reached, used buffers are not
+      put back to the pool and will be garbage collected.
+    </description>
+  </property>
+  <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>50000</value>
     <tag>OM, PERFORMANCE</tag>
@@ -2181,13 +2193,6 @@
     <value>32MB</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
     <description>Byte limit for Raft's Log Worker queue.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
-    <value>64MB</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>Maximum byte size of all pending write requests.
     </description>
   </property>
   <property>
@@ -4837,5 +4842,15 @@
     <description>When KeyProvider is configured, the max retries allowed to attempt
       warm up edek cache if none of key successful on OM start up.
     </description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
+    <value>1024</value>
+    <description>Soft limit for number of lock objects that could be idle in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
+    <value>10000</value>
+    <description>Maximum number of lock objects that could be present in the pool.</description>
   </property>
 </configuration>

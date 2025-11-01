@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,16 +131,12 @@ public class SnapshotDefragService extends BackgroundService
     String snapshotPath = OmSnapshotManager.getSnapshotPath(
         ozoneManager.getConfiguration(), snapshotInfo);
 
-    try {
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
+             ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
-      OmSnapshotLocalData snapshotLocalData = ozoneManager.getOmSnapshotManager()
-          .getSnapshotLocalDataManager()
-          .getOmSnapshotLocalData(snapshotInfo);
-
       // Check if snapshot needs compaction (defragmentation)
-      boolean needsDefrag = snapshotLocalData.getNeedsDefrag();
-      LOG.debug("Snapshot {} needsDefragmentation field value: {}",
-          snapshotInfo.getName(), needsDefrag);
+      boolean needsDefrag = readableOmSnapshotLocalDataProvider.needsDefrag();
+      LOG.debug("Snapshot {} needsDefragmentation field value: {}", snapshotInfo.getName(), needsDefrag);
 
       return needsDefrag;
     } catch (IOException e) {
