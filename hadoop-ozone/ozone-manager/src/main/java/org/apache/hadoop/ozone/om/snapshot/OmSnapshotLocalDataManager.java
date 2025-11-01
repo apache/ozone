@@ -372,7 +372,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         } finally {
           internalLock.readLock().unlock();
         }
-
+      }
+      // If Snapshot is purged but not flushed completely to disk then this needs to wait for the next iteration
+      // which can be done by incrementing the orphan check count for the snapshotId.
+      if (!snapshotLocalData.getVersionSstFileInfos().isEmpty() && snapshotLocalData.getTransactionInfo() != null) {
+        incrementOrphanCheckCount(snapshotId);
       }
       snapshotLocalDataProvider.commit();
     }
