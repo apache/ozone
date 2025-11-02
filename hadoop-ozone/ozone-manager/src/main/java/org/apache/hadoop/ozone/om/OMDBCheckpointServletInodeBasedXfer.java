@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -268,7 +269,8 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           // get the list of snapshots from the checkpoint
           try (OmMetadataManagerImpl checkpointMetadataManager = OmMetadataManagerImpl
               .createCheckpointMetadataManager(om.getConfiguration(), checkpoint)) {
-            snapshotPaths = getSnapshotDirsFromDB(checkpointMetadataManager);
+            snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, checkpointMetadataManager,
+                snapshotLocalDataManager);
           }
           writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, false);
@@ -402,11 +404,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         Table.KeyValue<String, SnapshotInfo> kv = iter.next();
         SnapshotInfo snapshotInfo = kv.getValue();
         try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapLocalMeta =
-                 localDataManager.getOmSnapshotLocalDataMeta(snapInfo.getSnapshotId())) {
-          OmSnapshotManager.getSnapshotPath(getConf(),
-              snapshotInfo.getCheckpointDirName());
-          Path snapshotDir = getSnapshotPath(activeOMMetadataManager,
-              snapInfo.getSnapshotId(), snapLocalMeta.getMeta().getVersion());
+                 localDataManager.getOmSnapshotLocalDataMeta(snapshotInfo.getSnapshotId())) {
+          Path snapshotDir = getSnapshotPath(activeOMMetadataManager, snapshotInfo.getSnapshotId(),
+              snapLocalMeta.getMeta().getVersion());
           snapshotPaths.add(snapshotDir);
         }
       }
