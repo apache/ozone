@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -35,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -146,6 +149,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
   }
 
   @AfterEach
@@ -228,12 +232,15 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .thenReturn(lock);
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirs(any());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
+    doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
 
   @ParameterizedTest
@@ -586,6 +593,99 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(servicesSucceeded.get() > 0, "Services should have succeeded after lock release");
   }
 
+  /**
+   * Tests the full checkpoint servlet flow to ensure snapshot paths are read
+   * from checkpoint metadata (frozen state) rather than live OM metadata (current state).
+   * Scenario:
+   * 1. Create snapshots S1
+   * 2. create snapshot S2 later just before checkpoint
+   * 3. Servlet processes checkpoint - should still include S1, S3 data as
+   *    checkpoint snapshotInfoTable has S1 S3
+   */
+  @Test
+  public void testCheckpointIncludesSnapshotsFromFrozenState() throws Exception {
+    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+
+    setupCluster();
+    om.getKeyManager().getSnapshotSstFilteringService().pause();
+
+    // Create test data and snapshots
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+
+    // Create key before first snapshot
+    TestDataUtil.createKey(bucket, "key1",
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "data1".getBytes(StandardCharsets.UTF_8));
+    client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
+    // At this point: Live OM has snapshots S1
+    List<OzoneSnapshot> snapshots = new ArrayList<>();
+    client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
+        .forEachRemaining(snapshots::add);
+    assertEquals(1, snapshots.size(), "Should have 1 snapshot initially");
+    OzoneSnapshot snapshot1 = snapshots.stream()
+        .filter(snap -> snap.getName().equals("snapshot1"))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("snapshot1 not found"));
+
+    // Setup servlet mocks for checkpoint processing
+    setupMocks();
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
+
+    // Create a checkpoint that captures current state (S1)
+    DBStore dbStore = om.getMetadataManager().getStore();
+    DBStore spyDbStore = spy(dbStore);
+    AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
+
+    when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
+      // Purge snapshot2 before checkpoint
+      // create snapshot 3 before checkpoint
+      client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot2");
+      // Also wait for double buffer to flush to ensure all transactions are committed
+      om.awaitDoubleBufferFlush();
+      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      doNothing().when(checkpoint).cleanupCheckpoint(); // Don't cleanup for verification
+      capturedCheckpoint.set(checkpoint);
+      return checkpoint;
+    });
+
+    // Initialize servlet
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
+        eq(false), any(), any(), eq(false));
+    omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
+        false, om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+    // Process checkpoint servlet
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    snapshots.clear();
+    client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
+        .forEachRemaining(snapshots::add);
+    assertEquals(2, snapshots.size(), "Should have 2 snapshots");
+    OzoneSnapshot snapshot2 = snapshots.stream()
+        .filter(snap -> snap.getName().equals("snapshot2"))
+        .findFirst()
+        .orElseThrow(() -> new RuntimeException("snapshot2 not found"));
+    // Extract tarball and verify contents
+    String testDirName = folder.resolve("testDir").toString();
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    File newDbDir = new File(newDbDirName);
+    assertTrue(newDbDir.mkdirs());
+    FileUtil.unTar(tempFile, newDbDir);
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
+    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+        OM_DB_NAME + "-" + snapshot1.getSnapshotId());
+    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+        OM_DB_NAME + "-" + snapshot2.getSnapshotId());
+    boolean snapshot1IncludedInCheckpoint = Files.exists(snapshot1DbDir);
+    boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);
+    assertTrue(snapshot1IncludedInCheckpoint && snapshot2IncludedInCheckpoint,
+        "Checkpoint should include both snapshot1 and snapshot2 data");
+    // Cleanup
+    if (capturedCheckpoint.get() != null) {
+      capturedCheckpoint.get().cleanupCheckpoint();
+    }
+  }
+
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
     try (Stream<Path> filesInTarball = Files.list(snapshotDbDir)) {
       List<Path> files = filesInTarball.filter(p -> p.toString().contains(".log"))
@@ -648,6 +748,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Init the mock with the spyDbstore
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
         eq(false), any(), any(), eq(false));
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
     omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
         false,
         om.getOmAdminUsernames(), om.getOmAdminGroups(), false);

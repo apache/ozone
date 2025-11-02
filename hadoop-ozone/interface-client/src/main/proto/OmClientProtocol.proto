@@ -880,7 +880,7 @@ message SnapshotInfo {
   optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
   optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
-  optional string checkpointDir = 11;
+  optional string checkpointDir = 11 [deprecated = true];
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;

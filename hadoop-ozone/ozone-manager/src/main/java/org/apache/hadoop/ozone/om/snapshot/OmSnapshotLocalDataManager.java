@@ -159,7 +159,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   @VisibleForTesting
   public String getSnapshotLocalPropertyYamlPath(UUID snapshotId) {
-    Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId);
+    Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId, 0);
     return getSnapshotLocalPropertyYamlPath(snapshotPath);
   }
 
@@ -177,6 +177,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                      null))) {
       snapshotLocalData.commit();
     }
+  }
+
+  public ReadableOmSnapshotLocalDataMetaProvider getOmSnapshotLocalDataMeta(SnapshotInfo snapInfo) throws IOException {
+    return getOmSnapshotLocalDataMeta(snapInfo.getSnapshotId());
+  }
+
+  public ReadableOmSnapshotLocalDataMetaProvider getOmSnapshotLocalDataMeta(UUID snapshotId) throws IOException {
+    return new ReadableOmSnapshotLocalDataMetaProvider(snapshotId);
   }
 
   public ReadableOmSnapshotLocalDataProvider getOmSnapshotLocalData(SnapshotInfo snapshotInfo) throws IOException {
@@ -439,6 +447,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
+  private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
+    HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
+        snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
+    if (!acquiredLock.isLockAcquired()) {
+      throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
+    }
+    return acquiredLock;
+  }
+
   private static final class LockDataProviderInitResult {
     private final OmSnapshotLocalData snapshotLocalData;
     private final HierarchicalResourceLock lock;
@@ -467,6 +484,34 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     private OmSnapshotLocalData getSnapshotLocalData() {
       return snapshotLocalData;
+    }
+  }
+
+  /**
+   * Provides LocalData's metadata stored in memory for a snapshot after acquiring a read lock on this.
+   */
+  public final class ReadableOmSnapshotLocalDataMetaProvider implements AutoCloseable {
+    private final SnapshotVersionsMeta meta;
+    private final HierarchicalResourceLock lock;
+    private boolean closed;
+
+    private ReadableOmSnapshotLocalDataMetaProvider(UUID snapshotId) throws IOException {
+      this.lock = acquireLock(snapshotId, true);
+      this.meta = versionNodeMap.get(snapshotId);
+      this.closed = false;
+    }
+
+    public synchronized SnapshotVersionsMeta getMeta() throws IOException {
+      if (closed) {
+        throw new IOException("Resource has already been closed.");
+      }
+      return meta;
+    }
+
+    @Override
+    public synchronized void close() throws IOException {
+      closed = true;
+      lock.close();
     }
   }
 
@@ -550,15 +595,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         this.isPreviousSnapshotLoaded = true;
       }
       return previousSnapshotLocalData;
-    }
-
-    private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
-      HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
-          snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
-      if (!acquiredLock.isLockAcquired()) {
-        throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
-      }
-      return acquiredLock;
     }
 
     /**
@@ -946,7 +982,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  static final class SnapshotVersionsMeta {
+  /**
+   * Class that encapsulates the metadata corresponding to a snapshot's local data.
+   */
+  public static final class SnapshotVersionsMeta {
     private final UUID previousSnapshotId;
     private final Map<Integer, LocalDataVersionNode> snapshotVersions;
     private int version;
@@ -968,16 +1007,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return versionNodes;
     }
 
-    UUID getPreviousSnapshotId() {
+    public UUID getPreviousSnapshotId() {
       return previousSnapshotId;
     }
 
-    int getVersion() {
+    public int getVersion() {
       return version;
     }
 
-    Map<Integer, LocalDataVersionNode> getSnapshotVersions() {
-      return snapshotVersions;
+    private Map<Integer, LocalDataVersionNode> getSnapshotVersions() {
+      return Collections.unmodifiableMap(snapshotVersions);
     }
 
     LocalDataVersionNode getVersionNode(int snapshotVersion) {

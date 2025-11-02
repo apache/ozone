@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Optional;
@@ -79,6 +80,7 @@ public class SnapshotDefragService extends BackgroundService
   private final AtomicBoolean running;
 
   private final MultiSnapshotLocks snapshotIdLocks;
+  private final OzoneConfiguration conf;
 
   private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
 
@@ -90,10 +92,11 @@ public class SnapshotDefragService extends BackgroundService
     this.snapshotLimitPerTask = configuration
         .getLong(SNAPSHOT_DEFRAG_LIMIT_PER_TASK,
             SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT);
+    this.conf = configuration;
     snapshotsDefraggedCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
     IOzoneManagerLock omLock = ozoneManager.getMetadataManager().getLock();
-    this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true);
+    this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true, 1);
   }
 
   @Override
@@ -128,11 +131,14 @@ public class SnapshotDefragService extends BackgroundService
    * Checks if a snapshot needs defragmentation by examining its YAML metadata.
    */
   private boolean needsDefragmentation(SnapshotInfo snapshotInfo) {
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), snapshotInfo);
-
+    if (!SstFilteringService.isSstFiltered(conf, snapshotInfo)) {
+      return false;
+    }
     try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
              ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
+      Path snapshotPath = OmSnapshotManager.getSnapshotPath(
+          ozoneManager.getMetadataManager(), snapshotInfo,
+          readableOmSnapshotLocalDataProvider.getSnapshotLocalData().getVersion());
       // Read snapshot local metadata from YAML
       // Check if snapshot needs compaction (defragmentation)
       boolean needsDefrag = readableOmSnapshotLocalDataProvider.needsDefrag();
