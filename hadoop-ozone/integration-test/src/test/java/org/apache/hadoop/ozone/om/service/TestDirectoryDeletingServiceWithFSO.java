@@ -661,6 +661,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     cluster.restartOzoneManager();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
     assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }
