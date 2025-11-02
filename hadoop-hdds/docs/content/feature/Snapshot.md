@@ -116,7 +116,7 @@ Manage snapshots using `ozone sh` or `ozone fs` (Hadoop-compatible) commands:
     ```
     **Note:** The difference between `--all-status` and `-all` (or `-a`):
     * `--all-status`: Controls which jobs to show based on status (lists all jobs regardless of status)
-    * `-all` (or `-a`): Controls the number of results returned (pagination option, removes pagination limit, **not related to snapdiff job status**)
+    * `-all` (or `-a`): Controls the number of results returned (pagination option, removes pagination limit, **not related to snapshot diff job status**)
     
     For example:
     ```shell
