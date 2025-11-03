@@ -1125,12 +1125,13 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       testKds.resume();
 
-      // Deterministically drain: keep running the service until it reports
-      // all keys from this test have been reclaimed.
+      // Deterministically drain: keep running until DeletedTable becomes empty.
+      // DB is the source of truth; avoids relying on in-memory counters.
+      OMMetadataManager testMm = testOmTestManagers.getMetadataManager();
       GenericTestUtils.waitFor(() -> {
         try {
           testKds.runPeriodicalTaskNow();
-          return testKds.getDeletedKeyCount().get() >= numKeysToCreate;
+          return testMm.countRowsInTable(testMm.getDeletedTable()) == 0;
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
