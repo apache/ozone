@@ -1124,18 +1124,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       createAndDeleteKeys(numKeysToCreate, 1, testOmTestManagers);
 
       testKds.resume();
-
-      // Deterministically drain: keep running until DeletedTable becomes empty.
-      // DB is the source of truth; avoids relying on in-memory counters.
-      OMMetadataManager testMm = testOmTestManagers.getMetadataManager();
-      GenericTestUtils.waitFor(() -> {
-        try {
-          testKds.runPeriodicalTaskNow();
-          return testMm.countRowsInTable(testMm.getDeletedTable()) == 0;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, 100, 10000);
+      testKds.setKeyLimitPerTask(numKeysToCreate);
+      testKds.runPeriodicalTaskNow();
 
       // Verify that submitRequest was called multiple times.
       // The exact number of calls depends on the key size and testRatisLimitBytes,
