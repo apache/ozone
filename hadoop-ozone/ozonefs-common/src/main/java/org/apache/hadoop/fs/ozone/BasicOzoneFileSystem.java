@@ -139,13 +139,6 @@ public class BasicOzoneFileSystem extends FileSystem {
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
-    isRatisStreamingEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
-    streamingAutoThreshold = (int) OzoneConfiguration.of(conf).getStorageSize(
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
-        StorageUnit.BYTES);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -193,6 +186,13 @@ public class BasicOzoneFileSystem extends FileSystem {
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       ConfigurationSource source = getConfSource();
+      isRatisStreamingEnabled = source.getBoolean(
+          OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
+          OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
+      streamingAutoThreshold = (int) source.getStorageSize(
+          OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
+          OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
+          StorageUnit.BYTES);
       this.hsyncEnabled = OzoneFSUtils.canEnableHsync(source, true);
       LOG.debug("hsyncEnabled = {}", hsyncEnabled);
       this.adapter =
