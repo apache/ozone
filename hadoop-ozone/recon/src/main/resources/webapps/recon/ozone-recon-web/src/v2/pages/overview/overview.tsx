@@ -28,9 +28,9 @@ import {
 import { Link } from 'react-router-dom';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
-import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
-import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
-import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
+import OverviewSummaryCard from '@/v2/components/cards/overviewSummaryCard';
+import OverviewStorageCard from '@/v2/components/cards/overviewStorageCard';
+import OverviewSimpleCard from '@/v2/components/cards/overviewSimpleCard';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { checkResponseError, showDataFetchError } from '@/utils/common';
