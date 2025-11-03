@@ -1125,6 +1125,9 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       testKds.resume();
       testKds.setKeyLimitPerTask(numKeysToCreate);
+
+      // Manually trigger the KeyDeletingService to run its task immediately.
+      // This will initiate the purge requests to Ratis.
       testKds.runPeriodicalTaskNow();
 
       // Verify that submitRequest was called multiple times.
@@ -1152,11 +1155,14 @@ class TestKeyDeletingService extends OzoneTestBase {
             .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + actualRatisLimitBytes)
             .isLessThanOrEqualTo(actualRatisLimitBytes);
 
-        // Sum up all the keys purged in this batch (may be spread across multiple DeletedKeys entries)
+        // Count purged keys encoded as DeletedKeys entries
         totalPurgedKeysAcrossBatches += purgeRequest.getDeletedKeysList()
             .stream()
             .mapToInt(OzoneManagerProtocolProtos.DeletedKeys::getKeysCount)
             .sum();
+        // Some keys can be represented as KeysToUpdate (when versions must be retained).
+        // Treat each KeysToUpdate entry as one affected key for batching-accounting purposes.
+        totalPurgedKeysAcrossBatches += purgeRequest.getKeysToUpdateCount();
       }
 
       // Assert that the sum of keys across all batches equals the total number of keys initially deleted.
