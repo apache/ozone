@@ -466,6 +466,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       service.runPeriodicalTaskNow();
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
       snapshotDeletingService.resume();
+      snapshotDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount, metadataManager);
       keyDeletingService.resume();
     }
