@@ -153,6 +153,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         try {
           v.get().getMetadataManager().getStore().flushDB();
           v.get().close();
+          LOG.debug("Invalidated SnapshotId: '{}' in snapshot cache.", k);
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshotId: " + key, e);
         }

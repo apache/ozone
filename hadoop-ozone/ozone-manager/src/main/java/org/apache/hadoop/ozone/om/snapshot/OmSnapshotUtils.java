@@ -33,7 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -212,6 +216,29 @@ public final class OmSnapshotUtils {
       } else {
         Files.createLink(newFile.toPath(), oldFile.toPath());
       }
+    }
+  }
+
+  /**
+   * Retrieves the local data version for the given snapshot.
+   * <p>
+   * The version is read from the snapshot's local data YAML metadata file.
+   * This version is used to track the state of defragmentation operations
+   * on the snapshot.
+   *
+   * @param snapshotInfo SnapshotInfo object
+   * @return the version number from the snapshot's local data, or 0 if the
+   *         metadata cannot be read
+   */
+  public static int getLocalDataVersion(OzoneManager ozoneManager, SnapshotInfo snapshotInfo) {
+    try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
+             ozoneManager.getOmSnapshotManager().getSnapshotLocalDataManager().getOmSnapshotLocalData(snapshotInfo)) {
+      OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
+      return snapshotLocalData.getVersion();
+    } catch (IOException e) {
+      LOG.warn("Failed to read YAML metadata for snapshot {}, assuming version 0",
+          snapshotInfo.getName(), e);
+      return 0;
     }
   }
 }

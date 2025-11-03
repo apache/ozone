@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherStrin
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
@@ -262,15 +263,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles) throws IOException {
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles,
+      int snapshotLocalDataVersion) throws IOException {
     try {
       lock = new OmReadOnlyLock();
       hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
       omEpoch = 0;
-      String snapshotDir = OMStorage.getOmDbDir(conf) +
-          OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
+      String snapshotDir = OMStorage.getOmDbDir(conf) + OM_KEY_PREFIX +
+          (snapshotLocalDataVersion <= 0 ? OM_SNAPSHOT_CHECKPOINT_DIR : OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR);
       File metaDir = new File(snapshotDir);
       String dbName = OM_DB_NAME + snapshotDirName;
+      if (snapshotLocalDataVersion > 0) {
+        dbName += OzoneConsts.SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX + snapshotLocalDataVersion;
+      }
+      LOG.debug("snapshotLocalDataVersion = {}. Final dbName = {}", snapshotLocalDataVersion, dbName);
       checkSnapshotDirExist(Paths.get(metaDir.toPath().toString(), dbName).toFile());
       final boolean enableRocksDBMetrics = conf.getBoolean(
           OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,

@@ -521,9 +521,13 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "checkpointState";
-  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = "checkpointStateDefragged";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointStateDefragged";
+  public static final String TEMP_DIFF_SST_FILES_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR
+      + OM_KEY_PREFIX + "tempDiffSstFiles";
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
+  public static final String SNAPSHOT_DEFRAG_VERSION_SUFFIX_PREFIX = "-v";
 
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
