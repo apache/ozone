@@ -46,9 +46,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REP
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
@@ -62,7 +59,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -111,10 +107,10 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -177,7 +173,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * families before compaction.
    */
   public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT =
-      ImmutableSet.of(KEY_TABLE, DIRECTORY_TABLE, FILE_TABLE);
+      RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
   private final long diffCleanupServiceInterval;
   private final int maxOpenSstFilesInSnapshotDb;
@@ -198,12 +194,9 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public OmSnapshotManager(OzoneManager ozoneManager) throws IOException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
-    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager(),
-        omMetadataManager.getSnapshotChainManager(), ozoneManager.getConfiguration());
     boolean isFilesystemSnapshotEnabled = ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
         isFilesystemSnapshotEnabled ? "enabled" : "disabled");
-
     // Confirm that snapshot feature can be safely disabled.
     // Throw unchecked exception if that is not the case.
     if (!isFilesystemSnapshotEnabled &&
@@ -216,7 +209,6 @@ public final class OmSnapshotManager implements AutoCloseable {
           "Please set config ozone.filesystem.snapshot.enabled to true and " +
           "try to start this Ozone Manager again.");
     }
-
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
@@ -231,6 +223,12 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
     );
+    CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapDBProvider = snapshotInfo ->
+        getSnapshotOmMetadataManager(snapshotInfo, 0, maxOpenSstFilesInSnapshotDb,
+            ozoneManager.getConfiguration());
+    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager(),
+        omMetadataManager.getSnapshotChainManager(), ozoneManager.getVersionManager(), defaultSnapDBProvider,
+        ozoneManager.getConfiguration());
     Preconditions.checkArgument(this.maxOpenSstFilesInSnapshotDb >= -1,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES + " value should be larger than or equal to -1.");
 
@@ -238,7 +236,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
     String dbPath = getDbPath(ozoneManager.getConfiguration());
-
     try {
       // Add default CF
       columnFamilyDescriptors.add(new ColumnFamilyDescriptor(
@@ -377,6 +374,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     return isSnapshotInfoTableEmpty;
   }
 
+  private static OmMetadataManagerImpl getSnapshotOmMetadataManager(SnapshotInfo snapshotInfo, int version,
+      int maxOpenSstFilesInSnapshotDb, OzoneConfiguration conf) throws IOException {
+    return new OmMetadataManagerImpl(conf, snapshotInfo.getCheckpointDirName(version),
+        maxOpenSstFilesInSnapshotDb);
+  }
+
   private CacheLoader<UUID, OmSnapshot> createCacheLoader() {
     return new CacheLoader<UUID, OmSnapshot>() {
 
@@ -429,9 +432,8 @@ public final class OmSnapshotManager implements AutoCloseable {
           }
           try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapshotLocalDataProvider =
                    snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
-            snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-                snapshotInfo.getCheckpointDirName(snapshotLocalDataProvider.getMeta().getVersion()),
-                maxOpenSstFilesInSnapshotDb);
+            snapshotMetadataManager = getSnapshotOmMetadataManager(snapshotInfo,
+                snapshotLocalDataProvider.getMeta().getVersion(), maxOpenSstFilesInSnapshotDb, conf);
           }
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
@@ -586,17 +588,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   @VisibleForTesting
   public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
     return snapshotDiffCleanupService;
-  }
-
-  /**
-   * Captures the list of SST files for keyTable, fileTable and directoryTable in the DB.
-   * @param store AOS or snapshot DB for not defragged or defragged snapshot respectively.
-   * @return a Map of (table, set of SST files corresponding to the table)
-   */
-  public static List<LiveFileMetaData> getSnapshotSSTFileList(RDBStore store) throws IOException {
-    return store.getDb().getLiveFilesMetaData().stream()
-        .filter(lfm -> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
-        .collect(Collectors.toList());
   }
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator

@@ -20,6 +20,10 @@ package org.apache.hadoop.ozone.om.snapshot;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_DEFRAG;
+import static org.apache.ozone.rocksdb.util.RdbUtil.getLiveSSTFilesForCFs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
@@ -52,7 +56,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
@@ -63,8 +70,10 @@ import org.apache.hadoop.ozone.om.lock.FlatResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.LiveFileMetaData;
@@ -113,7 +122,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private volatile boolean closed;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager,
-      SnapshotChainManager snapshotChainManager,
+      SnapshotChainManager snapshotChainManager, OMLayoutVersionManager omLayoutVersionManager,
+      CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider,
       OzoneConfiguration configuration) throws IOException {
     this.localDataGraph = GraphBuilder.directed().build();
     this.omMetadataManager = omMetadataManager;
@@ -128,7 +138,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     this.versionNodeMap = new ConcurrentHashMap<>();
     this.fullLock = new ReentrantReadWriteLock();
     this.internalLock = new ReentrantReadWriteLock();
-    init(configuration, snapshotChainManager);
+    init(configuration, snapshotChainManager, omLayoutVersionManager, defaultSnapProvider);
   }
 
   @VisibleForTesting
@@ -172,7 +182,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
              new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
                  () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore),
+                         getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
+                             COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT),
                          snapshotInfo.getPathPreviousSnapshotId(), null),
                      null))) {
       snapshotLocalData.commit();
@@ -242,6 +253,32 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
+  private void addMissingSnapshotYamlFiles(
+      CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider) throws IOException {
+    try (Table.KeyValueIterator<String, SnapshotInfo> itr = omMetadataManager.getSnapshotInfoTable().iterator()) {
+      while (itr.hasNext()) {
+        SnapshotInfo snapshotInfo = itr.next().getValue();
+        UUID snapshotId = snapshotInfo.getSnapshotId();
+        File snapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(snapshotId));
+        // Create a yaml file for snapshots which are missing
+        if (!snapshotLocalDataFile.exists()) {
+          List<LiveFileMetaData> sstList = Collections.emptyList();
+          if (snapshotInfo.getSnapshotStatus() == SNAPSHOT_ACTIVE) {
+            try (OmMetadataManagerImpl snapshotMetadataManager = defaultSnapProvider.apply(snapshotInfo)) {
+              ManagedRocksDB snapDB = ((RDBStore)snapshotMetadataManager.getStore()).getDb().getManagedRocksDb();
+              sstList = getLiveSSTFilesForCFs(snapDB, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+            } catch (Exception e) {
+              throw new IOException(e);
+            }
+          }
+          OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapshotId, sstList,
+              snapshotInfo.getPathPreviousSnapshotId(), null);
+          snapshotLocalDataSerializer.save(snapshotLocalDataFile, snapshotLocalData);
+        }
+      }
+    }
+  }
+
   void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
     if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
       return;
@@ -297,12 +334,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return snapshotToBeCheckedForOrphans;
   }
 
-  private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager) throws IOException {
+  private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager,
+      OMLayoutVersionManager layoutVersionManager,
+      CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider) throws IOException {
     this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     File snapshotDir = new File(store.getSnapshotsParentDir());
+    boolean upgradeNeeded = !layoutVersionManager.isAllowed(SNAPSHOT_DEFRAG);
+    if (upgradeNeeded) {
+      addMissingSnapshotYamlFiles(defaultSnapProvider);
+    }
     File[] localDataFiles = snapshotDir.listFiles(
         (dir, name) -> name.startsWith(checkpointPrefix) && name.endsWith(YAML_FILE_EXTENSION));
     if (localDataFiles == null) {
@@ -813,7 +856,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     public void addSnapshotVersion(RDBStore snapshotStore) throws IOException {
-      List<LiveFileMetaData> sstFiles = OmSnapshotManager.getSnapshotSSTFileList(snapshotStore);
+      List<LiveFileMetaData> sstFiles = getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
+          COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
           previousSnapshotLocalData.getVersion());
