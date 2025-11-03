@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -660,11 +661,12 @@ public class TestDirectoryDeletingServiceWithFSO {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
     cluster.waitForClusterToBeReady();
-    for (int i = 0; i < 3; i++) {
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, Exception>) () -> {
       cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
       cluster.getOzoneManager().awaitDoubleBufferFlush();
-    }
-    assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
+      OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+      return metadataManager.countRowsInTable(metadataManager.getSnapshotInfoTable()) == initialSnapshotCount;
+    }, 2000, 120000);
     dirDeletingService.resume();
   }
 
