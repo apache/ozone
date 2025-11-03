@@ -833,7 +833,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     return count.get() == expectedCount;
   }
 
-
   private void checkPath(Path path) {
     FileNotFoundException ex = assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(path));
     assertThat(ex.getMessage()).contains("No such file or directory");
