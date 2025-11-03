@@ -81,7 +81,6 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -661,12 +660,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
     cluster.waitForClusterToBeReady();
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, Exception>) () -> {
-      cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
-      cluster.getOzoneManager().awaitDoubleBufferFlush();
-      OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
-      return metadataManager.countRowsInTable(metadataManager.getSnapshotInfoTable()) == initialSnapshotCount;
-    }, 2000, 120000);
+    cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    assertTableRowCountWithSnapshotService(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }
 
@@ -830,6 +826,19 @@ public class TestDirectoryDeletingServiceWithFSO {
     });
 
     return count.get() == expectedCount;
+  }
+
+  private void assertTableRowCountWithSnapshotService(Table<String, ?> table, int count)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        return assertTableRowCount(count, table);
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 120000);
   }
 
   private void checkPath(Path path) {
