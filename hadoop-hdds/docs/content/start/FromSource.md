@@ -74,7 +74,7 @@ curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/pr
 tar xzf protobuf-2.5.0.tar.gz
 cd protobuf-2.5.0
 
-# Insert arm64 macro to src/google/protobuf/stubs/platform_macros.h  
+# Insert arm64 macro to src/google/protobuf/stubs/platform_macros.h
 sed -i '' '59 a\
 #elif defined(__arm64__)\
 #define GOOGLE_PROTOBUF_ARCH_ARM 1\
