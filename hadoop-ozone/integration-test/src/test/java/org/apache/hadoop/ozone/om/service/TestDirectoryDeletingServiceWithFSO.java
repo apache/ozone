@@ -660,9 +660,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
     cluster.waitForClusterToBeReady();
+    GenericTestUtils.waitFor(() -> {
+      OzoneManager om = cluster.getOzoneManager();
+      return om.isLeaderReady() && 
+          om.getKeyManager().getSnapshotDeletingService() != null;
+    }, 1000, 30000);
     cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
     cluster.getOzoneManager().awaitDoubleBufferFlush();
-    assertTableRowCountWithSnapshotService(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
+    assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }
 
@@ -828,18 +833,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     return count.get() == expectedCount;
   }
 
-  private void assertTableRowCountWithSnapshotService(Table<String, ?> table, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
-        cluster.getOzoneManager().awaitDoubleBufferFlush();
-        return assertTableRowCount(count, table);
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, 120000);
-  }
 
   private void checkPath(Path path) {
     FileNotFoundException ex = assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(path));
