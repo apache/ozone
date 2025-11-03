@@ -130,7 +130,7 @@ public class TestOMSnapshotDAG {
   }
 
   private String getDBCheckpointAbsolutePath(SnapshotInfo snapshotInfo) {
-    return OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
+    return OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0);
   }
 
   private static String getSnapshotDBKey(String volumeName, String bucketName,

@@ -733,7 +733,7 @@ public class TestOMDbCheckpointServlet {
     writeClient.createSnapshot(vname, bname, snapshotName);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotPath = getSnapshotPath(conf, snapshotInfo)
+    String snapshotPath = getSnapshotPath(conf, snapshotInfo, 0)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
         100, 30000);
