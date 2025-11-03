@@ -1125,9 +1125,17 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       testKds.resume();
 
-      // Manually trigger the KeyDeletingService to run its task immediately.
-      // This will initiate the purge requests to Ratis.
-      testKds.runPeriodicalTaskNow();
+      // Deterministically drain: keep running the service until DeletedTable becomes empty.
+      // This matches the architecture (DB is the source of truth) and avoids magic iteration counts.
+      OMMetadataManager testMm = testOmTestManagers.getMetadataManager();
+      GenericTestUtils.waitFor(() -> {
+        try {
+          testKds.runPeriodicalTaskNow();
+          return testMm.countRowsInTable(testMm.getDeletedTable()) == 0;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 100, 10000);
 
       // Verify that submitRequest was called multiple times.
       // The exact number of calls depends on the key size and testRatisLimitBytes,
