@@ -21,7 +21,6 @@ import { Card, Row, Table } from 'antd';
 
 import { ColumnType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
-import ErrorMessage from '@/v2/components/errors/errorCard';
 import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
