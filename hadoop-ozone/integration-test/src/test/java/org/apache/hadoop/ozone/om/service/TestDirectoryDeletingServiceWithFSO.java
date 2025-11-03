@@ -660,30 +660,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
     cluster.waitForClusterToBeReady();
-    OzoneManager om = cluster.getOzoneManager();
-    GenericTestUtils.waitFor(() -> {
-      if (!om.isLeaderReady() || om.getKeyManager().getSnapshotDeletingService() == null) {
-        return false;
-      }
-      try {
-        OMMetadataManager omMetadataMgr = om.getMetadataManager();
-        SnapshotDeletingService snapshotDeletingSvc = om.getKeyManager().getSnapshotDeletingService();
-        Table<String, SnapshotInfo> snapInfoTable = omMetadataMgr.getSnapshotInfoTable();
-        // Check the specific deleted snapshots (snap1 and snap2) can be processed
-        SnapshotInfo snap1Info = snapInfoTable.get(
-            SnapshotInfo.getTableKey(testVolumeName, testBucketName, snap1));
-        SnapshotInfo snap2Info = snapInfoTable.get(
-            SnapshotInfo.getTableKey(testVolumeName, testBucketName, snap2));
-        // Both must exist and not be ignored (i.e., ready for purge)
-        return (snap1Info != null && !snapshotDeletingSvc.shouldIgnoreSnapshot(snap1Info)) &&
-            (snap2Info != null && !snapshotDeletingSvc.shouldIgnoreSnapshot(snap2Info));
-      } catch (IOException e) {
-        return false;
-      }
-    }, 1000, 120000);
-    om.getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
-    om.awaitDoubleBufferFlush();
-    assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
+    cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().runPeriodicalTaskNow();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }
 
