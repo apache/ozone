@@ -28,6 +28,18 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_O
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -72,6 +84,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -1844,6 +1857,58 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return false;
+  }
+
+  // NOTE: Update both getTableBucketPrefixInfo(volume, bucket) & getTableBucketPrefix(tableName, volume, bucket)
+  // simultaneously. Implemented duplicate functions to avoid computing bucketKeyPrefix redundantly for each and
+  // every table over and over again.
+  @Override
+  public TablePrefixInfo getTableBucketPrefix(String volume, String bucket) throws IOException {
+    String keyPrefix = getBucketKeyPrefix(volume, bucket);
+    String keyPrefixFso = getBucketKeyPrefixFSO(volume, bucket);
+    // Set value to 12 to avoid creating too big a HashTable unnecessarily.
+    Map<String, String> tablePrefixMap = new HashMap<>(12, 1.0f);
+
+    tablePrefixMap.put(VOLUME_TABLE, getVolumeKey(volume));
+    tablePrefixMap.put(BUCKET_TABLE, getBucketKey(volume, bucket));
+
+    tablePrefixMap.put(KEY_TABLE, keyPrefix);
+    tablePrefixMap.put(DELETED_TABLE, keyPrefix);
+    tablePrefixMap.put(SNAPSHOT_RENAMED_TABLE, keyPrefix);
+    tablePrefixMap.put(OPEN_KEY_TABLE, keyPrefix);
+    tablePrefixMap.put(MULTIPART_INFO_TABLE, keyPrefix);
+    tablePrefixMap.put(SNAPSHOT_INFO_TABLE, keyPrefix);
+
+    tablePrefixMap.put(FILE_TABLE, keyPrefixFso);
+    tablePrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
+    tablePrefixMap.put(DELETED_DIR_TABLE, keyPrefixFso);
+    tablePrefixMap.put(OPEN_FILE_TABLE, keyPrefixFso);
+
+    return new TablePrefixInfo(tablePrefixMap);
+  }
+
+  @Override
+  public String getTableBucketPrefix(String tableName, String volume, String bucket) throws IOException {
+    switch (tableName) {
+    case VOLUME_TABLE:
+      return getVolumeKey(volume);
+    case BUCKET_TABLE:
+      return getBucketKey(volume, bucket);
+    case KEY_TABLE:
+    case DELETED_TABLE:
+    case SNAPSHOT_RENAMED_TABLE:
+    case OPEN_KEY_TABLE:
+    case MULTIPART_INFO_TABLE:
+    case SNAPSHOT_INFO_TABLE:
+      return getBucketKeyPrefix(volume, bucket);
+    case FILE_TABLE:
+    case DIRECTORY_TABLE:
+    case DELETED_DIR_TABLE:
+    case OPEN_FILE_TABLE:
+      return getBucketKeyPrefixFSO(volume, bucket);
+    default:
+      return "";
+    }
   }
 
   @Override

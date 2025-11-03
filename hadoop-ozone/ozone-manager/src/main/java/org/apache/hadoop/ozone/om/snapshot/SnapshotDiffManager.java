@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.commons.lang3.StringUtils.leftPad;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
@@ -38,11 +39,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
@@ -102,6 +100,7 @@ import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -360,18 +359,17 @@ public class SnapshotDiffManager implements AutoCloseable {
         snapshotOMMM.getStore().getDbLocation().getPath();
     final UUID snapshotId = snapshotInfo.getSnapshotId();
     final long dbTxSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
-
     return new DifferSnapshotInfo(
         checkpointPath,
         snapshotId,
         dbTxSequenceNumber,
-        getColumnFamilyToKeyPrefixMap(snapshotOMMM, volumeName, bucketName),
+        snapshotOMMM.getTableBucketPrefix(volumeName, bucketName),
         ((RDBStore)snapshotOMMM.getStore()).getDb().getManagedRocksDb());
   }
 
   @VisibleForTesting
   protected Set<String> getSSTFileListForSnapshot(OmSnapshot snapshot,
-                                                  List<String> tablesToLookUp) {
+                                                  Set<String> tablesToLookUp) {
     return RdbUtil.getSSTFilesForComparison(((RDBStore)snapshot
         .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
         tablesToLookUp);
@@ -379,7 +377,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   @VisibleForTesting
   protected Map<Object, String> getSSTFileMapForSnapshot(OmSnapshot snapshot,
-      List<String> tablesToLookUp) throws IOException {
+      Set<String> tablesToLookUp) throws IOException {
     return RdbUtil.getSSTFilesWithInodesForComparison(((RDBStore)snapshot
             .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
         tablesToLookUp);
@@ -893,9 +891,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       final BucketLayout bucketLayout = getBucketLayout(volumeName, bucketName,
           fromSnapshot.getMetadataManager());
-      Map<String, String> tablePrefixes =
-          getColumnFamilyToKeyPrefixMap(toSnapshot.getMetadataManager(),
-              volumeName, bucketName);
+      TablePrefixInfo tablePrefixes = toSnapshot.getMetadataManager().getTableBucketPrefix(volumeName, bucketName);
 
       boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
       boolean performNonNativeDiff = diffDisableNativeLibs || disableNativeDiff;
@@ -964,9 +960,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             if (bucketLayout.isFileSystemOptimized()) {
               long bucketId = toSnapshot.getMetadataManager()
                   .getBucketId(volumeName, bucketName);
-              String tablePrefix = getTablePrefix(tablePrefixes,
-                  fromSnapshot.getMetadataManager()
-                      .getDirectoryTable().getName());
+              String tablePrefix = tablePrefixes.getTablePrefix(fromSnapshot.getMetadataManager()
+                  .getDirectoryTable().getName());
               oldParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   fromSnapshot.getMetadataManager().getDirectoryTable())
@@ -1050,7 +1045,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final OmSnapshot fromSnapshot, final OmSnapshot toSnapshot,
       final SnapshotInfo fsInfo, final SnapshotInfo tsInfo,
       final boolean useFullDiff, final boolean skipNativeDiff,
-      final Map<String, String> tablePrefixes,
+      final TablePrefixInfo tablePrefixes,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentMap<byte[], Boolean> objectIdToIsDirMap,
@@ -1058,7 +1053,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Optional<Set<Long>> newParentIds,
       final String diffDir, final String jobKey) throws IOException, RocksDBException {
 
-    List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
+    Set<String> tablesToLookUp = Collections.singleton(fsTable.getName());
     Set<String> deltaFiles = getDeltaFiles(fromSnapshot, toSnapshot,
         tablesToLookUp, fsInfo, tsInfo, useFullDiff, tablePrefixes, diffDir, jobKey);
 
@@ -1068,7 +1063,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (skipNativeDiff || !isNativeLibsLoaded) {
       Set<String> inputFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
       ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore()).getDb().getManagedRocksDb();
-      RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, fromDB);
+      RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, tablesToLookUp, fromDB);
       deltaFiles.addAll(inputFiles);
     }
     if (LOG.isDebugEnabled()) {
@@ -1090,13 +1085,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      Map<String, String> tablePrefixes, String jobKey) throws IOException, RocksDBException {
+      TablePrefixInfo tablePrefixes, String jobKey) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
-    String tablePrefix = getTablePrefix(tablePrefixes, fsTable.getName());
-    boolean isDirectoryTable =
-        fsTable.getName().equals(DIRECTORY_TABLE);
+    String tablePrefix = tablePrefixes.getTablePrefix(fsTable.getName());
+    boolean isDirectoryTable = fsTable.getName().equals(DIRECTORY_TABLE);
     SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
     long totalEstimatedKeysToProcess = sstFileReader.getEstimatedTotalKeys();
@@ -1106,9 +1100,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     double[] checkpoint = new double[1];
     checkpoint[0] = stepIncreasePct;
     if (Strings.isNotEmpty(tablePrefix)) {
-      char[] upperBoundCharArray = tablePrefix.toCharArray();
-      upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
-      sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
+      sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
     try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
         sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
@@ -1170,11 +1162,11 @@ public class SnapshotDiffManager implements AutoCloseable {
   @SuppressWarnings("checkstyle:ParameterNumber")
   Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
                             OmSnapshot toSnapshot,
-                            List<String> tablesToLookUp,
+                            Set<String> tablesToLookUp,
                             SnapshotInfo fsInfo,
                             SnapshotInfo tsInfo,
                             boolean useFullDiff,
-                            Map<String, String> tablePrefixes,
+                            TablePrefixInfo tablePrefixInfo,
                             String diffDir, String jobKey)
       throws IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
@@ -1193,7 +1185,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       recordActivity(jobKey, SST_FILE_DELTA_DAG_WALK);
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
-        deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir).map(HashSet::new);
+        deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, tablesToLookUp, diffDir).map(HashSet::new);
       } catch (Exception exception) {
         recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
         LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
@@ -1214,7 +1206,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
           .getDb().getManagedRocksDb();
       Set<String> diffFiles = getDiffFiles(fromSnapshot, toSnapshot, tablesToLookUp);
-      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes, fromDB, toDB);
+      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixInfo, tablesToLookUp, fromDB, toDB);
       deltaFiles = Optional.of(diffFiles);
     }
 
@@ -1223,7 +1215,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             toSnapshot.getSnapshotTableKey()));
   }
 
-  private Set<String> getDiffFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot, List<String> tablesToLookUp) {
+  private Set<String> getDiffFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot, Set<String> tablesToLookUp) {
     Set<String> diffFiles;
     try {
       Map<Object, String> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookUp);
@@ -1303,7 +1295,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final boolean isFSOBucket,
       final Optional<Map<Long, Path>> oldParentIdPathMap,
       final Optional<Map<Long, Path>> newParentIdPathMap,
-      final Map<String, String> tablePrefix) {
+      final TablePrefixInfo tablePrefix) {
     LOG.info("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
@@ -1394,8 +1386,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               modifyDiffs.add(codecRegistry.asRawData(entry));
             }
           } else {
-            String keyPrefix = getTablePrefix(tablePrefix,
-                (isDirectoryObject ? fsDirTable : fsTable).getName());
+            String keyPrefix = tablePrefix.getTablePrefix((isDirectoryObject ? fsDirTable : fsTable).getName());
             String oldKey = resolveBucketRelativePath(isFSOBucket,
                 oldParentIdPathMap, oldKeyName, true);
             String newKey = resolveBucketRelativePath(isFSOBucket,
@@ -1659,25 +1650,11 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   /**
-   * Get table prefix given a tableName.
-   */
-  private String getTablePrefix(Map<String, String> tablePrefixes,
-                                String tableName) {
-    // In case of FSO - either File/Directory table
-    // the key Prefix would be volumeId/bucketId and
-    // in case of non-fso - volumeName/bucketName
-    if (tableName.equals(DIRECTORY_TABLE) || tableName.equals(FILE_TABLE)) {
-      return tablePrefixes.get(DIRECTORY_TABLE);
-    }
-    return tablePrefixes.get(KEY_TABLE);
-  }
-
-  /**
    * check if the given key is in the bucket specified by tablePrefix map.
    */
-  boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
+  boolean isKeyInBucket(String key, TablePrefixInfo tablePrefixInfo,
                         String tableName) {
-    return key.startsWith(getTablePrefix(tablePrefixes, tableName));
+    return key.startsWith(tablePrefixInfo.getTablePrefix(tableName));
   }
 
   /**

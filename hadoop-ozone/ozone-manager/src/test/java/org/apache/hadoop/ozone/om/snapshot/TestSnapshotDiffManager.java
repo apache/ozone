@@ -61,7 +61,6 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyDouble;
 import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.anyString;
@@ -117,6 +116,7 @@ import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -434,6 +434,7 @@ public class TestSnapshotDiffManager {
     when(differ.getSSTDiffListWithFullPath(
         any(DifferSnapshotInfo.class),
         any(DifferSnapshotInfo.class),
+        anySet(),
         eq(diffDir))
     ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
 
@@ -452,16 +453,17 @@ public class TestSnapshotDiffManager {
              Mockito.CALLS_REAL_METHODS)) {
       mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
           .thenReturn(Collections.singleton(RandomStringUtils.secure().nextAlphabetic(10)));
-      mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
+      mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any(), anySet()))
+          .thenAnswer(i -> null);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
       doNothing().when(spy).updateProgress(anyString(), anyDouble());
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
-          Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
+          Sets.newHashSet("cf1", "cf2"), fromSnapshotInfo,
           toSnapshotInfo, false,
-          Collections.emptyMap(), diffDir, diffJobKey);
+          new TablePrefixInfo(Collections.emptyMap()), diffDir, diffJobKey);
       assertEquals(randomStrings, deltaFiles);
     }
     rcFromSnapshot.close();
@@ -481,7 +483,7 @@ public class TestSnapshotDiffManager {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
+              () -> RdbUtil.getSSTFilesForComparison(any(), anySet()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
                 .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
@@ -491,7 +493,7 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), any(), anyMap(), anySet(), any(ManagedRocksDB.class),
                   any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
@@ -513,6 +515,7 @@ public class TestSnapshotDiffManager {
         when(differ.getSSTDiffListWithFullPath(
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
+            anySet(),
             anyString()))
             .thenReturn(Optional.ofNullable(Collections.emptyList()));
       }
@@ -533,11 +536,11 @@ public class TestSnapshotDiffManager {
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
-          Arrays.asList("cf1", "cf2"),
+          Sets.newHashSet("cf1", "cf2"),
           fromSnapshotInfo,
           toSnapshotInfo,
           false,
-          Collections.emptyMap(),
+          new TablePrefixInfo(Collections.emptyMap()),
           snapDiffDir.getAbsolutePath(), diffJobKey);
       assertEquals(deltaStrings, deltaFiles);
     }
@@ -553,7 +556,7 @@ public class TestSnapshotDiffManager {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
+              () -> RdbUtil.getSSTFilesForComparison(any(), anySet()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
                 .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
@@ -563,7 +566,7 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), any(), anyMap(), anySet(), any(ManagedRocksDB.class),
                   any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
@@ -586,6 +589,7 @@ public class TestSnapshotDiffManager {
           .getSSTDiffListWithFullPath(
               any(DifferSnapshotInfo.class),
               any(DifferSnapshotInfo.class),
+              anySet(),
               anyString());
 
       UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
@@ -605,11 +609,11 @@ public class TestSnapshotDiffManager {
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
-          Arrays.asList("cf1", "cf2"),
+          Sets.newHashSet("cf1", "cf2"),
           fromSnapshotInfo,
           toSnapshotInfo,
           false,
-          Collections.emptyMap(),
+          new TablePrefixInfo(Collections.emptyMap()),
           snapDiffDir.getAbsolutePath(), diffJobKey);
       assertEquals(deltaStrings, deltaFiles);
 
@@ -702,7 +706,7 @@ public class TestSnapshotDiffManager {
             String keyName = split[split.length - 1];
             return Integer.parseInt(keyName.substring(3)) % 2 == 0;
           }
-      ).when(spy).isKeyInBucket(anyString(), anyMap(), anyString());
+      ).when(spy).isKeyInBucket(anyString(), any(), anyString());
       assertFalse(isKeyInBucket);
 
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
@@ -720,7 +724,7 @@ public class TestSnapshotDiffManager {
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, ""), "");
+          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, "")), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -854,8 +858,7 @@ public class TestSnapshotDiffManager {
         return keyInfo;
       });
       when(fromSnapTable.getName()).thenReturn("table");
-      Map<String, String> tablePrefixes = mock(Map.class);
-      when(tablePrefixes.get(anyString())).thenReturn("");
+      TablePrefixInfo tablePrefixes = new TablePrefixInfo(Collections.emptyMap());
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doReturn(true).when(spy)
           .areDiffJobAndSnapshotsActive(volumeName, bucketName, fromSnapName,
@@ -1248,7 +1251,7 @@ public class TestSnapshotDiffManager {
         false,
         Optional.empty(),
         Optional.empty(),
-        Collections.emptyMap());
+        new TablePrefixInfo(Collections.emptyMap()));
 
     assertEquals(0, totalDiffEntries);
   }
@@ -1290,7 +1293,7 @@ public class TestSnapshotDiffManager {
             false,
             Optional.empty(),
             Optional.empty(),
-            Collections.emptyMap())
+            new TablePrefixInfo(Collections.emptyMap()))
     );
     assertEquals("Old and new key name both are null",
         exception.getMessage());
@@ -1558,12 +1561,12 @@ public class TestSnapshotDiffManager {
       }
       return null;
     }).when(spy).getSSTFileMapForSnapshot(Mockito.any(OmSnapshot.class),
-        Mockito.anyList());
+        Mockito.anySet());
     doNothing().when(spy).recordActivity(any(), any());
     doNothing().when(spy).updateProgress(anyString(), anyDouble());
     String diffJobKey = snap1 + DELIMITER + snap2;
-    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
-        snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);
+    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptySet(), snapshotInfo,
+        snapshotInfo, true, new TablePrefixInfo(Collections.emptyMap()), null, diffJobKey);
     Assertions.assertEquals(Sets.newHashSet("3.sst", "4.sst"), deltaFiles);
   }
 
@@ -1577,21 +1580,21 @@ public class TestSnapshotDiffManager {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
 
     doReturn(testDeltaFiles).when(spy).getDeltaFiles(any(OmSnapshot.class),
-        any(OmSnapshot.class), anyList(), eq(fromSnapInfo), eq(toSnapInfo),
-        eq(false), anyMap(), anyString(),
+        any(OmSnapshot.class), anySet(), eq(fromSnapInfo), eq(toSnapInfo),
+        eq(false), any(), anyString(),
         anyString());
 
     doReturn(testDeltaFiles).when(spy)
-        .getSSTFileListForSnapshot(any(OmSnapshot.class), anyList());
+        .getSSTFileListForSnapshot(any(OmSnapshot.class), anySet());
 
     doNothing().when(spy).addToObjectIdMap(eq(keyInfoTable), eq(keyInfoTable),
-        any(), anyBoolean(), any(), any(), any(), any(), any(), anyMap(), anyString());
+        any(), anyBoolean(), any(), any(), any(), any(), any(), any(), anyString());
     doNothing().when(spy).checkReportsIntegrity(any(), anyInt(), anyInt());
 
     doReturn(10L).when(spy).generateDiffReport(anyString(),
         any(), any(), any(), any(), any(), any(), any(),
         anyString(), anyString(), anyString(), anyString(), anyBoolean(),
-        any(), any(), anyMap());
+        any(), any(), any());
     doReturn(LEGACY).when(spy).getBucketLayout(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
