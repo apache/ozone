@@ -117,7 +117,7 @@ public class TestOMSnapshotDeleteResponse {
 
     // Confirm snapshot directory was created
     String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
-        snapshotInfo);
+        snapshotInfo, 0);
     assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
