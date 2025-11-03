@@ -215,6 +215,7 @@ public class TestSnapshotDefragAdmin {
       }
     } finally {
       System.setOut(oldOut);
+      ps.close();
     }
   }
 }
