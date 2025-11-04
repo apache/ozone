@@ -240,7 +240,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock)
         .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
 
   @ParameterizedTest
@@ -748,7 +748,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Init the mock with the spyDbstore
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
         eq(false), any(), any(), eq(false));
-    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any());
+    doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
     omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
         false,
         om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
