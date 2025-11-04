@@ -81,6 +81,8 @@ public final class KeyLifecycleServiceMetrics {
   private MutableGaugeLong numKeyDeleted;
   @Metric("Total keys renamed")
   private MutableGaugeLong numKeyRenamed;
+  @Metric("Total directories renamed")
+  private MutableGaugeLong numDirRenamed;
   @Metric("Total size of keys deleted")
   private MutableGaugeLong sizeKeyDeleted;
   @Metric("Total size of keys renamed")
@@ -110,6 +112,10 @@ public final class KeyLifecycleServiceMetrics {
     numKeyRenamed.incr(keyCount);
   }
 
+  public void incrNumDirRenamed(long dirCount) {
+    numDirRenamed.incr(dirCount);
+  }
+
   public void incrSizeKeyDeleted(long size) {
     sizeKeyDeleted.incr(size);
   }
@@ -128,6 +134,10 @@ public final class KeyLifecycleServiceMetrics {
 
   public MutableGaugeLong getNumKeyRenamed() {
     return numKeyRenamed;
+  }
+
+  public MutableGaugeLong getNumDirRenamed() {
+    return numDirRenamed;
   }
 
   public MutableGaugeLong getSizeKeyDeleted() {
