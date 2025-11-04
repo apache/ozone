@@ -475,7 +475,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testRenamedKeyReclaimation(boolean testForSnapshot)
-        throws IOException, InterruptedException, TimeoutException, ExecutionException {
+        throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
