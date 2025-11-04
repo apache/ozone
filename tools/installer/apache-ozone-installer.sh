@@ -46,6 +46,7 @@ HOSTS_ARG_RAW=""
 VERSION=""
 USE_SUDO="${USE_SUDO:-no}"
 SERVICE_USER="${SERVICE_USER:-}"
+SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER:-ozone}}"
 
 declare -a OM_HOSTS
 declare -a SCM_HOSTS
@@ -79,6 +80,7 @@ Options:
   -l --ssh-user <user>             SSH username (overrides user@ in host)
   -S, --use-sudo                     Run remote commands via sudo
   -u, --service-user <user>          Service user to run Ozone commands (default: ozone)
+  -g, --service-group <group>        Service group to run Ozone commands (default: ozone)
   -h, --help                        Show this help
 
 Examples:
@@ -86,7 +88,9 @@ Examples:
   $SCRIPT_NAME -H 10.0.0.10:2222 -m key -k ~/.ssh/id_rsa -i /opt/ozone -d /data/ozone -l ubuntu
   $SCRIPT_NAME -H myhost -m key -k ~/.ssh/id_rsa -v 2.0.0 -S -l ubuntu
   $SCRIPT_NAME -H myhost -m key -k ~/.ssh/id_rsa -v 2.0.0 -u ozone -S -l ubuntu
-  # HA with roles from YAML (om/scm/datanodes lists)
+  # HA with brace expansion: installer-{1..10}.domain expands to installer-1.domain,...,installer-10.domain
+  $SCRIPT_NAME -H "installer-{1..10}.domain" -m key -k ~/.ssh/id_rsa -v 2.0.0
+  # HA with roles mapping from YAML (om/scm/datanodes lists)
   $SCRIPT_NAME -M ha -C ./configs -R cluster.yaml -m key -k ~/.ssh/id_rsa -v 2.0.0
 EOF
 }
@@ -129,6 +133,8 @@ parse_args() {
         USE_SUDO="yes"; shift 1 ;;
       -u|--service-user)
         SERVICE_USER="$2"; shift 2 ;;
+      -g|--service-group)
+        SERVICE_GROUP="$2"; shift 2 ;;
       -h|--help)
         usage; exit 0 ;;
       *)
@@ -140,6 +146,11 @@ parse_args() {
 main() {
   print_header
   parse_args "$@"
+
+  # Expand brace patterns in HOSTS_ARG_RAW if present
+  if [[ -n "$HOSTS_ARG_RAW" ]]; then
+    HOSTS_ARG_RAW=$(expand_brace_patterns "$HOSTS_ARG_RAW")
+  fi
 
   if [[ "$AUTH_METHOD" != "password" && "$AUTH_METHOD" != "key" ]]; then
     echo "Error: --auth-method must be 'password' or 'key'" >&2
@@ -267,9 +278,9 @@ main() {
   START_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   printf "%s\n" "${SEPARATOR}"
   printf "%-18s | %s\n" "Started at" "$START_ISO"
-  printf "%-18s-+-%s\n" "------------------" "------------------"
+  printf "%-18s-+-%s\n" "------------------" "----------------------"
   printf "%-18s | %s\n" "Property" "Value"
-  printf "%-18s-+-%s\n" "------------------" "------------------"
+  printf "%-18s-+-%s\n" "------------------" "----------------------"
   printf "%-18s | %s\n" "Ozone version" "$VERSION"
   printf "%-18s | %s\n" "Install directory" "$INSTALL_BASE"
   printf "%-18s | %s\n" "Data directory" "$DATA_BASE"
@@ -277,16 +288,17 @@ main() {
   printf "%-18s | %s\n" "Deployment Mode" "$CLUSTER_MODE"
   if [[ -n "$SERVICE_USER" ]]; then
     printf "%-18s | %s\n" "Service User" "$SERVICE_USER"
+    printf "%-18s | %s\n" "Service Group" "$SERVICE_GROUP"
   fi
   if [[ "${USE_SUDO:-no}" == "yes" ]]; then
     printf "%-18s | %s\n" "Use Sudo" "yes"
   fi
-  printf "%-18s-+-%s\n" "------------------" "------------------"
+  printf "%-18s-+-%s\n" "------------------" "----------------------"
   printf "%-18s | %s\n" "Config directory" "$CONFIG_DIR"
   if [[ "$CLUSTER_MODE" == "ha" ]]; then
     printf "%-18s | %s\n" "Host Map file" "$ROLE_FILE"
   fi
-  printf "%-18s-+-%s\n" "------------------" "------------------"
+  printf "%-18s-+-%s\n" "------------------" "----------------------"
 
 
   if [[ "$CLUSTER_MODE" == "single" ]]; then
@@ -302,8 +314,8 @@ main() {
     fi
 
     if [[ -n "$SERVICE_USER" ]]; then
-      echo "Creating service user $SERVICE_USER on target..."
-      remote_create_service_user
+      echo "Creating service user $SERVICE_USER with group $SERVICE_GROUP on target..."
+      remote_create_service_user "$SERVICE_USER" "$SERVICE_GROUP"
     fi
 
     echo "Installing Java $JDK_MAJOR on target (if needed)..."
@@ -477,8 +489,8 @@ EON
           remote_cleanup_dirs "$INSTALL_BASE" "$DATA_BASE"
         fi
         if [[ -n "$SERVICE_USER" ]]; then
-          echo "[$current_host] Creating service user $SERVICE_USER..."
-          remote_create_service_user
+          echo "[$current_host] Creating service user $SERVICE_USER with group $SERVICE_GROUP..."
+          remote_create_service_user "$SERVICE_USER" "$SERVICE_GROUP"
         fi
         echo "[$current_host] Installing JDK $JDK_MAJOR (if needed)..."
         remote_install_java "$JDK_MAJOR"
@@ -558,6 +570,7 @@ main "$@"
 # ToDo: Add Recon to the role file
 # ToDo: Add S3Gateway to the role file
 # ToDo: Add Httpfs to the role file
+# ToDo: Add Logger to a file
 # ToDo: Kerberos Support
 # ToDo: TDE Support
 # ToDo: TLS Support
