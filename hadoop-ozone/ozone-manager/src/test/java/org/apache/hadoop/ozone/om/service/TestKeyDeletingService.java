@@ -623,8 +623,9 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
 
         writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        keyDeletingService.runPeriodicalTaskNow();
         directoryDeletingService.runPeriodicalTaskNow();
+        om.awaitDoubleBufferFlush();
+        keyDeletingService.runPeriodicalTaskNow();
         om.awaitDoubleBufferFlush();
         assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
 
