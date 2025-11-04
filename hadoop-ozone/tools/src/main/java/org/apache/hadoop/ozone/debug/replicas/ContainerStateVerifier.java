@@ -178,7 +178,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
           containerOperationClient.getContainerReplicas(containerId);
       
       if (replicaInfos.isEmpty()) {
-        return "[UNDER_REPLICATED: no replicas found]";
+        return "UNDER_REPLICATED: no replicas found";
       }
       
       int replicationFactor = containerInfo.getReplicationFactor().getNumber();
@@ -191,17 +191,17 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       }
       
       if (healthyReplicas < replicationFactor) {
-        return String.format("[UNDER_REPLICATED: %d/%d healthy replicas]", 
+        return String.format("UNDER_REPLICATED: %d/%d healthy replicas", 
             healthyReplicas, replicationFactor);
       } else if (healthyReplicas > replicationFactor) {
-        return String.format("[OVER_REPLICATED: %d/%d healthy replicas]", 
+        return String.format("OVER_REPLICATED: %d/%d healthy replicas", 
             healthyReplicas, replicationFactor);
       } else {
-        return "[HEALTHY_REPLICATION]";
+        return "HEALTHY_REPLICATION";
       }
       
     } catch (Exception e) {
-      return "[REPLICATION_CHECK_FAILED: " + e.getMessage() + "]";
+      return "REPLICATION_CHECK_FAILED: " + e.getMessage();
     }
   }
 

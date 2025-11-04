@@ -576,14 +576,14 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     
     if (!isSufficientlyReplicated()) {
       List<Integer> missingIndexes = unavailableIndexes(true);
-      sb.append(" [UNDER_REPLICATED: missing indexes ")
-        .append(missingIndexes).append(']');
+      sb.append(" UNDER_REPLICATED: missing indexes ")
+        .append(missingIndexes);
     } else if (isOverReplicated()) {
       List<Integer> excessIndexes = overReplicatedIndexes(false);
-      sb.append(" [OVER_REPLICATED: excess indexes ")
-        .append(excessIndexes).append(']');
+      sb.append(" OVER_REPLICATED: excess indexes ")
+        .append(excessIndexes);
     } else {
-      sb.append(" [HEALTHY_REPLICATION]");
+      sb.append(" HEALTHY_REPLICATION");
     }
       
     return sb.toString();
