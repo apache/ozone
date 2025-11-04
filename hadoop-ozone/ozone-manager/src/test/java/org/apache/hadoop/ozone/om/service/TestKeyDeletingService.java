@@ -1153,7 +1153,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // Get all captured requests that were sent
       List<OzoneManagerProtocolProtos.OMRequest> capturedRequests = requestCaptor.getAllValues();
 
-      // Iterate through each captured Ratis request (batch) to verify batching behavior
+      // Iterate through each captured Ratis request (batch)
       for (OzoneManagerProtocolProtos.OMRequest omRequest : capturedRequests) {
         assertNotNull(omRequest);
         assertEquals(OzoneManagerProtocolProtos.Type.PurgeKeys, omRequest.getCmdType());
