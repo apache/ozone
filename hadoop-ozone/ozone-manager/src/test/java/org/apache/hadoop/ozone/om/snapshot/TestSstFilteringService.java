@@ -219,7 +219,7 @@ public class TestSstFilteringService {
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
 
     String snapshotDirName =
-        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
+        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0);
 
     for (LiveFileMetaData file : allFiles) {
       //Skipping the previous files from this check even those also works.
@@ -294,11 +294,11 @@ public class TestSstFilteringService {
     SnapshotInfo snapshot1Info = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap1"));
     File snapshot1Dir =
-        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot1Info));
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot1Info, 0));
     SnapshotInfo snapshot2Info = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap2"));
     File snapshot2Dir =
-        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot2Info));
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot2Info, 0));
 
     File snap1Current = new File(snapshot1Dir, "CURRENT");
     File snap2Current = new File(snapshot2Dir, "CURRENT");
