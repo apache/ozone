@@ -41,8 +41,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,15 +106,25 @@ public class NSSummaryTask implements ReconOmTask {
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    int maxKeysInMemory = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    int maxIterators = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    int maxWorkers = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
 
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        nsSummaryFlushToDBMaxThreshold);
+        nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
+        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold,
+        maxIterators, maxWorkers, maxKeysInMemory);
   }
 
   @Override
@@ -216,7 +228,7 @@ public class NSSummaryTask implements ReconOmTask {
       return buildTaskResult(false);
     }
 
-    LOG.info("Starting NSSummary tree reprocess with unified control...");
+    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
     long startTime = System.nanoTime(); // Record start time
     
     try {
@@ -234,6 +246,7 @@ public class NSSummaryTask implements ReconOmTask {
   protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
+    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
 
     try {
       // reinit Recon RocksDB's namespace CF.
@@ -305,7 +318,7 @@ public class NSSummaryTask implements ReconOmTask {
       // Reset state to IDLE on successful completion
       if (success) {
         REBUILD_STATE.set(RebuildState.IDLE);
-        LOG.info("NSSummary tree reprocess completed successfully with unified control.");
+        LOG.info("Completed RocksDB Reprocess for {} in {}", getTaskName(), (endTime - startTime));
       }
     }
 

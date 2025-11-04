@@ -87,34 +87,35 @@ public class NSSummaryTaskDbEventHandler {
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
-    if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
-    }
-    if (nsSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
-      nsSummary = new NSSummary();
-    }
-    int[] fileBucket = nsSummary.getFileSizeBucket();
+    nsSummaryMap.compute(parentObjectId, (k, v) -> {
+      if (v == null) {
+        try {
+          v = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+          if (v == null) {
+            v = new NSSummary();
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      NSSummary nsSummary = v;
+      int[] fileBucket = nsSummary.getFileSizeBucket();
+      nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+      nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+      // Before arithmetic operations, check for sentinel value
+      long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+      if (currentReplSize < 0) {
+        // Old data, initialize to 0 before first use
+        currentReplSize = 0;
+        nsSummary.setReplicatedSizeOfFiles(0);
+      }
+      nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
+      int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
-    // Update immediate parent's totals (includes all descendant files)
-    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
-    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
-    // Before arithmetic operations, check for sentinel value
-    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
-    if (currentReplSize < 0) {
-      // Old data, initialize to 0 before first use
-      currentReplSize = 0;
-      nsSummary.setReplicatedSizeOfFiles(0);
-    }
-    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
-    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
-
-    ++fileBucket[binIndex];
-    nsSummary.setFileSizeBucket(fileBucket);
-    nsSummaryMap.put(parentObjectId, nsSummary);
+      ++fileBucket[binIndex];
+      nsSummary.setFileSizeBucket(fileBucket);
+      return nsSummary;
+    });
 
     // Propagate upwards to all parents in the parent chain
     propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
@@ -253,14 +254,17 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
-  protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
-    try {
-      updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-      return false;
-    } finally {
-      nsSummaryMap.clear();
+  protected synchronized boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap,
+                                                      long nsSummaryFlushToDBMaxThreshold) {
+    if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+      try {
+        updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
+      } catch (IOException e) {
+        LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+        return false;
+      } finally {
+        nsSummaryMap.clear();
+      }
     }
     return true;
   }

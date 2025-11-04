@@ -122,7 +122,7 @@ public abstract class FileSizeCountTaskHelper {
     writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
     
     long endTime = Time.monotonicNow();
-    LOG.info("{} completed RocksDB Reprocess in {} ms.", taskName, (endTime - startTime));
+    LOG.info("Completed RocksDB Reprocess for {} in {}", taskName, (endTime - startTime));
     
     return buildTaskResult(taskName, true);
   }

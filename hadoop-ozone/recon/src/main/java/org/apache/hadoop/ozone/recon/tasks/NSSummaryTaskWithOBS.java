@@ -23,8 +23,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -35,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,64 +54,87 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskWithOBS.class);
 
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxKeysInMemory;
+  private final int maxIterators;
+  private final int maxWorkers;
 
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      long nsSummaryFlushToDBMaxThreshold) {
+      long nsSummaryFlushToDBMaxThreshold, int maxIterators, int maxWorkers, int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-
+    Map<Long, NSSummary> nsSummaryMap = new ConcurrentHashMap<>();
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     try {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               keyTableIter = keyTable.iterator()) {
+      try (ParallelTableIteratorOperation<String, OmKeyInfo>
+               keyTableIter = new ParallelTableIteratorOperation<>(omMetadataManager, keyTable, StringCodec.get(),
+          maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
 
-        while (keyTableIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-          OmKeyInfo keyInfo = kv.getValue();
+        Function<Table.KeyValue<String, OmKeyInfo>, Void> keyOperation = kv -> {
+          try {
+            OmKeyInfo keyInfo = kv.getValue();
 
-          // KeyTable entries belong to both Legacy and OBS buckets.
-          // Check bucket layout and if it's anything other than OBS,
-          // continue to the next iteration.
-          String volumeName = keyInfo.getVolumeName();
-          String bucketName = keyInfo.getBucketName();
-          String bucketDBKey = omMetadataManager
-              .getBucketKey(volumeName, bucketName);
-          // Get bucket info from bucket table
-          OmBucketInfo omBucketInfo = omMetadataManager
-              .getBucketTable().getSkipCache(bucketDBKey);
+            // KeyTable entries belong to both Legacy and OBS buckets.
+            // Check bucket layout and if it's anything other than OBS,
+            // continue to the next iteration.
+            String volumeName = keyInfo.getVolumeName();
+            String bucketName = keyInfo.getBucketName();
+            String bucketDBKey = omMetadataManager
+                .getBucketKey(volumeName, bucketName);
+            // Get bucket info from bucket table
+            OmBucketInfo omBucketInfo = omMetadataManager
+                .getBucketTable().getSkipCache(bucketDBKey);
 
-          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
-            continue;
-          }
-
-          setKeyParentID(keyInfo);
-
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
+            if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+              return null;
             }
+
+            setKeyParentID(keyInfo);
+
+            try {
+              lock.readLock().lock();
+              handlePutKeyEvent(keyInfo, nsSummaryMap);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            } finally {
+              lock.readLock().unlock();
+            }
+            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+              try {
+                lock.writeLock().lock();
+                if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
+                  throw new IOException("Failed to commit nsSummaryMap");
+                }
+              } finally {
+                lock.writeLock().unlock();
+              }
+            }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
           }
-        }
+          return null;
+        };
+        keyTableIter.performTaskOnTableVals(this.getClass().getName(), null, null, keyOperation);
       }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-          ioEx);
+    } catch (Exception exception) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ", exception);
       nsSummaryMap.clear();
       return false;
     }
 
     // flush and commit left out entries at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+    if (!flushAndCommitNSToDB(nsSummaryMap, 0)) {
       return false;
     }
     LOG.debug("Completed a reprocess run of NSSummaryTaskWithOBS");
@@ -196,7 +224,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           LOG.debug("Skipping DB update event: {}", action);
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-          if (!flushAndCommitNSToDB(nsSummaryMap)) {
+          if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
             return new ImmutablePair<>(seekPos, false);
           }
           seekPos = eventCounter + 1;
@@ -210,7 +238,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     }
 
     // Flush and commit left-out entries at the end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+    if (!flushAndCommitNSToDB(nsSummaryMap, 0)) {
       return new ImmutablePair<>(seekPos, false);
     }
 

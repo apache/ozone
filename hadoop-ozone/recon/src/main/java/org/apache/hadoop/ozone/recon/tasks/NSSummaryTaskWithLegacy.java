@@ -25,9 +25,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -40,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +60,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private final boolean enableFileSystemPaths;
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxKeysInMemory;
+  private final int maxIterators;
+  private final int maxWorkers;
 
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
@@ -62,7 +70,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  reconOMMetadataManager,
                                  OzoneConfiguration
                                  ozoneConfiguration,
-                                 long nsSummaryFlushToDBMaxThreshold) {
+                                 long nsSummaryFlushToDBMaxThreshold,
+                                 int maxIterators,
+                                 int maxWorkers,
+                                 int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     // true if FileSystemPaths enabled
@@ -70,6 +81,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
             OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,
@@ -132,7 +146,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         return new ImmutablePair<>(seekPos, false);
       }
       if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-        if (!flushAndCommitNSToDB(nsSummaryMap)) {
+        if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
           return new ImmutablePair<>(seekPos, false);
         }
         seekPos = eventCounter + 1;
@@ -140,7 +154,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     }
 
     // flush and commit left out entries at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+    if (!flushAndCommitNSToDB(nsSummaryMap, 0)) {
       return new ImmutablePair<>(seekPos, false);
     }
 
@@ -255,63 +269,79 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    Map<Long, NSSummary> nsSummaryMap = new ConcurrentHashMap<>();
 
     try {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
+      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+      try (ParallelTableIteratorOperation<String, OmKeyInfo>
+          keyTableIter = new ParallelTableIteratorOperation<>(omMetadataManager, keyTable, StringCodec.get(),
+          maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator()) {
+        Function<Table.KeyValue<String, OmKeyInfo>, Void> keyOperation = kv -> {
+          try {
+            OmKeyInfo keyInfo = kv.getValue();
 
-        while (keyTableIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-          OmKeyInfo keyInfo = kv.getValue();
-
-          // KeyTable entries belong to both Legacy and OBS buckets.
-          // Check bucket layout and if it's OBS
-          // continue to the next iteration.
-          if (!isBucketLayoutValid((ReconOMMetadataManager) omMetadataManager,
-              keyInfo)) {
-            continue;
-          }
-
-          if (enableFileSystemPaths) {
-            // The LEGACY bucket is a file system bucket.
-            setKeyParentID(keyInfo);
-
-            if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-              OmDirectoryInfo directoryInfo =
-                  new OmDirectoryInfo.Builder()
-                      .setName(keyInfo.getKeyName())
-                      .setObjectID(keyInfo.getObjectID())
-                      .setParentObjectID(keyInfo.getParentObjectID())
-                      .build();
-              handlePutDirEvent(directoryInfo, nsSummaryMap);
-            } else {
-              handlePutKeyEvent(keyInfo, nsSummaryMap);
+            // KeyTable entries belong to both Legacy and OBS buckets.
+            // Check bucket layout and if it's OBS
+            // continue to the next iteration.
+            if (!isBucketLayoutValid((ReconOMMetadataManager) omMetadataManager,
+                keyInfo)) {
+              return null;
             }
-          } else {
-            // The LEGACY bucket is an object store bucket.
-            setParentBucketId(keyInfo);
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
-          }
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
+
+            try {
+              lock.readLock().lock();
+              if (enableFileSystemPaths) {
+                // The LEGACY bucket is a file system bucket.
+                setKeyParentID(keyInfo);
+
+                if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+                  OmDirectoryInfo directoryInfo =
+                      new OmDirectoryInfo.Builder()
+                          .setName(keyInfo.getKeyName())
+                          .setObjectID(keyInfo.getObjectID())
+                          .setParentObjectID(keyInfo.getParentObjectID())
+                          .build();
+                  handlePutDirEvent(directoryInfo, nsSummaryMap);
+                } else {
+                  handlePutKeyEvent(keyInfo, nsSummaryMap);
+                }
+              } else {
+                // The LEGACY bucket is an object store bucket.
+                setParentBucketId(keyInfo);
+                handlePutKeyEvent(keyInfo, nsSummaryMap);
+              }
+            } finally {
+              lock.readLock().unlock();
             }
+            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+              try {
+                lock.writeLock().lock();
+                if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
+                  throw new IOException();
+                }
+              } finally {
+                lock.writeLock().unlock();
+              }
+            }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
           }
-        }
+          return null;
+        };
+        keyTableIter.performTaskOnTableVals(this.getClass().getName(), null, null, keyOperation);
       }
-    } catch (IOException ioEx) {
+    } catch (Exception ex) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-          ioEx);
+          ex);
       nsSummaryMap.clear();
       return false;
     }
 
     // flush and commit left out entries at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+    if (!flushAndCommitNSToDB(nsSummaryMap, 0)) {
       return false;
     }
     LOG.debug("Completed a reprocess run of NSSummaryTaskWithLegacy");

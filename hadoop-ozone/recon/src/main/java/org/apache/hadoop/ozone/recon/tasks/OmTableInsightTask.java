@@ -108,6 +108,9 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
+    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
+    long startTime = Time.monotonicNow();
+
     init();
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
@@ -142,8 +145,9 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
+    long endTime = Time.monotonicNow();
 
-    LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
+    LOG.info("Completed RocksDB Reprocess for {} in {}", getTaskName(), (endTime - startTime));
     return buildTaskResult(true);
   }
 
