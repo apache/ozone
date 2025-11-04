@@ -105,7 +105,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
 
       String replicationStatus = checkReplicationStatus(keyLocation.getContainerID());
       replicaCheckMsg.append(", ").append(replicationStatus);
-      if (replicationStatus.contains("UNDER_REPLICATED") || replicationStatus.contains("REPLICATION_CHECK_FAILED")) {
+      if (replicationStatus.contains("REPLICATION_CHECK_FAILED")) {
         pass = false;
       }
 
