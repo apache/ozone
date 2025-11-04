@@ -44,6 +44,10 @@ solutions that want to aggregate data across multiple cloud providers.
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
 API from the AWS specification.  A new STS endpoint `/sts` on port `9880` will be created to service STS requests in the S3 Gateway.
 
+Furthermore, the initial implementation of Ozone STS focuses only on Apache Ranger for the first phase, as it aligns more
+with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.  Consideration for the Ozone
+Native Authorizer will be given when processing IAM policies as described below.
+
 ## 3.1 Capabilities
 
 The Ozone STS implementation has the following capabilities:
@@ -125,8 +129,9 @@ will be created to run every 3 hours to delete revoked tokens that have been in 
 ## 3.6 Prerequisites
 
 A user must be configured with a Kerberos identity in Ozone and the S3 `getSecret` command
-must be called to issue permanent S3 credentials.  With these credentials, the AssumeRole API can be made.  
-Furthermore, when using RangerOzoneAuthorizer, a role must be configured in Ranger UI for each role the AssumeRole API
+must be called to issue permanent S3 credentials.  With these credentials, the AssumeRole API call can be made, but additional 
+steps below are needed for the call to be successfully authorized.  
+When using RangerOzoneAuthorizer, a role must be configured in Ranger UI for each role the AssumeRole API
 can be used with.  The user making the AssumeRole call must be in this role, and this role must have access
 to the (new) `ASSUME_ROLE` permission in Ranger, in addition to the volumes/buckets/keys and other permissions (such as `READ`,
 `LIST`, etc.) that are required.
@@ -149,11 +154,11 @@ components:
 - `InetAddress` ip - IP address of caller
 - `UserGroupInformation` ugi - the user making the call
 - `String` targetRoleName - what role is being assumed
-- `Set<OzoneGrant>` grants - further limiting the scope of the role according to the grants
+- `Set<AssumeRoleRequest.OzoneGrant>` grants - further limiting the scope of the role according to the grants
 
 The grants parameter is optional, and would only be present if the AssumeRole API call had an IAM session policy JSON 
 parameter supplied.  A conversion utility, `IamSessionPolicyResolver` will process the IAM policy and convert it to a 
-`Set<OzoneGrant>`, in effect translating from S3 nomenclature for resources and actions to Ozone nomenclature of 
+`Set<AssumeRoleRequest.OzoneGrant>`, in effect translating from S3 nomenclature for resources and actions to Ozone nomenclature of 
 `IOzoneObj` and `ACLType`.  Ranger would use all of this information to determine if the AssumeRole call should be 
 successfully authorized, and if so, it will return a String representation of the granted permissions and paths.  
 
