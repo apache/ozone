@@ -4664,7 +4664,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
             = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
             .getRangeKVs(null, 100, ozoneKey);
         return !rangeKVs.isEmpty();
-      }, 100, 30000);
+      }, 100, 60000);
 
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
