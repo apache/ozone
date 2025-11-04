@@ -181,6 +181,14 @@ message DeleteScmKeyBlocksRequestProto {
 message KeyBlocks {
   required string key = 1;
   repeated BlockID blocks = 2;
+  repeated uint64 size = 3;
+  repeated uint64 replicatedSize = 4;
+}
+
+message DeletedBlock {
+  required BlockID blockId = 1;
+  optional uint64 size = 2 [default = 0];
+  optional uint64 replicatedSize = 3 [default = 0];
 }
 
 /**

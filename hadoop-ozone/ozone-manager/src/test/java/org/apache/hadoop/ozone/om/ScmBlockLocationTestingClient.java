@@ -148,33 +148,37 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
     List<DeleteBlockGroupResult> results = new ArrayList<>();
-    List<DeleteBlockResult> blockResultList = new ArrayList<>();
-    Result result;
     for (BlockGroup keyBlocks : keyBlocksInfoList) {
-      for (BlockID blockKey : keyBlocks.getBlockIDList()) {
-        currentCall++;
-        switch (this.failCallsFrequency) {
-        case 0:
-          result = success;
-          numBlocksDeleted++;
-          break;
-        case 1:
-          result = unknownFailure;
-          break;
-        default:
-          if (currentCall % this.failCallsFrequency == 0) {
-            result = unknownFailure;
-          } else {
-            result = success;
-            numBlocksDeleted++;
-          }
-        }
-        blockResultList.add(new DeleteBlockResult(blockKey, result));
+      List<DeleteBlockResult> blockResultList = new ArrayList<>();
+      // Process BlockIDs directly if present
+      for (BlockID blockID : keyBlocks.getBlockIDList()) {
+        blockResultList.add(processBlock(blockID));
       }
-      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(),
-          blockResultList));
+      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(), blockResultList));
     }
     return results;
+  }
+
+  private DeleteBlockResult processBlock(BlockID blockID) {
+    currentCall++;
+    Result result;
+    switch (failCallsFrequency) {
+    case 0:
+      result = success;
+      numBlocksDeleted++;
+      break;
+    case 1:
+      result = unknownFailure;
+      break;
+    default:
+      if (currentCall % failCallsFrequency == 0) {
+        result = unknownFailure;
+      } else {
+        result = success;
+        numBlocksDeleted++;
+      }
+    }
+    return new DeleteBlockResult(blockID, result);
   }
 
   @Override

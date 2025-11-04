@@ -162,6 +162,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -836,8 +837,21 @@ public class KeyManagerImpl implements KeyManager {
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
+              List<Long> blockSizes = info.getKeyLocationVersions().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                      .map(b -> b.getLength())).collect(Collectors.toList());
+
+              List<Long> replicatedBlockSizes = info.getKeyLocationVersions().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationList()
+                      .stream()
+                      .map(b -> QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig())))
+                  .collect(Collectors.toList());
+
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
-                  .addAllBlockIDs(blockIDS).build();
+                  .addAllBlockIDs(blockIDS)
+                  .addAllBlockSize(blockSizes)
+                  .addAllReplicatedBlockSize(replicatedBlockSizes)
+                  .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
                   keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
