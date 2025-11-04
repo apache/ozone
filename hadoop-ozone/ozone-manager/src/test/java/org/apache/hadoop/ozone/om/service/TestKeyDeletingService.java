@@ -1123,6 +1123,20 @@ class TestKeyDeletingService extends OzoneTestBase {
       // Create and delete keys using the test-specific managers
       createAndDeleteKeys(numKeysToCreate, 1, testOmTestManagers);
 
+      // Ensure all keys are in DeletedTable before processing
+      // This addresses potential timing issues with RocksDB iterator consistency
+      // by ensuring the DeletedTable has all keys before the service processes them
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              return testOm.getMetadataManager().countRowsInTable(
+                  testOm.getMetadataManager().getDeletedTable()) == numKeysToCreate;
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          },
+          100, 5000); // Poll every 100ms, timeout after 5s
+
       testKds.resume();
       testKds.setKeyLimitPerTask(numKeysToCreate);
 
