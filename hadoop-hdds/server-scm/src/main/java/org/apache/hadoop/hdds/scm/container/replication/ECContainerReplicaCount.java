@@ -577,11 +577,11 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     if (!isSufficientlyReplicated()) {
       List<Integer> missingIndexes = unavailableIndexes(true);
       sb.append(" UNDER_REPLICATED: missing indexes ")
-        .append(missingIndexes);
+          .append(missingIndexes);
     } else if (isOverReplicated()) {
       List<Integer> excessIndexes = overReplicatedIndexes(false);
       sb.append(" OVER_REPLICATED: excess indexes ")
-        .append(excessIndexes);
+          .append(excessIndexes);
     } else {
       sb.append(" HEALTHY_REPLICATION");
     }
