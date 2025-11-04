@@ -1,0 +1,1 @@
+export OZONE_OPTS="${OZONE_OPTS:--Xmx1024m -XX:ParallelGCThreads=8}"
