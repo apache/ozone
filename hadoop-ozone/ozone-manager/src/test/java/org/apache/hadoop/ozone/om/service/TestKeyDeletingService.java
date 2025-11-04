@@ -520,9 +520,6 @@ class TestKeyDeletingService extends OzoneTestBase {
         }
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 2, metadataManager);
         keyDeletingService.resume();
-        // Manually trigger service to process renamed keys immediately
-        keyDeletingService.runPeriodicalTaskNow();
-        om.awaitDoubleBufferFlush();
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 1, metadataManager);
         try (Table.KeyValueIterator<String, String> itr = snapshotRenamedTable.iterator()) {
           itr.forEachRemaining(entry -> {
@@ -623,10 +620,6 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
 
         writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        directoryDeletingService.runPeriodicalTaskNow();
-        om.awaitDoubleBufferFlush();
-        keyDeletingService.runPeriodicalTaskNow();
-        om.awaitDoubleBufferFlush();
         assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
 
         assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
