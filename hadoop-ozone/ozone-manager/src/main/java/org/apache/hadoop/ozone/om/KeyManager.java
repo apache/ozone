@@ -307,7 +307,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId, OmKeyInfo parentInfo,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter) throws IOException;
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum)
+      throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
@@ -317,7 +318,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId, long bucketId, OmKeyInfo parentInfo,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter) throws IOException;
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum)
+      throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.

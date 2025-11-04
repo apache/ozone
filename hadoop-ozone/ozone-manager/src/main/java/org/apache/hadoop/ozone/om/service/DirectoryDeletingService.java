@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -394,9 +394,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         .getVolumeBucketIdPairFSO(delDirName);
 
     // step-1: get all sub directories under the deletedDir
+    int remainingNum = remainNum.get();
     List<OmKeyInfo> subDirs =
         keyManager.getPendingDeletionSubDirs(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
-            pendingDeletedDirInfo, keyInfo -> true);
+            pendingDeletedDirInfo, keyInfo -> true, remainingNum);
     remainNum.addAndGet(-subDirs.size());
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
@@ -411,9 +412,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // step-2: get all sub files under the deletedDir
     // Only remove sub files if the parent directory is going to be deleted or can be reclaimed.
+    remainingNum = remainNum.get();
     List<OmKeyInfo> subFiles =
         keyManager.getPendingDeletionSubFiles(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
-            pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo));
+            pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo), remainingNum);
     remainNum.addAndGet(-subFiles.size());
 
     if (LOG.isDebugEnabled()) {
@@ -473,10 +475,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     List<PurgePathRequest> ll = new ArrayList<>();
     for (PurgePathRequest purgePathRequest : requests) {
       consumedSize += purgePathRequest.getSerializedSize();
-      ll.add(purgePathRequest);
-      if (consumedSize >= ratisByteLimit) {
+      if (consumedSize <= ratisByteLimit) {
+        ll.add(purgePathRequest);
+      } else {
         submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, ll);
         ll.clear();
+        ll.add(purgePathRequest);
         consumedSize = 0;
       }
     }
@@ -485,7 +489,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
   }
 
-  private OzoneManagerProtocolProtos.OMResponse submitPurgeRequest(String snapTableKey,
+  @VisibleForTesting
+  OzoneManagerProtocolProtos.OMResponse submitPurgeRequest(String snapTableKey,
       UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap,
       List<PurgePathRequest> pathRequests) throws InterruptedException {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
@@ -628,7 +633,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      */
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, UUID expectedPreviousSnapshotId,
-        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount, int pathLimitPerTask) throws InterruptedException {
+        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount, int remaining)
+        throws InterruptedException {
       OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
       IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
@@ -642,7 +648,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subFileNum = 0L;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         Map<VolumeBucketId, BucketNameInfo> bucketNameInfos = new HashMap<>();
-        AtomicInteger remainNum = new AtomicInteger(pathLimitPerTask);
+        AtomicInteger remainNum = new AtomicInteger(remaining);
 
         List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
         while (remainNum.get() > 0) {
