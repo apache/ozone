@@ -1046,33 +1046,21 @@ public class ObjectEndpoint extends EndpointBase {
                   "Bytes to skip: "
                       + rangeHeader.getStartOffset() + " actual: " + skipped);
             }
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucketName, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(
-                  sourceObject, ozoneOutputStream, 0, length, new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              outputStream = ozoneOutputStream;
+          }
+          try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+              .createMultipartKey(volume.getName(), bucketName, key, length,
+                  partNumber, uploadID)) {
+            metadataLatencyNs =
+                getMetrics().updateCopyKeyMetadataStats(startNanos);
+            copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
+                new byte[getIOBufferSize(length)]);
+            ozoneOutputStream.getMetadata()
+                .putAll(sourceKeyDetails.getMetadata());
+            String raw = ozoneOutputStream.getMetadata().get(ETAG);
+            if (raw != null) {
+              ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
             }
-          } else {
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucketName, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
-                  new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              String raw = ozoneOutputStream.getMetadata().get(ETAG);
-              if (raw != null) {
-                ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
-              }
-              outputStream = ozoneOutputStream;
-            }
+            outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
           perf.appendSizeBytes(copyLength);
