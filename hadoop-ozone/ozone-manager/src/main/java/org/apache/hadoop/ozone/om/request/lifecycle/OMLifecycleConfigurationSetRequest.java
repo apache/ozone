@@ -149,6 +149,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
         throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
       }
       omLifecycleConfiguration.setUpdateID(transactionLogIndex);
+      omLifecycleConfiguration.setBucketObjectID(metadataManager.getBucketId(volumeName, bucketName));
 
       metadataManager.getLifecycleConfigurationTable().addCacheEntry(
           new CacheKey<>(bucketKey),

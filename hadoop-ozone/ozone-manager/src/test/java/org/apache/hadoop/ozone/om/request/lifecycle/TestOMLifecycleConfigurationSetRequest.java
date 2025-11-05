@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationSetResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -108,7 +109,8 @@ public class TestOMLifecycleConfigurationSetRequest extends
 
     OMClientResponse omClientResponse = request.validateAndUpdateCache(ozoneManager, txLogIndex);
     OMResponse omResponse = omClientResponse.getOMResponse();
-
+    OMLifecycleConfigurationSetResponse response = (OMLifecycleConfigurationSetResponse) omClientResponse;
+    assertNotEquals(-1, response.getOmLifecycleConfiguration().getBucketObjectID());
     assertNotNull(omResponse.getSetLifecycleConfigurationResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());

@@ -23,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 /**
  * A class that encapsulates lifecycle configuration.
  */
-@Immutable
 public final class OmLifecycleConfiguration extends WithObjectID
     implements Auditable, CopyObject<OmLifecycleConfiguration> {
 
@@ -56,6 +54,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static final int LC_MAX_RULES = 1000;
   private final String volume;
   private final String bucket;
+  private long bucketObjectID = -1L;
   private final BucketLayout bucketLayout;
   private final long creationTime;
   private final List<OmLCRule> rules;
@@ -68,6 +67,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     super(builder);
     this.volume = builder.volume;
     this.bucket = builder.bucket;
+    this.bucketObjectID = builder.bucketObjectID;
     this.rules = Collections.unmodifiableList(builder.rules);
     this.creationTime = builder.creationTime;
     this.bucketLayout = builder.bucketLayout;
@@ -83,6 +83,14 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
   public String getVolume() {
     return volume;
+  }
+
+  public long getBucketObjectID() {
+    return bucketObjectID;
+  }
+
+  public void setBucketObjectID(long objID) {
+    bucketObjectID = objID;
   }
 
   public long getCreationTime() {
@@ -145,6 +153,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return new Builder(this)
         .setVolume(this.volume)
         .setBucket(this.bucket)
+        .setBucketObjectID(this.bucketObjectID)
         .setBucketLayout(bucketLayout)
         .setCreationTime(this.creationTime)
         .setRules(this.rules);
@@ -155,6 +164,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return "OmLifecycleConfiguration{" +
         "volume='" + volume + '\'' +
         ", bucket='" + bucket + '\'' +
+        ", bucketObjectID='" + bucketObjectID + '\'' +
         ", creationTime=" + creationTime +
         ", rulesCount=" + rules.size() +
         ", objectID=" + getObjectID() +
@@ -167,6 +177,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volume);
     auditMap.put(OzoneConsts.BUCKET, this.bucket);
+    auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.bucketObjectID));
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
 
     return auditMap;
@@ -189,6 +200,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     LifecycleConfiguration.Builder b = LifecycleConfiguration.newBuilder()
         .setVolume(volume)
         .setBucket(bucket)
+        .setBucketObjectID(bucketObjectID)
         .setBucketLayout(bucketLayout.toProto())
         .setCreationTime(creationTime)
         .addAllRules(rulesProtoBuf)
@@ -220,6 +232,9 @@ public final class OmLifecycleConfiguration extends WithObjectID
     if (lifecycleConfiguration.hasUpdateID()) {
       builder.setUpdateID(lifecycleConfiguration.getUpdateID());
     }
+    if (lifecycleConfiguration.hasBucketObjectID()) {
+      builder.setBucketObjectID(lifecycleConfiguration.getBucketObjectID());
+    }
 
     return builder.build();
   }
@@ -230,6 +245,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static class Builder extends WithObjectID.Builder {
     private String volume = "";
     private String bucket = "";
+    private long bucketObjectID = -1L;
     private BucketLayout bucketLayout;
     private long creationTime;
     private List<OmLCRule> rules = new ArrayList<>();
@@ -248,6 +264,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
     public Builder setBucket(String bucketName) {
       this.bucket = bucketName;
+      return this;
+    }
+
+    public Builder setBucketObjectID(long bucketID) {
+      this.bucketObjectID = bucketID;
       return this;
     }
 

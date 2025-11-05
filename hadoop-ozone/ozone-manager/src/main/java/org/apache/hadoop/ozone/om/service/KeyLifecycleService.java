@@ -270,6 +270,12 @@ public class KeyLifecycleService extends BackgroundService {
             onFailure(bucketKey);
             return result;
           }
+          if (bucket.getObjectID() != policy.getBucketObjectID()) {
+            LOG.warn("Bucket object ID doesn't match. ID in bucket is {}, ID in LifecycleConfiguration is {}.",
+                bucket.getObjectID(), policy.getBucketObjectID());
+            onFailure(bucketKey);
+            return result;
+          }
         } catch (IOException e) {
           LOG.warn("Failed to get Bucket {}", bucketKey, e);
           onFailure(bucketKey);
