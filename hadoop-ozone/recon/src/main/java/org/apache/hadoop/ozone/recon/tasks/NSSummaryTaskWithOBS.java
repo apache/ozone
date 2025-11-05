@@ -71,33 +71,33 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-            OmKeyInfo keyInfo = kv.getValue();
+          OmKeyInfo keyInfo = kv.getValue();
 
-            // KeyTable entries belong to both Legacy and OBS buckets.
-            // Check bucket layout and if it's anything other than OBS,
-            // continue to the next iteration.
-            String volumeName = keyInfo.getVolumeName();
-            String bucketName = keyInfo.getBucketName();
-            String bucketDBKey = omMetadataManager
-                .getBucketKey(volumeName, bucketName);
-            // Get bucket info from bucket table
-            OmBucketInfo omBucketInfo = omMetadataManager
-                .getBucketTable().getSkipCache(bucketDBKey);
+          // KeyTable entries belong to both Legacy and OBS buckets.
+          // Check bucket layout and if it's anything other than OBS,
+          // continue to the next iteration.
+          String volumeName = keyInfo.getVolumeName();
+          String bucketName = keyInfo.getBucketName();
+          String bucketDBKey = omMetadataManager
+              .getBucketKey(volumeName, bucketName);
+          // Get bucket info from bucket table
+          OmBucketInfo omBucketInfo = omMetadataManager
+              .getBucketTable().getSkipCache(bucketDBKey);
 
-            if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
             continue;
-            }
+          }
 
-            setKeyParentID(keyInfo);
+          setKeyParentID(keyInfo);
 
-              handlePutKeyEvent(keyInfo, nsSummaryMap);
-            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
-                }
-          }
-              }
             }
+          }
+        }
+      }
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);

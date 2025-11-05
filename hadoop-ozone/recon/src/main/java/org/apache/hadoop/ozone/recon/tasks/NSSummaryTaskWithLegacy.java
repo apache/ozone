@@ -266,43 +266,43 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-            OmKeyInfo keyInfo = kv.getValue();
+          OmKeyInfo keyInfo = kv.getValue();
 
-            // KeyTable entries belong to both Legacy and OBS buckets.
-            // Check bucket layout and if it's OBS
-            // continue to the next iteration.
-            if (!isBucketLayoutValid((ReconOMMetadataManager) omMetadataManager,
-                keyInfo)) {
+          // KeyTable entries belong to both Legacy and OBS buckets.
+          // Check bucket layout and if it's OBS
+          // continue to the next iteration.
+          if (!isBucketLayoutValid((ReconOMMetadataManager) omMetadataManager,
+              keyInfo)) {
             continue;
-            }
+          }
 
-              if (enableFileSystemPaths) {
-                // The LEGACY bucket is a file system bucket.
-                setKeyParentID(keyInfo);
+          if (enableFileSystemPaths) {
+            // The LEGACY bucket is a file system bucket.
+            setKeyParentID(keyInfo);
 
-                if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-                  OmDirectoryInfo directoryInfo =
-                      new OmDirectoryInfo.Builder()
-                          .setName(keyInfo.getKeyName())
-                          .setObjectID(keyInfo.getObjectID())
-                          .setParentObjectID(keyInfo.getParentObjectID())
-                          .build();
-                  handlePutDirEvent(directoryInfo, nsSummaryMap);
-                } else {
-                  handlePutKeyEvent(keyInfo, nsSummaryMap);
-                }
-              } else {
-                // The LEGACY bucket is an object store bucket.
-                setParentBucketId(keyInfo);
-                handlePutKeyEvent(keyInfo, nsSummaryMap);
+            if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+              OmDirectoryInfo directoryInfo =
+                  new OmDirectoryInfo.Builder()
+                      .setName(keyInfo.getKeyName())
+                      .setObjectID(keyInfo.getObjectID())
+                      .setParentObjectID(keyInfo.getParentObjectID())
+                      .build();
+              handlePutDirEvent(directoryInfo, nsSummaryMap);
+            } else {
+              handlePutKeyEvent(keyInfo, nsSummaryMap);
             }
-            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          } else {
+            // The LEGACY bucket is an object store bucket.
+            setParentBucketId(keyInfo);
+            handlePutKeyEvent(keyInfo, nsSummaryMap);
+          }
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
-                }
-          }
-              }
             }
+          }
+        }
+      }
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);

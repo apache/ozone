@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,7 +216,7 @@ public class NSSummaryTask implements ReconOmTask {
       return buildTaskResult(false);
     }
 
-    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
+    LOG.info("Starting NSSummary tree reprocess with unified control...");
     long startTime = System.nanoTime(); // Record start time
     
     try {
@@ -235,7 +234,6 @@ public class NSSummaryTask implements ReconOmTask {
   protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
-    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
 
     try {
       // reinit Recon RocksDB's namespace CF.
@@ -307,7 +305,7 @@ public class NSSummaryTask implements ReconOmTask {
       // Reset state to IDLE on successful completion
       if (success) {
         REBUILD_STATE.set(RebuildState.IDLE);
-        LOG.info("Completed RocksDB Reprocess for {} in {}", getTaskName(), (endTime - startTime));
+        LOG.info("NSSummary tree reprocess completed successfully with unified control.");
       }
     }
 

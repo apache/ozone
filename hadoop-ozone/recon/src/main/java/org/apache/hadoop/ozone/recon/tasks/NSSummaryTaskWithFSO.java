@@ -82,7 +82,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     final Collection<Long> objectIdsToBeDeleted = Collections.synchronizedList(new ArrayList<>());
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
-              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
@@ -134,35 +134,35 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   private void handleUpdateOnDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,
                          OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-          OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
-          OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
-          OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
+    OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
+            (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
+    OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
+    OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
 
-          switch (action) {
-          case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
+    switch (action) {
+    case PUT:
+      handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+      break;
 
-          case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
+    case DELETE:
+      handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+      break;
 
-          case UPDATE:
-            if (oldDirectoryInfo != null) {
-              // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-            } else {
+    case UPDATE:
+      if (oldDirectoryInfo != null) {
+        // delete first, then put
+        handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+      } else {
         LOG.warn("Update event does not have the old dirInfo for {}.", dirTableUpdateEvent.getKey());
-            }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
+      }
+      handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+      break;
 
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
-          }
-        }
+    default:
+      LOG.debug("Skipping DB update event : {}",
+              omdbUpdateEvent.getAction());
+    }
+  }
 
   private void handleUpdateOnDeletedDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId>  omdbUpdateEvent,
                                              OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap,
@@ -232,13 +232,13 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
                 dirTableIter = dirTable.iterator()) {
         while (dirTableIter.hasNext()) {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
-            OmDirectoryInfo directoryInfo = kv.getValue();
-              handlePutDirEvent(directoryInfo, nsSummaryMap);
-            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          OmDirectoryInfo directoryInfo = kv.getValue();
+          handlePutDirEvent(directoryInfo, nsSummaryMap);
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
-              }
             }
+          }
         }
       }
 
@@ -250,15 +250,15 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
               keyTableIter = keyTable.iterator()) {
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-            OmKeyInfo keyInfo = kv.getValue();
-              handlePutKeyEvent(keyInfo, nsSummaryMap);
-            if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          OmKeyInfo keyInfo = kv.getValue();
+          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
-                }
-          }
-              }
             }
+          }
+        }
+      }
 
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",

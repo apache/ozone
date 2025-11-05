@@ -97,11 +97,11 @@ public class NSSummaryTaskDbEventHandler {
       // as this is a new ID
       nsSummary = new NSSummary();
     }
-      int[] fileBucket = nsSummary.getFileSizeBucket();
+    int[] fileBucket = nsSummary.getFileSizeBucket();
 
     // Update immediate parent's totals (includes all descendant files)
-      nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
-      nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
     // Before arithmetic operations, check for sentinel value
     long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
     if (currentReplSize < 0) {
@@ -110,10 +110,10 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary.setReplicatedSizeOfFiles(0);
     }
     nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
-      int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
-      ++fileBucket[binIndex];
-      nsSummary.setFileSizeBucket(fileBucket);
+    ++fileBucket[binIndex];
+    nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
@@ -254,14 +254,14 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
-      try {
+    try {
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
-      } catch (IOException e) {
-        LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-        return false;
-      } finally {
-        nsSummaryMap.clear();
-      }
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return false;
+    } finally {
+      nsSummaryMap.clear();
+    }
     return true;
   }
 
