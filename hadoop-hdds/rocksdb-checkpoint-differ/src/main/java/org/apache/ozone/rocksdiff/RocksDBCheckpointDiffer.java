@@ -492,12 +492,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         CompactionLogEntry.Builder builder;
         builder = new CompactionLogEntry.Builder(trxId,
             System.currentTimeMillis(),
-            inputFileCompactions.keySet().stream()
-                .map(inputFile -> {
-                  final CompactionFileInfo f = inflightCompactions.get(inputFile);
-                  return f != null ? f : inputFileCompactions.get(inputFile);
-                })
-                .collect(Collectors.toList()),
+            inputFileCompactions.entrySet().stream()
+                .map(inputFileEntry -> {
+                  final CompactionFileInfo f = inflightCompactions.get(inputFileEntry.getKey());
+                  return f != null ? f : inputFileEntry.getValue();
+                }).collect(Collectors.toList()),
             new ArrayList<>(toFileInfoList(compactionJobInfo.outputFiles(), db).values()));
 
         if (LOG.isDebugEnabled()) {
