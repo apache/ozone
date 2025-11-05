@@ -18,9 +18,6 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 
 /**
@@ -101,24 +98,6 @@ public class DiskBalancerInfo {
     }
   }
 
-  public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
-    DiskBalancerConfiguration conf = new DiskBalancerConfiguration(threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven);
-    HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
-
-    StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
-        StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.newBuilder();
-    builder.setIsRunning(this.operationalState == DiskBalancerOperationalState.RUNNING);
-    builder.setDiskBalancerConf(confProto);
-    builder.setSuccessMoveCount(successCount);
-    builder.setFailureMoveCount(failureCount);
-    builder.setBytesToMove(bytesToMove);
-    builder.setBalancedBytes(balancedBytes);
-    builder.setVolumeDataDensity(volumeDataDensity);
-    
-    return builder.build();
-  }
-
   public DiskBalancerOperationalState getOperationalState() {
     return operationalState;
   }
@@ -173,6 +152,46 @@ public class DiskBalancerInfo {
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
+  }
+
+  public long getSuccessCount() {
+    return successCount;
+  }
+
+  public void setSuccessCount(long successCount) {
+    this.successCount = successCount;
+  }
+
+  public long getFailureCount() {
+    return failureCount;
+  }
+
+  public void setFailureCount(long failureCount) {
+    this.failureCount = failureCount;
+  }
+
+  public long getBytesToMove() {
+    return bytesToMove;
+  }
+
+  public void setBytesToMove(long bytesToMove) {
+    this.bytesToMove = bytesToMove;
+  }
+
+  public long getBalancedBytes() {
+    return balancedBytes;
+  }
+
+  public void setBalancedBytes(long balancedBytes) {
+    this.balancedBytes = balancedBytes;
+  }
+
+  public double getVolumeDataDensity() {
+    return volumeDataDensity;
+  }
+
+  public void setVolumeDataDensity(double volumeDataDensity) {
+    this.volumeDataDensity = volumeDataDensity;
   }
 
   @Override

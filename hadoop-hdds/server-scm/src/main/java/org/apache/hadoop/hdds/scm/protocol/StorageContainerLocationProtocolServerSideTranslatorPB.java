@@ -59,8 +59,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
@@ -741,21 +739,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
-      case DatanodeDiskBalancerInfo:
-        return ScmContainerLocationResponse.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setStatus(Status.OK)
-          .setDatanodeDiskBalancerInfoResponse(getDatanodeDiskBalancerInfo(
-              request.getDatanodeDiskBalancerInfoRequest(),
-              request.getVersion()))
-          .build();
-      case DatanodeDiskBalancerOp:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setDatanodeDiskBalancerOpResponse(getDatanodeDiskBalancerOp(
-                request.getDatanodeDiskBalancerOpRequest()))
-            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1374,32 +1357,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             request.getScmId());
   }
 
-  public DatanodeDiskBalancerInfoResponseProto getDatanodeDiskBalancerInfo(
-      StorageContainerLocationProtocolProtos.
-          DatanodeDiskBalancerInfoRequestProto request, int clientVersion)
-      throws IOException {
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> infoProtoList;
-    switch (request.getInfoType()) {
-    case report:
-      infoProtoList = impl.getDiskBalancerReport(request.getCount(),
-          clientVersion);
-      break;
-    case status:
-      infoProtoList = impl.getDiskBalancerStatus(
-          request.getHostsList().isEmpty() ? null : request.getHostsList(),
-          // If an optional proto enum field is not set, it will return the first
-          // enum value. So, we need to check if the field is set.
-          request.hasStatus() ? request.getStatus() : null,
-          clientVersion);
-      break;
-    default:
-      infoProtoList = null;
-    }
-    return DatanodeDiskBalancerInfoResponseProto.newBuilder()
-        .addAllInfo(infoProtoList)
-        .build();
-  }
-
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
   }
@@ -1409,47 +1366,4 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
-  public DatanodeDiskBalancerOpResponseProto getDatanodeDiskBalancerOp(
-          StorageContainerLocationProtocolProtos.
-                  DatanodeDiskBalancerOpRequestProto request)
-          throws IOException {
-    List<DatanodeAdminError> errors;
-    HddsProtos.DiskBalancerConfigurationProto conf = request.getConf();
-    switch (request.getOpType()) {
-    case START:
-      errors = impl.startDiskBalancer(
-          conf.hasThreshold() ? conf.getThreshold() : null,
-          conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
-          conf.hasParallelThread() ? conf.getParallelThread() : null,
-          conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
-          request.getHostsList().isEmpty() ? null : request.getHostsList());
-      break;
-    case UPDATE:
-
-      errors = impl.updateDiskBalancerConfiguration(
-          conf.hasThreshold() ? conf.getThreshold() : null,
-          conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
-          conf.hasParallelThread() ? conf.getParallelThread() : null,
-          conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
-          request.getHostsList().isEmpty() ? null : request.getHostsList());
-      break;
-    case STOP:
-      errors = impl.stopDiskBalancer(
-          request.getHostsList().isEmpty() ? null : request.getHostsList());
-      break;
-    default:
-      errors = new ArrayList<>();
-    }
-
-    DatanodeDiskBalancerOpResponseProto.Builder response =
-            DatanodeDiskBalancerOpResponseProto.newBuilder();
-    for (DatanodeAdminError e : errors) {
-      DatanodeAdminErrorResponseProto.Builder error =
-              DatanodeAdminErrorResponseProto.newBuilder();
-      error.setHost(e.getHostname());
-      error.setError(e.getError());
-      response.addFailedHosts(error);
-    }
-    return response.build();
-  }
 }

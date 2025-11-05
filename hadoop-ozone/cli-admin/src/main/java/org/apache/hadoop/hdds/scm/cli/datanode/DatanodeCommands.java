@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.admin.diskbalancer.DiskBalancerCommands;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -37,7 +38,7 @@ import picocli.CommandLine;
         RecommissionSubCommand.class,
         StatusSubCommand.class,
         UsageInfoSubcommand.class,
-        DiskBalancerCommands.class
+        DiskBalancerCommands.class,
     })
 @MetaInfServices(AdminSubcommand.class)
 public class DatanodeCommands implements AdminSubcommand {

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.storage;
+package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
@@ -30,7 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class contains configuration values for the DiskBalancer.
+ * Configuration class for the Datanode DiskBalancer service.
+ * Configuration can be updated dynamically via DiskBalancer RPC commands.
  */
 @ConfigGroup(prefix = "hdds.datanode.disk.balancer")
 public final class DiskBalancerConfiguration {
@@ -294,3 +295,4 @@ public final class DiskBalancerConfiguration {
     return config;
   }
 }
+

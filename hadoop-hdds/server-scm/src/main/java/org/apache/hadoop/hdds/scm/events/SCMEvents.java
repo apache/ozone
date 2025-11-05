@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
@@ -212,14 +211,6 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
-  
-  /**
-   * DiskBalancer reports are send out by Datanodes. This report is received by
-   * SCMDatanodeHeartbeatDispatcher and DiskBalancer_Report Event is generated.
-   */
-  public static final TypedEvent<DiskBalancerReportFromDatanode>
-      DISK_BALANCER_REPORT = new TypedEvent<>(
-          DiskBalancerReportFromDatanode.class, "DiskBalancer_Report");
 
   public static final TypedEvent<DatanodeDetails>
       REPLICATION_MANAGER_NOTIFY =
