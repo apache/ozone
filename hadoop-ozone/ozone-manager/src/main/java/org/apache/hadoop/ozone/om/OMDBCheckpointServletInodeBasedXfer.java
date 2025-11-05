@@ -305,7 +305,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param hardLinkFileMap     Map of hardlink file paths to their unique identifiers for deduplication.
    * @throws IOException if an I/O error occurs during processing.
    */
-  private void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
+  void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
       AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       Map<String, String> hardLinkFileMap) throws IOException {
     for (Path snapshotDir : snapshotPaths) {
@@ -482,7 +482,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param flush  If true, flushes in-memory data to disk before checkpointing.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
+  DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
     // Create & return the checkpoint.
     return getDbStore().getCheckpoint(flush);
   }
