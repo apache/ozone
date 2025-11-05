@@ -260,10 +260,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         Map<String, String> hardLinkFileMap = new HashMap<>();
         SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
         /*
+         * Acquire snapshot cache lock when includeSnapshotData is true to prevent race conditions
+         * between checkpoint operations and snapshot purge operations. Without this lock, a purge
+         * operation (e.g., from a Ratis transaction on follower OM) could delete snapshot directories
+         * while checkpoint is reading snapshot data, leading to FileNotFoundException or corrupted
+         * checkpoint data. The lock ensures checkpoint completes reading snapshot data before purge
+         * can delete the snapshot directory.
+         *
          * When includeSnapshotData is false, lock is set to null and no locking is performed.
          * In this case, the try-with-resources block does not call close() on any resource,
          * which is intentional because snapshot consistency is not required.
-         * This pattern is safe in Java: try-with-resources will simply skip closing if the resource is null.
          */
         try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = includeSnapshotData ? snapshotCache.lock() : null) {
           // get the list of sst files of the checkpoint.
