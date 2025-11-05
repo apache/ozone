@@ -397,6 +397,14 @@ public class TestOMNodeDetails {
     
     OMNodeDetails nodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(conf, "nonexistent", "node");
     assertNull(nodeDetails);
+    
+    String serviceId = "om-service";
+    String nodeId = "om-01";
+    
+    nodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(conf, serviceId, null);
+    assertNull(nodeDetails);
+    nodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(conf, null, nodeId);
+    assertNull(nodeDetails);
   }
 
   /**
