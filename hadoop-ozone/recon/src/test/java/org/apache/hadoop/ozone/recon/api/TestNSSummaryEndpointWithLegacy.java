@@ -435,7 +435,7 @@ public class TestNSSummaryEndpointWithLegacy {
     setUpMultiBlockReplicatedKeys();
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy = 
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
-                                    reconOMMetadataManager, conf, 10, 1, 1, 10);
+                                    reconOMMetadataManager, conf, 10);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

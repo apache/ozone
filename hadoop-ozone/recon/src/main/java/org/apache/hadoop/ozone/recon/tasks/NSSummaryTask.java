@@ -41,7 +41,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.util.Time;
@@ -106,25 +105,15 @@ public class NSSummaryTask implements ReconOmTask {
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
-    int maxKeysInMemory = ozoneConfiguration.getInt(
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
-    int maxIterators = ozoneConfiguration.getInt(
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
-    int maxWorkers = ozoneConfiguration.getInt(
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
 
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
+        nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold,
-        maxIterators, maxWorkers, maxKeysInMemory);
+        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
   }
 
   @Override

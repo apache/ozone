@@ -112,7 +112,7 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(),
-        threshold, 1, 1, 10);
+        threshold);
 
     // Populate a custom complex tree structure
     populateComplexTree();

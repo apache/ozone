@@ -61,7 +61,7 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(),
-        threshold, 1, 1, 10);
+        threshold);
   }
 
   /**

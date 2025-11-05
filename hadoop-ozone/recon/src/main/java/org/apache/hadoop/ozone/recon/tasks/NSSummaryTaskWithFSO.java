@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,12 +29,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -45,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,23 +52,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
   private final long nsSummaryFlushToDBMaxThreshold;
-  private final int maxKeysInMemory;
-  private final int maxIterators;
-  private final int maxWorkers;
 
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
                               reconOMMetadataManager,
-                              long nsSummaryFlushToDBMaxThreshold,
-                              int maxIterators,
-                              int maxWorkers,
-                              int maxKeysInMemory) {
+                              long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
-    this.maxIterators = maxIterators;
-    this.maxWorkers = maxWorkers;
-    this.maxKeysInMemory = maxKeysInMemory;
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
@@ -97,7 +82,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     final Collection<Long> objectIdsToBeDeleted = Collections.synchronizedList(new ArrayList<>());
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
-          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
@@ -149,35 +134,35 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   private void handleUpdateOnDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,
                          OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-            (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
-    OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
-    OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
+          OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
+                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
+          OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
+          OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
 
-    switch (action) {
-    case PUT:
-      handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-      break;
+          switch (action) {
+          case PUT:
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
 
-    case DELETE:
-      handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-      break;
+          case DELETE:
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
 
-    case UPDATE:
-      if (oldDirectoryInfo != null) {
-        // delete first, then put
-        handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-      } else {
+          case UPDATE:
+            if (oldDirectoryInfo != null) {
+              // delete first, then put
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+            } else {
         LOG.warn("Update event does not have the old dirInfo for {}.", dirTableUpdateEvent.getKey());
-      }
-      handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-      break;
+            }
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            break;
 
-    default:
-      LOG.debug("Skipping DB update event : {}",
-              omdbUpdateEvent.getAction());
-    }
-  }
+          default:
+            LOG.debug("Skipping DB update event : {}",
+                    omdbUpdateEvent.getAction());
+          }
+        }
 
   private void handleUpdateOnDeletedDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId>  omdbUpdateEvent,
                                              OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap,
@@ -237,83 +222,51 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new ConcurrentHashMap<>();
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-      Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
-      try (ParallelTableIteratorOperation<String, OmDirectoryInfo>
-                dirTableIter = new ParallelTableIteratorOperation<>(omMetadataManager, dirTable,
-          StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
-        Function<Table.KeyValue<String, OmDirectoryInfo>, Void> dirOperation = kv -> {
-          try {
+      Table<String, OmDirectoryInfo> dirTable =
+          omMetadataManager.getDirectoryTable();
+      try (TableIterator<String,
+              ? extends Table.KeyValue<String, OmDirectoryInfo>>
+                dirTableIter = dirTable.iterator()) {
+        while (dirTableIter.hasNext()) {
+          Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
             OmDirectoryInfo directoryInfo = kv.getValue();
-            try {
-              lock.readLock().lock();
               handlePutDirEvent(directoryInfo, nsSummaryMap);
-            } finally {
-              lock.readLock().unlock();
-            }
-
             if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-              try {
-                lock.writeLock().lock();
-                if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
-                  throw new IOException("Unable to flush NSSummaryMap to DB");
-                }
-              } finally {
-                lock.writeLock().unlock();
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
               }
             }
-          } catch (IOException e) {
-            throw new UncheckedIOException(e);
-          }
-          return null;
-        };
-        dirTableIter.performTaskOnTableVals(this.getClass().getName(), null, null, dirOperation);
+        }
       }
 
       // Get fileTable used by FSO
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getFileTable();
 
-      try (ParallelTableIteratorOperation<String, OmKeyInfo>
-              keyTableIter = new ParallelTableIteratorOperation<>(omMetadataManager, keyTable,
-          StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
-        Function<Table.KeyValue<String, OmKeyInfo>, Void> keyOperation = kv -> {
-          try {
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+              keyTableIter = keyTable.iterator()) {
+        while (keyTableIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
             OmKeyInfo keyInfo = kv.getValue();
-            try {
-              lock.readLock().lock();
               handlePutKeyEvent(keyInfo, nsSummaryMap);
-            } finally {
-              lock.readLock().unlock();
-            }
             if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-              try {
-                lock.writeLock().lock();
-                if (!flushAndCommitNSToDB(nsSummaryMap, nsSummaryFlushToDBMaxThreshold)) {
-                  throw new IOException("Unable to flush NSSummaryMap to DB");
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
                 }
-              } finally {
-                lock.writeLock().unlock();
+          }
               }
             }
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-          return null;
-        };
-        keyTableIter.performTaskOnTableVals(this.getClass().getName(), null, null, keyOperation);
-      }
 
-    } catch (Exception ex) {
+    } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-              ex);
+              ioEx);
       return false;
     }
     // flush and commit left out keys at end
-    if (!flushAndCommitNSToDB(nsSummaryMap, 0)) {
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       LOG.info("flushAndCommitNSToDB failed during reprocessWithFSO.");
       return false;
     }

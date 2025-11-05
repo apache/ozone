@@ -81,7 +81,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(),
-        threshold, 1, 1, 10);
+        threshold);
   }
 
 

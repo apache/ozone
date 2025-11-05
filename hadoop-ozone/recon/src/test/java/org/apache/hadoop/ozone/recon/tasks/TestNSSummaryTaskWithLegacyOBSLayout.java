@@ -61,7 +61,7 @@ public class TestNSSummaryTaskWithLegacyOBSLayout extends AbstractNSSummaryTaskT
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(),
         getOzoneConfiguration(),
-        threshold, 1, 1, 10);
+        threshold);
   }
 
   /**

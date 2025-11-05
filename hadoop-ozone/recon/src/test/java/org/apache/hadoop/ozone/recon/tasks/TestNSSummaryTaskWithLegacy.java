@@ -65,7 +65,7 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
     long threshold = getOmConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(getReconNamespaceSummaryManager(), getReconOMMetadataManager(),
-            getOmConfiguration(), threshold, 1, 1, 10);
+            getOmConfiguration(), threshold);
   }
 
   /**
