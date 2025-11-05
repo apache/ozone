@@ -857,16 +857,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
-  private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
-    try (Stream<Path> filesInTarball = Files.list(snapshotDbDir)) {
-      List<Path> files = filesInTarball.filter(p -> p.toString().contains(".log"))
-          .collect(Collectors.toList());
-      for (Path p : files) {
-        Files.delete(p);
-      }
-    }
-  }
-
   private static Set<Path> getAllPathsInTarball(File newDbDir) throws IOException {
     Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
