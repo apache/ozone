@@ -270,26 +270,30 @@ The pending deletion bytes are calculated and updated within the BlockDeletionSe
 
 ### New HDDS Layout and Upgrade
 
-A new HDDS layout version, DATA_DISTRIBUTION, has been introduced to handle the potential issues during upgrading.
+A new HDDS layout feature, DATA_DISTRIBUTION, has been introduced to handle upgrade and downgrade scenarios correctly and ensure accurate persistence of pending deletion metrics.
 
-- In the OM to SCM block deletion request, a new field is added to protobuf to represent the block with its size. If a new OM connects to an old SCM, the request will be accepted by SCM, but the new field will be ignored by the old SCM. So OM will think these blocks are deleted by actually not, leading to orphan blocks residual in containers.
-- In SCM, for an existing Ozone cluster, SCM may already have many DeletedBlocksTransactions in DB without block size information. As SCM maintains a DeletedBlocksTransactionSummary which requires update on new transactions creation, and finished transactions creation. For those old existing transactions, DeletedBlocksTransactionSummary doesn't need to be updated when they are finished and deleted. The DATA_DISTRIBUTION feature finalization action is a good timing to distinguish which are new transactions, which are old transactions.
+#### Why a New Layout Feature Is Needed
 
-Before DATA_DISTRIBUTION is not finalized,
+Although rolling upgrades are not supported in Ozone (meaning OM and SCM should never run different versions simultaneously), SCM and Datanodes may persist aggregated size metrics in their databases during the upgrade process.
+If these metrics are written before the cluster is finalized, and later the cluster is downgraded and re-upgraded, the old values can become stale or inaccurate since old code won’t update them correctly.
 
-- The OM to SCM block deletion request will use the current existing field for block ID info
-- SCM will not collect DeletedBlocksTransactionSummary, nor it will expose the information
-- Datanode will not expose the TotalPendingBytes
-- Since Recon doesn't be covered in current Ozone upgrading framework, Recon should be prepared for the case that both SCM and Datanode doesn't have the info required for /storagedistribution
+To prevent such inaccuracies, SCM and DNs must only start persisting the aggregated pending deletion data once the layout feature is finalized.
 
-After the upgrade:
+#### Behavior Before DATA_DISTRIBUTION Finalization
 
-- The OM to SCM block deletion request will use the new field for block ID info and size
-- SCM will know the start ID of new transactions, aggregate block size in OM request into DeletedBlocksTransaction, update and expose DeletedBlocksTransactionSummary. Old requests from old OM are still supported.
-- Datanode will receive DeletedBlocksTransactions with or without block size included from SCM, for new transactions or old existing transactions. Datanode should handle them properly, and begin to publish metrics, including pending deletion bytes for new transactions.
+- SCM does not collect or expose DeletedBlocksTransactionSummary.
+- DNs do not report TotalPendingBytes.
+- Recon must handle the case where SCM and DN do not expose storage distribution data.
+
+#### Behavior After DATA_DISTRIBUTION Finalization
+
+- SCM aggregates block sizes for new transactions, updates DeletedBlocksTransactionSummary, and exposes these metrics.
+- DNs handle both legacy and new transactions, calculate pending deletion bytes for new ones, and report them.
+- The persisted counters in SCM and DN reflect only data deleted after finalization, ensuring accuracy even across upgrade/downgrade cycles.
 
 #### Known Limitations
-For an existing Ozone cluster updating, if there are existing pending deletion transactions in SCM and DN, these transactions will not be covered in the new data/metrics exposed by SCM and DN. So the data shown by Recon UI can vary a lot from the real total pending deletion size. The gap will reduce gradually after existing old transactions are executed and finished.
+For an existing Ozone cluster updating, if there are existing pending deletion transactions in SCM and DN, these transactions will not be covered in the new data/metrics exposed by SCM and DN. 
+So the data shown by Recon UI can vary a lot from the real total pending deletion size. The gap will reduce gradually after existing old transactions are executed and finished.
 
 ## Approach 2: CLI-based (Not Proceeding)
 
