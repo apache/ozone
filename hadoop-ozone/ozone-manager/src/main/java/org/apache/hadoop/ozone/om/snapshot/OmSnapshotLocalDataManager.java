@@ -872,30 +872,25 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     private void checkForOphanVersionsAndIncrementCount(UUID snapshotId, SnapshotVersionsMeta previousVersionsMeta,
         SnapshotVersionsMeta currentVersionMeta, boolean isPurgeTransactionSet) {
-      internalLock.readLock().lock();
-      try {
-        if (previousVersionsMeta != null) {
-          Map<Integer, LocalDataVersionNode> currentVersionNodeMap = currentVersionMeta.getSnapshotVersions();
-          Map<Integer, LocalDataVersionNode> previousVersionNodeMap = previousVersionsMeta.getSnapshotVersions();
-          boolean versionsRemoved = previousVersionNodeMap.keySet().stream()
-              .anyMatch(version -> !currentVersionNodeMap.containsKey(version));
+      if (previousVersionsMeta != null) {
+        Map<Integer, LocalDataVersionNode> currentVersionNodeMap = currentVersionMeta.getSnapshotVersions();
+        Map<Integer, LocalDataVersionNode> previousVersionNodeMap = previousVersionsMeta.getSnapshotVersions();
+        boolean versionsRemoved = previousVersionNodeMap.keySet().stream()
+            .anyMatch(version -> !currentVersionNodeMap.containsKey(version));
 
-          // The previous snapshotId could have become an orphan entry or could have orphan versions.(In case of
-          // version removals)
-          if (versionsRemoved || !Objects.equals(previousVersionsMeta.getPreviousSnapshotId(),
-              currentVersionMeta.getPreviousSnapshotId())) {
-            incrementOrphanCheckCount(previousVersionsMeta.getPreviousSnapshotId());
-          }
-          // If the transactionInfo set, this means the snapshot has been purged and the entire YAML file could have
-          // become an orphan. Otherwise if the version is updated it
-          // could mean that there could be some orphan version present within the
-          // same snapshot.
-          if (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
-            incrementOrphanCheckCount(snapshotId);
-          }
+        // The previous snapshotId could have become an orphan entry or could have orphan versions.(In case of
+        // version removals)
+        if (versionsRemoved || !Objects.equals(previousVersionsMeta.getPreviousSnapshotId(),
+            currentVersionMeta.getPreviousSnapshotId())) {
+          incrementOrphanCheckCount(previousVersionsMeta.getPreviousSnapshotId());
         }
-      } finally {
-        internalLock.readLock().unlock();
+        // If the transactionInfo set, this means the snapshot has been purged and the entire YAML file could have
+        // become an orphan. Otherwise if the version is updated it
+        // could mean that there could be some orphan version present within the
+        // same snapshot.
+        if (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
+          incrementOrphanCheckCount(snapshotId);
+        }
       }
     }
 
