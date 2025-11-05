@@ -862,14 +862,44 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
           }
         }
-        upsertNode(super.snapshotId, localDataVersionNodes, getSnapshotLocalData().getTransactionInfo() != null);
+        SnapshotVersionsMeta previousVersionMeta = upsertNode(super.snapshotId, localDataVersionNodes);
+        checkForOphanVersionsAndIncrementCount(super.snapshotId, previousVersionMeta, localDataVersionNodes,
+            getSnapshotLocalData().getTransactionInfo() != null);
         // Reset dirty bit
         resetDirty();
       }
     }
 
-    private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions,
-        boolean transactionInfoSet) throws IOException {
+    private void checkForOphanVersionsAndIncrementCount(UUID snapshotId, SnapshotVersionsMeta previousVersionsMeta,
+        SnapshotVersionsMeta currentVersionMeta, boolean transactionInfoSet) {
+      internalLock.readLock().lock();
+      try {
+        if (previousVersionsMeta != null) {
+          Map<Integer, LocalDataVersionNode> currentVersionNodeMap = currentVersionMeta.getSnapshotVersions();
+          Map<Integer, LocalDataVersionNode> previousVersionNodeMap = previousVersionsMeta.getSnapshotVersions();
+          boolean versionsRemoved = previousVersionNodeMap.keySet().stream()
+              .anyMatch(version -> !currentVersionNodeMap.containsKey(version));
+
+          // The previous snapshotId could have become an orphan entry or could have orphan versions.(In case of
+          // version removals)
+          if (versionsRemoved || !Objects.equals(previousVersionsMeta.getPreviousSnapshotId(),
+              currentVersionMeta.getPreviousSnapshotId())) {
+            incrementOrphanCheckCount(previousVersionsMeta.getPreviousSnapshotId());
+          }
+          // If the transactionInfo set, this means the snapshot has been purged and the entire YAML file could have
+          // become an orphan. Otherwise if the version is updated it
+          // could mean that there could be some orphan version present within the
+          // same snapshot.
+          if (transactionInfoSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
+            incrementOrphanCheckCount(snapshotId);
+          }
+        }
+      } finally {
+        internalLock.readLock().unlock();
+      }
+    }
+
+    private SnapshotVersionsMeta upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
       internalLock.writeLock().lock();
       try {
         SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
@@ -877,14 +907,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             existingSnapVersions.getSnapshotVersions();
         Map<Integer, LocalDataVersionNode> newVersions = snapshotVersions.getSnapshotVersions();
         Map<Integer, List<LocalDataVersionNode>> predecessors = new HashMap<>();
-        boolean versionsRemoved = false;
         // Track all predecessors of the existing versions and remove the node from the graph.
         for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
           LocalDataVersionNode existingVersionNode = existingVersion.getValue();
           // Create a copy of predecessors since the list of nodes returned would be a mutable set and it changes as the
           // nodes in the graph would change.
           predecessors.put(existingVersion.getKey(), new ArrayList<>(localDataGraph.predecessors(existingVersionNode)));
-          versionsRemoved = versionsRemoved || !newVersions.containsKey(existingVersion.getKey());
           localDataGraph.removeNode(existingVersionNode);
         }
 
@@ -896,21 +924,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             localDataGraph.putEdge(predecessor, entry.getValue());
           }
         }
-        if (existingSnapVersions != null) {
-          // The previous snapshotId could have become an orphan entry or could have orphan versions.(In case of
-          // version removals)
-          if (versionsRemoved || !Objects.equals(existingSnapVersions.getPreviousSnapshotId(),
-              snapshotVersions.getPreviousSnapshotId())) {
-            incrementOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
-          }
-          // If the transactionInfo set, this means the snapshot has been purged and the entire YAML file could have
-          // become an orphan. Otherwise if the version is updated it
-          // could mean that there could be some orphan version present within the
-          // same snapshot.
-          if (transactionInfoSet || existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
-            incrementOrphanCheckCount(snapshotId);
-          }
-        }
+        return existingSnapVersions;
       } finally {
         internalLock.writeLock().unlock();
       }
