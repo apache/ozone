@@ -270,7 +270,7 @@ The pending deletion bytes are calculated and updated within the BlockDeletionSe
 
 ### New HDDS Layout and Upgrade
 
-A new HDDS layout feature, DATA_DISTRIBUTION, has been introduced to handle upgrade and downgrade scenarios correctly and ensure accurate persistence of pending deletion metrics.
+A new HDDS layout feature, STORAGE_SPACE_DISTRIBUTION, has been introduced to handle upgrade and downgrade scenarios correctly and ensure accurate persistence of pending deletion metrics.
 
 #### Why a New Layout Feature Is Needed
 
@@ -279,13 +279,13 @@ If these metrics are written before the cluster is finalized, and later the clus
 
 To prevent such inaccuracies, SCM and DNs must only start persisting the aggregated pending deletion data once the layout feature is finalized.
 
-#### Behavior Before DATA_DISTRIBUTION Finalization
+#### Behavior Before STORAGE_SPACE_DISTRIBUTION Finalization
 
 - SCM does not collect or expose DeletedBlocksTransactionSummary.
 - DNs do not report TotalPendingBytes.
 - Recon must handle the case where SCM and DN do not expose storage distribution data.
 
-#### Behavior After DATA_DISTRIBUTION Finalization
+#### Behavior After STORAGE_SPACE_DISTRIBUTION Finalization
 
 - SCM aggregates block sizes for new transactions, updates DeletedBlocksTransactionSummary, and exposes these metrics.
 - DNs handle both legacy and new transactions, calculate pending deletion bytes for new ones, and report them.
