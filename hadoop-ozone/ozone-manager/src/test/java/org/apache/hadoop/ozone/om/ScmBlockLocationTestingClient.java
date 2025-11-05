@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,8 +152,8 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
     for (BlockGroup keyBlocks : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResultList = new ArrayList<>();
       // Process BlockIDs directly if present
-      for (BlockID blockID : keyBlocks.getBlockIDList()) {
-        blockResultList.add(processBlock(blockID));
+      for (DeletedBlock deletedBlock : keyBlocks.getDeletedBlocks()) {
+        blockResultList.add(processBlock(deletedBlock.getBlockID()));
       }
       results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(), blockResultList));
     }

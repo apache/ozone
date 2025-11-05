@@ -185,12 +185,6 @@ message KeyBlocks {
   repeated uint64 replicatedSize = 4;
 }
 
-message DeletedBlock {
-  required BlockID blockId = 1;
-  optional uint64 size = 2 [default = 0];
-  optional uint64 replicatedSize = 3 [default = 0];
-}
-
 /**
  * A delete key response from SCM to OM, it contains multiple child-results.
  * Each child-result represents a key deletion result, only if all blocks of

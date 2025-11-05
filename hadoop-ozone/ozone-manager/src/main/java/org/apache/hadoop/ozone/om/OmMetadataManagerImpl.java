@@ -80,6 +80,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -1814,12 +1815,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
       for (OmKeyLocationInfoGroup keyLocations :
           info.getKeyLocationVersions()) {
-        List<BlockID> item = keyLocations.getLocationList().stream()
-            .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+        List<DeletedBlock> item = keyLocations.getLocationList().stream()
+            .map(b -> new DeletedBlock(
+                new BlockID(b.getContainerID(), b.getLocalID()), info.getDataSize(), info.getReplicatedSize()))
             .collect(Collectors.toList());
         BlockGroup keyBlocks = BlockGroup.newBuilder()
             .setKeyName(deletedKey)
-            .addAllBlockIDs(item)
+            .addAllDeletedBlocks(item)
             .build();
         result.add(keyBlocks);
       }

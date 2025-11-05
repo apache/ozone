@@ -28,26 +28,13 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyB
 public final class BlockGroup {
 
   private String groupID;
-  private List<BlockID> blockIDs;
-  private List<Long> blockSizes;
-  private List<Long> replicatedBlockSizes;
   private List<DeletedBlock> deletedBlocks;
   public static final long SIZE_NOT_AVAILABLE = -1;
 
   private BlockGroup(String groupID,
-                     List<BlockID> blockIDs,
-                     List<Long> blockSizes,
-                     List<Long> replicatedBlockSizes,
                      List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
-    this.blockIDs = blockIDs;
-    this.blockSizes = blockSizes;
-    this.replicatedBlockSizes = replicatedBlockSizes;
     this.deletedBlocks = deletedBlocks;
-  }
-
-  public List<BlockID> getBlockIDList() {
-    return blockIDs;
   }
 
   public List<DeletedBlock> getDeletedBlocks() {
@@ -60,10 +47,10 @@ public final class BlockGroup {
 
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    for (int i = 0; i < blockIDs.size(); i++) {
-      kbb.addBlocks(blockIDs.get(i).getProtobuf());
-      kbb.addSize(blockSizes.get(i));
-      kbb.addReplicatedSize(replicatedBlockSizes.get(i));
+    for (DeletedBlock deletedBlock : deletedBlocks) {
+      kbb.addBlocks(deletedBlock.getBlockID().getProtobuf());
+      kbb.addSize(deletedBlock.getSize());
+      kbb.addReplicatedSize(deletedBlock.getReplicatedSize());
     }
     return kbb.setKey(groupID).build();
   }
@@ -101,9 +88,6 @@ public final class BlockGroup {
   public String toString() {
     return "BlockGroup[" +
         "groupID='" + groupID + '\'' +
-        ", blockIDs=" + blockIDs +
-        ", blockSizes=" + blockSizes +
-        ", replicatedBlockSizes=" + replicatedBlockSizes +
         ", deletedBlocks=" + deletedBlocks +
         ']';
   }
@@ -114,18 +98,10 @@ public final class BlockGroup {
   public static class Builder {
 
     private String groupID;
-    private List<BlockID> blockIDs;
-    private List<Long> blockSizes;
-    private List<Long> replicatedBlockSizes;
     private List<DeletedBlock> deletedBlocks;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
-      return this;
-    }
-
-    public Builder addAllBlockIDs(List<BlockID> blockIDList) {
-      this.blockIDs = blockIDList;
       return this;
     }
 
@@ -134,18 +110,8 @@ public final class BlockGroup {
       return this;
     }
 
-    public Builder addAllBlockSize(List<Long> blockSizeList) {
-      this.blockSizes = blockSizeList;
-      return this;
-    }
-
-    public Builder addAllReplicatedBlockSize(List<Long> replicatedSizeList) {
-      replicatedBlockSizes = replicatedSizeList;
-      return this;
-    }
-
     public BlockGroup build() {
-      return new BlockGroup(groupID, blockIDs, blockSizes, replicatedBlockSizes, deletedBlocks);
+      return new BlockGroup(groupID, deletedBlocks);
     }
   }
 }
