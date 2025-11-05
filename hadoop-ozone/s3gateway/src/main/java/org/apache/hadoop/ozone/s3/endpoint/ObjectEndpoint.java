@@ -58,9 +58,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -1521,17 +1523,6 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
-  }
-
-  public static String stripQuotes(String value) {
-    if (value == null) {
-      return null;
-    }
-    return value.replaceAll("^\\\"|\\\"$", "");
-  }
-
-  static String wrapInQuotes(String value) {
-    return "\"" + value + "\"";
   }
 
   @VisibleForTesting
