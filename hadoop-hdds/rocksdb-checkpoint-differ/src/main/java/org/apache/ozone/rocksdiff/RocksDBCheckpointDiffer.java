@@ -493,7 +493,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         builder = new CompactionLogEntry.Builder(trxId,
             System.currentTimeMillis(),
             inputFileCompactions.keySet().stream()
-                .map(inputFile -> inputFileCompactions.containsKey(inputFile) ?
+                .map(inputFile -> inflightCompactions.containsKey(inputFile) ?
                     inflightCompactions.get(inputFile) : inputFileCompactions.get(inputFile))
                 .collect(Collectors.toList()),
             new ArrayList<>(toFileInfoList(compactionJobInfo.outputFiles(), db).values()));
@@ -524,12 +524,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());
           for (String inputFile : inputFileCompactions.keySet()) {
-            if (!inflightCompactions.containsKey(inputFile)) {
-              LOG.warn("Input file not found in inflightCompactionsMap : {} which should have been added on " +
-                      "compactionBeginListener.",
-                  inputFile);
+            CompactionFileInfo removed = inflightCompactions.remove(inputFile);
+            if (removed == null) {
+              LOG.info("Input file not found in inflightCompactionsMap : {} which should have been added on " +
+                      "compactionBeginListener.", inputFile);
             }
-            inflightCompactions.remove(inputFile);
           }
         }
         // Add the compaction log entry to the prune queue
