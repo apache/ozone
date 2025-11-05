@@ -36,6 +36,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;
+  private static final String METRIC_NAME = ECReconstructionCoordinatorTask.METRIC_NAME;
 
   public ReconstructECContainersCommandHandler(ConfigurationSource conf,
       ReplicationSupervisor supervisor,
@@ -58,7 +59,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   }
 
   public String getMetricsName() {
-    return ECReconstructionCoordinatorTask.METRIC_NAME;
+    return METRIC_NAME;
   }
 
   @Override
@@ -68,22 +69,22 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return (int) this.supervisor.getReplicationRequestCount(ECReconstructionCoordinatorTask.METRIC_NAME);
+    return (int) this.supervisor.getReplicationRequestCount(METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return (int) this.supervisor.getReplicationRequestAvgTime(ECReconstructionCoordinatorTask.METRIC_NAME);
+    return this.supervisor.getReplicationRequestAvgTime(METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return this.supervisor.getReplicationRequestTotalTime(ECReconstructionCoordinatorTask.METRIC_NAME);
+    return this.supervisor.getReplicationRequestTotalTime(METRIC_NAME);
   }
 
   @Override
   public int getQueuedCount() {
-    return (int) this.supervisor.getReplicationQueuedCount(ECReconstructionCoordinatorTask.METRIC_NAME);
+    return (int) this.supervisor.getReplicationQueuedCount(METRIC_NAME);
   }
 
   public ConfigurationSource getConf() {

@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public class ReconcileContainerCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final DNContainerOperationClient dnClient;
+  private static final String METRIC_NAME = ReconcileContainerTask.METRIC_NAME;
 
   public ReconcileContainerCommandHandler(ReplicationSupervisor supervisor, DNContainerOperationClient dnClient) {
     this.supervisor = supervisor;
@@ -54,25 +55,25 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return (int) this.supervisor.getReplicationQueuedCount(ReconcileContainerTask.METRIC_NAME);
+    return (int) this.supervisor.getReplicationQueuedCount(METRIC_NAME);
   }
 
   @Override
   public int getInvocationCount() {
-    return (int) this.supervisor.getReplicationRequestCount(ReconcileContainerTask.METRIC_NAME);
+    return (int) this.supervisor.getReplicationRequestCount(METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return (int) this.supervisor.getReplicationRequestAvgTime(ReconcileContainerTask.METRIC_NAME);
+    return this.supervisor.getReplicationRequestAvgTime(METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return this.supervisor.getReplicationRequestTotalTime(ReconcileContainerTask.METRIC_NAME);
+    return this.supervisor.getReplicationRequestTotalTime(METRIC_NAME);
   }
 
   public String getMetricsName() {
-    return ReconcileContainerTask.METRIC_NAME;
+    return METRIC_NAME;
   }
 }
