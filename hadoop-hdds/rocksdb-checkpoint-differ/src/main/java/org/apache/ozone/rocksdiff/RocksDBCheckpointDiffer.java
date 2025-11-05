@@ -527,8 +527,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           for (String inputFile : inputFileCompactions.keySet()) {
             CompactionFileInfo removed = inflightCompactions.remove(inputFile);
             if (removed == null) {
-              LOG.info("Input file not found in inflightCompactionsMap : {} which should have been added on " +
-                      "compactionBeginListener.", inputFile);
+              String columnFamily = StringUtils.bytes2String(compactionJobInfo.columnFamilyName());
+              // Before compaction starts in rocksdb onCompactionBegin event listener is called and here the
+              // inflightCompactionsMap is populated. So, if the compaction log entry is not found in the map, then
+              // there could be a possible race condition on rocksdb compaction behavior.
+              LOG.info("Input file not found in inflightCompactionsMap : {} for compaction with jobId : {} for " +
+                      "column family : {} which should have been added on rocksdb's onCompactionBegin event listener." +
+                      " SnapDiff computation which has this diff file would fallback to full diff.",
+                  inputFile, compactionJobInfo.jobId(), columnFamily);
             }
           }
         }
