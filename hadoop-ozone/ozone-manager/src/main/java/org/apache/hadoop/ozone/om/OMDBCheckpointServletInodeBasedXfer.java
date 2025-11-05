@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -211,6 +213,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     DBCheckpoint checkpoint = null;
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     OMMetadataManager omMetadataManager = om.getMetadataManager();
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     boolean includeSnapshotData = includeSnapshotData(request);
     AtomicLong maxTotalSstSize = new AtomicLong(getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT));
@@ -220,7 +223,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     if (!includeSnapshotData) {
       maxTotalSstSize.set(Long.MAX_VALUE);
     } else {
-      snapshotPaths = getSnapshotDirs(omMetadataManager);
+      snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, omMetadataManager, snapshotLocalDataManager);
     }
 
     if (sstFilesToExclude.isEmpty()) {
@@ -265,17 +268,23 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = includeSnapshotData ? snapshotCache.lock() : null) {
           // get the list of sst files of the checkpoint.
           checkpoint = createAndPrepareCheckpoint(true);
-          List<Path> sstBackupFiles = extractSSTFilesFromCompactionLog(checkpoint);
           // unlimited files as we want the Active DB contents to be transferred in a single batch
           maxTotalSstSize.set(Long.MAX_VALUE);
           Path checkpointDir = checkpoint.getCheckpointLocation();
           writeDBToArchive(sstFilesToExclude, checkpointDir, maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, false);
           if (includeSnapshotData) {
+            List<Path> sstBackupFiles = extractSSTFilesFromCompactionLog(checkpoint);
+            // get the list of snapshots from the checkpoint
+            try (OmMetadataManagerImpl checkpointMetadataManager = OmMetadataManagerImpl
+                    .createCheckpointMetadataManager(om.getConfiguration(), checkpoint)) {
+              snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, checkpointMetadataManager,
+                  snapshotLocalDataManager);
+            }
             writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
                 hardLinkFileMap, false);
-            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(),
-                maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
+            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, archiveOutputStream, tmpdir,
+                hardLinkFileMap, false);
             // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
             transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize, archiveOutputStream,
                 hardLinkFileMap);
@@ -380,20 +389,27 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   }
 
   /**
-   * Collects paths to all snapshot databases.
+   * Collects paths to all snapshot databases from the OM DB.
    *
-   * @param omMetadataManager OMMetadataManager instance
+   * @param activeOMMetadataManager OMMetadataManager instance
    * @return Set of paths to snapshot databases
    * @throws IOException if an I/O error occurs
    */
-  Set<Path> getSnapshotDirs(OMMetadataManager omMetadataManager) throws IOException {
+  Set<Path> getSnapshotDirsFromDB(OMMetadataManager activeOMMetadataManager, OMMetadataManager omMetadataManager,
+      OmSnapshotLocalDataManager localDataManager) throws IOException {
     Set<Path> snapshotPaths = new HashSet<>();
-    SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
-    for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
-      String snapshotDir =
-          OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
-      Path path = Paths.get(snapshotDir);
-      snapshotPaths.add(path);
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iter =
+        omMetadataManager.getSnapshotInfoTable().iterator()) {
+      while (iter.hasNext()) {
+        Table.KeyValue<String, SnapshotInfo> kv = iter.next();
+        SnapshotInfo snapshotInfo = kv.getValue();
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapLocalMeta =
+                 localDataManager.getOmSnapshotLocalDataMeta(snapshotInfo.getSnapshotId())) {
+          Path snapshotDir = getSnapshotPath(activeOMMetadataManager, snapshotInfo.getSnapshotId(),
+              snapLocalMeta.getMeta().getVersion());
+          snapshotPaths.add(snapshotDir);
+        }
+      }
     }
     return snapshotPaths;
   }

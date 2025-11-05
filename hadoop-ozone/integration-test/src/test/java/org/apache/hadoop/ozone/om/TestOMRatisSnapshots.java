@@ -337,11 +337,11 @@ public class TestOMRatisSnapshots {
     File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
     Path followerActiveDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
     Path followerSnapshotDir =
-        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo));
+        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo, 0));
     File leaderMetaDir = OMStorage.getOmDbDir(leaderOM.getConfiguration());
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
-        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0));
 
     // Get list of live files on the leader.
     RocksDB activeRocksDB = ((RDBStore) leaderOM.getMetadataManager().getStore())
@@ -1056,7 +1056,7 @@ public class TestOMRatisSnapshots {
         .get(tableKey);
     // Allow the snapshot to be written to disk
     String fileName =
-        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {

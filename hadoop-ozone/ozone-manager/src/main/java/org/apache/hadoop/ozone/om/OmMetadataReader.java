@@ -275,9 +275,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+            bucket, args.getKeyName());
+      }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       audit.logReadFailure(

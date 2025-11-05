@@ -91,6 +91,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
     List<String> snapshotDbKeys = snapshotPurgeRequest
         .getSnapshotDBKeysList();
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
     try {
 
       // Each snapshot purge operation does three things:
@@ -123,12 +124,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       }
       // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
-        snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+        snapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), snapshotInfo));
       }
 
-      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos);
+      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos,
+          transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
       LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",

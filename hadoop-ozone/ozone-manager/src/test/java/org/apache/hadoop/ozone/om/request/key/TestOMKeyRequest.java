@@ -349,5 +349,4 @@ public class TestOMKeyRequest {
     assertNotNull(snapshotInfo);
     return snapshotInfo;
   }
-
 }
