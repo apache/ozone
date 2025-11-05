@@ -172,3 +172,49 @@ $ ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volumelo
 ```
 
 Note in JSON output mode, field `contToken` won't show up at all in the result if there are no more entries after the batch (i.e. when `hasMore` is `false`).
+
+
+## Snapshot Defragmentation Trigger
+
+The snapshot defrag command triggers the Snapshot Defragmentation Service to run immediately on a specific Ozone Manager node.
+This command manually initiates the snapshot defragmentation process which compacts snapshot data and removes fragmentation to improve storage efficiency.
+
+This command only works on Ozone Manager HA clusters.
+
+```bash
+$ ozone admin om snapshot defrag --help
+Usage: ozone admin om snapshot defrag [-hV] [--no-wait] [--node-id=<nodeId>]
+                                      [-id=<omServiceId>]
+Triggers the Snapshot Defragmentation Service to run immediately. This command
+manually initiates the snapshot defragmentation process which compacts
+snapshot data and removes fragmentation to improve storage efficiency. This
+command works only on OzoneManager HA cluster.
+  -h, --help                Show this help message and exit.
+      --no-wait             Do not wait for the defragmentation task to
+                              complete. The command will return immediately
+                              after triggering the task.
+      --node-id=<nodeId>    NodeID of the OM to trigger snapshot
+                              defragmentation on.
+  -id, --service-id=<omServiceId>
+                            Ozone Manager Service ID
+  -V, --version             Print version information and exit.
+```
+
+### Example usages
+
+- Trigger snapshot defragmentation on OM node `om3` in service `omservice` and wait for completion:
+
+```bash
+$ ozone admin om snapshot defrag --service-id=omservice --node-id=om3
+Triggering Snapshot Defrag Service ...
+Snapshot defragmentation completed successfully.
+```
+
+- Trigger snapshot defragmentation without waiting for completion:
+
+```bash
+$ ozone admin om snapshot defrag --service-id=omservice --node-id=om3 --no-wait
+Triggering Snapshot Defrag Service ...
+Snapshot defragmentation task has been triggered successfully and is running in the background.
+```
+
