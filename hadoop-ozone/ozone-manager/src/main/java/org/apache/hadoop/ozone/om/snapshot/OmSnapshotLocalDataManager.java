@@ -871,7 +871,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     private void checkForOphanVersionsAndIncrementCount(UUID snapshotId, SnapshotVersionsMeta previousVersionsMeta,
-        SnapshotVersionsMeta currentVersionMeta, boolean transactionInfoSet) {
+        SnapshotVersionsMeta currentVersionMeta, boolean isPurgeTransactionSet) {
       internalLock.readLock().lock();
       try {
         if (previousVersionsMeta != null) {
@@ -890,7 +890,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           // become an orphan. Otherwise if the version is updated it
           // could mean that there could be some orphan version present within the
           // same snapshot.
-          if (transactionInfoSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
+          if (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
             incrementOrphanCheckCount(snapshotId);
           }
         }
