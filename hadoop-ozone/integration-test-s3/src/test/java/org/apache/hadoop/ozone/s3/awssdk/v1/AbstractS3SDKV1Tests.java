@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3.awssdk.v1;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
-import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -119,6 +118,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
+import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1232,7 +1232,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       for (PartETag part : completedParts) {
         completionXml.append("  <Part>\n");
         completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
-        completionXml.append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n");
+        completionXml.append("    <ETag>").append(ObjectEndpoint.stripQuotes(part.getETag())).append("</ETag>\n");
         completionXml.append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");

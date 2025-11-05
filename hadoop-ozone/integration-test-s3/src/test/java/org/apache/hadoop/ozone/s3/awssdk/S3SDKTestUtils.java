@@ -128,17 +128,4 @@ public final class S3SDKTestUtils {
     }
     return connection;
   }
-
-  /**
-   * Strip leading and trailing quotes from a string.
-   *
-   * @param input The input string.
-   * @return The string without leading and trailing quotes.
-   */
-  public static String stripQuotes(String input) {
-    if (input == null) {
-      return null;
-    }
-    return input.replaceAll("^\\\"|\\\"$", "");
-  }
 }
