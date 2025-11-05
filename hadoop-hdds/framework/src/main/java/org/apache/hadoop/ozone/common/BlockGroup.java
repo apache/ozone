@@ -31,8 +31,7 @@ public final class BlockGroup {
   private List<DeletedBlock> deletedBlocks;
   public static final long SIZE_NOT_AVAILABLE = -1;
 
-  private BlockGroup(String groupID,
-                     List<DeletedBlock> deletedBlocks) {
+  private BlockGroup(String groupID, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
     this.deletedBlocks = deletedBlocks;
   }
