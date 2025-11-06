@@ -156,6 +156,7 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  AssumeRole = 143;
 }
 
 enum SafeMode {
@@ -304,6 +305,7 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+  optional AssumeRoleRequest                assumeRoleRequest              = 144;
 }
 
 message OMResponse {
@@ -437,6 +439,7 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+  optional AssumeRoleResponse                assumeRoleResponse            = 143;
 }
 
 enum Status {
@@ -1494,6 +1497,7 @@ message OMTokenProto {
     enum Type {
       DELEGATION_TOKEN = 1;
       S3AUTHINFO = 2;
+      S3_STS_TOKEN = 3;
     };
     required Type   type           = 1;
     optional uint32 version        = 2;
@@ -1511,6 +1515,11 @@ message OMTokenProto {
     optional string strToSign      = 14;
     optional string omServiceId    = 15 [deprecated = true];
     optional string secretKeyId    = 16;
+    // STS-specific fields
+    optional string roleArn             = 17;
+    optional string originalAccessKeyId = 18;
+    optional string secretAccessKey     = 19;
+    optional string sessionPolicy       = 20;
 }
 
 message SecretKeyProto {
@@ -2263,6 +2272,9 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+    // If present, indicates this request uses STS temporary credentials
+    // and carries the base64-encoded session token for validation.
+    optional string sessionToken = 4;
 }
 
 message RecoverLeaseRequest {
@@ -2352,6 +2364,21 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+message AssumeRoleRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  optional int32 durationSeconds          = 3 [default = 3600];
+  optional string awsIamSessionPolicy     = 4;
+}
+
+message AssumeRoleResponse {
+  required string accessKeyId             = 1;
+  required string secretAccessKey         = 2;
+  required string sessionToken            = 3;
+  required uint64 expirationEpochSeconds  = 4;
+  required string assumedRoleId           = 5;
 }
 
 /**

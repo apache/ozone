@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -801,6 +802,14 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
     getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
+  }
+
+  @Override
+  public AssumeRoleResponseInfo assumeRole(String roleArn,
+                                           String roleSessionName,
+                                           int durationSeconds,
+                                           String awsIamSessionPolicy) throws IOException {
+    return null;
   }
 
 }

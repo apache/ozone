@@ -300,6 +300,7 @@ public final class OmUtils {
     case CompleteMultiPartUpload:
     case AbortMultiPartUpload:
     case GetS3Secret:
+    case AssumeRole:
     case GetDelegationToken:
     case RenewDelegationToken:
     case CancelDelegationToken:
