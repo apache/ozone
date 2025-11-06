@@ -30,8 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Configuration class for the Datanode DiskBalancer service.
- * Configuration can be updated dynamically via DiskBalancer RPC commands.
+ * This class contains configuration values for the DiskBalancer.
  */
 @ConfigGroup(prefix = "hdds.datanode.disk.balancer")
 public final class DiskBalancerConfiguration {
