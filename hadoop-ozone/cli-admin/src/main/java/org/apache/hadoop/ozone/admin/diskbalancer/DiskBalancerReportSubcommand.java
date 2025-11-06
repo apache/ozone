@@ -51,7 +51,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       reports.add(report);
       return true;
     } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName);
+      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
       return false;
     }
   }

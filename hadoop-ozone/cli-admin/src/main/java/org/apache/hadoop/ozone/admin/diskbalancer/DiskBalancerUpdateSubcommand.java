@@ -85,7 +85,7 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       diskBalancerProxy.updateDiskBalancerConfiguration(builder.build());
       return true;
     } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName);
+      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
       return false;
     }
   }
