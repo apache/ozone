@@ -287,9 +287,7 @@ remote_upload_xmls() {
       scp_put "$config_dir/ozone-site.xml" "/tmp/$tmp_oz"
       ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\" && mv -f /tmp/$tmp_oz \"$etc_dir/ozone-site.xml\" && \
         sed -i${sed_hosts} -e \"s|DATA_BASE|${data_base_sub}|g\" \"$etc_dir/ozone-site.xml\" && \
-        if [ -n \"${SERVICE_USER:-}\" ]; then \
-          chown $service_user:$service_group \"$etc_dir/ozone-site.xml\" 2>/dev/null || true; \
-        fi"
+        chown $service_user:$service_group \"$etc_dir/ozone-site.xml\" 2>/dev/null || true; "
     ) &
   fi
   if [[ -f "$config_dir/core-site.xml" ]]; then
@@ -297,9 +295,7 @@ remote_upload_xmls() {
       scp_put "$config_dir/core-site.xml" "/tmp/$tmp_core"
       ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\" && mv -f /tmp/$tmp_core \"$etc_dir/core-site.xml\" && \
         sed -i${sed_hosts} \"$etc_dir/core-site.xml\" && \
-        if [ -n \"${SERVICE_USER:-}\" ]; then \
-          chown $service_user:$service_group \"$etc_dir/core-site.xml\" 2>/dev/null || true; \
-        fi"
+        chown $service_user:$service_group \"$etc_dir/core-site.xml\" 2>/dev/null || true; "
     ) &
   fi
   if [[ -f "$config_dir/ozone-env.sh" ]]; then
@@ -307,9 +303,7 @@ remote_upload_xmls() {
       scp_put "$config_dir/ozone-env.sh" "/tmp/$tmp_env"
       ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\" && mv -f /tmp/$tmp_env \"$etc_dir/ozone-env.sh\" && \
         sed -i${sed_hosts} \"$etc_dir/ozone-env.sh\" && \
-        if [ -n \"${SERVICE_USER:-}\" ]; then \
-          chown $service_user:$service_group \"$etc_dir/ozone-env.sh\" 2>/dev/null || true; \
-        fi"
+        chown $service_user:$service_group \"$etc_dir/ozone-env.sh\" 2>/dev/null || true; "
     ) &
   fi
   wait
@@ -322,81 +316,9 @@ unique_hosts() {
 }
 
 install_shared_ssh_key() {
-  # Install a shared SSH keypair on the TARGET_HOST so hosts can SSH to each other passwordlessly
+  # Install shared SSH keypair for cluster node-to-node communication
   # Args: $1=local_private_key_path, $2=local_public_key_path
-  local local_priv="$1" local_pub="$2"
-  local service_user="${SERVICE_USER:-ozone}"
-  local service_group="${SERVICE_GROUP:-ozone}"
-  local tmp_priv="/tmp/.ozone_cluster_key" tmp_pub="/tmp/.ozone_cluster_key.pub"
-  scp_put "$local_priv" "$tmp_priv"
-  scp_put "$local_pub" "$tmp_pub"
-  
-  # Function to install SSH key for a specific user
-  ssh_run "set -euo pipefail; \
-    install_key_for_user() { \
-      local target_user=\"\$1\"; \
-      local target_group=\"\$2\"; \
-      local user_home; \
-      if [ \"\$target_user\" = \"root\" ] || [ -z \"\$target_user\" ]; then \
-        user_home=\"/root\"; \
-      else \
-        user_home=\$(getent passwd \"\$target_user\" | cut -d: -f6 2>/dev/null || echo \"/home/\$target_user\"); \
-      fi; \
-      local ssh_dir=\"\$user_home/.ssh\"; \
-      mkdir -p \"\$ssh_dir\" && chmod 700 \"\$ssh_dir\"; \
-      touch \"\$ssh_dir/authorized_keys\" && chmod 600 \"\$ssh_dir/authorized_keys\"; \
-      PUB_KEY=\$(cat $tmp_pub); \
-      # Extract key type and key data (ignoring comments) for comparison
-      KEY_TYPE=\$(echo \"\$PUB_KEY\" | awk '{print \$1}'); \
-      KEY_DATA=\$(echo \"\$PUB_KEY\" | awk '{print \$2}'); \
-      # Check if this exact key (type + data) already exists, ignoring comments
-      if ! awk -v key_type=\"\$KEY_TYPE\" -v key_data=\"\$KEY_DATA\" \
-        'BEGIN {found=0} \
-         \$1 == key_type && \$2 == key_data {found=1; exit} \
-         END {exit !found}' \"\$ssh_dir/authorized_keys\" 2>/dev/null; then \
-        echo \"\$PUB_KEY\" >> \"\$ssh_dir/authorized_keys\"; \
-      fi; \
-      cp -f $tmp_priv \"\$ssh_dir/id_ed25519\"; \
-      cp -f $tmp_pub  \"\$ssh_dir/id_ed25519.pub\"; \
-      chmod 600 \"\$ssh_dir/id_ed25519\"; \
-      chmod 644 \"\$ssh_dir/id_ed25519.pub\"; \
-      local cfg=\"\$ssh_dir/config\"; \
-      if [ ! -f \"\$cfg\" ] || ! grep -qsF 'StrictHostKeyChecking' \"\$cfg\" 2>/dev/null; then \
-        printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' >> \"\$cfg\"; \
-        chmod 600 \"\$cfg\"; \
-      fi; \
-      # Set ownership for all files in ssh_dir
-      if [ \"\$target_user\" != \"root\" ] && [ -n \"\$target_user\" ]; then \
-        chown -R \$target_user:\$target_group \"\$ssh_dir\" 2>/dev/null || true; \
-      fi; \
-      # Deduplicate authorized_keys after adding
-      if [ -f \"\$ssh_dir/authorized_keys\" ]; then \
-        awk '{ \
-          match(\$0, /^[^ ]* +([^ ]+)/, arr); \
-          if (arr[1] != \"\") { \
-            key = \$1 \" \" arr[1]; \
-            if (!seen[key]++) print; \
-          } else { \
-            print; \
-          } \
-        }' \"\$ssh_dir/authorized_keys\" > \"\$ssh_dir/authorized_keys.tmp\" 2>/dev/null && \
-        mv -f \"\$ssh_dir/authorized_keys.tmp\" \"\$ssh_dir/authorized_keys\" && \
-        chmod 600 \"\$ssh_dir/authorized_keys\" || true; \
-      fi; \
-    }; \
-    # Install for SSH user (current user)
-    CURRENT_USER=\$(whoami); \
-    install_key_for_user \"\$CURRENT_USER\" \"$service_group\"; \
-    # Install for service user if different and set
-    if [ -n \"$service_user\" ] && [ \"$service_user\" != \"\$CURRENT_USER\" ]; then \
-      install_key_for_user \"$service_user\" \"$service_group\"; \
-    fi; \
-    rm -f $tmp_priv $tmp_pub"
-  # Also deduplicate using our helper function for both users
-  deduplicate_authorized_keys "$TARGET_USER"
-  if [[ -n "$service_user" && "$service_user" != "$TARGET_USER" ]]; then
-    deduplicate_authorized_keys "$service_user"
-  fi
+  install_ssh_key "$2" "$1"
 }
 
 run_smoke_on_host() {
@@ -440,7 +362,7 @@ remote_install_java() {
       SUDO=; [ \"\$EUID\" -ne 0 ] && SUDO=sudo; \
       if command -v apt-get >/dev/null 2>&1; then \
         pkg=openjdk-$major-jdk; \
-        \$SUDO apt-get update -y && \$SUDO apt-get install -y \$pkg || \
+        \$SUDO apt-get update -y >/dev/null 2>&1 && \$SUDO apt-get install -y \$pkg >/dev/null 2>&1 || \
         \$SUDO apt-get install -y openjdk-$major-jdk-headless >/dev/null 2>&1; \
       elif command -v dnf >/dev/null 2>&1; then \
         \$SUDO dnf install -y java-$major-openjdk java-$major-openjdk-devel >/dev/null 2>&1; \
@@ -500,51 +422,97 @@ remote_setup_ozone_home() {
   ensure_ozone_env_sourced
 }
 
-deduplicate_authorized_keys() {
-  # Helper function to deduplicate authorized_keys file
-  # This removes exact duplicate lines and also handles keys with same content but different comments
-  local target_user="${1:-}"
-  if [[ -n "$target_user" && "$target_user" != "root" ]]; then
-    local user_home
-    user_home=$(ssh_run "getent passwd \"$target_user\" | cut -d: -f6" 2>/dev/null || echo "")
-    if [[ -z "$user_home" ]]; then
-      user_home="/home/$target_user"
+install_ssh_key() {
+  # Unified function to install SSH keys for passwordless SSH
+  # Args: $1=public_key_path (required), $2=private_key_path (optional)
+  # If private_key is provided, installs both keys for cluster node-to-node communication
+  # If only public_key is provided, only adds to authorized_keys for installer-to-host communication
+  local pub_key_path="$1"
+  local priv_key_path="${2:-}"
+  local service_user="${SERVICE_USER}"
+  
+  if [[ ! -f "$pub_key_path" ]]; then
+    echo "Error: public key file $pub_key_path does not exist." >&2
+    exit 1
+  fi
+  
+  local pub_key_content
+  pub_key_content="$(cat "$pub_key_path")"
+  
+  if [[ "$AUTH_METHOD" == "password" ]]; then
+    if [[ -z "${AUTH_PASSWORD:-}" ]]; then
+      read -rs -p "Enter SSH password for ${TARGET_USER}@${TARGET_HOST}: " AUTH_PASSWORD
+      echo
     fi
-    ssh_run "set -euo pipefail; \
-      AUTH_KEYS=\"$user_home/.ssh/authorized_keys\"; \
-      if [ -f \"\$AUTH_KEYS\" ]; then \
-        # Extract key type and key data (ignoring comments) for deduplication
-        awk '{ \
-          # Extract key type (first field) and key data (second field), ignoring comments \
-          match(\$0, /^[^ ]* +([^ ]+)/, arr); \
-          if (arr[1] != \"\") { \
-            key = \$1 \" \" arr[1]; \
-            if (!seen[key]++) print; \
-          } else { \
-            print; \
-          } \
-        }' \"\$AUTH_KEYS\" > \"\$AUTH_KEYS.tmp\" 2>/dev/null && \
-        mv -f \"\$AUTH_KEYS.tmp\" \"\$AUTH_KEYS\" && \
-        chmod 600 \"\$AUTH_KEYS\" || true; \
-      fi"
+    sshpass -p "$AUTH_PASSWORD" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "set -euo pipefail; \
+      mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
+      if ! grep -qsF \"$pub_key_content\" ~/.ssh/authorized_keys 2>/dev/null; then \
+        echo \"$pub_key_content\" >> ~/.ssh/authorized_keys; \
+      fi" >/dev/null 2>&1 || true
   else
-    ssh_run "set -euo pipefail; \
-      AUTH_KEYS=\"\$HOME/.ssh/authorized_keys\"; \
-      if [ -f \"\$AUTH_KEYS\" ]; then \
-        # Extract key type and key data (ignoring comments) for deduplication
-        awk '{ \
-          # Extract key type (first field) and key data (second field), ignoring comments \
-          match(\$0, /^[^ ]* +([^ ]+)/, arr); \
-          if (arr[1] != \"\") { \
-            key = \$1 \" \" arr[1]; \
-            if (!seen[key]++) print; \
-          } else { \
-            print; \
-          } \
-        }' \"\$AUTH_KEYS\" > \"\$AUTH_KEYS.tmp\" 2>/dev/null && \
-        mv -f \"\$AUTH_KEYS.tmp\" \"\$AUTH_KEYS\" && \
-        chmod 600 \"\$AUTH_KEYS\" || true; \
-      fi"
+    if [[ -n "$priv_key_path" ]]; then
+      # Cluster key: install both private and public keys for multiple users
+      local tmp_priv="/tmp/.ozone_cluster_key" tmp_pub="/tmp/.ozone_key.pub"
+      scp_put "$priv_key_path" "$tmp_priv"
+      scp_put "$pub_key_path" "$tmp_pub"
+      ssh_run "set -euo pipefail; \
+        PUB_KEY=\$(cat $tmp_pub); \
+        install_for_user() { \
+          local target_user=\"\$1\"; \
+          local user_home; \
+          if [ \"\$target_user\" = \"root\" ] || [ -z \"\$target_user\" ]; then \
+            user_home=\"/root\"; \
+          else \
+            user_home=\$(getent passwd \"\$target_user\" | cut -d: -f6 2>/dev/null || echo \"/home/\$target_user\"); \
+          fi; \
+          local ssh_dir=\"\$user_home/.ssh\"; \
+          mkdir -p \"\$ssh_dir\" && chmod 700 \"\$ssh_dir\"; \
+          touch \"\$ssh_dir/authorized_keys\" && chmod 600 \"\$ssh_dir/authorized_keys\"; \
+          if ! grep -qsF \"\$PUB_KEY\" \"\$ssh_dir/authorized_keys\" 2>/dev/null; then \
+            echo \"\$PUB_KEY\" >> \"\$ssh_dir/authorized_keys\"; \
+          fi; \
+          # Deduplicate authorized_keys (remove keys with same type and data, ignoring comments)
+          awk '{ \
+            match(\$0, /^[^ ]* +([^ ]+)/, arr); \
+            if (arr[1] != \"\") { \
+              key = \$1 \" \" arr[1]; \
+              if (!seen[key]++) print; \
+            } else { \
+              print; \
+            } \
+          }' \"\$ssh_dir/authorized_keys\" > \"\$ssh_dir/authorized_keys.tmp\" 2>/dev/null && \
+          mv -f \"\$ssh_dir/authorized_keys.tmp\" \"\$ssh_dir/authorized_keys\" && \
+          chmod 600 \"\$ssh_dir/authorized_keys\" || true; \
+          cp -f $tmp_priv \"\$ssh_dir/id_ed25519\"; \
+          cp -f $tmp_pub  \"\$ssh_dir/id_ed25519.pub\"; \
+          chmod 600 \"\$ssh_dir/id_ed25519\"; \
+          chmod 644 \"\$ssh_dir/id_ed25519.pub\"; \
+          local cfg=\"\$ssh_dir/config\"; \
+          if [ ! -f \"\$cfg\" ] || ! grep -qsF 'StrictHostKeyChecking' \"\$cfg\" 2>/dev/null; then \
+            printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  IdentityFile ~/.ssh/id_ed25519\n' >> \"\$cfg\"; \
+            chmod 600 \"\$cfg\"; \
+          fi; \
+          if [ \"\$target_user\" != \"root\" ] && [ -n \"\$target_user\" ]; then \
+            chown -R \$target_user:\$target_user \"\$ssh_dir\" 2>/dev/null || true; \
+          fi; \
+        }; \
+        CURRENT_USER=\$(whoami); \
+        install_for_user \"\$CURRENT_USER\"; \
+        if [ -n \"$service_user\" ] && [ \"$service_user\" != \"\$CURRENT_USER\" ]; then \
+          install_for_user \"$service_user\"; \
+        fi; \
+        rm -f $tmp_priv $tmp_pub"
+    else
+      # Installer key: only add public key to authorized_keys
+      local tmp_pub="/tmp/.ozone_key.pub"
+      scp_put "$pub_key_path" "$tmp_pub"
+      ssh_run "set -euo pipefail; \
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
+        if ! grep -qsF \"\$(cat $tmp_pub)\" ~/.ssh/authorized_keys 2>/dev/null; then \
+          cat $tmp_pub >> ~/.ssh/authorized_keys; \
+        fi; \
+        rm -f $tmp_pub"
+    fi
   fi
 }
 
@@ -554,63 +522,8 @@ ensure_passwordless_ssh() {
     ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" >/dev/null
   fi
   local keyfile="$HOME/.ssh/id_ed25519.pub"
-
   echo "Setting up passwordless SSH to ${TARGET_USER}@${TARGET_HOST}:${SSH_PORT}..."
-  if [[ "$AUTH_METHOD" == "password" ]]; then
-    if [[ -z "${AUTH_PASSWORD:-}" ]]; then
-      read -rs -p "Enter SSH password for ${TARGET_USER}@${TARGET_HOST}: " AUTH_PASSWORD
-      echo
-    fi
-    # Check if key already exists before running ssh-copy-id
-    local pub_key_content
-    pub_key_content="$(cat "$keyfile")"
-    sshpass -p "$AUTH_PASSWORD" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "set -euo pipefail; \
-      mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
-      if ! grep -qsF \"$pub_key_content\" ~/.ssh/authorized_keys 2>/dev/null; then \
-        echo \"$pub_key_content\" >> ~/.ssh/authorized_keys; \
-      fi" >/dev/null 2>&1 || true
-    # Always deduplicate after any key operation
-    deduplicate_authorized_keys "$TARGET_USER"
-  else
-    local use_key
-    use_key="${AUTH_KEYFILE:-$HOME/.ssh/id_ed25519}"
-    if [[ ! -f "$use_key" ]]; then
-      echo "Error: key file $use_key does not exist." >&2
-      exit 1
-    fi
-    local tmp_pub
-    tmp_pub="$(mktemp)"
-    if ! ssh-keygen -y -f "$use_key" > "$tmp_pub" 2>/dev/null; then
-      echo "Error: could not derive public key from $use_key" >&2
-      rm -f "$tmp_pub"
-      exit 1
-    fi
-    local pub_key_content
-    pub_key_content="$(cat "$tmp_pub")"
-    # Always check and add manually (don't use ssh-copy-id to avoid duplicates)
-    if [[ -n "${AUTH_PASSWORD:-}" ]]; then
-      # Use password to push the public key (check for duplicates first)
-      sshpass -p "${AUTH_PASSWORD}" scp -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$tmp_pub" "${TARGET_USER}@${TARGET_HOST}:/tmp/.ozone_installer_key.pub" >/dev/null 2>&1
-      sshpass -p "${AUTH_PASSWORD}" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "set -euo pipefail; \
-        mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
-        if ! grep -qsF \"\$(cat /tmp/.ozone_installer_key.pub)\" ~/.ssh/authorized_keys 2>/dev/null; then \
-          cat /tmp/.ozone_installer_key.pub >> ~/.ssh/authorized_keys; \
-        fi; \
-        rm -f /tmp/.ozone_installer_key.pub" >/dev/null 2>&1
-    else
-      # No password available; try our standard helpers (check for duplicates first)
-      scp_put "$tmp_pub" "/tmp/.ozone_installer_key.pub"
-      ssh_run "set -euo pipefail; \
-        mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
-        if ! grep -qsF \"\$(cat /tmp/.ozone_installer_key.pub)\" ~/.ssh/authorized_keys 2>/dev/null; then \
-          cat /tmp/.ozone_installer_key.pub >> ~/.ssh/authorized_keys; \
-        fi; \
-        rm -f /tmp/.ozone_installer_key.pub"
-    fi
-    rm -f "$tmp_pub"
-    # Always deduplicate after any key operation
-    deduplicate_authorized_keys "$TARGET_USER"
-  fi
+  install_ssh_key "$keyfile"
   echo "Passwordless SSH is configured. Testing..."
   ssh_run "echo OK" >/dev/null
 }
@@ -674,9 +587,7 @@ remote_prepare_dirs() {
   local service_group="${SERVICE_GROUP}"
   ssh_run "set -euo pipefail; \
     mkdir -p \"$install_base\" \"$data_base\" \"$data_base/dn\" \"$data_base/meta\"; \
-    if [ -n \"${SERVICE_USER:-}\" ]; then \
-      chown -R $service_user:$service_group \"$install_base\" \"$data_base\" 2>/dev/null || true; \
-    fi"
+    chown -R $service_user:$service_group \"$install_base\" \"$data_base\" 2>/dev/null || true; "
 }
 
 remote_download_and_extract() {
@@ -700,10 +611,8 @@ remote_download_and_extract() {
     fi; \
     tar -xzf $tgt -C $install_base; echo 'Extracted to <<$install_base/$base_dir>>'; \
     rm -f $link $tgt; ln -s $install_base/$base_dir $link; echo 'Linked <<$link>> to <<$install_base/$base_dir>>'; \
-    if [ -n \"$service_user\" ]; then \
-      echo \"Chowning <<$install_base>> to <<$service_user>>...\" >&2; \
-      chown -R $service_user:$service_group \"$install_base\" 2>/dev/null || true; \
-    fi"
+    echo \"Chowning <<$install_base>> to <<$service_user>>...\" >&2; \
+    chown -R $service_user:$service_group \"$install_base\" 2>/dev/null || true; "
 }
 
 remote_generate_configs() {
