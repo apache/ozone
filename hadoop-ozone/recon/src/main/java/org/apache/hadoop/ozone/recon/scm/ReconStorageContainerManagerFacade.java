@@ -250,7 +250,8 @@ public class ReconStorageContainerManagerFacade
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
-        containerHealthSchemaManager, reconContainerMetadataManager,
+        containerHealthSchemaManager, containerHealthSchemaManagerV2,
+        reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();

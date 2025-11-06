@@ -47,10 +47,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainersV2;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -384,11 +384,11 @@ public class TestReconTasks {
 
     // V2 task should detect MISSING container from SCM
     LambdaTestUtils.await(120000, 6000, () -> {
-      List<UnhealthyContainersV2> allMissingContainers =
+      List<UnhealthyContainerRecordV2> allMissingContainers =
           reconContainerManager.getContainerSchemaManagerV2()
               .getUnhealthyContainers(
                   ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
-                  0L, Optional.empty(), 1000);
+                  0L, 0L, 1000);
       return (allMissingContainers.size() == 1);
     });
 
@@ -396,11 +396,11 @@ public class TestReconTasks {
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
 
     LambdaTestUtils.await(120000, 10000, () -> {
-      List<UnhealthyContainersV2> allMissingContainers =
+      List<UnhealthyContainerRecordV2> allMissingContainers =
           reconContainerManager.getContainerSchemaManagerV2()
               .getUnhealthyContainers(
                   ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
-                  0L, Optional.empty(), 1000);
+                  0L, 0L, 1000);
       return (allMissingContainers.isEmpty());
     });
 
