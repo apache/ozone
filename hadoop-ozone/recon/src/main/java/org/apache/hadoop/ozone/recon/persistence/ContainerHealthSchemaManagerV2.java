@@ -64,47 +64,89 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   /**
-   * Insert or update unhealthy container records in V2 table.
-   * Uses DAO pattern with try-insert-catch-update for Derby compatibility.
+   * Insert or update unhealthy container records in V2 table using TRUE batch insert.
+   * Uses JOOQ's batch API for optimal performance (single SQL statement for all records).
+   * Falls back to individual insert-or-update if batch insert fails (e.g., duplicate keys).
    */
   public void insertUnhealthyContainerRecords(List<UnhealthyContainerRecordV2> recs) {
+    if (recs == null || recs.isEmpty()) {
+      return;
+    }
+
     if (LOG.isDebugEnabled()) {
       recs.forEach(rec -> LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {}",
           rec.getContainerId(), rec.getContainerState()));
     }
 
-    try (Connection connection = containerSchemaDefinitionV2.getDataSource().getConnection()) {
-      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
-      try {
-        for (UnhealthyContainerRecordV2 rec : recs) {
-          UnhealthyContainersV2 jooqRec = new UnhealthyContainersV2(
-              rec.getContainerId(),
-              rec.getContainerState(),
-              rec.getInStateSince(),
-              rec.getExpectedReplicaCount(),
-              rec.getActualReplicaCount(),
-              rec.getReplicaDelta(),
-              rec.getReason());
+    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
 
-          try {
-            unhealthyContainersV2Dao.insert(jooqRec);
-          } catch (DataAccessException dataAccessException) {
-            // Log the error and update the existing record if ConstraintViolationException occurs
-            unhealthyContainersV2Dao.update(jooqRec);
-            LOG.debug("Error while inserting unhealthy container record: {}", rec, dataAccessException);
-          }
+    try {
+      // Try batch insert first (optimal path - single SQL statement)
+      dslContext.transaction(configuration -> {
+        DSLContext txContext = configuration.dsl();
+
+        // Build batch insert using VALUES clause
+        List<UnhealthyContainersV2Record> records = new ArrayList<>();
+        for (UnhealthyContainerRecordV2 rec : recs) {
+          UnhealthyContainersV2Record record = txContext.newRecord(UNHEALTHY_CONTAINERS_V2);
+          record.setContainerId(rec.getContainerId());
+          record.setContainerState(rec.getContainerState());
+          record.setInStateSince(rec.getInStateSince());
+          record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
+          record.setActualReplicaCount(rec.getActualReplicaCount());
+          record.setReplicaDelta(rec.getReplicaDelta());
+          record.setReason(rec.getReason());
+          records.add(record);
         }
-        connection.commit(); // Commit all inserted/updated records
-      } catch (Exception innerException) {
-        connection.rollback(); // Rollback transaction if an error occurs inside processing
-        LOG.error("Transaction rolled back due to error", innerException);
-        throw innerException;
-      } finally {
-        connection.setAutoCommit(true); // Reset auto-commit before the connection is auto-closed
+
+        // Execute true batch insert (single INSERT statement with multiple VALUES)
+        txContext.batchInsert(records).execute();
+      });
+
+      LOG.debug("Batch inserted {} unhealthy container records", recs.size());
+
+    } catch (DataAccessException e) {
+      // Batch insert failed (likely duplicate key) - fall back to insert-or-update per record
+      LOG.warn("Batch insert failed, falling back to individual insert-or-update for {} records",
+          recs.size(), e);
+
+      try (Connection connection = containerSchemaDefinitionV2.getDataSource().getConnection()) {
+        connection.setAutoCommit(false);
+        try {
+          for (UnhealthyContainerRecordV2 rec : recs) {
+            UnhealthyContainersV2 jooqRec = new UnhealthyContainersV2(
+                rec.getContainerId(),
+                rec.getContainerState(),
+                rec.getInStateSince(),
+                rec.getExpectedReplicaCount(),
+                rec.getActualReplicaCount(),
+                rec.getReplicaDelta(),
+                rec.getReason());
+
+            try {
+              unhealthyContainersV2Dao.insert(jooqRec);
+            } catch (DataAccessException insertEx) {
+              // Duplicate key - update existing record
+              unhealthyContainersV2Dao.update(jooqRec);
+            }
+          }
+          connection.commit();
+        } catch (Exception innerEx) {
+          connection.rollback();
+          LOG.error("Transaction rolled back during fallback insert", innerEx);
+          throw innerEx;
+        } finally {
+          connection.setAutoCommit(true);
+        }
+      } catch (Exception fallbackEx) {
+        LOG.error("Failed to insert {} records even with fallback", recs.size(), fallbackEx);
+        throw new RuntimeException("Recon failed to insert " + recs.size() +
+            " unhealthy container records.", fallbackEx);
       }
     } catch (Exception e) {
-      LOG.error("Failed to insert records into {} ", UNHEALTHY_CONTAINERS_V2_TABLE_NAME, e);
-      throw new RuntimeException("Recon failed to insert " + recs.size() + " unhealthy container records.", e);
+      LOG.error("Failed to batch insert records into {}", UNHEALTHY_CONTAINERS_V2_TABLE_NAME, e);
+      throw new RuntimeException("Recon failed to insert " + recs.size() +
+          " unhealthy container records.", e);
     }
   }
 
@@ -139,6 +181,65 @@ public class ContainerHealthSchemaManagerV2 {
       LOG.debug("Deleted {} records for container {} from V2 table", deleted, containerId);
     } catch (Exception e) {
       LOG.error("Failed to delete all states for container {} from V2 table", containerId, e);
+    }
+  }
+
+  /**
+   * Batch delete SCM-tracked states for multiple containers.
+   * This deletes MISSING, UNDER_REPLICATED, OVER_REPLICATED, MIS_REPLICATED
+   * for all containers in the list in a single transaction.
+   * REPLICA_MISMATCH is NOT deleted as it's tracked locally by Recon.
+   *
+   * @param containerIds List of container IDs to delete states for
+   */
+  public void batchDeleteSCMStatesForContainers(List<Long> containerIds) {
+    if (containerIds == null || containerIds.isEmpty()) {
+      return;
+    }
+
+    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    try {
+      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS_V2)
+          .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.in(containerIds))
+          .and(UNHEALTHY_CONTAINERS_V2.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString()))
+          .execute();
+      LOG.debug("Batch deleted {} SCM-tracked state records for {} containers",
+          deleted, containerIds.size());
+    } catch (Exception e) {
+      LOG.error("Failed to batch delete SCM states for {} containers", containerIds.size(), e);
+      throw new RuntimeException("Failed to batch delete SCM states", e);
+    }
+  }
+
+  /**
+   * Batch delete REPLICA_MISMATCH state for multiple containers.
+   * This is separate from batchDeleteSCMStatesForContainers because
+   * REPLICA_MISMATCH is tracked locally by Recon, not by SCM.
+   *
+   * @param containerIds List of container IDs to delete REPLICA_MISMATCH for
+   */
+  public void batchDeleteReplicaMismatchForContainers(List<Long> containerIds) {
+    if (containerIds == null || containerIds.isEmpty()) {
+      return;
+    }
+
+    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    try {
+      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS_V2)
+          .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.in(containerIds))
+          .and(UNHEALTHY_CONTAINERS_V2.CONTAINER_STATE.eq(
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .execute();
+      LOG.debug("Batch deleted {} REPLICA_MISMATCH records for {} containers",
+          deleted, containerIds.size());
+    } catch (Exception e) {
+      LOG.error("Failed to batch delete REPLICA_MISMATCH for {} containers",
+          containerIds.size(), e);
+      throw new RuntimeException("Failed to batch delete REPLICA_MISMATCH", e);
     }
   }
 

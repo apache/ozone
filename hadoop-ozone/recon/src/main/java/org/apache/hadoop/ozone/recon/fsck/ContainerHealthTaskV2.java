@@ -61,6 +61,9 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTaskV2.class);
 
+  // Batch size for database operations - balance between memory and DB roundtrips
+  private static final int DB_BATCH_SIZE = 1000;
+
   private final StorageContainerServiceProvider scmClient;
   private final ContainerManager containerManager;
   private final ContainerHealthSchemaManagerV2 schemaManagerV2;
@@ -141,7 +144,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   /**
    * Part 1: For each container Recon has, sync its health status with SCM.
    * This validates Recon's container superset against SCM's authoritative state.
-   * Process containers in batches to avoid OOM.
+   * Uses batch processing for efficient database operations.
    */
   private void processReconContainersAgainstSCM(long currentTime)
       throws IOException {
@@ -150,8 +153,11 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
     int syncedCount = 0;
     int errorCount = 0;
-    int batchSize = 100; // Process 100 containers at a time
+    int batchSize = 100; // Process 100 containers at a time from Recon
     long startContainerID = 0;
+
+    // Batch accumulator for DB operations
+    BatchOperationAccumulator batchOps = new BatchOperationAccumulator();
 
     while (true) {
       // Get a batch of containers
@@ -177,8 +183,14 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
         try {
           // Sync this container's health status with SCM (source of truth)
-          syncContainerWithSCM(container, currentTime, true);
+          // This collects operations instead of executing immediately
+          syncContainerWithSCMBatched(container, currentTime, true, batchOps);
           syncedCount++;
+
+          // Execute batch if it reached the threshold
+          if (batchOps.shouldFlush()) {
+            batchOps.flush();
+          }
 
         } catch (ContainerNotFoundException e) {
           // Container exists in Recon but not in SCM
@@ -198,6 +210,9 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       startContainerID = lastContainerID + 1;
     }
 
+    // Flush any remaining operations
+    batchOps.flush();
+
     LOG.info("Recon to SCM validation complete: synced={}, errors={}",
         syncedCount, errorCount);
   }
@@ -206,7 +221,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
    * Part 2: Get all CLOSED, QUASI_CLOSED, CLOSING containers from SCM and sync with V2 table.
    * For all containers (both in Recon and not in Recon), sync their health status with SCM.
    * This ensures Recon doesn't miss any unhealthy containers that SCM knows about.
-   * Process containers in batches to avoid OOM.
+   * Uses batch processing for efficient database operations.
    */
   private void processSCMContainersAgainstRecon(long currentTime)
       throws IOException {
@@ -219,6 +234,9 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     int totalProcessed = 0;
     long startId = 0;
     int batchSize = 1000;
+
+    // Batch accumulator for DB operations
+    BatchOperationAccumulator batchOps = new BatchOperationAccumulator();
 
     // Process CLOSED, QUASI_CLOSED, and CLOSING containers from SCM
     HddsProtos.LifeCycleState[] statesToProcess = {
@@ -256,16 +274,21 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
             }
 
             // Sync with SCM regardless of whether container exists in Recon
-            // This ensures V2 table always matches SCM's truth
+            // This collects operations instead of executing immediately
             if (existsInRecon) {
               // Container exists in Recon - sync using Recon's container info (has replicas)
-              syncContainerWithSCM(reconContainer, currentTime, true);
+              syncContainerWithSCMBatched(reconContainer, currentTime, true, batchOps);
             } else {
               // Container missing in Recon - sync using SCM's container info (no replicas available)
-              syncContainerWithSCM(scmContainer, currentTime, false);
+              syncContainerWithSCMBatched(scmContainer, currentTime, false, batchOps);
             }
 
             syncedCount++;
+
+            // Execute batch if it reached the threshold
+            if (batchOps.shouldFlush()) {
+              batchOps.flush();
+            }
 
           } catch (Exception ex) {
             LOG.error("Error syncing container {} from SCM",
@@ -282,225 +305,12 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       LOG.info("Completed processing {} containers from SCM", state);
     }
 
+    // Flush any remaining operations
+    batchOps.flush();
+
     LOG.info("SCM to Recon sync complete: totalProcessed={}, synced={}, " +
         "missingInRecon={}, errors={}",
         totalProcessed, syncedCount, missingInRecon, errorCount);
-  }
-
-  /**
-   * Sync a single container's health status with SCM (single source of truth).
-   * This method queries SCM for the container's health status and updates the V2 table accordingly.
-   *
-   * @param container The container to sync
-   * @param currentTime Current timestamp
-   * @param canAccessReplicas Whether we can access replicas from Recon's containerManager
-   *                          (true if container exists in Recon, false if only in SCM)
-   * @throws IOException if SCM communication fails
-   */
-  private void syncContainerWithSCM(
-      ContainerInfo container,
-      long currentTime,
-      boolean canAccessReplicas) throws IOException {
-
-    // Get SCM's authoritative health status for this container
-    ReplicationManagerReport report = scmClient.checkContainerStatus(container);
-    LOG.debug("Container {} health status from SCM: {}", container.getContainerID(), report);
-
-    // Sync to V2 table based on SCM's report
-    if (canAccessReplicas) {
-      // Container exists in Recon - we can access replicas for accurate counts and REPLICA_MISMATCH check
-      syncContainerHealthToDatabase(container, report, currentTime);
-    } else {
-      // Container doesn't exist in Recon - sync without replica information
-      syncContainerHealthToDatabaseWithoutReplicas(container, report, currentTime);
-    }
-  }
-
-  /**
-   * Sync container health state to V2 database based on SCM's ReplicationManager report.
-   * This version is used when container exists in Recon and we can access replicas.
-   */
-  private void syncContainerHealthToDatabase(
-      ContainerInfo container,
-      ReplicationManagerReport report,
-      long currentTime) throws IOException {
-
-    List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
-    boolean isHealthy = true;
-
-    // Get replicas for building records
-    Set<ContainerReplica> replicas =
-        containerManager.getContainerReplicas(container.containerID());
-    int actualReplicaCount = replicas.size();
-    int expectedReplicaCount = container.getReplicationConfig().getRequiredNodes();
-
-    // Check each health state from SCM's report
-    if (report.getStat(HealthState.MISSING) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MISSING,
-          currentTime, expectedReplicaCount, actualReplicaCount, "Reported by SCM"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.UNDER_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.UNDER_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount, "Reported by SCM"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.OVER_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.OVER_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount, "Reported by SCM"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.MIS_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MIS_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount, "Reported by SCM"));
-      isHealthy = false;
-    }
-
-    // Insert/update unhealthy records
-    if (!recordsToInsert.isEmpty()) {
-      schemaManagerV2.insertUnhealthyContainerRecords(recordsToInsert);
-    }
-
-    // Check REPLICA_MISMATCH locally (SCM doesn't track data checksums)
-    checkAndUpdateReplicaMismatch(container, replicas, currentTime,
-        expectedReplicaCount, actualReplicaCount);
-
-    // If healthy according to SCM and no REPLICA_MISMATCH, remove from V2 table
-    // (except REPLICA_MISMATCH which is handled separately)
-    if (isHealthy) {
-      // Remove SCM-tracked states, but keep REPLICA_MISMATCH if it exists
-      schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-          UnHealthyContainerStates.MISSING);
-      schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-          UnHealthyContainerStates.UNDER_REPLICATED);
-      schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-          UnHealthyContainerStates.OVER_REPLICATED);
-      schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-          UnHealthyContainerStates.MIS_REPLICATED);
-    }
-  }
-
-  /**
-   * Sync container health state to V2 database for containers NOT in Recon.
-   * This version handles containers that only exist in SCM (no replica access).
-   */
-  private void syncContainerHealthToDatabaseWithoutReplicas(
-      ContainerInfo container,
-      ReplicationManagerReport report,
-      long currentTime) {
-
-    List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
-    boolean isHealthy = true;
-
-    // We cannot get replicas from Recon since container doesn't exist
-    int expectedReplicaCount = container.getReplicationConfig().getRequiredNodes();
-    int actualReplicaCount = 0; // Unknown
-
-    // Check each health state from SCM's report
-    if (report.getStat(HealthState.MISSING) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MISSING,
-          currentTime, expectedReplicaCount, actualReplicaCount,
-          "Reported by SCM (container not in Recon)"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.UNDER_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.UNDER_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount,
-          "Reported by SCM (container not in Recon)"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.OVER_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.OVER_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount,
-          "Reported by SCM (container not in Recon)"));
-      isHealthy = false;
-    }
-
-    if (report.getStat(HealthState.MIS_REPLICATED) > 0) {
-      recordsToInsert.add(createRecord(container, UnHealthyContainerStates.MIS_REPLICATED,
-          currentTime, expectedReplicaCount, actualReplicaCount,
-          "Reported by SCM (container not in Recon)"));
-      isHealthy = false;
-    }
-
-    // Insert/update unhealthy records
-    if (!recordsToInsert.isEmpty()) {
-      try {
-        schemaManagerV2.insertUnhealthyContainerRecords(recordsToInsert);
-        LOG.info("Updated V2 table with {} unhealthy states for container {} (not in Recon)",
-            recordsToInsert.size(), container.getContainerID());
-      } catch (Exception e) {
-        LOG.error("Failed to insert unhealthy records for container {} (not in Recon)",
-            container.getContainerID(), e);
-      }
-    }
-
-    // If healthy according to SCM, remove SCM-tracked states from V2 table
-    if (isHealthy) {
-      try {
-        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-            UnHealthyContainerStates.MISSING);
-        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-            UnHealthyContainerStates.UNDER_REPLICATED);
-        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-            UnHealthyContainerStates.OVER_REPLICATED);
-        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-            UnHealthyContainerStates.MIS_REPLICATED);
-      } catch (Exception e) {
-        LOG.warn("Failed to delete healthy container {} records from V2",
-            container.getContainerID(), e);
-      }
-    }
-
-    // Note: REPLICA_MISMATCH is NOT checked here because:
-    // - Container doesn't exist in Recon, so we cannot access replicas
-    // - REPLICA_MISMATCH is Recon-only detection (SCM doesn't track checksums)
-    // - It will be checked when container eventually syncs to Recon
-  }
-
-  /**
-   * Check for REPLICA_MISMATCH locally (SCM doesn't track data checksums).
-   * This compares checksums across replicas to detect data inconsistencies.
-   * ONLY called when container exists in Recon and we can access replicas.
-   */
-  private void checkAndUpdateReplicaMismatch(
-      ContainerInfo container,
-      Set<ContainerReplica> replicas,
-      long currentTime,
-      int expectedReplicaCount,
-      int actualReplicaCount) {
-
-    try {
-      // Check if replicas have mismatched checksums
-      boolean hasMismatch = hasDataChecksumMismatch(replicas);
-
-      if (hasMismatch) {
-        UnhealthyContainerRecordV2 record = createRecord(
-            container,
-            UnHealthyContainerStates.REPLICA_MISMATCH,
-            currentTime,
-            expectedReplicaCount,
-            actualReplicaCount,
-            "Checksum mismatch detected by Recon");
-
-        List<UnhealthyContainerRecordV2> records = new ArrayList<>();
-        records.add(record);
-        schemaManagerV2.insertUnhealthyContainerRecords(records);
-      } else {
-        // No mismatch - remove REPLICA_MISMATCH state if it exists
-        schemaManagerV2.deleteUnhealthyContainer(container.getContainerID(),
-            UnHealthyContainerStates.REPLICA_MISMATCH);
-      }
-
-    } catch (Exception e) {
-      LOG.warn("Error checking replica mismatch for container {}",
-          container.getContainerID(), e);
-    }
   }
 
   /**
@@ -550,5 +360,192 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
         replicaDelta,
         reason
     );
+  }
+
+  /**
+   * Batched version of syncContainerWithSCM - collects operations instead of executing immediately.
+   */
+  private void syncContainerWithSCMBatched(
+      ContainerInfo container,
+      long currentTime,
+      boolean canAccessReplicas,
+      BatchOperationAccumulator batchOps) throws IOException {
+
+    // Get SCM's authoritative health status for this container
+    ReplicationManagerReport report = scmClient.checkContainerStatus(container);
+    LOG.debug("Container {} health status from SCM: {}", container.getContainerID(), report);
+
+    // Collect delete operation for this container's SCM states
+    batchOps.addContainerForSCMStateDeletion(container.getContainerID());
+
+    // Collect insert operations based on SCM's report
+    if (canAccessReplicas) {
+      Set<ContainerReplica> replicas =
+          containerManager.getContainerReplicas(container.containerID());
+      int actualReplicaCount = replicas.size();
+      int expectedReplicaCount = container.getReplicationConfig().getRequiredNodes();
+
+      collectRecordsFromReport(container, report, currentTime,
+          expectedReplicaCount, actualReplicaCount, "Reported by SCM", batchOps);
+
+      // Check REPLICA_MISMATCH locally and add to batch
+      checkAndUpdateReplicaMismatchBatched(container, replicas, currentTime,
+          expectedReplicaCount, actualReplicaCount, batchOps);
+    } else {
+      int expectedReplicaCount = container.getReplicationConfig().getRequiredNodes();
+      int actualReplicaCount = 0;
+
+      collectRecordsFromReport(container, report, currentTime,
+          expectedReplicaCount, actualReplicaCount,
+          "Reported by SCM (container not in Recon)", batchOps);
+    }
+  }
+
+  /**
+   * Check REPLICA_MISMATCH and collect batch operations (batched version).
+   */
+  private void checkAndUpdateReplicaMismatchBatched(
+      ContainerInfo container,
+      Set<ContainerReplica> replicas,
+      long currentTime,
+      int expectedReplicaCount,
+      int actualReplicaCount,
+      BatchOperationAccumulator batchOps) {
+
+    try {
+      // Check if replicas have mismatched checksums
+      boolean hasMismatch = hasDataChecksumMismatch(replicas);
+
+      if (hasMismatch) {
+        // Add REPLICA_MISMATCH record to batch
+        UnhealthyContainerRecordV2 record = createRecord(
+            container,
+            UnHealthyContainerStates.REPLICA_MISMATCH,
+            currentTime,
+            expectedReplicaCount,
+            actualReplicaCount,
+            "Checksum mismatch detected by Recon");
+        batchOps.addRecordForInsertion(record);
+      } else {
+        // No mismatch - collect delete operation for REPLICA_MISMATCH
+        batchOps.addContainerForReplicaMismatchDeletion(container.getContainerID());
+      }
+
+    } catch (Exception e) {
+      LOG.warn("Error checking replica mismatch for container {}",
+          container.getContainerID(), e);
+    }
+  }
+
+  /**
+   * Collect unhealthy container records from SCM's report.
+   */
+  private void collectRecordsFromReport(
+      ContainerInfo container,
+      ReplicationManagerReport report,
+      long currentTime,
+      int expectedReplicaCount,
+      int actualReplicaCount,
+      String reason,
+      BatchOperationAccumulator batchOps) {
+
+    if (report.getStat(HealthState.MISSING) > 0) {
+      batchOps.addRecordForInsertion(createRecord(container,
+          UnHealthyContainerStates.MISSING, currentTime,
+          expectedReplicaCount, actualReplicaCount, reason));
+    }
+
+    if (report.getStat(HealthState.UNDER_REPLICATED) > 0) {
+      batchOps.addRecordForInsertion(createRecord(container,
+          UnHealthyContainerStates.UNDER_REPLICATED, currentTime,
+          expectedReplicaCount, actualReplicaCount, reason));
+    }
+
+    if (report.getStat(HealthState.OVER_REPLICATED) > 0) {
+      batchOps.addRecordForInsertion(createRecord(container,
+          UnHealthyContainerStates.OVER_REPLICATED, currentTime,
+          expectedReplicaCount, actualReplicaCount, reason));
+    }
+
+    if (report.getStat(HealthState.MIS_REPLICATED) > 0) {
+      batchOps.addRecordForInsertion(createRecord(container,
+          UnHealthyContainerStates.MIS_REPLICATED, currentTime,
+          expectedReplicaCount, actualReplicaCount, reason));
+    }
+  }
+
+  /**
+   * Accumulator for batch database operations.
+   * Collects delete and insert operations and flushes them when threshold is reached.
+   */
+  private class BatchOperationAccumulator {
+    private final List<Long> containerIdsForSCMStateDeletion;
+    private final List<Long> containerIdsForReplicaMismatchDeletion;
+    private final List<UnhealthyContainerRecordV2> recordsForInsertion;
+
+    BatchOperationAccumulator() {
+      this.containerIdsForSCMStateDeletion = new ArrayList<>(DB_BATCH_SIZE);
+      this.containerIdsForReplicaMismatchDeletion = new ArrayList<>(DB_BATCH_SIZE);
+      this.recordsForInsertion = new ArrayList<>(DB_BATCH_SIZE);
+    }
+
+    void addContainerForSCMStateDeletion(long containerId) {
+      containerIdsForSCMStateDeletion.add(containerId);
+    }
+
+    void addContainerForReplicaMismatchDeletion(long containerId) {
+      containerIdsForReplicaMismatchDeletion.add(containerId);
+    }
+
+    void addRecordForInsertion(UnhealthyContainerRecordV2 record) {
+      recordsForInsertion.add(record);
+    }
+
+    boolean shouldFlush() {
+      // Flush when any list reaches batch size
+      return containerIdsForSCMStateDeletion.size() >= DB_BATCH_SIZE ||
+          containerIdsForReplicaMismatchDeletion.size() >= DB_BATCH_SIZE ||
+          recordsForInsertion.size() >= DB_BATCH_SIZE;
+    }
+
+    void flush() {
+      if (containerIdsForSCMStateDeletion.isEmpty() &&
+          containerIdsForReplicaMismatchDeletion.isEmpty() &&
+          recordsForInsertion.isEmpty()) {
+        return; // Nothing to flush
+      }
+
+      try {
+        // Execute batch delete for SCM states
+        if (!containerIdsForSCMStateDeletion.isEmpty()) {
+          schemaManagerV2.batchDeleteSCMStatesForContainers(containerIdsForSCMStateDeletion);
+          LOG.info("Batch deleted SCM states for {} containers", containerIdsForSCMStateDeletion.size());
+          containerIdsForSCMStateDeletion.clear();
+        }
+
+        // Execute batch delete for REPLICA_MISMATCH
+        if (!containerIdsForReplicaMismatchDeletion.isEmpty()) {
+          schemaManagerV2.batchDeleteReplicaMismatchForContainers(containerIdsForReplicaMismatchDeletion);
+          LOG.info("Batch deleted REPLICA_MISMATCH for {} containers",
+              containerIdsForReplicaMismatchDeletion.size());
+          containerIdsForReplicaMismatchDeletion.clear();
+        }
+
+        // Execute batch insert
+        if (!recordsForInsertion.isEmpty()) {
+          schemaManagerV2.insertUnhealthyContainerRecords(recordsForInsertion);
+          LOG.info("Batch inserted {} unhealthy container records", recordsForInsertion.size());
+          recordsForInsertion.clear();
+        }
+
+      } catch (Exception e) {
+        LOG.error("Failed to flush batch operations", e);
+        // Clear lists to avoid retrying bad data
+        containerIdsForSCMStateDeletion.clear();
+        containerIdsForReplicaMismatchDeletion.clear();
+        recordsForInsertion.clear();
+        throw new RuntimeException("Batch operation failed", e);
+      }
+    }
   }
 }
