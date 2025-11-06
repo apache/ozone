@@ -197,9 +197,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) throws IOException {
-    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager());
-    boolean isFilesystemSnapshotEnabled =
-        ozoneManager.isFilesystemSnapshotEnabled();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager(),
+        omMetadataManager.getSnapshotChainManager(), ozoneManager.getConfiguration());
+    boolean isFilesystemSnapshotEnabled = ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
         isFilesystemSnapshotEnabled ? "enabled" : "disabled");
 
@@ -345,6 +346,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
+  public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
+      UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      return true;
+    }
+    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
+  }
+
   /**
    * Help reject OM startup if snapshot feature is disabled
    * but there are snapshots remaining in this OM. Note: snapshots that are
@@ -473,6 +484,14 @@ public final class OmSnapshotManager implements AutoCloseable {
   @VisibleForTesting
   public int getSnapshotCacheSize() {
     return snapshotCache == null ? 0 : snapshotCache.size();
+  }
+
+  /**
+   * Get snapshot cache instance.
+   * @return snapshotCache.
+   */
+  public SnapshotCache getSnapshotCache() {
+    return snapshotCache;
   }
 
   /**

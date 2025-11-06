@@ -178,10 +178,6 @@ public class SnapshotDefragService extends BackgroundService
     public BackgroundTaskResult call() throws Exception {
       // Check OM leader and readiness
       if (shouldRun()) {
-        final long count = runCount.incrementAndGet();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Initiating Snapshot Defragmentation Task: run # {}", count);
-        }
         triggerSnapshotDefragOnce();
       }
 
@@ -190,6 +186,12 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   public synchronized boolean triggerSnapshotDefragOnce() throws IOException {
+
+    final long count = runCount.incrementAndGet();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initiating Snapshot Defragmentation Task: run # {}", count);
+    }
+
     // Check if rocks-tools native lib is available
     if (!isRocksToolsNativeLibAvailable()) {
       LOG.warn("Rocks-tools native library is not available. " +
