@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 
 /**
- * Class defining Safe mode exit when SCM State Machine is ready, ie all transaction is applied
+ * Class defining Safe mode exit when SCM State Machine is ready, ie all transaction is applied.
  */
 public class StateMachineReadyRule extends SafeModeExitRule<Boolean> {
   private SCMStateMachine scmStateMachine = null;
