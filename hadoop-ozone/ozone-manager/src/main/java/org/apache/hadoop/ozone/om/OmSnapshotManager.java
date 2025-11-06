@@ -196,9 +196,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) throws IOException {
-    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager());
-    boolean isFilesystemSnapshotEnabled =
-        ozoneManager.isFilesystemSnapshotEnabled();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager(),
+        omMetadataManager.getSnapshotChainManager(), ozoneManager.getConfiguration());
+    boolean isFilesystemSnapshotEnabled = ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
         isFilesystemSnapshotEnabled ? "enabled" : "disabled");
 
@@ -342,6 +343,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       this.snapshotDiffCleanupService = null;
     }
+  }
+
+  public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
+      UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      return true;
+    }
+    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
   }
 
   /**
