@@ -124,7 +124,10 @@ authorize subsequent S3 API calls that use the sessionToken.
 
 In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in RocksDB will be created
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
-will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.
+will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.  The
+input parameter for the command-line utility will be the accessKeyId of the temporary token - this value is returned in
+plain text as a result of the AssumeRole call (mentioned above).  In this way, specific STS tokens can be revoked as opposed 
+to all tokens.  Furthermore, AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
 
 ## 3.6 Prerequisites
 
