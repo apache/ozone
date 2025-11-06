@@ -486,6 +486,14 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
+   * Get snapshot cache instance.
+   * @return snapshotCache.
+   */
+  public SnapshotCache getSnapshotCache() {
+    return snapshotCache;
+  }
+
+  /**
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateCache() {
