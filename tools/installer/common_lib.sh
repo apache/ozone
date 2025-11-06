@@ -449,6 +449,7 @@ install_ssh_key() {
       if ! grep -qsF \"$pub_key_content\" ~/.ssh/authorized_keys 2>/dev/null; then \
         echo \"$pub_key_content\" >> ~/.ssh/authorized_keys; \
       fi" >/dev/null 2>&1 || true
+    deduplicate_authorized_keys "$TARGET_USER"
   else
     if [[ -n "$priv_key_path" ]]; then
       # Cluster key: install both private and public keys for multiple users
@@ -471,18 +472,6 @@ install_ssh_key() {
           if ! grep -qsF \"\$PUB_KEY\" \"\$ssh_dir/authorized_keys\" 2>/dev/null; then \
             echo \"\$PUB_KEY\" >> \"\$ssh_dir/authorized_keys\"; \
           fi; \
-          # Deduplicate authorized_keys (remove keys with same type and data, ignoring comments)
-          awk '{ \
-            match(\$0, /^[^ ]* +([^ ]+)/, arr); \
-            if (arr[1] != \"\") { \
-              key = \$1 \" \" arr[1]; \
-              if (!seen[key]++) print; \
-            } else { \
-              print; \
-            } \
-          }' \"\$ssh_dir/authorized_keys\" > \"\$ssh_dir/authorized_keys.tmp\" 2>/dev/null && \
-          mv -f \"\$ssh_dir/authorized_keys.tmp\" \"\$ssh_dir/authorized_keys\" && \
-          chmod 600 \"\$ssh_dir/authorized_keys\" || true; \
           cp -f $tmp_priv \"\$ssh_dir/id_ed25519\"; \
           cp -f $tmp_pub  \"\$ssh_dir/id_ed25519.pub\"; \
           chmod 600 \"\$ssh_dir/id_ed25519\"; \
@@ -502,6 +491,11 @@ install_ssh_key() {
           install_for_user \"$service_user\"; \
         fi; \
         rm -f $tmp_priv $tmp_pub"
+      # Deduplicate authorized_keys for both users using helper function
+      deduplicate_authorized_keys "$TARGET_USER"
+      if [[ -n "$service_user" && "$service_user" != "$TARGET_USER" ]]; then
+        deduplicate_authorized_keys "$service_user"
+      fi
     else
       # Installer key: only add public key to authorized_keys
       local tmp_pub="/tmp/.ozone_key.pub"
@@ -512,6 +506,7 @@ install_ssh_key() {
           cat $tmp_pub >> ~/.ssh/authorized_keys; \
         fi; \
         rm -f $tmp_pub"
+      deduplicate_authorized_keys "$TARGET_USER"
     fi
   fi
 }

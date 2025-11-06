@@ -73,9 +73,9 @@ Options:
   -d, --data-dir <path>             Data Root Directory on host (default: $DEFAULT_DATA_BASE)
   -s, --start                       Initialize and start single-node Ozone after install
   # Mode selection is automatic: HA if >=3 hosts provided (via -H or role-file), single-node otherwise
-  -R, --role-file <filename>       Role file filename (path derived from --config-dir, required for HA)
-  -J, --jdk-version <17|21>         JDK major version to install and set (default: 17)
-  -C, --config-dir <path>           Local dir with ozone-site.xml, core-site.xml, ozone-env.sh, and role file (default: script_dir/configs/unsecure/single or ha)
+  -r, --role-file <filename>       Role file filename (path derived from --config-dir, required for HA)
+  -j, --jdk-version <17|21>         JDK major version to install and set (default: 17)
+  -c, --config-dir <path>           Local dir with ozone-site.xml, core-site.xml, ozone-env.sh, and role file (default: script_dir/configs/unsecure/single or ha)
   -x, --clean                       Cleanup install and data directories before install
   -l --ssh-user <user>             SSH username (overrides user@ in host)
   -S, --use-sudo                     Run remote commands via sudo
@@ -91,7 +91,7 @@ Examples:
   # HA with brace expansion: installer-{1..10}.domain expands to installer-1.domain,...,installer-10.domain
   $SCRIPT_NAME -H "installer-{1..10}.domain" -m key -k ~/.ssh/id_rsa -v 2.0.0
   # HA with roles mapping from YAML (om/scm/datanodes lists)
-  $SCRIPT_NAME -M ha -C ./configs -R cluster.yaml -m key -k ~/.ssh/id_rsa -v 2.0.0
+  $SCRIPT_NAME -c ./configs -r cluster.yaml -m key -k ~/.ssh/id_rsa -v 2.0.0
 EOF
 }
 
@@ -119,11 +119,11 @@ parse_args() {
         START_AFTER_INSTALL="yes"; shift 1 ;;
       -M|--cluster-mode)
         CLUSTER_MODE="$2"; shift 2 ;;
-      -R|--role-file)
+      -r|--role-file)
         ROLE_FILE="$(basename "$2")"; shift 2 ;;
-      -J|--jdk-version)
+      -j|--jdk-version)
         JDK_MAJOR="$2"; JDK_SET="yes"; shift 2 ;;
-      -C|--config-dir)
+      -c|--config-dir)
         CONFIG_DIR="$2"; shift 2 ;;
       -x|--clean)
         CLEAN_MODE="yes"; CLEAN_MODE_SET="yes"; shift 1 ;;
