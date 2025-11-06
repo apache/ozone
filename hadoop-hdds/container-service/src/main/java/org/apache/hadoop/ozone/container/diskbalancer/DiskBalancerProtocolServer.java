@@ -29,15 +29,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatu
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Server-side implementation of {@link DiskBalancerProtocol} for datanodes.
  */
 public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
 
-  private static final Logger LOG = LoggerFactory.getLogger(DiskBalancerProtocolServer.class);
+  private final DatanodeStateMachine datanodeStateMachine;
+  private final PrivilegedOperation adminChecker;
 
   /**
    * Functional interface for checking admin privileges before executing operations.
@@ -52,9 +51,6 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
      */
     void check(String operation) throws IOException;
   }
-
-  private final DatanodeStateMachine datanodeStateMachine;
-  private final PrivilegedOperation adminChecker;
 
   public DiskBalancerProtocolServer(DatanodeStateMachine datanodeStateMachine,
       PrivilegedOperation adminChecker) {

@@ -76,12 +76,11 @@ public class TestHeartbeatEndpointTask {
       new InetSocketAddress("test-scm-1", 9861);
 
   private DatanodeStateMachine datanodeStateMachine;
-  private OzoneContainer container;
 
   @BeforeEach
   public void setup() {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
-    container = mock(OzoneContainer.class);
+    OzoneContainer container = mock(OzoneContainer.class);
     when(datanodeStateMachine.getContainer()).thenReturn(container);
     PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
     when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());
