@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -175,7 +176,7 @@ public class ContainerOperationClient implements ScmClient {
    * @throws IOException
    */
   public void createContainer(XceiverClientSpi client,
-      long containerId) throws IOException {
+                              long containerId) throws IOException {
     String encodedToken = getEncodedContainerToken(containerId);
 
     ContainerProtocolCalls.createContainer(client, containerId, encodedToken);
@@ -184,7 +185,7 @@ public class ContainerOperationClient implements ScmClient {
     // creation state.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created container {} machines {}", containerId,
-              client.getPipeline().getNodes());
+          client.getPipeline().getNodes());
     }
   }
 
@@ -199,7 +200,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, String owner) throws IOException {
+                                               HddsProtos.ReplicationFactor factor, String owner) throws IOException {
     ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
     return createContainer(replicationConfig, owner);
@@ -210,7 +211,7 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      ContainerWithPipeline containerWithPipeline = 
+      ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.allocateContainer(replicationConfig, owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
@@ -259,14 +260,14 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
-      int endHours, boolean force) throws IOException {
+                                                        int endHours, boolean force) throws IOException {
     return storageContainerLocationClient.startMaintenanceNodes(
         hosts, endHours, force);
   }
 
   @Override
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
+                                            HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
     return storageContainerLocationClient.createReplicationPipeline(type,
         factor, nodePool);
@@ -317,7 +318,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public void deleteContainer(long containerId, Pipeline pipeline,
-      boolean force) throws IOException {
+                              boolean force) throws IOException {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
@@ -348,7 +349,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public ContainerListResult listContainer(long startContainerID,
-      int count) throws IOException {
+                                           int count) throws IOException {
     if (count > maxCountOfContainerList) {
       LOG.warn("Attempting to list {} containers. However, this exceeds" +
           " the cluster's current limit of {}. The results will be capped at the" +
@@ -361,9 +362,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public ContainerListResult listContainer(long startContainerID,
-      int count, HddsProtos.LifeCycleState state,
-      HddsProtos.ReplicationType repType,
-      ReplicationConfig replicationConfig) throws IOException {
+                                           int count, HddsProtos.LifeCycleState state,
+                                           HddsProtos.ReplicationType repType,
+                                           ReplicationConfig replicationConfig) throws IOException {
     if (count > maxCountOfContainerList) {
       LOG.warn("Attempting to list {} containers. However, this exceeds" +
           " the cluster's current limit of {}. The results will be capped at the" +
@@ -376,7 +377,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public ContainerDataProto readContainer(long containerID,
-      Pipeline pipeline) throws IOException {
+                                          Pipeline pipeline) throws IOException {
     XceiverClientManager clientManager = getXceiverClientManager();
     String encodedToken = getEncodedContainerToken(containerID);
     XceiverClientSpi client = null;
@@ -396,8 +397,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  public Map<DatanodeDetails, ReadContainerResponseProto>
-      readContainerFromAllNodes(long containerID, Pipeline pipeline)
+  public Map<DatanodeDetails, ReadContainerResponseProto> readContainerFromAllNodes(long containerID, Pipeline pipeline)
       throws IOException, InterruptedException {
     XceiverClientManager clientManager = getXceiverClientManager();
     String encodedToken = getEncodedContainerToken(containerID);
@@ -434,8 +434,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<ContainerReplicaInfo>
-      getContainerReplicas(long containerId) throws IOException {
+  public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
             ClientVersion.CURRENT_VERSION);
@@ -551,19 +550,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      long startTxId) throws IOException {
-    return storageContainerLocationClient.getFailedDeletedBlockTxn(count,
-        startTxId);
-  }
-
-  @Override
-  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
-    return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
-  }
-
-  @Override
-  public HddsProtos.DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
     return storageContainerLocationClient.getDeletedBlockSummary();
   }
 

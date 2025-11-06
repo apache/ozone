@@ -24,9 +24,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -56,18 +56,15 @@ public class DeletedBlockLogStateManagerImpl
   private ContainerManager containerManager;
   private final SCMHADBTransactionBuffer transactionBuffer;
   private final Set<Long> deletingTxIDs;
-  private final Set<Long> skippingRetryTxIDs;
   public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
-  public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
-             Table<Long, DeletedBlocksTransaction> deletedTable,
+  public DeletedBlockLogStateManagerImpl(Table<Long, DeletedBlocksTransaction> deletedTable,
              Table<String, ByteString> statefulServiceConfigTable,
              ContainerManager containerManager, SCMHADBTransactionBuffer txBuffer) {
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
-    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
     this.statefulConfigTable = statefulServiceConfigTable;
   }
 
@@ -273,17 +270,11 @@ public class DeletedBlockLogStateManagerImpl
    * Builder for ContainerStateManager.
    */
   public static class Builder {
-    private ConfigurationSource conf;
     private SCMRatisServer scmRatisServer;
     private Table<Long, DeletedBlocksTransaction> deletedBlocksTransactionTable;
     private SCMHADBTransactionBuffer transactionBuffer;
     private ContainerManager containerManager;
     private Table<String, ByteString> statefulServiceConfigTable;
-
-    public Builder setConfiguration(final ConfigurationSource config) {
-      conf = config;
-      return this;
-    }
 
     public Builder setRatisServer(final SCMRatisServer ratisServer) {
       scmRatisServer = ratisServer;
@@ -312,11 +303,10 @@ public class DeletedBlockLogStateManagerImpl
     }
 
     public DeletedBlockLogStateManager build() throws IOException {
-      Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(deletedBlocksTransactionTable);
 
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
-          conf, deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
+          deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
       return scmRatisServer.getProxyHandler(RequestType.BLOCK,
           DeletedBlockLogStateManager.class, impl);

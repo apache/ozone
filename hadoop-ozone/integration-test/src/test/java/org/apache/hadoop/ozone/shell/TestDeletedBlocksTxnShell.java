@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.shell;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,8 +32,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -54,8 +50,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.admin.scm.GetDeletedBlockSummarySubcommand;
-import org.apache.hadoop.ozone.admin.scm.GetFailedDeletedBlocksTxnSubcommand;
-import org.apache.hadoop.ozone.admin.scm.ResetDeletedBlockRetryCountSubcommand;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +57,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 
 /**
  * Test for DeletedBlocksTxnSubcommand Cli.
@@ -77,8 +70,6 @@ public class TestDeletedBlocksTxnShell {
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String scmServiceId;
-  private File txnFile;
   private int numOfSCMs = 3;
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
@@ -97,9 +88,7 @@ public class TestDeletedBlocksTxnShell {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    scmServiceId = "scm-service-test1";
-
-    conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
+    String scmServiceId = "scm-service-test1";
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(scmServiceId)
@@ -109,7 +98,7 @@ public class TestDeletedBlocksTxnShell {
         .build();
     cluster.waitForClusterToBeReady();
 
-    txnFile = tempDir.resolve("txn.txt").toFile();
+    File txnFile = tempDir.resolve("txn.txt").toFile();
     LOG.info("txnFile path: {}", txnFile.getAbsolutePath());
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
   }
@@ -178,113 +167,6 @@ public class TestDeletedBlocksTxnShell {
   private void flush() throws Exception {
     // only flush leader here, avoid the follower concurrent flush and write
     getSCMLeader().getScmHAManager().asSCMHADBTransactionBuffer().flush();
-  }
-  
-  @Test
-  public void testDeletedBlocksTxnSubcommand() throws Exception {
-    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
-    int currentValidTxnNum;
-    // add 30 block deletion transactions
-    DeletedBlockLog deletedBlockLog = getSCMLeader().
-        getScmBlockManager().getDeletedBlockLog();
-    deletedBlockLog.addTransactions(generateData(30));
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(30, currentValidTxnNum);
-
-    // let the first 20 txns be failed
-    List<Long> txIds = new ArrayList<>();
-    for (int i = 1; i < 21; i++) {
-      txIds.add((long) i);
-    }
-    // increment retry count than threshold, count will be set to -1
-    for (int i = 0; i < maxRetry + 1; i++) {
-      deletedBlockLog.incrementCount(txIds);
-    }
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(10, currentValidTxnNum);
-
-    ContainerOperationClient scmClient = new ContainerOperationClient(conf);
-    CommandLine cmd;
-    // getFailedDeletedBlocksTxn cmd will print all the failed txns
-    GetFailedDeletedBlocksTxnSubcommand getCommand =
-        new GetFailedDeletedBlocksTxnSubcommand();
-    cmd = new CommandLine(getCommand);
-    cmd.parseArgs("-a");
-    getCommand.execute(scmClient);
-    int matchCount = 0;
-    Pattern p = Pattern.compile("\"txID\" : \\d+", Pattern.MULTILINE);
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    while (m.find()) {
-      matchCount += 1;
-    }
-    assertEquals(20, matchCount);
-
-    // print the first 10 failed txns info into file
-    cmd.parseArgs("-o", txnFile.getAbsolutePath(), "-c", "10");
-    getCommand.execute(scmClient);
-    assertThat(txnFile).exists();
-
-    ResetDeletedBlockRetryCountSubcommand resetCommand =
-        new ResetDeletedBlockRetryCountSubcommand();
-    cmd = new CommandLine(resetCommand);
-
-    // reset the txns in file
-    cmd.parseArgs("-i", txnFile.getAbsolutePath());
-    resetCommand.execute(scmClient);
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(20, currentValidTxnNum);
-
-    // reset the given txIds list
-    cmd.parseArgs("-l", "11,12,13,14,15");
-    resetCommand.execute(scmClient);
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(25, currentValidTxnNum);
-
-    // reset the non-existing txns and valid txns, should do nothing
-    cmd.parseArgs("-l", "1,2,3,4,5,100,101,102,103,104,105");
-    resetCommand.execute(scmClient);
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(25, currentValidTxnNum);
-
-    // reset all the result expired txIds, all transactions should be available
-    cmd.parseArgs("-a");
-    resetCommand.execute(scmClient);
-    flush();
-    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
-    LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    assertEquals(30, currentValidTxnNum);
-
-    // Fail first 20 txns be failed
-    // increment retry count than threshold, count will be set to -1
-    for (int i = 0; i < maxRetry + 1; i++) {
-      deletedBlockLog.incrementCount(txIds);
-    }
-    flush();
-
-    GetFailedDeletedBlocksTxnSubcommand getFailedBlockCommand =
-        new GetFailedDeletedBlocksTxnSubcommand();
-    outContent.reset();
-    cmd = new CommandLine(getFailedBlockCommand);
-    // set start transaction as 15
-    cmd.parseArgs("-c", "5", "-s", "15");
-    getFailedBlockCommand.execute(scmClient);
-    matchCount = 0;
-    p = Pattern.compile("\"txID\" : \\d+", Pattern.MULTILINE);
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    while (m.find()) {
-      matchCount += 1;
-    }
-    assertEquals(5, matchCount);
   }
 
   @Test

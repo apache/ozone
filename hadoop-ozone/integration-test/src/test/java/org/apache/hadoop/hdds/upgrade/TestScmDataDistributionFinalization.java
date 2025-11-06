@@ -141,7 +141,8 @@ public class TestScmDataDistributionFinalization {
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(), scmClient.getScmInfo().getMetaDataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // Create Volume and Bucket
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
@@ -189,8 +190,8 @@ public class TestScmDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -328,8 +329,8 @@ public class TestScmDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion(),
-        scmClient.getScmInfo().getMetaDataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION.layoutVersion(),
+        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
@@ -353,7 +354,6 @@ public class TestScmDataDistributionFinalization {
     String value = "sample value";
     TestDataUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
     // update scmInfo in OM
-    cluster.getOzoneManager().setScmInfo(activeSCM.getBlockProtocolServer().getScmInfo());
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     // delete the key
     bucket.deleteKey(keyName);

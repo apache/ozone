@@ -455,7 +455,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     if (txList.isEmpty()) {
       return;
     }
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
       for (DeletedBlocksTransaction tx: txList) {
         if (tx.hasTotalBlockSize()) {
@@ -485,7 +485,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     if (txIDs.isEmpty()) {
       return;
     }
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
       ArrayList<Long> txToQueryList = new ArrayList<>();
       for (Long txID: txIDs) {
@@ -693,7 +693,7 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   @Nullable
   public DeletedBlocksTransactionSummary getTransactionSummary() {
-    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION)) {
       return null;
     }
     return DeletedBlocksTransactionSummary.newBuilder()
@@ -706,7 +706,7 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   private void initDataDistributionData() throws IOException {
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION)) {
       DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
       if (summary != null) {
         isFirstTxIdForDataDistributionSet = true;
@@ -719,7 +719,7 @@ public class SCMDeletedBlockTransactionStatusManager {
             totalBlockCount.get(), totalBlocksSize.get(), firstTxIdForDataDistribution);
       }
     } else {
-      LOG.info(HDDSLayoutFeature.DATA_DISTRIBUTION + " is not finalized");
+      LOG.info(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION + " is not finalized");
     }
   }
 
