@@ -241,6 +241,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
   private static GenericTestUtils.PrintStreamCapturer output;
+  private static final BucketLayout VERSIONING_TEST_BUCKET_LAYOUT =
+      BucketLayout.OBJECT_STORE;
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
@@ -4604,9 +4606,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
 
   }
-
-  private static final BucketLayout VERSIONING_TEST_BUCKET_LAYOUT =
-      BucketLayout.OBJECT_STORE;
 
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
