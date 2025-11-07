@@ -4637,8 +4637,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
+    // Get actual bucket layout from the bucket itself to avoid mismatch
+    String bucketKey = cluster.getOzoneManager().getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+    BucketLayout actualLayout = cluster.getOzoneManager().getMetadataManager()
+        .getBucketTable().get(bucketKey).getBucketLayout();
+    
     OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable(getBucketLayout()).get(
+        .getKeyTable(actualLayout).get(
             cluster.getOzoneManager().getMetadataManager()
                 .getOzoneKey(volumeName, bucketName, keyName));
 
@@ -4650,13 +4656,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
+      // Wait for deleted key to become visible in deletedTable
+      String ozoneKey = cluster.getOzoneManager().getMetadataManager()
+          .getOzoneKey(volumeName, bucketName, keyName);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+        List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+            = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+            .getRangeKVs(null, 100, ozoneKey);
+        return !rangeKVs.isEmpty();
+      }, 100, 60000);
+
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-          .getRangeKVs(null, 100,
-              cluster.getOzoneManager().getMetadataManager()
-              .getOzoneKey(volumeName, bucketName, keyName));
+          .getRangeKVs(null, 100, ozoneKey);
 
-      assertThat(rangeKVs.size()).isGreaterThan(0);
+      assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
