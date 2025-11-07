@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -347,7 +348,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneConfiguration conf = getConf();
 
     Set<Path> snapshotPaths = new HashSet<>();
-
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     // get snapshotInfo entries
     OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
@@ -359,11 +361,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
-        Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        if (waitForDir) {
-          waitForDirToExist(path);
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+                 snapshotLocalDataManager.getOmSnapshotLocalDataMeta(entry.getValue())) {
+          Path path = Paths.get(getSnapshotPath(conf, entry.getValue(), snapMetaProvider.getMeta().getVersion()));
+          if (waitForDir) {
+            waitForDirToExist(path);
+          }
+          snapshotPaths.add(path);
         }
-        snapshotPaths.add(path);
       }
     } finally {
       checkpointMetadataManager.stop();

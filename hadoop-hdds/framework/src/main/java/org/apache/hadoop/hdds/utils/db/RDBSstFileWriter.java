@@ -28,7 +28,7 @@ import org.rocksdb.RocksDBException;
 /**
  * DumpFileWriter using rocksdb sst files.
  */
-class RDBSstFileWriter implements Closeable {
+public class RDBSstFileWriter implements Closeable {
 
   private ManagedSstFileWriter sstFileWriter;
   private File sstFile;
@@ -36,7 +36,7 @@ class RDBSstFileWriter implements Closeable {
   private ManagedOptions emptyOption = new ManagedOptions();
   private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
 
-  RDBSstFileWriter(File externalFile) throws RocksDatabaseException {
+  public RDBSstFileWriter(File externalFile) throws RocksDatabaseException {
     this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
     this.sstFile = externalFile;
@@ -57,6 +57,17 @@ class RDBSstFileWriter implements Closeable {
       closeOnFailure();
       throw new RocksDatabaseException("Failed to put key (length=" + key.length
           + ") and value (length=" + value.length + "), sstFile=" + sstFile.getAbsolutePath(), e);
+    }
+  }
+
+  public void delete(byte[] key) throws RocksDatabaseException {
+    try {
+      sstFileWriter.delete(key);
+      keyCounter.incrementAndGet();
+    } catch (RocksDBException e) {
+      closeOnFailure();
+      throw new RocksDatabaseException("Failed to delete key (length=" + key.length
+          + "), sstFile=" + sstFile.getAbsolutePath(), e);
     }
   }
 

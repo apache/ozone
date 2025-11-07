@@ -195,6 +195,21 @@ public class TestOmAcls {
   }
 
   @Test
+  public void testGetFileStatusPermissionDenied() throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    TestDataUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8));
+
+    authorizer.keyAclAllow = false;
+    OMException exception = assertThrows(OMException.class,
+            () -> bucket.getFileStatus("testKey"));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have READ " +
+            "permission to access key");
+    verifyAuditLog(OMAction.GET_FILE_STATUS, AuditEventStatus.FAILURE);
+  }
+
+  @Test
   public void testSetACLPermissionDenied() throws Exception {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 

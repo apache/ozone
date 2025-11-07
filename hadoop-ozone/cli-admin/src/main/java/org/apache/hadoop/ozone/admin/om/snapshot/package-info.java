@@ -15,5 +15,7 @@
  * limitations under the License.
  */
 
-/** SCM protocol related interfaces. */
-package org.apache.hadoop.hdds.scm.protocol;
+/**
+ * Command line for Ozone Manager snapshot operations.
+ */
+package org.apache.hadoop.ozone.admin.om.snapshot;

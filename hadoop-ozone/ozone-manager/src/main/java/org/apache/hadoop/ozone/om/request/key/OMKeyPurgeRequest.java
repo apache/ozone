@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,15 +35,19 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketPurgeKeysSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -91,11 +97,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
         UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
-        if (!validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-            expectedPreviousSnapshotId)) {
-          return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
-              new OMException("Snapshot validation failed", OMException.ResultCodes.INVALID_REQUEST)));
-        }
+        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId);
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);
@@ -121,9 +124,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       OMException oe = new OMException("No keys found to be purged or renamed in the request.",
           OMException.ResultCodes.KEY_DELETION_ERROR);
-      if (LOG.isDebugEnabled()) {
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
-      }
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
 
@@ -140,6 +141,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // last purge transaction when running for AOS
         deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
+      List<OmBucketInfo> bucketInfoList = updateBucketSize(purgeKeysRequest.getBucketPurgeKeysSizeList(),
+          omMetadataManager);
+
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
         if (fromSnapshotInfo != null) {
@@ -155,15 +159,60 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         }
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
       }
+      return new OMKeyPurgeResponse(omResponse.build(), keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo,
+          keysToUpdateList, bucketInfoList);
     } catch (IOException e) {
-      if (LOG.isDebugEnabled()) {
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
-      }
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
-
-    return new OMKeyPurgeResponse(omResponse.build(),
-        keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList);
   }
 
+  private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,
+      OMMetadataManager omMetadataManager) throws OMException {
+    Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = new HashMap<>();
+    List<String[]> bucketKeyList = new ArrayList<>();
+    for (BucketPurgeKeysSize bucketPurgeKey : bucketPurgeKeysSizeList) {
+      String volumeName = bucketPurgeKey.getBucketNameInfo().getVolumeName();
+      String bucketName = bucketPurgeKey.getBucketNameInfo().getBucketName();
+      bucketPurgeKeysSizes.computeIfAbsent(volumeName, k -> new HashMap<>())
+          .computeIfAbsent(bucketName, k -> {
+            bucketKeyList.add(new String[]{volumeName, bucketName});
+            return new ArrayList<>();
+          }).add(bucketPurgeKey);
+    }
+    mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketKeyList));
+    boolean acquiredLock = getOmLockDetails().isLockAcquired();
+    if (!acquiredLock) {
+      throw new OMException("Failed to acquire bucket lock for purging keys.",
+          OMException.ResultCodes.KEY_DELETION_ERROR);
+    }
+    List<OmBucketInfo> bucketInfoList = new ArrayList<>();
+    try {
+      for (Map.Entry<String, Map<String, List<BucketPurgeKeysSize>>> volEntry : bucketPurgeKeysSizes.entrySet()) {
+        String volumeName = volEntry.getKey();
+        for (Map.Entry<String, List<BucketPurgeKeysSize>> bucketEntry : volEntry.getValue().entrySet()) {
+          String bucketName = bucketEntry.getKey();
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+          // Check null if bucket has been deleted.
+          if (omBucketInfo != null) {
+            boolean bucketUpdated = false;
+            for (BucketPurgeKeysSize bucketPurgeKeysSize : bucketEntry.getValue()) {
+              BucketNameInfo bucketNameInfo = bucketPurgeKeysSize.getBucketNameInfo();
+              if (bucketNameInfo.getBucketId() == omBucketInfo.getObjectID()) {
+                omBucketInfo.purgeSnapshotUsedBytes(bucketPurgeKeysSize.getPurgedBytes());
+                omBucketInfo.purgeSnapshotUsedNamespace(bucketPurgeKeysSize.getPurgedNamespace());
+                bucketUpdated = true;
+              }
+            }
+            if (bucketUpdated) {
+              bucketInfoList.add(omBucketInfo.copyObject());
+            }
+          }
+        }
+      }
+      return bucketInfoList;
+    } finally {
+      mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketKeyList));
+    }
+  }
 }

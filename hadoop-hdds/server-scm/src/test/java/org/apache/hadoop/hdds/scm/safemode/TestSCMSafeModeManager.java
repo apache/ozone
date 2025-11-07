@@ -246,7 +246,6 @@ public class TestSCMSafeModeManager {
         Arguments.of(100, 30, 8, 0.90, 1),
         Arguments.of(100, 90, 22, 0.10, 0.9),
         Arguments.of(100, 30, 8, 0, 0.9),
-        Arguments.of(100, 90, 22, 0, 0),
         Arguments.of(100, 90, 22, 0, 0.5)
     );
   }

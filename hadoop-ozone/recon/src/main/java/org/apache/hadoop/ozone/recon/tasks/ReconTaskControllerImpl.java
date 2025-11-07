@@ -50,14 +50,19 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.types.NamedCallableTask;
 import org.apache.hadoop.ozone.recon.tasks.types.TaskExecutionException;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +77,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final ReconDBProvider reconDBProvider;
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconGlobalStatsManager reconGlobalStatsManager;
+  private final ReconFileMetadataManager reconFileMetadataManager;
 
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
@@ -82,7 +89,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final AtomicBoolean tasksFailed = new AtomicBoolean(false);
   private volatile ReconOMMetadataManager currentOMMetadataManager;
   private final OzoneConfiguration configuration;
-  
+
+  // Metrics
+  private final ReconTaskControllerMetrics controllerMetrics;
+  private final ReconTaskMetrics taskMetrics;
+
   // Retry logic for event processing failures
   private AtomicInteger eventProcessRetryCount = new AtomicInteger(0);
   private AtomicLong lastRetryTimestamp = new AtomicLong(0);
@@ -90,23 +101,33 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
                                  Set<ReconOmTask> tasks,
                                  ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
                                  ReconDBProvider reconDBProvider,
                                  ReconContainerMetadataManager reconContainerMetadataManager,
-                                 ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+                                 ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                 ReconGlobalStatsManager reconGlobalStatsManager,
+                                 ReconFileMetadataManager reconFileMetadataManager) {
     this.configuration = configuration;
     this.reconDBProvider = reconDBProvider;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
+    this.reconFileMetadataManager = reconFileMetadataManager;
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
+
+    // Initialize metrics
+    this.controllerMetrics = ReconTaskControllerMetrics.create();
+    this.taskMetrics = ReconTaskMetrics.create();
+
     int eventBufferCapacity = configuration.getInt(OZONE_RECON_OM_EVENT_BUFFER_CAPACITY,
         OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT);
-    this.eventBuffer = new OMUpdateEventBuffer(eventBufferCapacity);
+    this.eventBuffer = new OMUpdateEventBuffer(eventBufferCapacity, controllerMetrics);
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
@@ -178,6 +199,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       stagedReconDBProvider = reconDBProvider.getStagedReconDBProvider();
     } catch (IOException e) {
       LOG.error("Failed to get staged Recon DB provider for reinitialization of tasks.", e);
+
+      // Track checkpoint creation failure
+      controllerMetrics.incrReprocessCheckpointFailures();
+
       recordAllTaskStatus(localReconOmTaskMap, -1, -1);
       return false;
     }
@@ -193,32 +218,51 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     AtomicBoolean isRunSuccessful = new AtomicBoolean(true);
     try {
       CompletableFuture.allOf(tasks.stream()
-          .map(task -> CompletableFuture.supplyAsync(() -> {
-            try {
-              return task.call();
-            } catch (Exception e) {
-              if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
+          .map(task -> {
+            // Track reprocess duration per task - start time recorded before async execution
+            long reprocessStartTime = Time.monotonicNow();
+
+            return CompletableFuture.supplyAsync(() -> {
+              try {
+                ReconOmTask.TaskResult result = task.call();
+                return result;
+              } catch (Exception e) {
+                // Track reprocess failure per task
+                taskMetrics.incrTaskReprocessFailures(task.getTaskName());
+
+                if (e instanceof InterruptedException) {
+                  Thread.currentThread().interrupt();
+                }
+                // Wrap the exception with the task name
+                throw new TaskExecutionException(task.getTaskName(), e);
               }
-              // Wrap the exception with the task name
-              throw new TaskExecutionException(task.getTaskName(), e);
-            }
-          }, executorService).thenAccept(result -> {
-            if (!result.isTaskSuccess()) {
-              String taskName = result.getTaskName();
-              LOG.error("Init failed for task {}.", taskName);
+            }, executorService).thenAccept(result -> {
+              // Update reprocess duration after task completes (includes queue time)
+              long reprocessDuration = Time.monotonicNow() - reprocessStartTime;
+              taskMetrics.updateTaskReprocessDuration(task.getTaskName(), reprocessDuration);
+
+              if (!result.isTaskSuccess()) {
+                String taskName = result.getTaskName();
+                LOG.error("Init failed for task {}.", taskName);
+
+                // Track reprocess failure per task
+                taskMetrics.incrTaskReprocessFailures(taskName);
+
+                isRunSuccessful.set(false);
+              }
+            }).exceptionally(ex -> {
+              LOG.error("Task failed with exception: ", ex);
               isRunSuccessful.set(false);
-            }
-          }).exceptionally(ex -> {
-            LOG.error("Task failed with exception: ", ex);
-            isRunSuccessful.set(false);
-            if (ex.getCause() instanceof TaskExecutionException) {
-              TaskExecutionException taskEx = (TaskExecutionException) ex.getCause();
-              String taskName = taskEx.getTaskName();
-              LOG.error("The above error occurred while trying to execute task: {}", taskName);
-            }
-            return null;
-          })).toArray(CompletableFuture[]::new)).join();
+              if (ex.getCause() instanceof TaskExecutionException) {
+                TaskExecutionException taskEx = (TaskExecutionException) ex.getCause();
+                String taskName = taskEx.getTaskName();
+                // Track reprocess failure per task
+                taskMetrics.incrTaskReprocessFailures(taskName);
+                LOG.error("The above error occurred while trying to execute task: {}", taskName);
+              }
+              return null;
+            });
+          }).toArray(CompletableFuture[]::new)).join();
     } catch (CompletionException ce) {
       LOG.error("Completing all tasks failed with exception ", ce);
       isRunSuccessful.set(false);
@@ -232,21 +276,37 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconDBProvider.replaceStagedDb(stagedReconDBProvider);
         reconNamespaceSummaryManager.reinitialize(reconDBProvider);
         reconContainerMetadataManager.reinitialize(reconDBProvider);
+        reconGlobalStatsManager.reinitialize(reconDBProvider);
+        reconFileMetadataManager.reinitialize(reconDBProvider);
         recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
+
+        // Track reprocess success
+        controllerMetrics.incrReprocessSuccessCount();
+
         LOG.info("Re-initialization of tasks completed successfully.");
       } catch (Exception e) {
         LOG.error("Re-initialization of tasks failed.", e);
+
+        // Track stage database failure
+        controllerMetrics.incrReprocessStageDatabaseFailures();
+
         recordAllTaskStatus(localReconOmTaskMap, -1, -1);
         // reinitialize the Recon OM tasks with the original DB provider
         try {
           reconNamespaceSummaryManager.reinitialize(reconDBProvider);
           reconContainerMetadataManager.reinitialize(reconDBProvider);
+          reconGlobalStatsManager.reinitialize(reconDBProvider);
+          reconFileMetadataManager.reinitialize(reconDBProvider);
         } catch (IOException ex) {
           LOG.error("Re-initialization of task manager failed.", e);
         }
       }
     } else {
       LOG.error("Re-initialization of tasks failed.");
+
+      // Track reprocess execution failure
+      controllerMetrics.incrReprocessExecutionFailures();
+
       try {
         stagedReconDBProvider.close();
       } catch (Exception e) {
@@ -323,8 +383,17 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       OMUpdateEventBatch events, List<ReconOmTask.TaskResult> failedTasks) {
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
+          // Track task delta processing duration
+          long taskStartTime = Time.monotonicNow();
+
           try {
-            return task.call();
+            ReconOmTask.TaskResult result = task.call();
+
+            // Update task delta processing duration
+            long taskDuration = Time.monotonicNow() - taskStartTime;
+            taskMetrics.updateTaskDeltaProcessingDuration(task.getTaskName(), taskDuration);
+
+            return result;
           } catch (Exception e) {
             if (e instanceof InterruptedException) {
               Thread.currentThread().interrupt();
@@ -338,12 +407,19 @@ public class ReconTaskControllerImpl implements ReconTaskController {
               taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           if (!result.isTaskSuccess()) {
             LOG.error("Task {} failed", taskName);
+
+            // Track task delta processing failure
+            taskMetrics.incrTaskDeltaProcessingFailures(taskName);
+
             failedTasks.add(new ReconOmTask.TaskResult.Builder()
                 .setTaskName(taskName)
                 .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
                 .build());
             taskStatusUpdater.setLastTaskRunStatus(-1);
           } else {
+            // Track task delta processing success
+            taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
+
             taskStatusUpdater.setLastTaskRunStatus(0);
             taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
           }
@@ -354,6 +430,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             TaskExecutionException taskEx = (TaskExecutionException) ex.getCause();
             String taskName = taskEx.getTaskName();
             LOG.error("The above error occurred while trying to execute task: {}", taskName);
+
+            // Track task delta processing failure
+            taskMetrics.incrTaskDeltaProcessingFailures(taskName);
 
             ReconTaskStatusUpdater taskStatusUpdater =
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
@@ -484,6 +563,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       ReconTaskReInitializationEvent.ReInitializationReason reason) {
     LOG.info("Queueing task reinitialization event due to: {} (retry attempt count: {})", reason,
         eventProcessRetryCount.get());
+
+    // Track reprocess submission
+    controllerMetrics.incrTotalReprocessSubmittedToQueue();
 
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
     if (null != reInitializationResult) {

@@ -492,16 +492,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         CompactionLogEntry.Builder builder;
         builder = new CompactionLogEntry.Builder(trxId,
             System.currentTimeMillis(),
-            inputFileCompactions.keySet().stream()
-                .map(inputFile -> {
-                  if (!inflightCompactions.containsKey(inputFile)) {
-                    LOG.warn("Input file not found in inflightCompactionsMap : {} which should have been added on " +
-                            "compactionBeginListener.",
-                        inputFile);
-                  }
-                  return inflightCompactions.getOrDefault(inputFile, inputFileCompactions.get(inputFile));
-                })
-                .collect(Collectors.toList()),
+            inputFileCompactions.entrySet().stream()
+                .map(inputFileEntry -> {
+                  final CompactionFileInfo f = inflightCompactions.get(inputFileEntry.getKey());
+                  return f != null ? f : inputFileEntry.getValue();
+                }).collect(Collectors.toList()),
             new ArrayList<>(toFileInfoList(compactionJobInfo.outputFiles(), db).values()));
 
         if (LOG.isDebugEnabled()) {
@@ -530,7 +525,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());
           for (String inputFile : inputFileCompactions.keySet()) {
-            inflightCompactions.remove(inputFile);
+            CompactionFileInfo removed = inflightCompactions.remove(inputFile);
+            if (removed == null) {
+              String columnFamily = StringUtils.bytes2String(compactionJobInfo.columnFamilyName());
+              // Before compaction starts in rocksdb onCompactionBegin event listener is called and here the
+              // inflightCompactionsMap is populated. So, if the compaction log entry is not found in the map, then
+              // there could be a possible race condition on rocksdb compaction behavior.
+              LOG.info("Input file not found in inflightCompactionsMap : {} for compaction with jobId : {} for " +
+                      "column family : {} which should have been added on rocksdb's onCompactionBegin event listener." +
+                      " SnapDiff computation which has this diff file would fallback to full diff.",
+                  inputFile, compactionJobInfo.jobId(), columnFamily);
+            }
           }
         }
         // Add the compaction log entry to the prune queue

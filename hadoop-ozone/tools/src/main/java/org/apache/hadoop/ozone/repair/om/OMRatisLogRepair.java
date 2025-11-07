@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.repair.om;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.EchoRPC;
 
+import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -70,6 +71,12 @@ public class OMRatisLogRepair extends RepairTool {
   private long index;
 
   private SegmentedRaftLogOutputStream outputStream = null;
+
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
 
   @Override
   public void execute() throws Exception {
