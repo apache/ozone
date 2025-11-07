@@ -100,7 +100,8 @@ public abstract class ContainerKeyMapperHelper {
     Map<Long, Long> containerKeyCountMap = new ConcurrentHashMap<>();
 
     try {
-      LOG.info("Starting RocksDB Reprocess for {}", taskName);
+      LOG.info("{}: Starting parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
+          taskName, maxIterators, maxWorkers, maxKeysInMemory, bucketLayout);
       Instant start = Instant.now();
 
       // Ensure the tables are truncated only once
@@ -152,8 +153,13 @@ public abstract class ContainerKeyMapperHelper {
       Instant end = Instant.now();
       long durationMillis = Duration.between(start, end).toMillis();
       double durationSeconds = (double) durationMillis / 1000.0;
-      LOG.info("Completed RocksDB Reprocess for {}. Processed {} keys in {} ms ({} seconds).",
-          taskName, omKeyCount, durationMillis, durationSeconds);
+      long keysProcessed = omKeyCount.get();
+      double throughput = keysProcessed / Math.max(durationSeconds, 0.001);
+      
+      LOG.info("{}: Parallel reprocess completed. Processed {} keys in {} ms ({} sec) - " +
+          "Throughput: {} keys/sec - Containers: {}, Container-Key mappings: {}",
+          taskName, keysProcessed, durationMillis, String.format("%.2f", durationSeconds),
+          String.format("%.2f", throughput), containerKeyCountMap.size(), containerKeyMap.size());
     } catch (Exception ex) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;

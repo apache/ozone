@@ -31,14 +31,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +64,9 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
+  private final int maxKeysInMemory;
+  private final int maxIterators;
+  private final int maxWorkers;
 
   @Inject
   public OmTableInsightTask(ReconGlobalStatsManager reconGlobalStatsManager,
@@ -70,6 +79,15 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+    this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    this.maxIterators = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    this.maxWorkers = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
   }
 
   @Override
@@ -115,22 +133,26 @@ public class OmTableInsightTask implements ReconOmTask {
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = table.iterator()) {
+      try {
         if (tableHandlers.containsKey(tableName)) {
-          Triple<Long, Long, Long> details =
-              tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              details.getLeft());
-          unReplicatedSizeMap.put(
-              getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
-              details.getRight());
+          // Parallelize handler tables (OPEN_KEY_TABLE, OPEN_FILE_TABLE, DELETED_TABLE)
+          LOG.info("{}: Processing table {} with parallel iteration ({} iterators, {} workers)",
+              getTaskName(), tableName, maxIterators, maxWorkers);
+          
+          Triple<Long, Long, Long> details = getTableSizeAndCountParallel(
+              omMetadataManager, tableName, tableHandlers.get(tableName));
+          
+          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
+          unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
         } else {
-          long count = Iterators.size(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          // Keep simple tables sequential due to heterogeneous key types
+          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
+            long count = Iterators.size(iterator);
+            objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          }
         }
-      } catch (IOException ioEx) {
+      } catch (Exception ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
         return buildTaskResult(false);
       }
@@ -146,9 +168,60 @@ public class OmTableInsightTask implements ReconOmTask {
       writeDataToDB(replicatedSizeMap);
     }
     long endTime = Time.monotonicNow();
+    long durationMs = endTime - startTime;
+    double durationSec = durationMs / 1000.0;
+    int parallelizedTables = tableHandlers.size();  // 3 handler tables
+    int sequentialTables = tables.size() - parallelizedTables;
 
-    LOG.info("Completed RocksDB Reprocess for {} in {}", getTaskName(), (endTime - startTime));
+    LOG.info("{}: RocksDB reprocess completed in {} ms ({} sec) - " +
+        "Total tables: {}, Parallelized (with handlers): {}, Sequential (simple count): {}",
+        getTaskName(), durationMs, String.format("%.2f", durationSec), 
+        tables.size(), parallelizedTables, sequentialTables);
     return buildTaskResult(true);
+  }
+
+  /**
+   * Parallel version of getTableSizeAndCount for handler tables.
+   * Uses ParallelTableIteratorOperation with atomic accumulators.
+   */
+  private Triple<Long, Long, Long> getTableSizeAndCountParallel(
+      OMMetadataManager omMetadataManager, String tableName, OmTableHandler handler) 
+      throws Exception {
+    
+    AtomicLong count = new AtomicLong(0);
+    AtomicLong unReplicatedSize = new AtomicLong(0);
+    AtomicLong replicatedSize = new AtomicLong(0);
+    
+    Table<String, ?> table = omMetadataManager.getTable(tableName);
+    
+    try (ParallelTableIteratorOperation<String, ?> parallelIter =
+             new ParallelTableIteratorOperation<>(omMetadataManager, table,
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, 100000)) {
+      
+      parallelIter.performTaskOnTableVals(tableName, null, null, kv -> {
+        if (kv != null && kv.getValue() != null) {
+          Object value = kv.getValue();
+          
+          if (value instanceof OmKeyInfo) {
+            // For OPEN_KEY_TABLE and OPEN_FILE_TABLE
+            OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+            unReplicatedSize.addAndGet(omKeyInfo.getDataSize());
+            replicatedSize.addAndGet(omKeyInfo.getReplicatedSize());
+            count.incrementAndGet();
+          } else if (value instanceof RepeatedOmKeyInfo) {
+            // For DELETED_TABLE - match original getTableSizeAndCount() logic (lines 129-130)
+            RepeatedOmKeyInfo repeatedOmKeyInfo = (RepeatedOmKeyInfo) value;
+            org.apache.commons.lang3.tuple.Pair<Long, Long> sizes = repeatedOmKeyInfo.getTotalSize();
+            unReplicatedSize.addAndGet(sizes.getRight());  // Original: result.getRight()
+            replicatedSize.addAndGet(sizes.getLeft());     // Original: result.getLeft()
+            count.addAndGet(repeatedOmKeyInfo.getOmKeyInfoList().size());
+          }
+        }
+        return null;
+      });
+    }
+    
+    return Triple.of(count.get(), unReplicatedSize.get(), replicatedSize.get());
   }
 
   @Override

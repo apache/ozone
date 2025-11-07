@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -30,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,9 +53,8 @@ public abstract class FileSizeCountTaskHelper {
    */
   public static void handlePutKeyEvent(OmKeyInfo omKeyInfo,
                                        Map<FileSizeCountKey, Long> fileSizeCountMap) {
-    FileSizeCountKey key = getFileSizeCountKey(omKeyInfo);
-    Long count = fileSizeCountMap.containsKey(key) ? fileSizeCountMap.get(key) + 1L : 1L;
-    fileSizeCountMap.put(key, count);
+    fileSizeCountMap.compute(getFileSizeCountKey(omKeyInfo),
+        (k, v) -> (v == null ? 0L : v) + 1L);
   }
 
   /**
@@ -61,9 +65,8 @@ public abstract class FileSizeCountTaskHelper {
     if (omKeyInfo == null) {
       LOG.warn("Deleting a key not found while handling DELETE key event. Key not found in Recon OM DB: {}", key);
     } else {
-      FileSizeCountKey countKey = getFileSizeCountKey(omKeyInfo);
-      Long count = fileSizeCountMap.containsKey(countKey) ? fileSizeCountMap.get(countKey) - 1L : -1L;
-      fileSizeCountMap.put(countKey, count);
+      fileSizeCountMap.compute(getFileSizeCountKey(omKeyInfo),
+          (k, v) -> (v == null ? 0L : v) - 1L);
     }
   }
 
@@ -105,24 +108,39 @@ public abstract class FileSizeCountTaskHelper {
   public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
                                                  ReconFileMetadataManager reconFileMetadataManager,
                                                  BucketLayout bucketLayout,
-                                                 String taskName) {
-    LOG.info("Starting RocksDB Reprocess for {}", taskName);
-    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
-    long startTime = Time.monotonicNow();
+                                                 String taskName,
+                                                 int maxIterators,
+                                                 int maxWorkers,
+                                                 int maxKeysInMemory) {
+    LOG.info("{}: Starting parallel RocksDB reprocess with {} iterators, {} workers for bucket layout {}",
+        taskName, maxIterators, maxWorkers, bucketLayout);
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new ConcurrentHashMap<>();
+    long overallStartTime = Time.monotonicNow();
     
     // Ensure the file count table is truncated only once during reprocess
     truncateFileCountTableIfNeeded(reconFileMetadataManager, taskName);
     
+    long iterationStartTime = Time.monotonicNow();
     boolean status = reprocessBucketLayout(
-        bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName);
+        bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName,
+        maxIterators, maxWorkers, maxKeysInMemory);
     if (!status) {
       return buildTaskResult(taskName, false);
     }
+    long iterationEndTime = Time.monotonicNow();
     
+    long writeStartTime = Time.monotonicNow();
     writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    long writeEndTime = Time.monotonicNow();
     
-    long endTime = Time.monotonicNow();
-    LOG.info("Completed RocksDB Reprocess for {} in {}", taskName, (endTime - startTime));
+    long overallEndTime = Time.monotonicNow();
+    long totalDurationMs = overallEndTime - overallStartTime;
+    long iterationDurationMs = iterationEndTime - iterationStartTime;
+    long writeDurationMs = writeEndTime - writeStartTime;
+    
+    LOG.info("{}: Parallel RocksDB reprocess completed - Total: {} ms (Iteration: {} ms, Write: {} ms) - " +
+        "File count entries: {}", taskName, totalDurationMs, iterationDurationMs, writeDurationMs, 
+        fileSizeCountMap.size());
     
     return buildTaskResult(taskName, true);
   }
@@ -134,31 +152,40 @@ public abstract class FileSizeCountTaskHelper {
                                               OMMetadataManager omMetadataManager,
                                               Map<FileSizeCountKey, Long> fileSizeCountMap,
                                               ReconFileMetadataManager reconFileMetadataManager,
-                                              String taskName) {
+                                              String taskName,
+                                              int maxIterators,
+                                              int maxWorkers,
+                                              int maxKeysInMemory) {
+    LOG.info("{}: Starting parallel iteration with {} iterators, {} workers for bucket layout {}",
+        taskName, maxIterators, maxWorkers, bucketLayout);
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
-    int totalKeysProcessed = 0;
+    long startTime = Time.monotonicNow();
     
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
-             omKeyInfoTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
-        totalKeysProcessed++;
-
-        // Flush to RocksDB periodically.
-        if (fileSizeCountMap.size() >= 100000) {
-          // For reprocess, we don't need to check existing values since table was truncated
-          LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-          writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-          fileSizeCountMap.clear();
-        }
-      }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ioEx);
+    // Use parallel table iteration
+    Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+      handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+      return null;
+    };
+    
+    try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
+             new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, 100000)) {
+      keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
       return false;
     }
     
-    LOG.info("Reprocessed {} keys for bucket layout {} using RocksDB.", totalKeysProcessed, bucketLayout);
+    long endTime = Time.monotonicNow();
+    long durationMs = endTime - startTime;
+    double durationSec = durationMs / 1000.0;
+    int totalKeys = fileSizeCountMap.values().stream().mapToInt(Long::intValue).sum();
+    double throughput = totalKeys / Math.max(durationSec, 0.001);
+    
+    LOG.info("{}: Reprocessed {} keys for bucket layout {} in {} ms ({} sec) - Throughput: {}/sec",
+        taskName, totalKeys, bucketLayout, durationMs, String.format("%.2f", durationSec), 
+        String.format("%.2f", throughput));
+    
     return true;
   }
 

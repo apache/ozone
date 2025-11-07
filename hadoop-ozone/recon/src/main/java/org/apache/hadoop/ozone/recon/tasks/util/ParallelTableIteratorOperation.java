@@ -202,6 +202,9 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     }
     waitForQueueSize(iterFutures, 0);
     waitForQueueSize(workerFutures, 0);
+    
+    // Log final stats
+    LOG.info("{}: Parallel iteration completed - Total keys processed: {}", taskName, keyCounter.get());
   }
 
   @Override
