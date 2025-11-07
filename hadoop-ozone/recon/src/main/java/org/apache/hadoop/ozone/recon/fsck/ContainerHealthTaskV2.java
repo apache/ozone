@@ -349,7 +349,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       int actualReplicaCount,
       String reason) {
 
-    int replicaDelta = actualReplicaCount - expectedReplicaCount;
+    int replicaDelta = expectedReplicaCount - actualReplicaCount;
 
     return new UnhealthyContainerRecordV2(
         container.getContainerID(),

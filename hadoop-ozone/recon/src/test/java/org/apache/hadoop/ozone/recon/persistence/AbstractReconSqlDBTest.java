@@ -179,7 +179,7 @@ public class AbstractReconSqlDBTest {
         @Override
         public String getJdbcUrl() {
           return "jdbc:derby:" + tempDir.getAbsolutePath() +
-              File.separator + "derby_recon.db";
+              File.separator + "derby_recon.db;user=RECON;create=true";
         }
 
         @Override

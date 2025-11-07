@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -316,13 +317,24 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
     List<ContainerInfo> scmContainers = getMockContainers(1);
     ContainerInfo scmContainer = scmContainers.get(0);
 
-    when(scmClientMock.getListOfContainers(anyInt(), anyInt(),
-        any(HddsProtos.LifeCycleState.class))).thenReturn(scmContainers);
+    // Mock getListOfContainers to handle pagination correctly
+    // Return container for CLOSED state with startId=0, empty otherwise
+    when(scmClientMock.getListOfContainers(anyLong(), anyInt(),
+        any(HddsProtos.LifeCycleState.class))).thenAnswer(invocation -> {
+          long startId = invocation.getArgument(0);
+          HddsProtos.LifeCycleState state = invocation.getArgument(2);
+          // Only return container for CLOSED state and startId=0
+          if (state == HddsProtos.LifeCycleState.CLOSED && startId == 0) {
+            return scmContainers;
+          }
+          return Collections.emptyList();
+        });
     when(containerManagerMock.getContainer(scmContainer.containerID()))
         .thenThrow(new ContainerNotFoundException("Container not found in Recon"));
 
     ReplicationManagerReport report = createMockReport(0, 1, 0, 0);
-    when(scmClientMock.checkContainerStatus(scmContainer)).thenReturn(report);
+    // Use any() matcher since getListOfContainers returns a list with the same container
+    when(scmClientMock.checkContainerStatus(any(ContainerInfo.class))).thenReturn(report);
 
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
@@ -378,7 +390,7 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
     // SCM doesn't have this container
     when(scmClientMock.checkContainerStatus(reconContainer))
         .thenThrow(new ContainerNotFoundException("Container not found in SCM"));
-    when(scmClientMock.getListOfContainers(anyInt(), anyInt(),
+    when(scmClientMock.getListOfContainers(anyLong(), anyInt(),
         any(HddsProtos.LifeCycleState.class))).thenReturn(Collections.emptyList());
 
     // Insert a record for this container first
