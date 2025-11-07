@@ -241,6 +241,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
   private static GenericTestUtils.PrintStreamCapturer output;
+  private static final BucketLayout VERSIONING_TEST_BUCKET_LAYOUT =
+      BucketLayout.OBJECT_STORE;
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
@@ -4452,12 +4454,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
 
-    omMetadataManager.getKeyTable(getBucketLayout())
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
             omKeyInfo);
 
@@ -4605,10 +4607,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
 
@@ -4624,7 +4622,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // information. This is easier to do with object store keys.
     volume.createBucket(bucketName, BucketArgs.newBuilder()
         .setVersioning(versioning)
-        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
+        .setBucketLayout(VERSIONING_TEST_BUCKET_LAYOUT).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     TestDataUtil.createKey(bucket, keyName,
@@ -4637,38 +4635,22 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   private void checkExceptedResultForVersioningTest(String volumeName,
       String bucketName, String keyName, int expectedCount) throws Exception {
-    // Get actual bucket layout from the bucket itself to avoid mismatch
-    String bucketKey = cluster.getOzoneManager().getMetadataManager()
-        .getBucketKey(volumeName, bucketName);
-    BucketLayout actualLayout = cluster.getOzoneManager().getMetadataManager()
-        .getBucketTable().get(bucketKey).getBucketLayout();
-    
-    OmKeyInfo omKeyInfo = cluster.getOzoneManager().getMetadataManager()
-        .getKeyTable(actualLayout).get(
-            cluster.getOzoneManager().getMetadataManager()
-                .getOzoneKey(volumeName, bucketName, keyName));
+    OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
+    String ozoneKey = metadataManager.getOzoneKey(volumeName, bucketName, keyName);
+
+    OmKeyInfo omKeyInfo = metadataManager.getKeyTable(VERSIONING_TEST_BUCKET_LAYOUT).get(ozoneKey);
 
     assertNotNull(omKeyInfo);
-    assertEquals(expectedCount,
-        omKeyInfo.getKeyLocationVersions().size());
+    assertEquals(expectedCount, omKeyInfo.getKeyLocationVersions().size());
 
+    // Suspend KeyDeletingService to prevent it from purging entries from deleted table
+    cluster.getOzoneManager().getKeyManager().getDeletingService().suspend();
     // ensure flush double buffer for deleted Table
     cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
-      // Wait for deleted key to become visible in deletedTable
-      String ozoneKey = cluster.getOzoneManager().getMetadataManager()
-          .getOzoneKey(volumeName, bucketName, keyName);
-      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
-        List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
-            = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-            .getRangeKVs(null, 100, ozoneKey);
-        return !rangeKVs.isEmpty();
-      }, 100, 60000);
-
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
-          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
-          .getRangeKVs(null, 100, ozoneKey);
+          = metadataManager.getDeletedTable().getRangeKVs(null, 100, ozoneKey);
 
       assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
@@ -4676,13 +4658,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
-          .getOzoneManager().getMetadataManager()
-          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
-              .getOzoneKey(volumeName, bucketName, keyName));
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          metadataManager.getDeletedTable().get(ozoneKey);
 
       assertNull(repeatedOmKeyInfo);
     }
+    cluster.getOzoneManager().getKeyManager().getDeletingService().resume();
   }
 
   @Test
