@@ -4646,10 +4646,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(expectedCount,
         omKeyInfo.getKeyLocationVersions().size());
 
-    // ensure flush double buffer for deleted Table
-    cluster.getOzoneManager().awaitDoubleBufferFlush();
     // Suspend KeyDeletingService to prevent it from purging entries from deleted table
     cluster.getOzoneManager().getKeyManager().getDeletingService().suspend();
+    // ensure flush double buffer for deleted Table
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
