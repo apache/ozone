@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -30,7 +29,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -139,8 +137,9 @@ public final class OmSnapshotUtils {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
     Path checkpointDataDirPath = Paths.get(dbPath.getParent().toString(), OM_CHECKPOINT_DATA_DIR);
-    checkpointDataDirPath.toFile().mkdir();
-    List<Path> filesToDelete = new ArrayList<>();
+    if (!checkpointDataDirPath.toFile().mkdir()) {
+      throw new IOException("Failed to create directory: " + checkpointDataDirPath);
+    }
     if (hardLinkFile.exists()) {
       // Read file.
       try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
@@ -156,7 +155,6 @@ public final class OmSnapshotUtils {
           String from = parts[1];
           String to = parts[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
-          filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(checkpointDataDirPath.toString(), to);
           // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();

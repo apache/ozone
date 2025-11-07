@@ -4084,8 +4084,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try {
         time = Time.monotonicNow();
-        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex,
-            oldDBLocation, checkpointDataDir);
+        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation, checkpointDataDir);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
@@ -4296,16 +4295,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Files.move(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
         }
       }
-    }
-  }
-
-  // Move the new snapshot directory into place.
-  private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
-      throws IOException {
-    Path incomingSnapshotsDir = Paths.get(dbPath.toString(),
-        OM_SNAPSHOT_DIR);
-    if (incomingSnapshotsDir.toFile().exists()) {
-      Files.move(incomingSnapshotsDir, dbSnapshotsDir);
     }
   }
 
