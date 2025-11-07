@@ -41,11 +41,40 @@ public class RetryRequestBatcher {
   private static final Logger LOG =
       LoggerFactory.getLogger(RetryRequestBatcher.class);
 
-  // Sliding window buffer: maintains inflight writeChunk and putBlock requests.
+  /**
+   * Minimum number of acknowledged chunks before triggering memory cleanup.
+   * This threshold prevents frequent list operations for small acknowledgements.
+   */
+  private static final int MIN_CLEANUP_THRESHOLD = 64;
+
+  /**
+   * Cleanup trigger ratio: clean up when acknowledged chunks exceed this fraction
+   * of the total list (e.g., 0.5 means clean up when >50% is acknowledged).
+   */
+  private static final double CLEANUP_RATIO_THRESHOLD = 0.5;
+
+  /**
+   * List of all inflight write chunk requests.
+   * Uses writeChunkStartIndex to track which chunks are still pending (not yet acknowledged).
+   */
   private final List<PendingWriteChunk> inflightWriteChunks;
+
+  /**
+   * Index pointing to the first non-acknowledged chunk in inflightWriteChunks.
+   * Chunks before this index have been acknowledged and may be cleaned up.
+   */
   private int writeChunkStartIndex;
+
+  /**
+   * Queue of pending putBlock requests, tracked by their commit offsets.
+   * Only the latest putBlock is meaningful for retry.
+   */
   private final LinkedList<Long> inflightPutBlocks;
+
+  /** Highest offset that has been acknowledged by the server. */
   private long acknowledgedOffset;
+
+  /** Highest offset that has been sent to the server. */
   private long sentOffset;
 
   /**
@@ -173,19 +202,25 @@ public class RetryRequestBatcher {
 
   /**
    * Mark requests up to the given offset as acknowledged.
-   * This removes them from the sliding window buffer.
+   *
+   * This method performs fast O(1) tracking by incrementing writeChunkStartIndex.
+   * Actual memory cleanup is deferred and handled lazily by trimAcknowledgedWriteChunks().
    *
    * @param offset the acknowledged offset
    */
   public synchronized void acknowledgeUpTo(long offset) {
     acknowledgedOffset = Math.max(acknowledgedOffset, offset);
 
+    // Mark write chunks as acknowledged by advancing the start index
     while (writeChunkStartIndex < inflightWriteChunks.size()
         && inflightWriteChunks.get(writeChunkStartIndex).getEndOffset() <= offset) {
       writeChunkStartIndex++;
     }
+
+    // Lazily clean up memory when worthwhile (see trimAcknowledgedWriteChunks for strategy)
     trimAcknowledgedWriteChunks();
 
+    // Remove acknowledged putBlock requests (these are small, so we clean immediately)
     while (!inflightPutBlocks.isEmpty() && inflightPutBlocks.peekFirst() <= offset) {
       inflightPutBlocks.removeFirst();
     }
@@ -253,20 +288,50 @@ public class RetryRequestBatcher {
     return inflightWriteChunks.size() - writeChunkStartIndex;
   }
 
+  /**
+   * Performs lazy cleanup of acknowledged write chunks to optimize memory usage.
+   *
+   * Strategy:
+   * - Acknowledged chunks are tracked by incrementing writeChunkStartIndex (O(1) operation)
+   * - Actual memory cleanup (removal from list) is deferred until it's worthwhile
+   * - Cleanup triggers when EITHER:
+   *   1. Acknowledged count exceeds MIN_CLEANUP_THRESHOLD (64 chunks), OR
+   *   2. Acknowledged chunks represent more than CLEANUP_RATIO_THRESHOLD (50%) of the list
+   *
+   * This approach balances memory usage with performance:
+   * - Avoids frequent O(n) list operations for each small acknowledgement
+   * - Prevents unbounded memory growth from accumulated acknowledged chunks
+   *
+   * IMPORTANT: Only ACKNOWLEDGED chunks (before writeChunkStartIndex) are removed.
+   * Active chunks (from writeChunkStartIndex onwards) are NEVER removed, so there's
+   * no data loss regardless of how many requests accumulate.
+   */
   private void trimAcknowledgedWriteChunks() {
+    // No acknowledged chunks to clean up
     if (writeChunkStartIndex == 0) {
       return;
     }
+
+    // All chunks are acknowledged - clear everything
     if (writeChunkStartIndex >= inflightWriteChunks.size()) {
       inflightWriteChunks.clear();
       writeChunkStartIndex = 0;
       return;
     }
 
-    if (writeChunkStartIndex > 64
-        || writeChunkStartIndex > inflightWriteChunks.size() / 2) {
+    // Check if cleanup is warranted based on our thresholds
+    int acknowledgedCount = writeChunkStartIndex;
+    int totalCount = inflightWriteChunks.size();
+    boolean exceedsMinThreshold = acknowledgedCount > MIN_CLEANUP_THRESHOLD;
+    boolean exceedsRatioThreshold = acknowledgedCount > totalCount * CLEANUP_RATIO_THRESHOLD;
+
+    if (exceedsMinThreshold || exceedsRatioThreshold) {
+      // Remove ONLY the acknowledged chunks [0, writeChunkStartIndex)
+      // Active chunks [writeChunkStartIndex, size) are preserved
       inflightWriteChunks.subList(0, writeChunkStartIndex).clear();
       writeChunkStartIndex = 0;
     }
+    // If neither threshold is met, we skip cleanup to avoid the cost of list removal.
+    // The acknowledged chunks remain in the list but are simply ignored (via the index).
   }
 }
