@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.debug.datanode.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTreeWithMismatches;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.updateTreeProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,12 +86,9 @@ class TestChecksumSubcommand {
     updateTreeProto(containerData, tree.toProto());
 
     File treeFile = new File(tempDir.toFile(), CONTAINER_ID + ".tree");
-    JsonNode actualJson = runChecksumCommand(treeFile);
+    JsonNode containerJson = runChecksumCommand(treeFile);
 
     // Verify container structure
-    assertThat(actualJson.isArray()).isTrue();
-    assertThat(actualJson.size()).isEqualTo(1);
-    JsonNode containerJson = actualJson.get(0);
     assertThat(containerJson.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
     assertThat(containerJson.has("containerMerkleTree")).isTrue();
 
@@ -137,13 +135,9 @@ class TestChecksumSubcommand {
       emptyInfo.writeTo(fos);
     }
 
-    JsonNode actualJson = runChecksumCommand(treeFile);
+    JsonNode containerJson = runChecksumCommand(treeFile);
     
     // Verify the structure for empty file
-    assertThat(actualJson.isArray()).isTrue();
-    assertThat(actualJson.size()).isEqualTo(1);
-    
-    JsonNode containerJson = actualJson.get(0);
     assertThat(containerJson.get("containerID").asLong()).isEqualTo(0);
     assertThat(containerJson.has("containerMerkleTree")).isFalse(); // Empty file has no merkle tree
   }
@@ -160,12 +154,9 @@ class TestChecksumSubcommand {
     updateTreeProto(containerData, tree.toProto());
 
     File treeFile = new File(tempDir.toFile(), CONTAINER_ID + ".tree");
-    JsonNode actualJson = runChecksumCommand(treeFile);
+    JsonNode containerJson = runChecksumCommand(treeFile);
 
     // Verify container structure
-    assertThat(actualJson.isArray()).isTrue();
-    assertThat(actualJson.size()).isEqualTo(1);
-    JsonNode containerJson = actualJson.get(0);
     assertThat(containerJson.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
     assertThat(containerJson.has("containerMerkleTree")).isTrue();
 
@@ -197,12 +188,9 @@ class TestChecksumSubcommand {
     updateTreeProto(containerData, tree.toProto());
 
     File treeFile = new File(tempDir.toFile(), CONTAINER_ID + ".tree");
-    JsonNode actualJson = runChecksumCommand(treeFile);
+    JsonNode containerJson = runChecksumCommand(treeFile);
 
     // Verify container structure
-    assertThat(actualJson.isArray()).isTrue();
-    assertThat(actualJson.size()).isEqualTo(1);
-    JsonNode containerJson = actualJson.get(0);
     assertThat(containerJson.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
     assertThat(containerJson.has("containerMerkleTree")).isTrue();
 
@@ -214,6 +202,84 @@ class TestChecksumSubcommand {
     JsonNode blockMerkleTrees = merkleTree.get("blockMerkleTrees");
     assertThat(blockMerkleTrees.isArray()).isTrue();
     assertThat(blockMerkleTrees.size()).isEqualTo(0); // Empty tree has no blocks
+  }
+
+  @Test
+  void testChecksumCommandWithDeletedBlocks() throws Exception {
+    // Create a mock container data
+    KeyValueContainerData containerData = Mockito.mock(KeyValueContainerData.class);
+    Mockito.when(containerData.getContainerID()).thenReturn(CONTAINER_ID);
+    Mockito.when(containerData.getMetadataPath()).thenReturn(tempDir.toString());
+
+    // Build a test tree with 5 blocks, marking blocks 2 and 4 as deleted
+    ContainerProtos.ContainerMerkleTree tree = buildTestTree(config, 5, 2L, 4L);
+    updateTreeProto(containerData, tree);
+
+    File treeFile = new File(tempDir.toFile(), CONTAINER_ID + ".tree");
+    JsonNode containerJson = runChecksumCommand(treeFile);
+
+    // Verify container structure
+    assertThat(containerJson.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+    assertThat(containerJson.has("containerMerkleTree")).isTrue();
+
+    // Verify merkle tree structure
+    JsonNode merkleTree = containerJson.get("containerMerkleTree");
+    JsonNode blockMerkleTrees = merkleTree.get("blockMerkleTrees");
+    assertThat(blockMerkleTrees.isArray()).isTrue();
+    assertThat(blockMerkleTrees.size()).isEqualTo(5);
+
+    // Verify blocks 1, 3, 5 are not deleted (have chunks)
+    verifyBlockStructure(blockMerkleTrees.get(0), 1L, false);
+    verifyBlockStructure(blockMerkleTrees.get(2), 3L, false);
+    verifyBlockStructure(blockMerkleTrees.get(4), 5L, false);
+
+    // Verify blocks 2 and 4 are deleted (no chunks)
+    verifyDeletedBlockStructure(blockMerkleTrees.get(1), 2L);
+    verifyDeletedBlockStructure(blockMerkleTrees.get(3), 4L);
+  }
+
+  @Test
+  void testChecksumCommandWithChecksumMismatch() throws Exception {
+    // Create a mock container data
+    KeyValueContainerData containerData = Mockito.mock(KeyValueContainerData.class);
+    Mockito.when(containerData.getContainerID()).thenReturn(CONTAINER_ID);
+    Mockito.when(containerData.getMetadataPath()).thenReturn(tempDir.toString());
+
+    // Build a test tree and introduce corrupt chunks (which sets checksumMatches to false)
+    ContainerMerkleTreeWriter baseTree = buildTestTree(config, 3);
+    org.apache.commons.lang3.tuple.Pair<ContainerProtos.ContainerMerkleTree, 
+        org.apache.hadoop.ozone.container.checksum.ContainerDiffReport> result = 
+        buildTestTreeWithMismatches(baseTree, 0, 0, 2); // 2 corrupt chunks
+    ContainerProtos.ContainerMerkleTree treeWithMismatches = result.getLeft();
+    updateTreeProto(containerData, treeWithMismatches);
+
+    File treeFile = new File(tempDir.toFile(), CONTAINER_ID + ".tree");
+    JsonNode containerJson = runChecksumCommand(treeFile);
+
+    // Verify container structure
+    assertThat(containerJson.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+
+    // Verify merkle tree has blocks with corrupt chunks
+    JsonNode merkleTree = containerJson.get("containerMerkleTree");
+    JsonNode blockMerkleTrees = merkleTree.get("blockMerkleTrees");
+    assertThat(blockMerkleTrees.isArray()).isTrue();
+
+    // At least one chunk should have checksumMatches = false
+    boolean foundCorruptChunk = false;
+    for (JsonNode block : blockMerkleTrees) {
+      JsonNode chunkMerkleTrees = block.get("chunkMerkleTrees");
+      for (JsonNode chunk : chunkMerkleTrees) {
+        if (!chunk.get("checksumMatches").asBoolean()) {
+          foundCorruptChunk = true;
+          // Verify the chunk still has all required fields
+          assertThat(chunk.has("offset")).isTrue();
+          assertThat(chunk.has("length")).isTrue();
+          assertThat(chunk.has("dataChecksum")).isTrue();
+          assertThat(chunk.get("dataChecksum").asText()).isNotEqualTo("0");
+        }
+      }
+    }
+    assertThat(foundCorruptChunk).as("Should have at least one chunk with checksumMatches=false").isTrue();
   }
 
   /**
@@ -234,8 +300,15 @@ class TestChecksumSubcommand {
    * Verify block structure including blockID, deleted status, dataChecksum, chunk count, and chunk details.
    */
   private void verifyBlockStructure(JsonNode block, long expectedBlockID) {
+    verifyBlockStructure(block, expectedBlockID, false);
+  }
+
+  /**
+   * Verify block structure including blockID, deleted status, dataChecksum, chunk count, and chunk details.
+   */
+  private void verifyBlockStructure(JsonNode block, long expectedBlockID, boolean expectedDeleted) {
     assertThat(block.get("blockID").asLong()).isEqualTo(expectedBlockID);
-    assertThat(block.get("deleted").asBoolean()).isFalse();
+    assertThat(block.get("deleted").asBoolean()).isEqualTo(expectedDeleted);
     assertThat(block.has("dataChecksum")).isTrue();
     assertThat(block.get("dataChecksum").asText()).isNotEqualTo("0");
 
@@ -247,6 +320,19 @@ class TestChecksumSubcommand {
     for (int i = 0; i < chunkMerkleTrees.size(); i++) {
       verifyChunkStructure(chunkMerkleTrees.get(i), i, true);
     }
+  }
+
+  /**
+   * Verify deleted block structure - deleted blocks should have no chunks.
+   */
+  private void verifyDeletedBlockStructure(JsonNode block, long expectedBlockID) {
+    assertThat(block.get("blockID").asLong()).isEqualTo(expectedBlockID);
+    assertThat(block.get("deleted").asBoolean()).isTrue();
+    assertThat(block.has("dataChecksum")).isTrue();
+
+    JsonNode chunkMerkleTrees = block.get("chunkMerkleTrees");
+    assertThat(chunkMerkleTrees.isArray()).isTrue();
+    assertThat(chunkMerkleTrees.size()).isEqualTo(0); // Deleted blocks have no chunks
   }
 
   /**

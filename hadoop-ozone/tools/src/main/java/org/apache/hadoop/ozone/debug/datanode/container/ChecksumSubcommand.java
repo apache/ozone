@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.debug.datanode.container;
 
-import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -64,11 +63,8 @@ public class ChecksumSubcommand implements Callable<Void> {
       ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumInfo(treeFile);
       ChecksumInfoWrapper wrapper = new ChecksumInfoWrapper(checksumInfo);
       
-      try (SequenceWriter writer = JsonUtils.getStdoutSequenceWriter()) {
-        writer.write(wrapper);
-        writer.flush();
-      }
-      System.out.println();
+      String jsonOutput = JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper);
+      System.out.println(jsonOutput);
     } catch (IOException e) {
       throw new RuntimeException("Failed to read tree file: " + treeFilePath, e);
     } catch (Exception e) {
