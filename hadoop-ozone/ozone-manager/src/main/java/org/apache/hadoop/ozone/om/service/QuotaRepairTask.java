@@ -102,33 +102,31 @@ public class QuotaRepairTask {
 
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
-    try {
-      // thread pool with 3 Table type * (1 task each + 3 thread for each task)
-      executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    // thread pool with 3 Table type * (1 task each + 3 thread for each task)
+    executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    try (OMMetadataManager activeMetaManager =
+        createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
-      try (OMMetadataManager activeMetaManager =
-          createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
-        repairActiveDb(activeMetaManager, builder, buckets);
+      repairActiveDb(activeMetaManager, builder, buckets);
 
       // TODO: repair snapshots for quota
 
-        // submit request to update
-        ClientId clientId = ClientId.randomId();
-        OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.QuotaRepair)
-            .setQuotaRepairRequest(builder.build())
-            .setClientId(clientId.toString())
-            .build();
-        OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest, clientId);
-        if (response != null && response.getSuccess()) {
-          REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
-        } else {
-          LOG.error("update quota repair count response failed");
-          REPAIR_STATUS.updateStatus("Response for update DB is failed");
-          return false;
-        }
+      // submit request to update
+      ClientId clientId = ClientId.randomId();
+      OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.QuotaRepair)
+          .setQuotaRepairRequest(builder.build())
+          .setClientId(clientId.toString())
+          .build();
+      OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest, clientId);
+      if (response != null && response.getSuccess()) {
+        REPAIR_STATUS.updateStatus(builder, om.getMetadataManager());
+      } else {
+        LOG.error("update quota repair count response failed");
+        REPAIR_STATUS.updateStatus("Response for update DB is failed");
+        return false;
       }
     } catch (Exception exp) {
       LOG.error("quota repair count failed", exp);

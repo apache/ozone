@@ -730,7 +730,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         event.getReason(), event.getTimestamp());
     resetTasksFailureFlag();
     // Use the checkpointed OM metadata manager for reinitialization to prevent data inconsistency
-    try (ReconOMMetadataManager checkpointedOMMetadataManager = event.getCheckpointedOMMetadataManager()) {
+    ReconOMMetadataManager checkpointedOMMetadataManager = null;
+    try (ReconOMMetadataManager manager = event.getCheckpointedOMMetadataManager()) {
+      checkpointedOMMetadataManager = manager;
       if (checkpointedOMMetadataManager != null) {
         LOG.info("Starting async task reinitialization with checkpointed OM metadata manager due to: {}",
                  event.getReason());
@@ -744,9 +746,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           resetRetryCounters();
           LOG.info("Completed async task reinitialization");
         }
-        
-        // Clean up checkpoint files after use (database connections are automatically closed by try-with-resources)
-        cleanupCheckpointFiles(checkpointedOMMetadataManager);
       } else {
         LOG.error("Checkpointed OM metadata manager is null, cannot perform reinitialization");
         return;
@@ -754,6 +753,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LOG.info("Completed processing reinitialization event: {}", event.getReason());
     } catch (Exception e) {
       LOG.error("Error processing reinitialization event", e);
+    } finally {
+      // Clean up checkpoint files after use (database connections are automatically closed by try-with-resources)
+      if (checkpointedOMMetadataManager != null) {
+        cleanupCheckpointFiles(checkpointedOMMetadataManager);
+      }
     }
   }
 
