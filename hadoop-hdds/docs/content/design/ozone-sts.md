@@ -1,7 +1,7 @@
 ---
 title: AWS STS Design for Ozone S3
 summary: STS Support in Ozone
-date: 2026-10-30
+date: 2025-10-30
 jira: HDDS-13323
 status: implementing
 author: Ren Koike, Fabian Morgan
@@ -44,9 +44,9 @@ solutions that want to aggregate data across multiple cloud providers.
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
 API from the AWS specification.  A new STS endpoint `/sts` on port `9880` will be created to service STS requests in the S3 Gateway.
 
-Furthermore, the initial implementation of Ozone STS focuses only on Apache Ranger for the first phase, as it aligns more
-with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.  Consideration for the Ozone
-Native Authorizer will be given when processing IAM policies as described below.
+Furthermore, the initial implementation of Ozone STS focuses only on Apache Ranger for authorization in the first phase, 
+as it aligns more with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.  
+Consideration for the Ozone Native Authorizer will be given when processing IAM policies as described below.
 
 ## 3.1 Capabilities
 
@@ -54,9 +54,9 @@ The Ozone STS implementation has the following capabilities:
 
 - Create temporary credentials that last from a minimum of 15 minutes to a maximum of 12 hours. The
 return value of the AssumeRole call will be temporary credentials consisting of 3 components: 
-  - accessKeyId - a generated String identifier beginning with the sequence "ASIA"
-  - secretAccessKey - a generated String password
-  - sessionToken - an opaque String identifier
+  - accessKeyId - a generated String identifier (cryptographically strong using SecureRandom) beginning with the sequence "ASIA"
+  - secretAccessKey - a generated String password (cryptographically strong using SecureRandom)
+  - sessionToken - a Base64-encoded opaque String identifier
 - The temporary credentials will have the permissions associated with a role. Furthermore, an 
 [AWS IAM Session Policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies_session) can 
 **optionally** be sent in the AssumeRole API call to limit the scope of the permissions further.  If 
@@ -181,8 +181,9 @@ created in Ranger as per the Prerequisites above.
 - If successful, Ozone responds with the temporary credentials.
 - A client makes S3 API calls with the temporary credentials for up to as long as the credentials last.  
 - When Ozone receives an S3 api call using temporary credentials, it will perform the following checks:
-  - Ensure the token is not expired
-  - Ensure the token is not revoked
+  - Ensure that if the accessKeyId starts with "ASIA", that a sessionToken was included in the `x-amz-security-token` header
+  - Ensure the sessionToken is not expired
+  - Ensure the sessionToken is not revoked
   - Validate the HMAC-SHA256 signature in the sessionToken
   - Decrypt the secretAccessKey from the sessionToken and validate the AWS signature
   - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
