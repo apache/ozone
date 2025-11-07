@@ -4452,12 +4452,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
 
-    omMetadataManager.getKeyTable(getBucketLayout())
+    omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
             omKeyInfo);
 
@@ -4605,9 +4605,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
+  private static final BucketLayout VERSIONING_TEST_BUCKET_LAYOUT =
+      BucketLayout.OBJECT_STORE;
 
   private void createRequiredForVersioningTest(String volumeName,
       String bucketName, String keyName, boolean versioning) throws Exception {
@@ -4624,7 +4623,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // information. This is easier to do with object store keys.
     volume.createBucket(bucketName, BucketArgs.newBuilder()
         .setVersioning(versioning)
-        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
+        .setBucketLayout(VERSIONING_TEST_BUCKET_LAYOUT).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     TestDataUtil.createKey(bucket, keyName,
@@ -4640,7 +4639,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OMMetadataManager metadataManager = cluster.getOzoneManager().getMetadataManager();
     String ozoneKey = metadataManager.getOzoneKey(volumeName, bucketName, keyName);
 
-    OmKeyInfo omKeyInfo = metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    OmKeyInfo omKeyInfo = metadataManager.getKeyTable(VERSIONING_TEST_BUCKET_LAYOUT).get(ozoneKey);
 
     assertNotNull(omKeyInfo);
     assertEquals(expectedCount, omKeyInfo.getKeyLocationVersions().size());
@@ -4654,7 +4653,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = metadataManager.getDeletedTable().getRangeKVs(null, 100, ozoneKey);
 
-      assertThat(rangeKVs.size()).isGreaterThan(0);
+      assertThat(rangeKVs).isNotEmpty();
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
