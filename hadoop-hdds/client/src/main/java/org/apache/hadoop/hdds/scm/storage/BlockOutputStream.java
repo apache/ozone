@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -469,42 +470,24 @@ public class BlockOutputStream extends OutputStream {
     }
     Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
 
-    // Use sliding window optimization to combine requests
     RetryRequestBatcher.OptimizedRetryPlan retryPlan = retryRequestBatcher.optimizeForRetry();
-    List<ChunkBuffer> combinedChunks = retryPlan.getCombinedChunks();
-    boolean needsPutBlock = retryPlan.needsPutBlock();
+    RetryChunkSelection chunkSelection =
+        selectChunksForRetry(len, allocatedBuffers, retryPlan);
 
-    List<ChunkBuffer> chunksToWrite = combinedChunks;
-    if (chunksToWrite.isEmpty() && len > 0) {
-      List<ChunkBuffer> fallback = new ArrayList<>(allocatedBuffers.size());
-      for (ChunkBuffer buffer : allocatedBuffers) {
-        if (buffer.position() > 0) {
-          fallback.add(buffer);
-        }
-      }
-      if (!fallback.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sliding window optimizer returned no chunks; falling back to {} allocated buffers",
-              fallback.size());
-        }
-        chunksToWrite = fallback;
-        needsPutBlock = true;
-      }
-    }
-
-    if (chunksToWrite.isEmpty()) {
+    if (chunkSelection.isEmpty()) {
       LOG.warn("Retry requested for length {} but no chunk buffers available to resend", len);
       return;
     }
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Sliding window optimization: combined {} chunks into {}, needsPutBlock={}",
-          allocatedBuffers.size(), chunksToWrite.size(), needsPutBlock);
+          allocatedBuffers.size(), chunkSelection.getChunks().size(), chunkSelection.needsPutBlock());
     }
 
     // Write combined chunks
     long remainingLen = len;
-    for (ChunkBuffer buffer : chunksToWrite) {
+    boolean piggybackFinalChunk = allowPutBlockPiggybacking && chunkSelection.needsPutBlock();
+    for (ChunkBuffer buffer : chunkSelection.getChunks()) {
       if (remainingLen <= 0) {
         break;
       }
@@ -513,40 +496,92 @@ public class BlockOutputStream extends OutputStream {
       writtenDataLength += writeLen;
       updateWriteChunkLength();
 
-      if (allowPutBlockPiggybacking && needsPutBlock && remainingLen == 0) {
-        // Last chunk: piggyback putBlock
+      if (piggybackFinalChunk && remainingLen == 0) {
         updatePutBlockLength();
-        CompletableFuture<PutBlockResult> putBlockFuture = writeChunkAndPutBlock(buffer, false);
-        CompletableFuture<Void> watchForCommitAsync =
-            putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
-        try {
-          watchForCommitAsync.get();
-        } catch (InterruptedException e) {
-          handleInterruptedException(e, true);
-        } catch (ExecutionException e) {
-          handleExecutionException(e);
-        }
+        waitForCommit(writeChunkAndPutBlock(buffer, false));
       } else {
-        // Write chunk without putBlock
         writeChunk(buffer);
       }
     }
 
-    // Send final putBlock if needed and not already piggybacked
-    if (needsPutBlock && !allowPutBlockPiggybacking) {
+    if (chunkSelection.needsPutBlock() && !piggybackFinalChunk) {
       updatePutBlockLength();
-      CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
-      CompletableFuture<Void> watchForCommitAsync =
-          putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
-      try {
-        watchForCommitAsync.get();
-      } catch (InterruptedException e) {
-        handleInterruptedException(e, true);
-      } catch (ExecutionException e) {
-        handleExecutionException(e);
-      }
+      waitForCommit(executePutBlock(false, false));
     }
     retryRequestBatcher.clear();
+  }
+
+  private RetryChunkSelection selectChunksForRetry(
+      long len,
+      List<ChunkBuffer> allocatedBuffers,
+      RetryRequestBatcher.OptimizedRetryPlan retryPlan) {
+    List<ChunkBuffer> planChunks = retryPlan.getCombinedChunks();
+    if (!planChunks.isEmpty()) {
+      return new RetryChunkSelection(planChunks, retryPlan.needsPutBlock());
+    }
+
+    if (len == 0) {
+      return RetryChunkSelection.empty();
+    }
+
+    List<ChunkBuffer> fallback = new ArrayList<>(allocatedBuffers.size());
+    for (ChunkBuffer buffer : allocatedBuffers) {
+      if (buffer != null && buffer.position() > 0) {
+        fallback.add(buffer);
+      }
+    }
+
+    if (fallback.isEmpty()) {
+      return RetryChunkSelection.empty();
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sliding window optimizer returned no chunks; falling back to {} allocated buffers",
+          fallback.size());
+    }
+    return new RetryChunkSelection(fallback, true);
+  }
+
+  private void waitForCommit(CompletableFuture<PutBlockResult> putBlockFuture)
+      throws IOException {
+    CompletableFuture<Void> watchForCommitAsync =
+        putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
+    try {
+      watchForCommitAsync.get();
+    } catch (InterruptedException e) {
+      handleInterruptedException(e, true);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
+    }
+  }
+
+  private static final class RetryChunkSelection {
+    private static final RetryChunkSelection EMPTY =
+        new RetryChunkSelection(Collections.emptyList(), false);
+
+    private final List<ChunkBuffer> chunks;
+    private final boolean needsPutBlock;
+
+    private RetryChunkSelection(List<ChunkBuffer> chunks, boolean needsPutBlock) {
+      this.chunks = chunks;
+      this.needsPutBlock = needsPutBlock;
+    }
+
+    static RetryChunkSelection empty() {
+      return EMPTY;
+    }
+
+    List<ChunkBuffer> getChunks() {
+      return chunks;
+    }
+
+    boolean needsPutBlock() {
+      return needsPutBlock;
+    }
+
+    boolean isEmpty() {
+      return chunks.isEmpty();
+    }
   }
 
   /**

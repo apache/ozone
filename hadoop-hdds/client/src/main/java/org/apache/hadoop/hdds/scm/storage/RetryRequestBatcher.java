@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -147,15 +146,8 @@ public class RetryRequestBatcher {
   public synchronized void trackInflightWriteChunkRequest(ChunkBuffer buffer, long offset) {
     PendingWriteChunk newRequest = new PendingWriteChunk(buffer, offset);
 
-    int size = inflightWriteChunks.size();
-    int activeStart = writeChunkStartIndex;
-    int relativePos = Collections.binarySearch(
-        inflightWriteChunks.subList(activeStart, size), newRequest);
-    if (relativePos < 0) {
-      relativePos = -relativePos - 1;
-    }
-    int insertPos = activeStart + relativePos;
-    inflightWriteChunks.add(insertPos, newRequest);
+    // Offsets are strictly increasing and non-overlapping; append to the end.
+    inflightWriteChunks.add(newRequest);
 
     sentOffset = Math.max(sentOffset, newRequest.getEndOffset());
   }
@@ -215,37 +207,13 @@ public class RetryRequestBatcher {
     }
 
     List<ChunkBuffer> combinedChunks = new ArrayList<>();
-    boolean needsPutBlock = false;
     long totalDataLength = 0;
-
-    // Merge writeChunk and putBlock sequences with two pointers to preserve ordering.
-    int writeIndex = writeChunkStartIndex;
-    int putIndex = 0;
-    while (writeIndex < inflightWriteChunks.size() || putIndex < inflightPutBlocks.size()) {
-      if (putIndex >= inflightPutBlocks.size()) {
-        PendingWriteChunk writeChunk = inflightWriteChunks.get(writeIndex++);
-        combinedChunks.add(writeChunk.getBuffer());
-        totalDataLength += writeChunk.getLength();
-      } else if (writeIndex >= inflightWriteChunks.size()) {
-        needsPutBlock = true;
-        break;
-      } else {
-        PendingWriteChunk writeChunk = inflightWriteChunks.get(writeIndex);
-        long putBlockOffset = inflightPutBlocks.get(putIndex);
-        if (writeChunk.getEndOffset() <= putBlockOffset) {
-          combinedChunks.add(writeChunk.getBuffer());
-          totalDataLength += writeChunk.getLength();
-          writeIndex++;
-        } else {
-          needsPutBlock = true;
-          putIndex++;
-        }
-      }
+    for (int i = writeChunkStartIndex; i < inflightWriteChunks.size(); i++) {
+      PendingWriteChunk writeChunk = inflightWriteChunks.get(i);
+      combinedChunks.add(writeChunk.getBuffer());
+      totalDataLength += writeChunk.getLength();
     }
-
-    if (!needsPutBlock && putIndex < inflightPutBlocks.size()) {
-      needsPutBlock = true;
-    }
+    boolean needsPutBlock = !inflightPutBlocks.isEmpty();
 
     LOG.debug("Optimized retry plan: {} combined chunks, needsPutBlock={}, totalDataLength={}",
         combinedChunks.size(), needsPutBlock, totalDataLength);
