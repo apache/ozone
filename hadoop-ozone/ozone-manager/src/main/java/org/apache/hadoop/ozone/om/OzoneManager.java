@@ -4017,8 +4017,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot install checkpoint from leader " + leaderId +
           ": checkpointLocation has no parent: " + checkpointLocation);
     }
-    Path checkpointDataDir = Paths.get(checkpointLocation.getParent().toString(),
-        OM_CHECKPOINT_DATA_DIR);
+    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
     Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
     TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(configuration, omDbPath);
@@ -4075,15 +4074,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRpcServer.stop();
       isOmRpcServerRunning = false;
       omRpcServerStopped = true;
-      LOG.info("RPC server is stopped. Spend " +
-          (Time.monotonicNow() - time) + " ms.");
+      LOG.info("RPC server is stopped. Spend {} ms.", Time.monotonicNow() - time);
       try {
         // Stop old metadataManager before replacing DB Dir
         time = Time.monotonicNow();
         metadataManager.stop();
         oldOmMetadataManagerStopped = true;
-        LOG.info("metadataManager is stopped. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("metadataManager is stopped. Spend {} ms.", Time.monotonicNow() - time);
       } catch (Exception e) {
         String errorMsg = "Failed to stop metadataManager. Cannot proceed " +
             "with installing the new checkpoint.";
@@ -4147,8 +4144,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcServer = getRpcServer(configuration);
         omRpcServer.start();
         isOmRpcServerRunning = true;
-        LOG.info("RPC server is re-started. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("RPC server is re-started. Spend {} ms.", Time.monotonicNow() - time);
       } catch (Exception e) {
         String errorMsg = "Failed to start RPC Server.";
         exitManager.exitSystem(1, errorMsg, e, LOG);
