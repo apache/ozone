@@ -13,6 +13,15 @@ set -euo pipefail
 SCRIPT_NAME="$(basename "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
+# Setup logging for all console output
+LOG_BASE="$SCRIPT_DIR/logs"
+TS_NOW="$(date +%Y%m%d_%H%M%S%N)"
+LOG_DIR="$LOG_BASE/installer_${TS_NOW}"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/installer.log"
+# Redirect both stdout and stderr to tee (append mode)
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Logging to $LOG_FILE"
 # Load env first
 if [[ -f "$ENV_FILE" ]]; then
   set -a
@@ -21,6 +30,23 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+get_port_from_local_ozsite() {
+  # Args: $1=property_name
+  local prop="$1"
+  local cfg="$CONFIG_DIR/ozone-site.xml"
+  if [[ -f "$cfg" ]]; then
+    awk -v key="$prop" 'BEGIN{found=0}
+      $0 ~ "<name>[[:space:]]*" key "[[:space:]]*</name>" {found=1; next}
+      found && $0 ~ /<value>/ {
+        line=$0;
+        sub(/.*>/, "", line);
+        sub(/<.*/, "", line);
+        n=split(line, a, ":");
+        if (n>1) { print a[n]; } else { print line; }
+        exit
+      }' "$cfg"
+  fi
+}
 DEFAULT_INSTALL_BASE="${DEFAULT_INSTALL_BASE:-/opt/ozone}"
 DEFAULT_DATA_BASE="${DEFAULT_DATA_BASE:-/data/ozone}"
 DEFAULT_VERSION="${DEFAULT_VERSION:-2.0.0}"
@@ -30,6 +56,7 @@ DATA_DIR_SET="no"
 VERSION_SET="no"
 JDK_SET="no"
 SSH_USER="${SSH_USER:-root}"
+SSH_USER_SET="no"
 DL_URL="${DL_URL:-https://dlcdn.apache.org/ozone/}"
 SEPARATOR="${SEPARATOR:--------------------------------------------}"
 SSH_PORT="${SSH_PORT:-22}"
@@ -47,6 +74,7 @@ VERSION=""
 USE_SUDO="${USE_SUDO:-no}"
 SERVICE_USER="${SERVICE_USER:-ozone}"
 SERVICE_GROUP="${SERVICE_GROUP:-ozone}"
+DEPLOY_ENABLED="no"
 
 declare -a OM_HOSTS
 declare -a SCM_HOSTS
@@ -68,7 +96,9 @@ Options:
   -m, --auth-method <password|key>  SSH auth method (default: password)
   -p, --password <password>         SSH password (if --auth-method=password)
   -k, --keyfile <path>              SSH private key file (if --auth-method=key)
-  -v, --version <x.y.z>             Ozone version (e.g., 1.4.0). If omitted, you can select interactively
+  -v, --version <x.y.z|local>
+                                    Ozone version (e.g., 2.0.0) or local mode:
+                                      - local: link an existing local shared directory (prompts for path and dirname)
   -i, --install-dir <path>          Install Root Directory on host (default: $DEFAULT_INSTALL_BASE)
   -d, --data-dir <path>             Data Root Directory on host (default: $DEFAULT_DATA_BASE)
   -s, --start                       Initialize and start single-node Ozone after install
@@ -128,7 +158,7 @@ parse_args() {
       -x|--clean)
         CLEAN_MODE="yes"; CLEAN_MODE_SET="yes"; shift 1 ;;
       -l|--ssh-user)
-        SSH_USER="$2"; shift 2 ;;
+        SSH_USER="$2"; SSH_USER_SET="yes"; shift 2 ;;
       -S|--use-sudo)
         USE_SUDO="yes"; shift 1 ;;
       -u|--service-user)
@@ -146,6 +176,9 @@ parse_args() {
 main() {
   print_header
   parse_args "$@"
+
+  # Preserve the raw hosts string for cdep (do not expand brace patterns for cdep)
+  DEPLOY_HOSTS_RAW="$HOSTS_ARG_RAW"
 
   # Expand brace patterns in HOSTS_ARG_RAW if present
   if [[ -n "$HOSTS_ARG_RAW" ]]; then
@@ -171,8 +204,39 @@ main() {
     confirm_or_read "JDK major version to install and set" JDK_MAJOR "$JDK_MAJOR"
   fi
   if [[ "$VERSION_SET" != "yes" ]]; then
-    confirm_or_read "Ozone version to install" VERSION "$(select_version)"
+    echo "Select Ozone source:"
+    echo "  1) Upstream Release (2.x.x)"
+    echo "  2) Internal Release (GBN)"
+    echo "  3) Local Directory with Snapshot"
+    read -r -p "Enter choice [1-3]: " _ver_choice || true
+    case "${_ver_choice:-1}" in
+      1)
+        # Show list and allow selection by number or version string
+        if command -v choose_upstream_version >/dev/null 2>&1; then
+          VERSION="$(choose_upstream_version)"
+        else
+          confirm_or_read "Ozone version to install" VERSION "$(select_version)"
+        fi
+        VERSION_SET="yes"
+        ;;
+      2)
+        VERSION="local"
+        VERSION_SET="yes"
+        confirm_or_read "Shared local path on target (directory containing ozone-*-SNAPSHOT/)" LOCAL_SHARED_PATH "${LOCAL_SHARED_PATH:-}"
+        confirm_or_read "Local Ozone directory name (e.g., ozone-2.x.x-SNAPSHOT)" LOCAL_OZONE_DIRNAME "${LOCAL_OZONE_DIRNAME:-}"
+        ;;
+      *)
+        echo "Invalid choice. Defaulting to Upstream Release."
+        confirm_or_read "Ozone version to install" VERSION "$(select_version)"
+        VERSION_SET="yes"
+        ;;
+    esac
   fi
+  if [[ "$VERSION_SET" == "yes" && "$VERSION" == "local" && -z "${LOCAL_SHARED_PATH:-}" ]]; then
+    echo "Error: No local shared path provided" >&2
+    exit 1
+  fi
+
   if [[ "$CLEAN_MODE_SET" != "yes" ]]; then
     confirm_or_read "Cleanup install and data directories" CLEAN_MODE "$CLEAN_MODE"
   fi
@@ -275,13 +339,20 @@ main() {
   # Summary table
     # Record start time
   START_TS=$(date +%s)
+  DEPLOY_RAN="no"
+  DEPLOY_TOTAL_S=0
   START_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  printf "%s\n" "${SEPARATOR}"
+  RECON_WEB_HOST=""
+  printf "\n%s\n" "${SEPARATOR}"
   printf "%-18s | %s\n" "Started at" "$START_ISO"
   printf "%-18s-+-%s\n" "------------------" "----------------------"
   printf "%-18s | %s\n" "Property" "Value"
   printf "%-18s-+-%s\n" "------------------" "----------------------"
   printf "%-18s | %s\n" "Ozone version" "$VERSION"
+  if [[ "$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')" == "local" ]]; then
+    printf "%-18s | %s\n" "Local shared path" "$LOCAL_SHARED_PATH"
+    printf "%-18s | %s\n" "Local Ozone directory name" "$LOCAL_OZONE_DIRNAME"
+  fi
   printf "%-18s | %s\n" "Install directory" "$INSTALL_BASE"
   printf "%-18s | %s\n" "Data directory" "$DATA_BASE"
   printf "%-18s | %s\n" "JDK version" "$JDK_MAJOR"
@@ -299,7 +370,6 @@ main() {
     printf "%-18s | %s\n" "Host Map file" "$ROLE_FILE"
   fi
   printf "%-18s-+-%s\n" "------------------" "----------------------"
-
 
   if [[ "$CLUSTER_MODE" == "single" ]]; then
     if [[ -z "$TARGET_HOST" ]]; then
@@ -326,8 +396,22 @@ main() {
     echo "Preparing directories on target..."
     remote_prepare_dirs "$INSTALL_BASE" "$DATA_BASE"
 
-    echo "Downloading and extracting Ozone $VERSION on target..."
-    remote_download_and_extract "$VERSION" "$INSTALL_BASE"
+    case "$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')" in
+      local)
+        if [[ -z "${LOCAL_SHARED_PATH:-}" ]]; then
+          confirm_or_read "Shared local path on target (directory containing ozone-*/)" LOCAL_SHARED_PATH "${LOCAL_SHARED_PATH:-}"
+        fi
+        if [[ -z "${LOCAL_OZONE_DIRNAME:-}" ]]; then
+          confirm_or_read "Local Ozone directory name (e.g., ozone-2.1.0-SNAPSHOT)" LOCAL_OZONE_DIRNAME "${LOCAL_OZONE_DIRNAME:-}"
+        fi
+        echo "Packaging and uploading local Ozone snapshot '$LOCAL_OZONE_DIRNAME' from '$LOCAL_SHARED_PATH' to target..."
+        upload_local_snapshot_to_target "$LOCAL_SHARED_PATH" "$LOCAL_OZONE_DIRNAME" "$INSTALL_BASE"
+        ;;
+      *)
+        echo "Downloading and extracting Ozone $VERSION on target..."
+        remote_download_and_extract "$VERSION" "$INSTALL_BASE"
+        ;;
+    esac
 
     echo "Setting OZONE_HOME on target..."
     remote_setup_ozone_home "$INSTALL_BASE"
@@ -340,6 +424,15 @@ main() {
     if [[ "$START_AFTER_INSTALL" == "yes" ]]; then
       echo "Initializing and starting Ozone (single-node) on target..."
       single_node_init_and_start "$INSTALL_BASE" "$DATA_BASE"
+      # Capture Recon UI host for summary
+      if [[ -n "${TARGET_HOST:-}" ]]; then
+        RECON_WEB_HOST="${TARGET_HOST#*@}"; RECON_WEB_HOST="${RECON_WEB_HOST%%:*}"
+      fi
+      # Capture UI ports from local ozone-site.xml
+      RECON_WEB_PORT="$(get_port_from_local_ozsite 'ozone.recon.http-address' || true)"; [[ -z "${RECON_WEB_PORT:-}" ]] && RECON_WEB_PORT="9888"
+      OM_WEB_HOST="$RECON_WEB_HOST"; SCM_WEB_HOST="$RECON_WEB_HOST"
+      OM_WEB_PORT="$(get_port_from_local_ozsite 'ozone.om.http-address' || true)"; [[ -z "${OM_WEB_PORT:-}" ]] && OM_WEB_PORT="9874"
+      SCM_WEB_PORT="$(get_port_from_local_ozsite 'ozone.scm.http-address' || true)"; [[ -z "${SCM_WEB_PORT:-}" ]] && SCM_WEB_PORT="9876"
       END_TS=$(date +%s)
       END_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
       echo "${SEPARATOR}"
@@ -368,6 +461,11 @@ Configs generated at:
   $INSTALL_BASE/current/etc/hadoop/ozone-hosts.yaml
 
 EON
+  if [[ -n "${RECON_WEB_HOST:-}" ]]; then
+    printf "OM UI:    http://%s:%s/\n" "$OM_WEB_HOST" "${OM_WEB_PORT}"
+    printf "SCM UI:   http://%s:%s/\n" "$SCM_WEB_HOST" "${SCM_WEB_PORT}"
+    printf "Recon UI: http://%s:%s/\n" "$RECON_WEB_HOST" "${RECON_WEB_PORT}"
+  fi
   elif [[ "$CLUSTER_MODE" == "ha" ]]; then
     # ROLE_FILE is just a filename, derive full path from CONFIG_DIR
     local role_file_path="$CONFIG_DIR/$ROLE_FILE"
@@ -449,27 +547,47 @@ EON
     done
     wait
 
-    # Generate a runtime SSH keypair and deploy to all nodes so they can SSH each other passwordlessly
+  # Deploy cluster-wide SSH identity for node-to-node communication
+  # If a private key was provided via -k, reuse it (generate pub if missing); else generate a runtime keypair
+  local _key_priv _key_pub _tmp_dir=""
+  if [[ "${AUTH_METHOD:-}" == "key" && -n "${AUTH_KEYFILE:-}" ]]; then
+    _key_priv="$AUTH_KEYFILE"
+    if [[ -f "${_key_priv}.pub" ]]; then
+      _key_pub="${_key_priv}.pub"
+    else
+      _tmp_dir="$(mktemp -d)"
+      _key_pub="$_tmp_dir/ozone_cluster_key_default.pub"
+      ssh-keygen -y -f "$_key_priv" > "$_key_pub"
+    fi
+    echo "Using provided private key for cluster SSH; deploying public key to all nodes..."
+  else
     echo "Generating runtime SSH keypair for cluster and deploying to all nodes..."
-    local _tmp_dir _key_priv _key_pub
     _tmp_dir="$(mktemp -d)"
-    _key_priv="$_tmp_dir/ozone_cluster_id_ed25519"
+    _key_priv="$_tmp_dir/ozone_cluster_key_default"
     _key_pub="${_key_priv}.pub"
     ssh-keygen -t ed25519 -N "" -f "$_key_priv" >/dev/null 2>&1
-    for h in "${all_hosts[@]}"; do
-      (
-        parse_host "$h"
-        install_shared_ssh_key "$_key_priv" "$_key_pub"
-      ) &
-    done
-    wait
+  fi
+  for h in "${all_hosts[@]}"; do
+    (
+      parse_host "$h"
+      install_shared_ssh_key "$_key_pub" "$_key_priv"
+    ) &
+  done
+  wait
+  if [[ -n "$_tmp_dir" ]]; then
     rm -rf "$_tmp_dir"
+  fi
 
     # Install to all
-    local om_csv scm_csv dn_csv dn_csv_clean
+    local om_csv scm_csv dn_csv recon_csv dn_csv_clean
     om_csv="$(join_by , "${OM_HOSTS[@]}")"
     scm_csv="$(join_by , "${SCM_HOSTS[@]}")"
     dn_csv="$(join_by , "${DN_HOSTS[@]}")"
+    if [[ ${#RECON_HOSTS[@]} -gt 0 ]]; then
+      recon_csv="$(join_by , "${RECON_HOSTS[@]}")"
+    else
+      recon_csv=""
+    fi
     # Build cleaned DN hostnames (strip user and :port for workers)
     declare -a DN_HOSTS_CLEAN=()
     for h in "${DN_HOSTS[@]}"; do
@@ -480,6 +598,22 @@ EON
       DN_HOSTS_CLEAN+=("$h")
     done
     dn_csv_clean="$(join_by , "${DN_HOSTS_CLEAN[@]}")"
+
+    # Prepare version-source specific parameters once (avoid per-host prompts)
+    local _ver_mode
+    _ver_mode="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
+    case "$_ver_mode" in
+      local)
+        if [[ -z "${LOCAL_SHARED_PATH:-}" ]]; then
+          confirm_or_read "Shared local path on target (directory containing ozone-*/)" LOCAL_SHARED_PATH "${LOCAL_SHARED_PATH:-}"
+        fi
+        if [[ -z "${LOCAL_OZONE_DIRNAME:-}" ]]; then
+          confirm_or_read "Local Ozone directory name (e.g., ozone-2.1.0-SNAPSHOT)" LOCAL_OZONE_DIRNAME "${LOCAL_OZONE_DIRNAME:-}"
+        fi
+        ;;
+      *)
+        ;;
+    esac
 
     for current_host in "${all_hosts[@]}"; do
       (
@@ -498,12 +632,20 @@ EON
         remote_setup_java_home "$JDK_MAJOR"
         echo "[$current_host] Preparing directories..."
         remote_prepare_dirs "$INSTALL_BASE" "$DATA_BASE"
-        echo "[$current_host] Downloading Ozone $VERSION..."
-        remote_download_and_extract "$VERSION" "$INSTALL_BASE"
+        case "$_ver_mode" in
+          local)
+            echo "[$current_host] Linking local Ozone directory '$LOCAL_OZONE_DIRNAME' from '$LOCAL_SHARED_PATH'..."
+            upload_local_snapshot_to_target "$LOCAL_SHARED_PATH" "$LOCAL_OZONE_DIRNAME" "$INSTALL_BASE"
+            ;;
+          *)
+            echo "[$current_host] Downloading Ozone $VERSION..."
+            remote_download_and_extract "$VERSION" "$INSTALL_BASE"
+            ;;
+        esac
         echo "[$current_host] Setting environment..."
         remote_setup_ozone_home "$INSTALL_BASE"
         echo "[$current_host] Generating HA configs..."
-        remote_generate_configs_ha "$INSTALL_BASE" "$DATA_BASE" "$om_csv" "$scm_csv" "$dn_csv"
+        remote_generate_configs_ha "$INSTALL_BASE" "$DATA_BASE" "$om_csv" "$scm_csv" "$dn_csv" "$recon_csv"
         # Also generate workers file to drive start-ozone.sh
         ssh_run "printf '%s' \"$dn_csv_clean\" | tr ',' '\n' > \"$INSTALL_BASE/current/etc/hadoop/workers\""
       ) &
@@ -513,6 +655,19 @@ EON
     if [[ "$START_AFTER_INSTALL" == "yes" ]]; then
       echo "Initializing and starting Ozone (HA) across nodes..."
       ha_init_and_start "$INSTALL_BASE" "$DATA_BASE"
+      # Capture Recon UI host for summary from role file if provided
+      if [[ ${#RECON_HOSTS[@]} -gt 0 ]]; then
+        RECON_WEB_HOST="${RECON_HOSTS[0]}"
+        RECON_WEB_HOST="${RECON_WEB_HOST#*@}"; RECON_WEB_HOST="${RECON_WEB_HOST%%:*}"
+        RECON_WEB_PORT="$(get_port_from_local_ozsite 'ozone.recon.http-address' || true)";
+      fi
+      # Capture UI ports from local ozone-site.xml
+      
+      # OM/SCM hosts from first entries
+      if [[ ${#OM_HOSTS[@]} -gt 0 ]]; then OM_WEB_HOST="${OM_HOSTS[0]}"; OM_WEB_HOST="${OM_WEB_HOST#*@}"; OM_WEB_HOST="${OM_WEB_HOST%%:*}"; fi
+      if [[ ${#SCM_HOSTS[@]} -gt 0 ]]; then SCM_WEB_HOST="${SCM_HOSTS[0]}"; SCM_WEB_HOST="${SCM_WEB_HOST#*@}"; SCM_WEB_HOST="${SCM_WEB_HOST%%:*}"; fi
+      OM_WEB_PORT="$(get_port_from_local_ozsite 'ozone.om.http-address' || true)";
+      SCM_WEB_PORT="$(get_port_from_local_ozsite 'ozone.scm.http-address' || true)";
       END_TS=$(date +%s)
       END_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
       echo "${SEPARATOR}"
@@ -544,18 +699,37 @@ EON
     echo "Error: unknown --cluster-mode '$CLUSTER_MODE' (use 'single' or 'ha')." >&2
     exit 1
   fi
-
+  printf "OM UI:    http://%s:%s/\n" "$OM_WEB_HOST" "${OM_WEB_PORT}"
+  printf "SCM UI:   http://%s:%s/\n" "$SCM_WEB_HOST" "${SCM_WEB_PORT}"
+  printf "Recon UI: http://%s:%s/\n" "$RECON_WEB_HOST" "${RECON_WEB_PORT}"
+  
   # Record end time and total duration
   if [[ "$START_AFTER_INSTALL" == "no" ]]; then
     END_TS=$(date +%s)
     END_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   fi
   TOTAL_S=$((END_TS - START_TS))
+  # Compute install-only time by subtracting deploy time if deploy ran
+  local INSTALL_TOTAL_S INSTALL_M INSTALL_S DEPLOY_M DEPLOY_S
+  if [[ "$DEPLOY_RAN" == "yes" ]]; then
+    INSTALL_TOTAL_S=$((TOTAL_S - DEPLOY_TOTAL_S))
+    (( INSTALL_TOTAL_S < 0 )) && INSTALL_TOTAL_S=0
+  else
+    INSTALL_TOTAL_S=$TOTAL_S
+  fi
+  INSTALL_M=$(((INSTALL_TOTAL_S%3600)/60))
+  INSTALL_S=$((INSTALL_TOTAL_S%60))
   M=$(((TOTAL_S%3600)/60))
   S=$((TOTAL_S%60))
   printf "%s\n" "${SEPARATOR}"
   printf "Completed at: %s\n" "$END_ISO"
-  printf "Total execution time: %02d:%02d >> %d seconds\n" "$M" "$S" "$TOTAL_S"
+  printf "Install time: %02d:%02d >> %d seconds\n" "$INSTALL_M" "$INSTALL_S" "$INSTALL_TOTAL_S"
+  if [[ "$DEPLOY_RAN" == "yes" ]]; then
+    DEPLOY_M=$(((DEPLOY_TOTAL_S%3600)/60))
+    DEPLOY_S=$((DEPLOY_TOTAL_S%60))
+    printf "Deploy time: %02d:%02d >> %d seconds\n" "$DEPLOY_M" "$DEPLOY_S" "$DEPLOY_TOTAL_S"
+  fi
+  printf "Total elapsed time: %02d:%02d >> %d seconds\n" "$M" "$S" "$TOTAL_S"
   printf "%s\n" "${SEPARATOR}"
 }
 
@@ -567,10 +741,8 @@ fi
 
 main "$@"
 
-# ToDo: Add Recon to the role file
 # ToDo: Add S3Gateway to the role file
 # ToDo: Add Httpfs to the role file
-# ToDo: Add Logger to a file
 # ToDo: Kerberos Support
 # ToDo: TDE Support
 # ToDo: TLS Support

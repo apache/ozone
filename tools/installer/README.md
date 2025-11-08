@@ -29,6 +29,20 @@ The Apache Ozone Installer automates the complete deployment process:
 
 ## Prerequisites
 
+### Default Ports to be opened
+
+- StorageContainerManagerStarter
+`9860, 9861, 9863, 9894, 9895, 9876 (UI port)`
+
+- OzoneManagerStarter
+`8981, 9862, 9872, 9874 (UI port)`
+
+- HddsDatanodeService
+`19864, 9856, 9857, 9858, 9859, 9886, 9882 (UI port)`
+
+- ReconServer
+`9891, 9888 (UI port)`
+
 ### Local Machine (Installer)
 - Bash 4.0+
 - SSH client (`ssh`, `scp`)

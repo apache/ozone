@@ -37,6 +37,23 @@
     <name>ozone.om.db.dirs</name>
     <value>DATA_BASE/meta/om</value>
   </property>
+  <property>
+    <name>ozone.recon.http-address</name>
+    <value>host1:9888</value>
+  </property>
+  <property>
+    <name>ozone.recon.address</name>
+    <value>host1:9891</value>
+  </property>
+  <property>
+    <name>ozone.recon.db.dir</name>
+    <value>DATA_BASE/meta/recon</value>
+  </property>
+  <property>
+    <name>ozone.recon.om.db.dir</name>
+    <value>DATA_BASE/meta/recon/om</value>
+  </property>
+  <property>
 </configuration>
 
 

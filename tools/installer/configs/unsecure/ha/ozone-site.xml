@@ -89,6 +89,22 @@
     <name>ozone.scm.skip.bootstrap.validation</name>
     <value>true</value>
   </property>
+  <property>
+    <name>ozone.recon.http-address</name>
+    <value>host3:9888</value>
+  </property>
+  <property>
+    <name>ozone.recon.address</name>
+    <value>host3:9891</value>
+  </property>
+  <property>
+    <name>ozone.recon.db.dir</name>
+    <value>DATA_BASE/data/recon</value>
+  </property>
+  <property>
+    <name>ozone.recon.om.db.dir</name>
+    <value>DATA_BASE/data/recon-om</value>
+  </property>
 </configuration>
 
 

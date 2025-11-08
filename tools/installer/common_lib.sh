@@ -34,7 +34,10 @@ parse_host() {
   else
     TARGET_HOST="$host_part"
   fi
-  if [[ -n "${SSH_USER:-}" ]]; then
+  # Respect explicit user@host unless --ssh-user was provided explicitly
+  if [[ "$raw" != *"@"* ]] && [[ -n "${SSH_USER:-}" ]]; then
+    TARGET_USER="$SSH_USER"
+  elif [[ "${SSH_USER_SET:-no}" == "yes" ]]; then
     TARGET_USER="$SSH_USER"
   fi
 }
@@ -197,6 +200,46 @@ select_version() {
   fi
 }
 
+choose_upstream_version() {
+  # Interactive version chooser that accepts either a version string or a numeric index
+  # Echoes the chosen version on stdout.
+  local versions suggestion count
+  versions="$(fetch_versions_list || true)"
+  if [[ -n "$versions" ]]; then
+    echo "Available Ozone Upstream Released Versions:" >&2
+    nl -ba <<<"$versions" | sed 's/^/  /' >&2
+    count="$(echo "$versions" | wc -l | tr -d ' ')"
+    if [[ -n "${DEFAULT_VERSION:-}" ]]; then
+      suggestion="$DEFAULT_VERSION"
+    else
+      suggestion="$(awk 'NR==1{print;exit}' <<<"$versions")"
+    fi
+    local input choice
+    read -r -p "Ozone version to install [${suggestion} or 1-${count}]: " input || true
+    if [[ -z "$input" ]]; then
+      echo "$suggestion"
+      return
+    fi
+    if [[ "$input" =~ ^[0-9]+$ ]] && [[ "$input" -ge 1 ]] && [[ "$input" -le "$count" ]]; then
+      choice="$(awk -v n="$input" 'NR==n{print;exit}' <<<"$versions")"
+      echo "$choice"
+    else
+      echo "$input"
+    fi
+  else
+    # Fallback to DEFAULT_VERSION or prompt raw
+    local fallback="${DEFAULT_VERSION:-}"
+    local input=""
+    if [[ -n "$fallback" ]]; then
+      read -r -p "Ozone version to install [${fallback}]: " input || true
+      echo "${input:-$fallback}"
+    else
+      read -r -p "Ozone version to install: " input || true
+      echo "$input"
+    fi
+  fi
+}
+
 ensure_ozone_env_sourced() {
   # Ensure /etc/bash.bashrc or /etc/bashrc sources /etc/profile.d/ozone.sh
   # This covers cases where bash is invoked without -l flag (non-login shells)
@@ -214,6 +257,23 @@ ensure_ozone_env_sourced() {
     fi"
 }
 
+remote_get_recon_http_port() {
+  # Echoes the Recon HTTP port from ozone-site.xml on the current TARGET_HOST.
+  # Args: $1 = install_base
+  local install_base="$1"
+  ssh_run "set -euo pipefail; \
+    f=\"$install_base/current/etc/hadoop/ozone-site.xml\"; \
+    if [ -f \"\$f\" ]; then \
+      awk 'BEGIN{found=0} \
+        /<name>[[:space:]]*ozone.recon.http-address[[:space:]]*<\\/name>/{found=1; next} \
+        found && /<value>/{ \
+          gsub(/.*>/, \"\"); gsub(/<.*/, \"\"); \
+          n=split(\$0,a,\":\"); if (n>1) { print a[n]; } else { print \$0; } \
+          exit \
+        }' \"\$f\"; \
+    fi"
+}
+
 ssh_run() {
   local cmd="$*"
   # echo "ssh_run: $cmd"
@@ -226,12 +286,19 @@ ssh_run() {
       # Wrap in sudo bash -c with proper quoting
       local cmd_quoted
       cmd_quoted=$(printf '%q' "$cmd")
-      cmd="sudo -i bash -c $cmd_quoted"
+      cmd="sudo -n bash -c $cmd_quoted"
     else
-      cmd="sudo -i $cmd"
+      cmd="sudo -n $cmd"
     fi
   fi
-  ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "$cmd"
+  local ssh_identity_args=""
+  local ssh_batch_args=""
+  if [[ "${AUTH_METHOD:-}" == "key" && -n "${AUTH_KEYFILE:-}" ]]; then
+    ssh_identity_args="-i ${AUTH_KEYFILE}"
+    ssh_batch_args="-o BatchMode=yes"
+  fi
+  # Use -n so ssh doesn't read from stdin; helps local Ctrl-C work reliably
+  ssh -n -p "$SSH_PORT" ${ssh_identity_args} ${ssh_batch_args} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "$cmd"
 }
 
 ssh_run_as_user() {
@@ -241,9 +308,11 @@ ssh_run_as_user() {
     cmd_quoted=$(printf '%q' "$*")
     
     if [[ "${USE_SUDO:-no}" == "yes" ]]; then
-      ssh_run "sudo -i -u $target_user bash -c $cmd_quoted"
+      # Run as login shell for target user, via sudo, to ensure environment (PATH, OZONE_HOME) is correct
+      ssh_run "sudo -n su - $target_user -c $cmd_quoted"
     else
-      ssh_run "if command -v sudo >/dev/null 2>&1; then sudo -i -u $target_user bash -c $cmd_quoted; else su $target_user -c \"bash -c $cmd_quoted\"; fi"
+      # Fallback when sudo is not requested: try sudo if available, else su (may require password)
+      ssh_run "if command -v sudo >/dev/null 2>&1; then sudo -n -u $target_user bash -c $cmd_quoted; else su - $target_user -c $cmd_quoted; fi"
     fi
   else
     ssh_run "$*"
@@ -251,18 +320,221 @@ ssh_run_as_user() {
 }
 
 scp_put() {
-  scp -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$1" "${TARGET_USER}@${TARGET_HOST}:$2"
+  local -a scp_identity_args=()
+  if [[ "${AUTH_METHOD:-}" == "key" && -n "${AUTH_KEYFILE:-}" ]]; then
+    scp_identity_args=(-i "${AUTH_KEYFILE}" -o BatchMode=yes)
+  fi
+  if [[ -n "${AUTH_PASSWORD:-}" ]]; then
+    sshpass -p "$AUTH_PASSWORD" scp -q -P "$SSH_PORT" "${scp_identity_args[@]}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$1" "${TARGET_USER}@${TARGET_HOST}:$2"
+  else
+    scp -q -P "$SSH_PORT" "${scp_identity_args[@]}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$1" "${TARGET_USER}@${TARGET_HOST}:$2"
+  fi
+}
+
+install_ssh_key() {
+  # Unified function to install SSH keys for passwordless SSH
+  # Args: $1=public_key_path (required), $2=private_key_path (optional)
+  # If private_key is provided, installs both keys for cluster node-to-node communication
+  # If only public_key is provided, only adds to authorized_keys for installer-to-host communication
+  local pub_key_path="$1"
+  local priv_key_path="${2:-}"
+  local service_user="${SERVICE_USER}"
+  # echo "Installing SSH key: $pub_key_path, with private key: $priv_key_path for user: $TARGET_USER"
+  
+  if [[ ! -f "$pub_key_path" ]]; then
+    echo "Error: public key file $pub_key_path does not exist." >&2
+    exit 1
+  fi
+  
+  local pub_key_content
+  pub_key_content="$(cat "$pub_key_path")"
+  
+  if [[ "$AUTH_METHOD" == "password" || -n "${AUTH_PASSWORD:-}" ]]; then
+    if [[ -z "${AUTH_PASSWORD:-}" ]]; then
+      read -rs -p "Enter SSH password for ${TARGET_USER}@${TARGET_HOST}: " AUTH_PASSWORD
+      echo
+    fi
+    sshpass -p "$AUTH_PASSWORD" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "set -euo pipefail; \
+      mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
+      if ! grep -qsF \"$pub_key_content\" ~/.ssh/authorized_keys 2>/dev/null; then \
+        echo \"$pub_key_content\" >> ~/.ssh/authorized_keys; \
+      fi" >/dev/null 2>&1 || true
+    deduplicate_authorized_keys "$TARGET_USER"
+  else
+    if [[ -n "$priv_key_path" ]]; then
+      # Cluster key: install both private and public keys for multiple users
+      local tmp_priv="/tmp/.ozone_cluster_key_default"
+      cat $priv_key_path > $tmp_priv
+      scp_put "$tmp_priv" "$tmp_priv"
+      ssh_run "set -euo pipefail; \
+        install_for_user() { \
+          local target_user=\"\$1\"; \
+          local user_home; \
+          if [ \"\$target_user\" = \"root\" ] || [ -z \"\$target_user\" ]; then \
+            user_home=\"/root\"; \
+          else \
+            user_home=\$(getent passwd \"\$target_user\" | cut -d: -f6 2>/dev/null || echo \"/home/\$target_user\"); \
+          fi; \
+          local ssh_dir=\"\$user_home/.ssh\"; \
+          mkdir -p \"\$ssh_dir\" && chmod 700 \"\$ssh_dir\"; \
+          cp -f $tmp_priv \"\$ssh_dir/id_ed25519\"; \
+          if command -v ssh-keygen >/dev/null 2>&1; then \
+            ssh-keygen -y -f \"\$ssh_dir/id_ed25519\" > \"\$ssh_dir/id_ed25519.pub\" 2>/dev/null || true; \
+          fi; \
+          chmod 600 \"\$ssh_dir/id_ed25519\"; \
+          chmod 644 \"\$ssh_dir/id_ed25519.pub\"; \
+          local cfg=\"\$ssh_dir/config\"; \
+          if [ ! -f \"\$cfg\" ] || ! grep -qsF 'StrictHostKeyChecking' \"\$cfg\" 2>/dev/null; then \
+            printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  IdentityFile ~/.ssh/id_ed25519\n' >> \"\$cfg\"; \
+            chmod 600 \"\$cfg\"; \
+          fi; \
+          if [ \"\$target_user\" != \"root\" ] && [ -n \"\$target_user\" ]; then \
+            chown -R \$target_user:\$target_user \"\$ssh_dir\" 2>/dev/null || true; \
+          fi; \
+        }; \
+        install_for_user \""$TARGET_USER"\"; \
+        if [ -n \"$service_user\" ] && [ \"$service_user\" != \""$TARGET_USER"\" ]; then \
+          install_for_user \"$service_user\"; \
+        fi; \
+        rm -f $tmp_priv"
+      # In key auth mode, do not modify authorized_keys (assumed already configured)
+      # Clean up local temporary key copy
+      rm -f "$tmp_priv" 2>/dev/null || true
+    else
+      # Installer key: only add public key to authorized_keys
+      local tmp_pub="/tmp/.ozone_key.pub"
+      scp_put "$pub_key_path" "$tmp_pub"
+      ssh_run "set -euo pipefail; \
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
+        if ! grep -qsF \"\$(cat $tmp_pub)\" ~/.ssh/authorized_keys 2>/dev/null; then \
+          cat $tmp_pub >> ~/.ssh/authorized_keys; \
+        fi; \
+        rm -f $tmp_pub"
+      deduplicate_authorized_keys "$TARGET_USER"
+    fi
+  fi
+}
+
+install_shared_ssh_key() {
+  # Install shared SSH keypair for cluster node-to-node communication
+  # Args: $1=local_public_key_path, $2=local_private_key_path
+  install_ssh_key "$1" "$2"
+}
+
+deduplicate_authorized_keys() {
+  # Deduplicate entries in authorized_keys for a given user on the remote host
+  # Args: $1=target_user (e.g., root, ozone)
+  local target_user="$1"
+  ssh_run "set -euo pipefail; \
+    TU=\"$target_user\"; \
+    if [ -z \"\$TU\" ] || [ \"\$TU\" = \"root\" ]; then \
+      USER_HOME=\"/root\"; \
+    else \
+      USER_HOME=\$(getent passwd \"\$TU\" | cut -d: -f6 2>/dev/null || echo \"/home/\$TU\"); \
+    fi; \
+    AUTH_FILE=\"\$USER_HOME/.ssh/authorized_keys\"; \
+    if [ -f \"\$AUTH_FILE\" ]; then \
+      TMP=\$(mktemp); \
+      awk '!seen[\$0]++' \"\$AUTH_FILE\" > \"\$TMP\" && mv \"\$TMP\" \"\$AUTH_FILE\"; \
+      chmod 600 \"\$AUTH_FILE\" 2>/dev/null || true; \
+      if [ \"\$TU\" != \"root\" ] && [ -n \"\$TU\" ]; then \
+        chown \"\$TU\":\"\$TU\" \"\$AUTH_FILE\" 2>/dev/null || true; \
+      fi; \
+    fi"
+}
+
+ensure_passwordless_ssh() {
+  local ssh_dir="$HOME/.ssh"
+  local installer_priv="${AUTH_KEYFILE:-$ssh_dir/ozone_installer_key_default}"
+  local installer_pub="${installer_priv}.pub"
+  local new_key_created="no"
+  mkdir -p "$ssh_dir"
+  
+  chmod 700 "$ssh_dir" 2>/dev/null || true
+  if [[ "${AUTH_METHOD:-}" == "key" && -n "${AUTH_KEYFILE:-}" ]]; then
+    chmod 600 "$installer_priv" 2>/dev/null || true
+    if [[ ! -f "$installer_pub" ]]; then
+      ssh-keygen -y -f "$installer_priv" > "$installer_pub"
+      chmod 644 "$installer_pub" 2>/dev/null || true
+    fi
+  else
+    if [[ ! -f "$installer_priv" ]]; then
+      echo "Generating installer SSH key at $installer_priv (ed25519)..."
+      ssh-keygen -t ed25519 -N "" -f "$installer_priv" >/dev/null
+      new_key_created="yes"
+    fi
+    if [[ ! -f "$installer_pub" ]]; then
+      ssh-keygen -y -f "$installer_priv" > "$installer_pub"
+      chmod 644 "$installer_pub" 2>/dev/null || true
+    fi
+  fi
+  # If we generated a new private key, add its pub key to local authorized_keys (per request)
+  if [[ "$new_key_created" == "yes" ]]; then
+    local auth_local="$ssh_dir/authorized_keys"
+    touch "$auth_local"
+    chmod 600 "$auth_local" 2>/dev/null || true
+    if ! grep -qsF "$(cat "$installer_pub")" "$auth_local" 2>/dev/null; then
+      cat "$installer_pub" >> "$auth_local"
+    fi
+  fi
+  # Ensure ssh config uses the installer key for this host, user and port
+  local ssh_cfg="$ssh_dir/config"
+  touch "$ssh_cfg"
+  chmod 600 "$ssh_cfg" 2>/dev/null || true
+  # Prefer a single wildcard entry for the domain (e.g., *.vpc.cloudera.com)
+  local domain="" host_entry=""
+  if [[ "$TARGET_HOST" == *.* ]]; then
+    domain="${TARGET_HOST#*.}"
+  fi
+  if [[ -n "$domain" ]]; then
+    host_entry="*.$domain"
+  else
+    host_entry="${TARGET_HOST}"
+  fi
+  # If the Host line already exists, do not add again
+  if ! grep -qsF "Host ${host_entry}" "$ssh_cfg" 2>/dev/null; then
+    {
+      echo "Host ${host_entry}"
+      echo "  User ${TARGET_USER}"
+      echo "  Port ${SSH_PORT}"
+      echo "  IdentityFile ${installer_priv}"
+      echo "  StrictHostKeyChecking no"
+      echo "  UserKnownHostsFile /dev/null"
+    } >> "$ssh_cfg"
+  fi
+  # Use the installer key for subsequent ssh/scp calls when key mode is enabled
+  if [[ "${AUTH_METHOD:-}" == "key" ]]; then
+    AUTH_KEYFILE="$installer_priv"
+  fi
+  echo "Setting up passwordless SSH to ${TARGET_USER}@${TARGET_HOST}:${SSH_PORT}..."
+  install_ssh_key "$installer_pub" "$installer_priv"
+  echo "Passwordless SSH is configured. Testing..."
+  ssh_run "echo OK" >/dev/null
+}
+
+ensure_passwordless_ssh_to_host() {
+  local host="$1"
+  local prev_host="$TARGET_HOST" prev_port="$SSH_PORT"
+  parse_host "$host"
+  # Run quietly to avoid interleaved output when executed in parallel
+  if ensure_passwordless_ssh >/dev/null 2>&1; then
+    printf "[%s@%s:%s] Passwordless SSH OK\n" "${TARGET_USER}" "${TARGET_HOST}" "${SSH_PORT}"
+  else
+    printf "[%s@%s:%s] Passwordless SSH FAILED\n" "${TARGET_USER}" "${TARGET_HOST}" "${SSH_PORT}" >&2
+  fi
+  TARGET_HOST="$prev_host"; SSH_PORT="$prev_port"
 }
 
 remote_cleanup_dirs() {
   local install_base="$1" data_base="$2"
   ssh_run "set -euo pipefail; \
+    SUDO_CMD=''; if command -v sudo >/dev/null 2>&1; then SUDO_CMD='sudo -n'; fi; \
     echo 'Cleaning install base: $install_base and data base: $data_base...' >&2; \
-    rm -rf $install_base $data_base; \
-    mkdir -p $install_base $data_base; \
+    \$SUDO_CMD rm -rf $install_base $data_base; \
+    \$SUDO_CMD mkdir -p $install_base $data_base; \
     echo 'Stopping Ozone processes (if any)...' >&2; \
-    for pat in 'Hdds[D]atanodeService' 'Ozone[M]anagerStarter' 'StorageContainerManager[S]tarter'; do \
-      pkill -9 -f \"\$pat\" || true; \
+    for pat in 'Hdds[D]atanodeService' 'Ozone[M]anagerStarter' 'StorageContainerManager[S]tarter' '[R]econServer'; do \
+      \$SUDO_CMD pkill -9 -f \"\$pat\" || true; \
     done; "
 }
 
@@ -315,10 +587,95 @@ unique_hosts() {
   awk '!seen[$0]++' <(printf "%s\n" "$@")
 }
 
-install_shared_ssh_key() {
-  # Install shared SSH keypair for cluster node-to-node communication
-  # Args: $1=local_private_key_path, $2=local_public_key_path
-  install_ssh_key "$2" "$1"
+stage_internal_or_local() {
+  # Unified staging of Ozone binaries on target for "internal" and "local snapshot" modes
+  # Usage:
+  #   stage_internal_or_local internal <gbn> <os_flavor> <install_base>
+  #   stage_internal_or_local local    <shared_path> <dir_name> <install_base>
+  local mode="$1"; shift
+  case "$mode" in
+    local)
+      local shared_path="$1" dir_name="$2" install_base="$3"
+      local source_dir="$shared_path/$dir_name"
+      local service_user="${SERVICE_USER}"
+      local service_group="${SERVICE_GROUP}"
+      if [[ ! -d "$source_dir" ]]; then
+        echo "ERROR: Local Ozone snapshot directory does not exist: $source_dir" >&2
+        exit 1
+      fi
+      local _tmp_dir _tar_file
+      _tmp_dir="$(mktemp -d)"
+      _tar_file="$_tmp_dir/${dir_name}.tar.gz"
+      echo "Creating tarball from local snapshot: $source_dir -> $_tar_file"
+      tar -C "$shared_path" -czf "$_tar_file" "$dir_name"
+      echo "Uploading tarball to target: ${TARGET_USER}@${TARGET_HOST}:$install_base/${dir_name}.tar.gz"
+      scp_put "$_tmp_dir/${dir_name}.tar.gz" "$install_base/${dir_name}.tar.gz"
+      rm -rf "$_tmp_dir"
+      ssh_run "set -euo pipefail; \
+        mkdir -p \"$install_base\"; \
+        cd \"$install_base\"; \
+        echo 'Extracting snapshot tarball ...' >&2; \
+        tar -xzf ${dir_name}.tar.gz -C \"$install_base\"; \
+        rm -f current; ln -s \"$install_base/$dir_name\" current; \
+        chown -R $service_user:$service_group \"$install_base\" 2>/dev/null || true; \
+        rm -f ${dir_name}.tar.gz; \
+        echo \"Linked <<$install_base/current>> to <<$install_base/$dir_name>>\" >&2"
+      ;;
+    *)
+      echo "stage_internal_or_local: unknown mode '$mode' (expected 'internal' or 'local')" >&2
+      return 1
+      ;;
+  esac
+}
+
+get_internal_os_options() {
+  # Args: $1=GBN
+  # Prints available OS flavors for the given GBN (one per line)
+  local gbn="$1"
+  local base="https://cloudera-build-2-us-west-2.vpc.cloudera.com/s3/build/${gbn}/cdh/7.x/"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "" ; return
+  fi
+  local html
+  html="$(curl -fsSL "$base" 2>/dev/null || true)"
+  if [[ -z "$html" ]]; then
+    echo "" ; return
+  fi
+  # Extract directory names that look like OS flavors (e.g., redhat8, redhat8arm64, redhat9, redhat9arm64, sles15, ubuntu22)
+  printf '%s\n' "$html" \
+    | grep -Eo 'href="[^"]+/"' \
+    | sed -E 's/^href="([^"/]+)\/".*$/\1/' \
+    | grep -E '^(redhat[0-9]+(arm64)?|ubuntu[0-9]+|sles[0-9]+)$' \
+    | sort -u
+}
+
+choose_internal_os_flavor() {
+  # Args: $1=GBN
+  # Echoes the selected OS flavor
+  local gbn="$1"
+  local options
+  options="$(get_internal_os_options "$gbn")"
+  local idx=0
+  local -a arr=()
+  if [[ -z "$options" ]]; then
+    echo "Could not fetch OS flavors for GBN ${gbn}; showing known options:" >&2
+    arr=(redhat8 redhat9 redhat8arm64 redhat9arm64 sles15 ubuntu22 ubuntu24)
+  else
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      arr+=("$line")
+    done <<<"$options"
+  fi
+  echo "Available OS flavors for GBN ${gbn}:" >&2
+  for ((idx=0; idx<${#arr[@]}; idx++)); do
+    printf "  %d) %s\n" "$((idx+1))" "${arr[$idx]}" >&2
+  done
+  local sel
+  read -r -p "Select OS flavor [1-${#arr[@]}] (default 1): " sel || true
+  if [[ -z "$sel" || ! "$sel" =~ ^[0-9]+$ || "$sel" -lt 1 || "$sel" -gt ${#arr[@]} ]]; then
+    sel=1
+  fi
+  echo "${arr[$((sel-1))]}"
 }
 
 run_smoke_on_host() {
@@ -422,115 +779,6 @@ remote_setup_ozone_home() {
   ensure_ozone_env_sourced
 }
 
-install_ssh_key() {
-  # Unified function to install SSH keys for passwordless SSH
-  # Args: $1=public_key_path (required), $2=private_key_path (optional)
-  # If private_key is provided, installs both keys for cluster node-to-node communication
-  # If only public_key is provided, only adds to authorized_keys for installer-to-host communication
-  local pub_key_path="$1"
-  local priv_key_path="${2:-}"
-  local service_user="${SERVICE_USER}"
-  
-  if [[ ! -f "$pub_key_path" ]]; then
-    echo "Error: public key file $pub_key_path does not exist." >&2
-    exit 1
-  fi
-  
-  local pub_key_content
-  pub_key_content="$(cat "$pub_key_path")"
-  
-  if [[ "$AUTH_METHOD" == "password" ]]; then
-    if [[ -z "${AUTH_PASSWORD:-}" ]]; then
-      read -rs -p "Enter SSH password for ${TARGET_USER}@${TARGET_HOST}: " AUTH_PASSWORD
-      echo
-    fi
-    sshpass -p "$AUTH_PASSWORD" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${TARGET_USER}@${TARGET_HOST}" "set -euo pipefail; \
-      mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
-      if ! grep -qsF \"$pub_key_content\" ~/.ssh/authorized_keys 2>/dev/null; then \
-        echo \"$pub_key_content\" >> ~/.ssh/authorized_keys; \
-      fi" >/dev/null 2>&1 || true
-    deduplicate_authorized_keys "$TARGET_USER"
-  else
-    if [[ -n "$priv_key_path" ]]; then
-      # Cluster key: install both private and public keys for multiple users
-      local tmp_priv="/tmp/.ozone_cluster_key" tmp_pub="/tmp/.ozone_key.pub"
-      scp_put "$priv_key_path" "$tmp_priv"
-      scp_put "$pub_key_path" "$tmp_pub"
-      ssh_run "set -euo pipefail; \
-        PUB_KEY=\$(cat $tmp_pub); \
-        install_for_user() { \
-          local target_user=\"\$1\"; \
-          local user_home; \
-          if [ \"\$target_user\" = \"root\" ] || [ -z \"\$target_user\" ]; then \
-            user_home=\"/root\"; \
-          else \
-            user_home=\$(getent passwd \"\$target_user\" | cut -d: -f6 2>/dev/null || echo \"/home/\$target_user\"); \
-          fi; \
-          local ssh_dir=\"\$user_home/.ssh\"; \
-          mkdir -p \"\$ssh_dir\" && chmod 700 \"\$ssh_dir\"; \
-          touch \"\$ssh_dir/authorized_keys\" && chmod 600 \"\$ssh_dir/authorized_keys\"; \
-          if ! grep -qsF \"\$PUB_KEY\" \"\$ssh_dir/authorized_keys\" 2>/dev/null; then \
-            echo \"\$PUB_KEY\" >> \"\$ssh_dir/authorized_keys\"; \
-          fi; \
-          cp -f $tmp_priv \"\$ssh_dir/id_ed25519\"; \
-          cp -f $tmp_pub  \"\$ssh_dir/id_ed25519.pub\"; \
-          chmod 600 \"\$ssh_dir/id_ed25519\"; \
-          chmod 644 \"\$ssh_dir/id_ed25519.pub\"; \
-          local cfg=\"\$ssh_dir/config\"; \
-          if [ ! -f \"\$cfg\" ] || ! grep -qsF 'StrictHostKeyChecking' \"\$cfg\" 2>/dev/null; then \
-            printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  IdentityFile ~/.ssh/id_ed25519\n' >> \"\$cfg\"; \
-            chmod 600 \"\$cfg\"; \
-          fi; \
-          if [ \"\$target_user\" != \"root\" ] && [ -n \"\$target_user\" ]; then \
-            chown -R \$target_user:\$target_user \"\$ssh_dir\" 2>/dev/null || true; \
-          fi; \
-        }; \
-        CURRENT_USER=\$(whoami); \
-        install_for_user \"\$CURRENT_USER\"; \
-        if [ -n \"$service_user\" ] && [ \"$service_user\" != \"\$CURRENT_USER\" ]; then \
-          install_for_user \"$service_user\"; \
-        fi; \
-        rm -f $tmp_priv $tmp_pub"
-      # Deduplicate authorized_keys for both users using helper function
-      deduplicate_authorized_keys "$TARGET_USER"
-      if [[ -n "$service_user" && "$service_user" != "$TARGET_USER" ]]; then
-        deduplicate_authorized_keys "$service_user"
-      fi
-    else
-      # Installer key: only add public key to authorized_keys
-      local tmp_pub="/tmp/.ozone_key.pub"
-      scp_put "$pub_key_path" "$tmp_pub"
-      ssh_run "set -euo pipefail; \
-        mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; \
-        if ! grep -qsF \"\$(cat $tmp_pub)\" ~/.ssh/authorized_keys 2>/dev/null; then \
-          cat $tmp_pub >> ~/.ssh/authorized_keys; \
-        fi; \
-        rm -f $tmp_pub"
-      deduplicate_authorized_keys "$TARGET_USER"
-    fi
-  fi
-}
-
-ensure_passwordless_ssh() {
-  if [[ ! -f "$HOME/.ssh/id_ed25519" ]]; then
-    echo "Generating a new SSH key (ed25519)..."
-    ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" >/dev/null
-  fi
-  local keyfile="$HOME/.ssh/id_ed25519.pub"
-  echo "Setting up passwordless SSH to ${TARGET_USER}@${TARGET_HOST}:${SSH_PORT}..."
-  install_ssh_key "$keyfile"
-  echo "Passwordless SSH is configured. Testing..."
-  ssh_run "echo OK" >/dev/null
-}
-
-ensure_passwordless_ssh_to_host() {
-  local host="$1"
-  local prev_host="$TARGET_HOST" prev_port="$SSH_PORT"
-  parse_host "$host"
-  ensure_passwordless_ssh
-  TARGET_HOST="$prev_host"; SSH_PORT="$prev_port"
-}
-
 remote_create_service_user() {
   local service_user="$1"
   local service_group="$2"
@@ -610,6 +858,25 @@ remote_download_and_extract() {
     chown -R $service_user:$service_group \"$install_base\" 2>/dev/null || true; "
 }
 
+remote_download_internal_and_extract() { stage_internal_or_local internal "$@"; }
+
+remote_link_local_current() {
+  local shared_path="$1" dir_name="$2" install_base="$3"
+  local link="${install_base}/current"
+  ssh_run "set -euo pipefail; \
+    mkdir -p \"$install_base\"; \
+    local_dir=\"$shared_path/$dir_name\"; \
+    if [ ! -d \"\$local_dir\" ]; then \
+      echo \"Local Ozone directory not found: \$local_dir\" >&2; \
+      exit 1; \
+    fi; \
+    rm -f \"$link\"; \
+    ln -s \"\$local_dir\" \"$link\"; \
+    echo \"Linked <<$link>> to <<\$local_dir>>\""
+}
+
+upload_local_snapshot_to_target() { stage_internal_or_local local "$@"; }
+
 remote_generate_configs() {
   local install_base="$1" data_base="$2" om_host="$3" scm_host="$4"
   local etc_dir="${install_base}/current/etc/hadoop"
@@ -619,22 +886,31 @@ remote_generate_configs() {
   local core_xml="${etc_dir}/core-site.xml"
   ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\"; \
     if [ -x \"$install_base/current/bin/ozone\" ]; then \"$install_base/current/bin/ozone\" genconf \"$etc_dir\" >/dev/null 2>&1 || true; fi"
-  ssh_run "cat > \"$hosts_yaml\" <<'YAML'
-om:
-  - ${om_host}
-scm:
-  - ${scm_host}
-datanodes:
-  - ${om_host}
-recon:
-  # - recon-host
-YAML"
+  local tmp_hosts_file
+  tmp_hosts_file="$(mktemp)"
+  {
+    echo "om:"
+    echo "  - ${om_host}"
+    echo "scm:"
+    echo "  - ${scm_host}"
+    echo "datanodes:"
+    echo "  - ${om_host}"
+    echo "recon:"
+    echo "  - ${om_host}"
+  } > "$tmp_hosts_file"
+  local remote_tmp="/tmp/.ozone_hosts_$RANDOM.yaml"
+  scp_put "$tmp_hosts_file" "$remote_tmp"
+  rm -f "$tmp_hosts_file"
+  local service_user="${SERVICE_USER}"
+  local service_group="${SERVICE_GROUP}"
+  ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\" && mv -f \"$remote_tmp\" \"$hosts_yaml\" && \
+    chown $service_user:$service_group \"$hosts_yaml\" 2>/dev/null || true"
   local cfg_dir="$CONFIG_DIR"
   remote_upload_xmls "$cfg_dir" "$etc_dir" "$om_host" "$data_base"
 }
 
 remote_generate_configs_ha() {
-  local install_base="$1" data_base="$2" om_hosts_csv="$3" scm_hosts_csv="$4" dn_hosts_csv="$5"
+  local install_base="$1" data_base="$2" om_hosts_csv="$3" scm_hosts_csv="$4" dn_hosts_csv="$5" recon_hosts_csv="${6:-}"
   local etc_dir="${install_base}/current/etc/hadoop"
   local hosts_yaml="${etc_dir}/ozone-hosts.yaml"
   local ozone_xml="${etc_dir}/ozone-site.xml"
@@ -642,20 +918,42 @@ remote_generate_configs_ha() {
   local core_xml="${etc_dir}/core-site.xml"
   ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\"; \
     if [ -x \"$install_base/current/bin/ozone\" ]; then \"$install_base/current/bin/ozone\" genconf \"$etc_dir\" >/dev/null 2>&1 || true; fi"
-  local om_hosts_clean scm_hosts_clean dn_hosts_clean
+  local om_hosts_clean scm_hosts_clean dn_hosts_clean recon_hosts_clean
   om_hosts_clean="$(echo "$om_hosts_csv" | tr ',' '\n' | sed 's/.*@//' | sed 's/:.*//' | paste -sd, -)"
   scm_hosts_clean="$(echo "$scm_hosts_csv" | tr ',' '\n' | sed 's/.*@//' | sed 's/:.*//' | paste -sd, -)"
   dn_hosts_clean="$(echo "$dn_hosts_csv" | tr ',' '\n' | sed 's/.*@//' | sed 's/:.*//' | paste -sd, -)"
-  ssh_run "cat > \"$hosts_yaml\" <<YAML
-om:
-$(echo "$om_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')
-scm:
-$(echo "$scm_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')
-datanodes:
-$(echo "$dn_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')
-recon:
-  # - recon-host
-YAML"
+  if [[ -n "$recon_hosts_csv" ]]; then
+    recon_hosts_clean="$(echo "$recon_hosts_csv" | tr ',' '\n' | sed 's/.*@//' | sed 's/:.*//' | paste -sd, -)"
+  else
+    recon_hosts_clean=""
+  fi
+  local first_recon_clean=""
+  if [[ -n "$recon_hosts_clean" ]]; then
+    first_recon_clean="$(echo "$recon_hosts_clean" | awk -F',' '{print $1}')"
+  fi
+  local tmp_hosts_file
+  tmp_hosts_file="$(mktemp)"
+  {
+    echo "om:"
+    printf "%s\n" "$(echo "$om_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')"
+    echo "scm:"
+    printf "%s\n" "$(echo "$scm_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')"
+    echo "datanodes:"
+    printf "%s\n" "$(echo "$dn_hosts_clean" | tr ',' '\n' | sed 's/^/  - /')"
+    echo "recon:"
+    if [[ -n "$first_recon_clean" ]]; then
+      printf "  - %s\n" "$first_recon_clean"
+    else
+      echo "  # - recon-host"
+    fi
+  } > "$tmp_hosts_file"
+  local remote_tmp="/tmp/.ozone_hosts_$RANDOM.yaml"
+  scp_put "$tmp_hosts_file" "$remote_tmp"
+  rm -f "$tmp_hosts_file"
+  local service_user="${SERVICE_USER}"
+  local service_group="${SERVICE_GROUP}"
+  ssh_run "set -euo pipefail; mkdir -p \"$etc_dir\" && mv -f \"$remote_tmp\" \"$hosts_yaml\" && \
+    chown $service_user:$service_group \"$hosts_yaml\" 2>/dev/null || true"
   local om_nodes om_props
   om_nodes="$(echo "$om_hosts_clean" | awk -F',' '{for(i=1;i<=NF;i++) printf (i>1?",":"")"om"i}')"
   om_props=""
@@ -671,68 +969,84 @@ YAML"
 
 single_node_init_and_start() {
   local install_base="$1" data_base="$2"
-  ssh_run_as_user "set -euo pipefail; \
-    if [ ! -x \"$install_base/current/bin/ozone\" ]; then echo 'ERROR: ozone binary missing or not executable' >&2; exit 1; fi; \
-    echo 'Initializing SCM on <<$TARGET_HOST>>' >&2; \
-    if ! ozone scm --init >/dev/null 2>&1; then echo 'ERROR: Failed to initialize SCM on <<$TARGET_HOST>>' >&2; exit 1; fi; \
-    echo 'Starting SCM on <<$TARGET_HOST>>' >&2; \
-    if ! ozone --daemon start scm >/dev/null 2>&1; then echo 'ERROR: Failed to start SCM on <<$TARGET_HOST>>' >&2; exit 1; fi; \
-    echo 'Initializing OM on <<$TARGET_HOST>>' >&2; \
-    if ! ozone om --init >/dev/null 2>&1; then echo 'ERROR: Failed to initialize OM on <<$TARGET_HOST>>' >&2; exit 1; fi; \
-    echo 'Starting OM on <<$TARGET_HOST>>' >&2; \
-    if ! ozone --daemon start om >/dev/null 2>&1; then echo 'ERROR: Failed to start OM on <<$TARGET_HOST>>' >&2; exit 1; fi; \
-    echo 'Starting Datanode on <<$TARGET_HOST>>' >&2; \
-    if ! ozone --daemon start datanode >/dev/null 2>&1; then echo 'ERROR: Failed to start Datanode on <<$TARGET_HOST>>' >&2; exit 1; fi; \
-    echo 'Ozone services started (single-node).' >&2"
+  local host="$TARGET_HOST"
+  local log_dir="${LOG_DIR}/${TARGET_HOST}"
+  ssh_run_as_user "set -euo pipefail; if [ ! -x \"$install_base/current/bin/ozone\" ]; then echo 'ERROR: ozone binary missing or not executable' >&2; exit 1; fi"
+  echo 'Initializing SCM on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone scm --init 2>&1" >> "${log_dir}/scm_init.log" 2>&1
+  echo 'Starting SCM on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone --daemon start scm 2>&1" >> "${log_dir}/scm_start.log" 2>&1
+  echo 'Initializing OM on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone om --init 2>&1" >> "${log_dir}/om_init.log" 2>&1
+  echo 'Starting OM on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone --daemon start om 2>&1" >> "${log_dir}/om_start.log" 2>&1
+  echo 'Starting Datanode on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone --daemon start datanode 2>&1" >> "${log_dir}/dn_start.log" 2>&1
+  echo 'Starting Recon on <<$host>>' >&2;
+  ssh_run_as_user "set -euo pipefail; mkdir -p $log_dir && ozone --daemon start recon 2>&1" >> "${log_dir}/recon_start.log" 2>&1
+  echo 'Ozone services started (single-node).' >&2
 }
 
 ha_init_and_start() {
   local install_base="$1" data_base="$2"
   local first_scm first_om h
   first_scm="${SCM_HOSTS[0]}"
+  local scm_log_dir="${LOG_DIR}/${first_scm}"
   first_om="${OM_HOSTS[0]}"
+  local om_log_dir="${LOG_DIR}/${first_om}"
+  mkdir -p $scm_log_dir $om_log_dir;
   parse_host "$first_scm"
-  ssh_run_as_user "set -euo pipefail; \
-    if [ ! -x \"$install_base/current/bin/ozone\" ]; then echo 'ERROR: ozone binary missing or not executable' >&2; exit 1; fi; \
-    echo 'Initializing SCM on <<$first_scm>>' >&2; \
-    if ! ozone scm --init >/dev/null 2>&1; then echo 'ERROR: Failed to initialize SCM on <<$first_scm>>' >&2; exit 1; fi; \
-    echo 'Starting SCM on <<$first_scm>>' >&2; \
-    if ! ozone --daemon start scm >/dev/null 2>&1; then echo 'ERROR: Failed to start SCM on <<$first_scm>>' >&2; exit 1; fi;"
+  ssh_run_as_user "set -euo pipefail; if [ ! -x \"$install_base/current/bin/ozone\" ]; then echo 'ERROR: ozone binary missing or not executable' >&2; exit 1; fi"
+  echo "Initializing SCM on <<$first_scm>>" >&2;
+  ssh_run_as_user "set -euo pipefail; ozone scm --init 2>&1" >> "${scm_log_dir}/scm_init.log" 2>&1
+  echo "Starting SCM on <<$first_scm>>" >&2;
+  ssh_run_as_user "set -euo pipefail; ozone --daemon start scm 2>&1" >> "${scm_log_dir}/scm_start.log" 2>&1
   for h in "${SCM_HOSTS[@]:1}"; do
     (
     parse_host "$h"
-    ssh_run_as_user "set -euo pipefail; \
-      echo 'Bootstrapping SCM on <<$h>>' >&2; \
-      if ! ozone scm --bootstrap >/dev/null 2>&1; then echo 'ERROR: Failed to bootstrap SCM on <<$h>>' >&2; exit 1; fi; \
-      echo 'Starting SCM on <<$h>>' >&2; \
-      if ! ozone --daemon start scm >/dev/null 2>&1; then echo 'ERROR: Failed to start SCM on <<$h>>' >&2; exit 1; fi;"
+    local scm_log_dir="${LOG_DIR}/${h}"
+    mkdir -p $scm_log_dir;
+    echo "Bootstrapping SCM on <<$h>>" >&2;
+    ssh_run_as_user "set -euo pipefail; ozone scm --bootstrap 2>&1" >> "${scm_log_dir}/scm_bootstrap.log" 2>&1
+    echo "Starting SCM on <<$h>>" >&2;
+    ssh_run_as_user "set -euo pipefail; ozone --daemon start scm 2>&1" >> "${scm_log_dir}/scm_start.log" 2>&1
     ) &
   done
   wait
   parse_host "$first_om"
-  ssh_run_as_user "set -euo pipefail; \
-    echo 'Initializing OM on <<$first_om>>' >&2; \
-    if ! ozone om --init >/dev/null 2>&1; then echo 'ERROR: Failed to initialize OM on <<$first_om>>' >&2; return; fi; \
-    echo 'Starting OM on <<$first_om>>' >&2; \
-    if ! ozone --daemon start om >/dev/null 2>&1; then echo 'ERROR: Failed to start OM on <<$first_om>>' >&2; return; fi;"
+  echo "Initializing OM on <<$first_om>>" >&2;
+  ssh_run_as_user "set -euo pipefail; ozone om --init 2>&1" >> "${om_log_dir}/om_init.log" 2>&1
+  echo "Starting OM on <<$first_om>>" >&2;
+  ssh_run_as_user "set -euo pipefail; ozone --daemon start om 2>&1" >> "${om_log_dir}/om_start.log" 2>&1
   for h in "${OM_HOSTS[@]:1}"; do
     (
     parse_host "$h"
-    ssh_run_as_user "set -euo pipefail; \
-      echo 'Bootstrapping OM on <<$h>>' >&2; \
-      if ! ozone om --init >/dev/null 2>&1; then echo 'ERROR: Failed to initialize OM on <<$h>>' >&2; return; fi; \
-      echo 'Starting OM on <<$h>>' >&2; \
-      if ! ozone --daemon start om >/dev/null 2>&1; then echo 'ERROR: Failed to start OM on <<$h>>' >&2; return; fi;"
+    local om_log_dir="${LOG_DIR}/${h}"
+    mkdir -p $om_log_dir;
+    echo "Bootstrapping OM on <<$h>>" >&2;
+    ssh_run_as_user "set -euo pipefail; ozone om --init 2>&1" >> "${om_log_dir}/om_init.log" 2>&1
+    echo "Starting OM on <<$h>>" >&2;
+    ssh_run_as_user "set -euo pipefail; ozone --daemon start om 2>&1" >> "${om_log_dir}/om_start.log" 2>&1
     ) &
   done
   wait
   for h in "${DN_HOSTS[@]}"; do
     (
       parse_host "$h"
-      ssh_run_as_user "set -euo pipefail; \
-        echo 'Starting Datanode on <<$h>>' >&2; \
-        if ! ozone --daemon start datanode >/dev/null 2>&1; then echo 'ERROR: Failed to start Datanode on <<$h>>' >&2; exit 1; fi;"
+      local dn_log_dir="${LOG_DIR}/${h}"
+      mkdir -p $dn_log_dir;
+      echo "Starting Datanode on <<$h>>" >&2;
+      ssh_run_as_user "set -euo pipefail; ozone --daemon start datanode 2>&1" >> "${dn_log_dir}/dn_start.log" 2>&1
     ) &
   done
   wait
+  # Start Recon only on one node based on host-map (first entry in RECON_HOSTS if provided)
+  if [[ ${#RECON_HOSTS[@]} -gt 0 ]]; then
+    local recon_target="${RECON_HOSTS[0]}"
+    parse_host "$recon_target"
+    local recon_log_dir="${LOG_DIR}/${recon_target}"
+    mkdir -p $recon_log_dir;
+    echo "Starting Recon on <<$recon_target>>" >&2;
+    ssh_run_as_user "set -euo pipefail; ozone --daemon start recon 2>&1" >> "${recon_log_dir}/recon_start.log" 2>&1
+  fi
 }
