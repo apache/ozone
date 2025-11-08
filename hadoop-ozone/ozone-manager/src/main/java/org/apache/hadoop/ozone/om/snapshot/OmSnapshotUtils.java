@@ -136,11 +136,11 @@ public final class OmSnapshotUtils {
   public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
-    Path parent = dbPath.getParent();
-    if (parent == null) {
+    Path dbPathParent = dbPath.getParent();
+    if (dbPathParent == null) {
       throw new IOException("Invalid dbPath: parent is null: " + dbPath);
     }
-    Path checkpointDataDirPath = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+    Path checkpointDataDirPath = Paths.get(dbPathParent.toString(), OM_CHECKPOINT_DATA_DIR);
     if (!checkpointDataDirPath.toFile().mkdir()) {
       throw new IOException("Failed to create directory: " + checkpointDataDirPath);
     }

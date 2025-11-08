@@ -4010,7 +4010,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
     if (checkpointLocation == null) {
-      throw new IOException("Cannot install checkpoint from leader " + leaderId +": checkpointLocation is null");
+      throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
     }
     Path parent = checkpointLocation.getParent();
     if (parent == null) {
