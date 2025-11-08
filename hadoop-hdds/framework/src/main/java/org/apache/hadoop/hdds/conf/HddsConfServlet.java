@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.OzoneConfiguration.getConfigurationResourceFiles;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,45 +62,6 @@ public class HddsConfServlet extends HttpServlet {
   private static final String COMMAND = "cmd";
   private static final OzoneConfiguration OZONE_CONFIG =
       new OzoneConfiguration();
-
-  /**
-   * Represents metadata for a configuration property, including its name, value and description.
-   */
-  public static class PropertyMetadata {
-    private String name;
-    private String value;
-    private String description;
-
-    public PropertyMetadata(String name, String value, String description) {
-      this.name = name;
-      this.value = value;
-      this.description = description;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public void setName(String name) {
-      this.name = name;
-    }
-
-    public String getValue() {
-      return value;
-    }
-
-    public void setValue(String value) {
-      this.value = value;
-    }
-
-    public String getDescription() {
-      return description;
-    }
-
-    public void setDescription(String description) {
-      this.description = description;
-    }
-  }
 
   /**
    * Return the Configuration of the daemon hosting this servlet.
@@ -203,17 +166,21 @@ public class HddsConfServlet extends HttpServlet {
       }
       
       Map<String, String> descriptionMap = buildDescriptionMap(config);
-      Map<String, Map<String, PropertyMetadata>> propMap = new HashMap<>();
+      Map<String, Map<String, OzoneConfiguration.Property>> propMap = new HashMap<>();
 
       for (String tag : tags.split(",")) {
         if (config.isPropertyTag(tag)) {
           Properties properties = config.getAllPropertiesByTag(tag);
-          Map<String, PropertyMetadata> metadataMap = new HashMap<>();
+          Map<String, OzoneConfiguration.Property> metadataMap = new HashMap<>();
           
           for (String propName : properties.stringPropertyNames()) {
             String value = properties.getProperty(propName);
             String description = descriptionMap.getOrDefault(propName, "");
-            metadataMap.put(propName, new PropertyMetadata(propName, value, description));
+            OzoneConfiguration.Property property = new OzoneConfiguration.Property();
+            property.setName(propName);
+            property.setValue(value);
+            property.setDescription(description);
+            metadataMap.put(propName, property);
           }
           propMap.put(tag, metadataMap);
         }
@@ -233,35 +200,19 @@ public class HddsConfServlet extends HttpServlet {
    */
   private Map<String, String> buildDescriptionMap(OzoneConfiguration config) {
     Map<String, String> descriptionMap = new HashMap<>();
-    
-    // List of configuration resource names to check
-    String[] configResources = new String[] {
-        "core-default.xml",
-        "core-site.xml",
-        "hdfs-default.xml",
-        "hdfs-site.xml",
-        "hdds-common-default.xml",
-        "hdds-client-default.xml",
-        "hdds-container-service-default.xml",
-        "hdds-server-framework-default.xml",
-        "hdds-server-scm-default.xml",
-        "ozone-common-default.xml",
-        "ozone-csi-default.xml",
-        "ozone-manager-default.xml",
-        "ozone-recon-default.xml",
-        "ozone-default.xml",
-        "ozone-site.xml"
-    };
-    
-    for (String resourceName : configResources) {
-      try {
+
+    try {
+      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
+      DocumentBuilder builder = factory.newDocumentBuilder();
+
+      for (String resourceName : getConfigurationResourceFiles()) {
         URL resourceUrl = config.getResource(resourceName);
         if (resourceUrl != null) {
-          parseXmlDescriptions(resourceUrl, descriptionMap);
+          parseXmlDescriptions(builder, resourceUrl, descriptionMap);
         }
-      } catch (Exception e) {
-        LOG.error("Could not read descriptions from resource: {}", resourceName, e);
       }
+    } catch (Exception e) {
+      LOG.error("Failed to parse XML resource files", e);
     }
 
     return descriptionMap;
@@ -269,16 +220,15 @@ public class HddsConfServlet extends HttpServlet {
 
   /**
    * Parse XML configuration file and extract property descriptions using DOM parser.
+   * @param builder The XML parser
    * @param resourceUrl URL of the XML resource to parse
    * @param descriptionMap map to populate with property name -> description mappings
    */
-  private void parseXmlDescriptions(URL resourceUrl, Map<String, String> descriptionMap) {
+  private void parseXmlDescriptions(DocumentBuilder builder, URL resourceUrl, Map<String, String> descriptionMap) {
     try (InputStream inputStream = resourceUrl.openStream()) {
-      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
-      DocumentBuilder builder = factory.newDocumentBuilder();
       Document doc = builder.parse(inputStream);
-      
       NodeList propertyNodes = doc.getElementsByTagName("property");
+
       for (int i = 0; i < propertyNodes.getLength(); i++) {
         Node propertyNode = propertyNodes.item(i);
         if (propertyNode.getNodeType() == Node.ELEMENT_NODE) {
