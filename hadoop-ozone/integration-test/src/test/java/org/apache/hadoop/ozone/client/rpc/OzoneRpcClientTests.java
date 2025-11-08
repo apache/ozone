@@ -1703,6 +1703,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         .getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
+  @Flaky("HDDS-13879")
   @ParameterizedTest
   @MethodSource("bucketLayoutsWithEnablePaths")
   public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths)
