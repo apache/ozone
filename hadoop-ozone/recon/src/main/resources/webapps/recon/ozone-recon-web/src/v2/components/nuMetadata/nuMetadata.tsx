@@ -125,6 +125,7 @@ const NUMetadata: React.FC<MetadataProps> = ({
 }) => {
   const [state, setState] = useState<MetadataState>([]);
   const [isProcessingData, setIsProcessingData] = useState<boolean>(false);
+  const [pgNumber, setPgNumber] = useState<number>(1);
   // Individual API calls that resolve together
   const summaryAPI = useApiData<SummaryResponse>(
     `/api/v1/namespace/summary?path=${path}`,
@@ -359,6 +360,11 @@ const NUMetadata: React.FC<MetadataProps> = ({
     }
   }, [path, getObjectInfoMapping]);
 
+  // Reset pagination when path changes
+  useEffect(() => {
+    setPgNumber(1);
+  }, [path]);
+
   // Coordinate API calls - process data when both calls complete
   useEffect(() => {
     if (!summaryAPI.loading && !quotaAPI.loading && 
@@ -369,12 +375,20 @@ const NUMetadata: React.FC<MetadataProps> = ({
   }, [summaryAPI.loading, quotaAPI.loading, summaryAPI.data, quotaAPI.data, 
       summaryAPI.lastUpdated, quotaAPI.lastUpdated, processMetadata]);
 
+  const handleTableChange = (newPagination: any) => {
+    setPgNumber(newPagination.current);
+  };
+
   return (
     <Table
       size='small'
       loading={loading}
       dataSource={state}
       bordered={true}
+      pagination={{
+        current: pgNumber
+      }}
+      onChange={handleTableChange}
       style={{
         flex: '0 1 45%',
         margin: '10px auto'

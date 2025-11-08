@@ -44,7 +44,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in transaction info table.",
+    description = "CLI to update the highest index in transaction info table." +
+        " The corresponding OM or SCM role should be stopped for this tool.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )

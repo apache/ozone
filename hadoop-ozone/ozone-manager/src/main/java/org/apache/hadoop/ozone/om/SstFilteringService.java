@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -87,7 +87,7 @@ public class SstFilteringService extends BackgroundService
 
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
     Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
-        snapshotInfo), SST_FILTERED_FILE);
+        snapshotInfo, 0), SST_FILTERED_FILE);
     return snapshotInfo.isSstFiltered() || sstFilteredFile.toFile().exists();
   }
 
@@ -138,7 +138,8 @@ public class SstFilteringService extends BackgroundService
           .acquireReadLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
       boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
-        String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
+        // Ensure snapshot is sstFiltered before defrag.
+        String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo, 0);
         try {
           // mark the snapshot as filtered by creating a file.
           if (Files.exists(Paths.get(snapshotDir))) {

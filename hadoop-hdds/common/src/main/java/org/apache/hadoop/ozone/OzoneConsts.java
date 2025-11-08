@@ -221,6 +221,7 @@ public final class OzoneConsts {
   public static final String OM_SST_FILE_INFO_START_KEY = "startKey";
   public static final String OM_SST_FILE_INFO_END_KEY = "endKey";
   public static final String OM_SST_FILE_INFO_COL_FAMILY = "columnFamily";
+  public static final String OM_SLD_TXN_INFO = "transactionInfo";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -520,6 +521,7 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = "checkpointStateDefragged";
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
 

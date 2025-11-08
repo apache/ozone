@@ -58,9 +58,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -905,7 +907,7 @@ public class ObjectEndpoint extends EndpointBase {
       S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
 
       for (CompleteMultipartUploadRequest.Part part : partList) {
-        partsMap.put(part.getPartNumber(), part.getETag());
+        partsMap.put(part.getPartNumber(), stripQuotes(part.getETag()));
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Parts map {}", partsMap);
@@ -1044,29 +1046,21 @@ public class ObjectEndpoint extends EndpointBase {
                   "Bytes to skip: "
                       + rangeHeader.getStartOffset() + " actual: " + skipped);
             }
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucketName, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(
-                  sourceObject, ozoneOutputStream, 0, length, new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              outputStream = ozoneOutputStream;
+          }
+          try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+              .createMultipartKey(volume.getName(), bucketName, key, length,
+                  partNumber, uploadID)) {
+            metadataLatencyNs =
+                getMetrics().updateCopyKeyMetadataStats(startNanos);
+            copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
+                new byte[getIOBufferSize(length)]);
+            ozoneOutputStream.getMetadata()
+                .putAll(sourceKeyDetails.getMetadata());
+            String raw = ozoneOutputStream.getMetadata().get(ETAG);
+            if (raw != null) {
+              ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
             }
-          } else {
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucketName, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
-                  new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              outputStream = ozoneOutputStream;
-            }
+            outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
           perf.appendSizeBytes(copyLength);
@@ -1099,6 +1093,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (StringUtils.isEmpty(eTag)) {
         eTag = omMultipartCommitUploadPartInfo.getPartName();
       }
+      eTag = wrapInQuotes(eTag);
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
@@ -1516,10 +1511,6 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
-  }
-
-  static String wrapInQuotes(String value) {
-    return "\"" + value + "\"";
   }
 
   @VisibleForTesting

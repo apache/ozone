@@ -30,6 +30,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
@@ -58,6 +60,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -138,6 +142,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -202,6 +207,7 @@ public class KeyManagerImpl implements KeyManager {
   private KeyDeletingService keyDeletingService;
 
   private SstFilteringService snapshotSstFilteringService;
+  private SnapshotDefragService snapshotDefragService;
   private SnapshotDeletingService snapshotDeletingService;
 
   private final KeyProviderCryptoExtension kmsProvider;
@@ -310,6 +316,11 @@ public class KeyManagerImpl implements KeyManager {
       startSnapshotSstFilteringService(configuration);
     }
 
+    if (snapshotDefragService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
+      startSnapshotDefragService(configuration);
+    }
+
     if (snapshotDeletingService == null &&
         ozoneManager.isFilesystemSnapshotEnabled()) {
 
@@ -393,6 +404,42 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
+  /**
+   * Start the snapshot defrag service if interval is not set to disabled value.
+   * @param conf
+   */
+  public void startSnapshotDefragService(OzoneConfiguration conf) {
+    if (isDefragSvcEnabled()) {
+      long serviceInterval = conf.getTimeDuration(
+          OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = conf.getTimeDuration(
+          OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+
+      snapshotDefragService =
+          new SnapshotDefragService(serviceInterval, TimeUnit.MILLISECONDS,
+              serviceTimeout, ozoneManager, conf);
+      snapshotDefragService.start();
+    } else {
+      LOG.info("SnapshotDefragService is disabled. Snapshot defragmentation will not run periodically.");
+    }
+  }
+
+  /**
+   * Stop the snapshot defrag service if it is running.
+   */
+  public void stopSnapshotDefragService() {
+    if (snapshotDefragService != null) {
+      snapshotDefragService.shutdown();
+      snapshotDefragService = null;
+    } else {
+      LOG.info("SnapshotDefragService is already stopped or not started.");
+    }
+  }
+
   private void startCompactionService(OzoneConfiguration configuration,
                                       boolean isCompactionServiceEnabled) {
     if (compactionService == null && isCompactionServiceEnabled) {
@@ -419,7 +466,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public void stop() throws IOException {
+  public void stop() {
     if (keyDeletingService != null) {
       keyDeletingService.shutdown();
       keyDeletingService = null;
@@ -436,6 +483,10 @@ public class KeyManagerImpl implements KeyManager {
       snapshotSstFilteringService.shutdown();
       snapshotSstFilteringService = null;
     }
+    if (snapshotDefragService != null) {
+      snapshotDefragService.shutdown();
+      snapshotDefragService = null;
+    }
     if (snapshotDeletingService != null) {
       snapshotDeletingService.shutdown();
       snapshotDeletingService = null;
@@ -448,6 +499,16 @@ public class KeyManagerImpl implements KeyManager {
       compactionService.shutdown();
       compactionService = null;
     }
+  }
+
+  /**
+   * Get the SnapshotDefragService instance.
+   *
+   * @return SnapshotDefragService instance, or null if not initialized
+   */
+  @Override
+  public SnapshotDefragService getSnapshotDefragService() {
+    return snapshotDefragService;
   }
 
   private OmBucketInfo getBucketInfo(String volumeName, String bucketName)
@@ -772,12 +833,15 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
+              List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
+                      .map(b -> new DeletedBlock(new BlockID(b.getContainerID(),
+                          b.getLocalID()), info.getDataSize(), info.getReplicatedSize()))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
+
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
-                  .addAllBlockIDs(blockIDS).build();
+                  .addAllDeletedBlocks(deletedBlocks)
+                  .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
                   keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
@@ -973,7 +1037,16 @@ public class KeyManagerImpl implements KeyManager {
     // any interval <= 0 causes IllegalArgumentException from scheduleWithFixedDelay
     return serviceInterval > 0;
   }
-  
+
+  public boolean isDefragSvcEnabled() {
+    long serviceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL,
+            OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    // any interval <= 0 causes IllegalArgumentException from scheduleWithFixedDelay
+    return serviceInterval > 0;
+  }
+
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName,
