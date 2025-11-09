@@ -2264,14 +2264,14 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId, OmKeyInfo parentInfo,
+  public DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId, OmKeyInfo parentInfo,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum) throws IOException {
     return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getDirectoryTable(),
         kv -> Table.newKeyValue(metadataManager.getOzoneDeletePathKey(kv.getValue().getObjectID(), kv.getKey()),
             OMFileRequest.getKeyInfoWithFullPath(parentInfo, kv.getValue())), filter, remainingNum);
   }
 
-  private <T extends WithParentObjectId> List<OmKeyInfo> gatherSubPathsWithIterator(long volumeId, long bucketId,
+  private <T extends WithParentObjectId> DeleteKeysResult gatherSubPathsWithIterator(long volumeId, long bucketId,
       OmKeyInfo parentInfo, Table<String, T> table,
       CheckedFunction<KeyValue<String, T>, KeyValue<String, OmKeyInfo>, IOException> deleteKeyTransformer,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> deleteKeyFilter, int remainingNum)
@@ -2287,12 +2287,12 @@ public class KeyManagerImpl implements KeyManager {
           remainingNum--;
         }
       }
-      return keyInfos;
+      return new DeleteKeysResult(keyInfos);
     }
   }
 
   @Override
-  public List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
+  public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
       long bucketId, OmKeyInfo parentInfo,
       CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum)
           throws IOException {

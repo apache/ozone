@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -395,9 +396,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // step-1: get all sub directories under the deletedDir
     int remainingNum = remainNum.get();
-    List<OmKeyInfo> subDirs =
+    DeleteKeysResult subDirDeleteResult =
         keyManager.getPendingDeletionSubDirs(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> true, remainingNum);
+    List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
     remainNum.addAndGet(-subDirs.size());
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
@@ -413,9 +415,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // step-2: get all sub files under the deletedDir
     // Only remove sub files if the parent directory is going to be deleted or can be reclaimed.
     remainingNum = remainNum.get();
-    List<OmKeyInfo> subFiles =
+    DeleteKeysResult subFileDeleteResult =
         keyManager.getPendingDeletionSubFiles(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo), remainingNum);
+    List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
     remainNum.addAndGet(-subFiles.size());
 
     if (LOG.isDebugEnabled()) {
@@ -472,20 +475,20 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       throws InterruptedException {
 
     int consumedSize = 0;
-    List<PurgePathRequest> ll = new ArrayList<>();
+    List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
     for (PurgePathRequest purgePathRequest : requests) {
       consumedSize += purgePathRequest.getSerializedSize();
       if (consumedSize <= ratisByteLimit) {
-        ll.add(purgePathRequest);
+        purgePathRequestList.add(purgePathRequest);
       } else {
-        submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, ll);
-        ll.clear();
-        ll.add(purgePathRequest);
+        submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestList);
+        purgePathRequestList.clear();
+        purgePathRequestList.add(purgePathRequest);
         consumedSize = 0;
       }
     }
-    if (!ll.isEmpty()) {
-      submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, ll);
+    if (!purgePathRequestList.isEmpty()) {
+      submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestList);
     }
   }
 
@@ -624,11 +627,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      * @param currentSnapshotInfo Information about the current snapshot whose deleted directories are being processed.
      * @param keyManager Key manager of the underlying storage system to handle key operations.
      * @param dirSupplier Supplier for fetching pending deleted directories to be processed.
-     * @param remainingBufLimit Remaining buffer limit for processing directories and files.
      * @param expectedPreviousSnapshotId The UUID of the previous snapshot expected in the chain.
      * @param totalExclusiveSizeMap A map for storing total exclusive size and exclusive replicated size
      *                              for each snapshot.
      * @param runCount The number of times the processing task has been executed.
+     * @param remaining Number of dirs to be processed.
      * @return A boolean indicating whether the processed directory list is empty.
      */
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
