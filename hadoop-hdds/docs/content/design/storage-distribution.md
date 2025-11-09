@@ -96,17 +96,17 @@ The Recon API will expose a single endpoint that returns a JSON object with the 
 
 | Field                 | Type   | Description                                            |
 |-----------------------|--------|--------------------------------------------------------|
-| openKeysBytes         | Long   | Bytes currently held by open keys (not yet committed). |
-| committedBytes        | Long   | Bytes committed to existing keys.                      |
-| containerPreAllocated | Long   | Pre-allocated space for open containers.               |
-| deletionPendingBytes  | Object | Bytes pending deletion.                                |
+| openKeyBytes         | Long   | Bytes currently held by open keys (not yet committed). |
+| committedKeyBytes        | Long   | Bytes committed to existing keys.                      |
+| preAllocatedContainerBytes | Long   | Pre-allocated space for open containers.               |
+| pendingDeletionBytes  | Object | Bytes pending deletion.                                |
 
 #### deletionPendingBytes Object
 
 | Field   | Type   | Description                                     |
 |---------|--------|-------------------------------------------------|
 | total   | Long   | Total bytes pending deletion across all stages. |
-| byStage | Object | Breakdown of pending deletion bytes by stage.   |
+| byComponent | Object | Breakdown of pending deletion bytes by component.   |
 
 #### byStage Object
 
