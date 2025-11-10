@@ -251,6 +251,7 @@ public class S3LifecycleConfiguration {
     }
   }
 
+  // OzoneBucket doesn't have objectID info.
   public OmLifecycleConfiguration toOmLifecycleConfiguration(OzoneBucket ozoneBucket)
       throws OS3Exception, OMException {
     try {

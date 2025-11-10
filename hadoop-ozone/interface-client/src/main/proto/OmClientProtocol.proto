@@ -2395,6 +2395,7 @@ message LifecycleConfiguration {
   repeated LifecycleRule rules = 5;
   optional uint64 objectID = 6;
   optional uint64 updateID = 7;
+  optional uint64 bucketObjectID = 8;
 }
 
 message SetLifecycleConfigurationRequest {
