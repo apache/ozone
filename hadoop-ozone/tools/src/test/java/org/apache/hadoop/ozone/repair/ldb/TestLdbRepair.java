@@ -127,7 +127,8 @@ public class TestLdbRepair {
         "--db", dbPath.toString(),
         "--column-family", TEST_CF_NAME
     };
-    int exitCode = withTextFromSystemIn("y")
+    // Pass two "y" inputs - one for user confirmation and the other for warning to stop service
+    int exitCode = withTextFromSystemIn("y", "y")
         .execute(() -> cmd.execute(args));
     assertEquals(0, exitCode, "Compaction command should execute successfully");
     long sizeAfterCompaction = calculateSstFileSize(dbPath);
