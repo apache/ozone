@@ -700,6 +700,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                   currentIteratedSnapshotId, snapId, toResolveSnapshotId));
             }
             UUID previousId = previousIds.iterator().next();
+            // If the previousId is null and if toResolveSnapshotId is not null then should throw an exception since
+            // the snapshot can never be resolved against the toResolveSnapshotId.
+            if (previousId == null) {
+              throw new IOException(String.format(
+                  "Snapshot %s versions previousId is null thus %s cannot be resolved against id %s",
+                  currentIteratedSnapshotId, snapId, toResolveSnapshotId));
+            }
             HierarchicalResourceLock previousToPreviousReadLockAcquired = acquireLock(previousId, true);
             try {
               // Get the version node for the snapshot and update the version node to the successor to point to the
@@ -748,6 +755,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             // Set the previous snapshot version to the relativePreviousVersionNode which was captured.
             versionMeta.setPreviousSnapshotVersion(relativePreviousVersionNode.getVersion());
           }
+        } else if (toResolveSnapshotId != null) {
+          // If the previousId is null and if toResolveSnapshotId is not null then should throw an exception since
+          // the snapshot can never be resolved against the toResolveSnapshotId.
+          throw new IOException(String.format("Unable to resolve previous snapshot id for snapshot: %s against " +
+                  "previous snapshotId : %s since current snapshot's previousSnapshotId is null",
+              snapId, toResolveSnapshotId));
         } else {
           toResolveSnapshotId = null;
           ssLocalData.setPreviousSnapshotId(null);
