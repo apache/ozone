@@ -164,9 +164,9 @@ public class DeletedBlockLogImpl
         .addAllLocalID(localIdList)
         .setCount(0);
 
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION)) {
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
       long replicatedSize = blocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum();
-      // even when HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION is finalized, old OM can still call the old API
+      // even when HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION is finalized, old OM can still call the old API
       if (replicatedSize >= 0) {
         builder.setTotalBlockReplicatedSize(replicatedSize);
         builder.setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum());
@@ -387,7 +387,7 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION) &&
+          if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
               txn.hasTotalBlockReplicatedSize()) {
             transactionStatusManager.getTxSizeMap().put(txn.getTxID(),
                 new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(txn.getLocalIDCount(),

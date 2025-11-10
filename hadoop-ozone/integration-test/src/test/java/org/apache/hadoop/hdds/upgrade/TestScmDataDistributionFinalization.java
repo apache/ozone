@@ -190,7 +190,7 @@ public class TestScmDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION.layoutVersion(),
+    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
@@ -329,7 +329,7 @@ public class TestScmDataDistributionFinalization {
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION.layoutVersion(),
+    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(

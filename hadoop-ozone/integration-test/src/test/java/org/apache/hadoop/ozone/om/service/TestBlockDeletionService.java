@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.STORAGE_DATA_DISTRIBUTION;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -161,7 +161,7 @@ public class TestBlockDeletionService {
     });
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
-    assertEquals(STORAGE_DATA_DISTRIBUTION.ordinal(),
+    assertEquals(STORAGE_SPACE_DISTRIBUTION.ordinal(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     // POST-UPGRADE
