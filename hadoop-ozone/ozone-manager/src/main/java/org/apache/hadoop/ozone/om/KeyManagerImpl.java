@@ -2287,7 +2287,7 @@ public class KeyManagerImpl implements KeyManager {
           remainingNum--;
         }
       }
-      return new DeleteKeysResult(keyInfos);
+      return new DeleteKeysResult(keyInfos, !iterator.hasNext());
     }
   }
 

@@ -28,12 +28,19 @@ public class DeleteKeysResult {
 
   private List<OmKeyInfo> keysToDelete;
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete) {
+  private boolean processedKeys;
+
+  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, boolean processedKeys) {
     this.keysToDelete = keysToDelete;
+    this.processedKeys = processedKeys;
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
     return keysToDelete;
+  }
+
+  public boolean isProcessedKeys() {
+    return processedKeys;
   }
 
 }

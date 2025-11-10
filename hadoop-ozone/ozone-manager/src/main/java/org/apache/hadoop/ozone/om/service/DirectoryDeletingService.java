@@ -307,7 +307,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
+      submitPurgePathsWithBatching(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -430,7 +430,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // step-3: If both sub-dirs and sub-files are exhausted under a parent
     // directory, only then delete the parent.
-    String purgeDeletedDir = purgeDir && remainNum.get() > 0 ? delDirName :  null;
+    String purgeDeletedDir =
+        purgeDir && subDirDeleteResult.isProcessedKeys() && subFileDeleteResult.isProcessedKeys() ? delDirName : null;
     if (purgeDeletedDir == null && subFiles.isEmpty() && subDirs.isEmpty()) {
       return Optional.empty();
     }
@@ -471,7 +472,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return purgePathsRequest.build();
   }
 
-  private List<OzoneManagerProtocolProtos.OMResponse> submitPurgePaths(List<PurgePathRequest> requests,
+  private List<OzoneManagerProtocolProtos.OMResponse> submitPurgePathsWithBatching(List<PurgePathRequest> requests,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap)
       throws InterruptedException {
 
