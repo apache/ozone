@@ -157,7 +157,6 @@ public class TestWatchForCommit {
         .getStorageContainerLocationClient();
   }
 
-
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
