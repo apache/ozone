@@ -769,6 +769,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
    * @return A list of SST files without extension.
@@ -810,6 +811,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
+   *                       must be non-null.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized Optional<List<SstFileInfo>> getSSTDiffList(DifferSnapshotVersion src,
