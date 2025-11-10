@@ -82,18 +82,34 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
 
   private List<K> getBounds(K startKey, K endKey) throws IOException {
-    RDBStore store = (RDBStore) this.metadataManager.getStore();
-    List<LiveFileMetaData> sstFiles = store.getDb().getSstFileList();
     Set<K> keys = new HashSet<>();
-    String tableName = table.getName();
-    byte[] tableNameBytes = tableName.getBytes(StandardCharsets.UTF_8);
-    for (LiveFileMetaData sstFile : sstFiles) {
-      // Filter SST files by column family to get bounds only for this specific table
-      if (Arrays.equals(sstFile.columnFamilyName(), tableNameBytes)) {
-        keys.add(this.keyCodec.fromPersistedFormat(sstFile.smallestKey()));
-        keys.add(this.keyCodec.fromPersistedFormat(sstFile.largestKey()));
+
+    // Try to get SST file boundaries for optimal segmentation
+    // In test/mock environments, this may not be available
+    try {
+      RDBStore store = (RDBStore) this.metadataManager.getStore();
+      if (store != null && store.getDb() != null) {
+        List<LiveFileMetaData> sstFiles = store.getDb().getSstFileList();
+        String tableName = table.getName();
+
+        // Only filter by column family if table name is available
+        if (tableName != null && !tableName.isEmpty()) {
+          byte[] tableNameBytes = tableName.getBytes(StandardCharsets.UTF_8);
+          for (LiveFileMetaData sstFile : sstFiles) {
+            // Filter SST files by column family to get bounds only for this specific table
+            if (Arrays.equals(sstFile.columnFamilyName(), tableNameBytes)) {
+              keys.add(this.keyCodec.fromPersistedFormat(sstFile.smallestKey()));
+              keys.add(this.keyCodec.fromPersistedFormat(sstFile.largestKey()));
+            }
+          }
+        }
       }
+    } catch (Exception e) {
+      // If we can't get SST files (test environment, permissions, etc.),
+      // just use empty bounds and rely on fallback path
+      LOG.debug("Unable to retrieve SST file boundaries, will use fallback iteration: {}", e.getMessage());
     }
+
     if (startKey != null) {
       keys.add(startKey);
     }
