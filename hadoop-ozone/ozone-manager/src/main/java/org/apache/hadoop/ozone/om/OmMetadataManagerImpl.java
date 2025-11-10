@@ -1861,7 +1861,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return false;
   }
 
-  // NOTE: Update both getTableBucketPrefixInfo(volume, bucket) & getTableBucketPrefix(tableName, volume, bucket)
+  // NOTE: Update both getTableBucketPrefix(volume, bucket) & getTableBucketPrefix(tableName, volume, bucket)
   // simultaneously. Implemented duplicate functions to avoid computing bucketKeyPrefix redundantly for each and
   // every table over and over again.
   @Override
@@ -1909,6 +1909,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     case OPEN_FILE_TABLE:
       return getBucketKeyPrefixFSO(volume, bucket);
     default:
+      LOG.warn("Unknown table name '{}' passed to getTableBucketPrefix (volume='{}', bucket='{}'). " +
+          "Returning empty string.", tableName, volume, bucket);
       return "";
     }
   }
