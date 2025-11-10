@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.debug.datanode.container;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.hasDataChecksum;
 
-import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -31,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -94,12 +92,9 @@ public class DiffSubcommand implements Callable<Void> {
       
       DiffReportWrapper wrapper = new DiffReportWrapper(
           diffReport1to2, diffReport2to1, checksumInfo1, checksumInfo2);
-      
-      try (SequenceWriter writer = JsonUtils.getStdoutSequenceWriter()) {
-        writer.write(wrapper);
-        writer.flush();
-      }
-      System.out.println();
+
+      String jsonOutput = JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper);
+      System.out.println(jsonOutput);
     } catch (IOException e) {
       throw new RuntimeException("Failed to read tree files", e);
     } catch (Exception e) {
@@ -122,10 +117,10 @@ public class DiffSubcommand implements Callable<Void> {
    * Performs the diff operation using ContainerChecksumTreeManager.
    */
   private ContainerDiffReport performDiff(ContainerProtos.ContainerChecksumInfo checksumInfo1,
-      ContainerProtos.ContainerChecksumInfo checksumInfo2) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ContainerChecksumTreeManager manager = new ContainerChecksumTreeManager(conf);
-    return manager.diff(checksumInfo1, checksumInfo2);
+      ContainerProtos.ContainerChecksumInfo checksumInfo2) {
+    ContainerDiffReport diffReport = new ContainerDiffReport(checksumInfo1.getContainerID());
+    ContainerChecksumTreeManager.compareContainerMerkleTree(checksumInfo1, checksumInfo2, diffReport);
+    return diffReport;
   }
 
   /**
@@ -230,8 +225,8 @@ public class DiffSubcommand implements Callable<Void> {
    */
   private static class DifferencesWrapper {
     private final List<MissingBlockWrapper> missingBlocks;
-    private final Map<String, List<ChunkWrapper>> missingChunks;
-    private final Map<String, List<ChunkWrapper>> corruptChunks;
+    private final Map<String, List<ChunkWrapper>> missingChunksPerBlock;
+    private final Map<String, List<ChunkWrapper>> corruptChunksPerBlock;
     private final List<DeletedBlockWrapper> divergedDeletedBlocks;
 
     DifferencesWrapper(ContainerDiffReport diffReport) {
@@ -242,23 +237,23 @@ public class DiffSubcommand implements Callable<Void> {
       }
 
       // Missing chunks
-      this.missingChunks = new HashMap<>();
+      this.missingChunksPerBlock = new HashMap<>();
       diffReport.getMissingChunks().forEach((blockId, chunks) -> {
         List<ChunkWrapper> chunkWrappers = new ArrayList<>();
         for (ContainerProtos.ChunkMerkleTree chunk : chunks) {
           chunkWrappers.add(new ChunkWrapper(chunk));
         }
-        this.missingChunks.put(String.valueOf(blockId), chunkWrappers);
+        this.missingChunksPerBlock.put(String.valueOf(blockId), chunkWrappers);
       });
 
       // Corrupt chunks
-      this.corruptChunks = new HashMap<>();
+      this.corruptChunksPerBlock = new HashMap<>();
       diffReport.getCorruptChunks().forEach((blockId, chunks) -> {
         List<ChunkWrapper> chunkWrappers = new ArrayList<>();
         for (ContainerProtos.ChunkMerkleTree chunk : chunks) {
           chunkWrappers.add(new ChunkWrapper(chunk));
         }
-        this.corruptChunks.put(String.valueOf(blockId), chunkWrappers);
+        this.corruptChunksPerBlock.put(String.valueOf(blockId), chunkWrappers);
       });
 
       // Diverged deleted blocks
@@ -272,12 +267,12 @@ public class DiffSubcommand implements Callable<Void> {
       return missingBlocks;
     }
 
-    public Map<String, List<ChunkWrapper>> getMissingChunks() {
-      return missingChunks;
+    public Map<String, List<ChunkWrapper>> getMissingChunksPerBlock() {
+      return missingChunksPerBlock;
     }
 
-    public Map<String, List<ChunkWrapper>> getCorruptChunks() {
-      return corruptChunks;
+    public Map<String, List<ChunkWrapper>> getCorruptChunksPerBlock() {
+      return corruptChunksPerBlock;
     }
 
     public List<DeletedBlockWrapper> getDivergedDeletedBlocks() {

@@ -281,6 +281,6 @@ public class TestDiffSubcommand {
     // Parse actual output
     String actualOutput = out.toString(DEFAULT_ENCODING).trim();
     ObjectMapper mapper = JsonUtils.getDefaultMapper();
-    return mapper.readTree(actualOutput).get(0);
+    return mapper.readTree(actualOutput);
   }
 }
