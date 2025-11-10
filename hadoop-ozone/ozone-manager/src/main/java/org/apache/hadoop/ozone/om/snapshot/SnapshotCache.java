@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
@@ -211,59 +210,62 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       throw new OMException("Unable to acquire readlock on snapshot db with key " + key,
           OMException.ResultCodes.INTERNAL_ERROR);
     }
-    // Atomic operation to initialize the OmSnapshot instance (once) if the key
-    // does not exist, and increment the reference count on the instance.
-    ReferenceCounted<OmSnapshot> rcOmSnapshot =
-        dbMap.compute(key, (k, v) -> {
-          if (v == null) {
-            LOG.info("Loading SnapshotId: '{}'", k);
-            try {
-              v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
-            } catch (OMException omEx) {
-              // Return null if the snapshot is no longer active
-              if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
-                throw new IllegalStateException(omEx);
-              }
-            } catch (IOException ioEx) {
-              // Failed to load snapshot DB
-              throw new IllegalStateException(ioEx);
-            } catch (Exception ex) {
-              // Unexpected and unknown exception thrown from CacheLoader#load
-              throw new IllegalStateException(ex);
+    try {
+      // Atomic operation to initialize the OmSnapshot instance (once) if the key
+      // does not exist, and increment the reference count on the instance.
+      ReferenceCounted<OmSnapshot> rcOmSnapshot = dbMap.compute(key, (k, v) -> {
+        if (v == null) {
+          LOG.info("Loading SnapshotId: '{}'", k);
+          try {
+            v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
+          } catch (OMException omEx) {
+            // Return null if the snapshot is no longer active
+            if (!omEx.getResult().equals(OMException.ResultCodes.FILE_NOT_FOUND)) {
+              throw new IllegalStateException(omEx);
             }
-            omMetrics.incNumSnapshotCacheSize();
+          } catch (IOException ioEx) {
+            // Failed to load snapshot DB
+            throw new IllegalStateException(ioEx);
+          } catch (Exception ex) {
+            // Unexpected and unknown exception thrown from CacheLoader#load
+            throw new IllegalStateException(ex);
           }
-          if (v != null) {
-            // When RC OmSnapshot is successfully loaded
-            v.incrementRefCount();
-          }
-          return v;
-        });
-    if (rcOmSnapshot == null) {
-      // The only exception that would fall through the loader logic above
-      // is OMException with FILE_NOT_FOUND.
-      lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
-      throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
-          OMException.ResultCodes.FILE_NOT_FOUND);
-    }
-    return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
-      private final AtomicReference<Boolean> closed = new AtomicReference<>(false);
-      @Override
-      public OmSnapshot get() {
-        return rcOmSnapshot.get();
+          omMetrics.incNumSnapshotCacheSize();
+        }
+        if (v != null) {
+          // When RC OmSnapshot is successfully loaded
+          v.incrementRefCount();
+        }
+        return v;
+      });
+      if (rcOmSnapshot == null) {
+        throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
+            OMException.ResultCodes.FILE_NOT_FOUND);
       }
 
-      @Override
-      public void close() {
-        closed.updateAndGet(alreadyClosed -> {
-          if (!alreadyClosed) {
-            rcOmSnapshot.decrementRefCount();
-            lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
-          }
-          return true;
-        });
-      }
-    };
+      return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+        private final AtomicReference<Boolean> closed = new AtomicReference<>(false);
+        @Override
+        public OmSnapshot get() {
+          return rcOmSnapshot.get();
+        }
+
+        @Override
+        public void close() {
+          closed.updateAndGet(alreadyClosed -> {
+            if (!alreadyClosed) {
+              rcOmSnapshot.decrementRefCount();
+              lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
+            }
+            return true;
+          });
+        }
+      };
+    } catch (Throwable e) {
+      // Release the read lock irrespective of the exception thrown.
+      lock.releaseReadLock(SNAPSHOT_DB_LOCK, key.toString());
+      throw e;
+    }
   }
 
   /**
