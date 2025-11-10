@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -164,6 +165,8 @@ public abstract class FileSizeCountTaskHelper {
     
     // Use fair lock to prevent write lock starvation when flushing
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
+    AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
     final int FLUSH_THRESHOLD = 100000;
     
     // Use parallel table iteration
@@ -175,15 +178,20 @@ public abstract class FileSizeCountTaskHelper {
         lock.readLock().unlock();
       }
       
-      // Periodic flush to prevent unbounded memory growth
-      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
+      // Only one thread should attempt flush to avoid blocking all workers
+      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD &&
+          isFlushingInProgress.compareAndSet(false, true)) {
         try {
           lock.writeLock().lock();
-          // Double-check after acquiring write lock
-          if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
-            LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-            writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-            fileSizeCountMap.clear();
+          try {
+            // Double-check after acquiring write lock
+            if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
+              LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
+              writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+              fileSizeCountMap.clear();
+            }
+          } finally {
+            isFlushingInProgress.set(false);  // Reset flag after flush completes
           }
         } catch (Exception e) {
           throw new RuntimeException("Failed to flush file size counts", e);

@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -112,6 +113,9 @@ public abstract class ContainerKeyMapperHelper {
 
       // Use fair lock to prevent write lock starvation when flushing
       ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+      // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
+      AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
+      
       // Use parallel table iteration
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         try {
@@ -123,12 +127,19 @@ public abstract class ContainerKeyMapperHelper {
             lock.readLock().unlock();
           }
           omKeyCount.incrementAndGet();
-          if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
+          
+          // Only one thread should attempt flush to avoid blocking all workers
+          if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold &&
+              isFlushingInProgress.compareAndSet(false, true)) {
             try {
               lock.writeLock().lock();
-              if (!checkAndCallFlushToDB(containerKeyMap, containerKeyFlushToDBMaxThreshold,
-                  reconContainerMetadataManager)) {
-                throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
+              try {
+                if (!checkAndCallFlushToDB(containerKeyMap, containerKeyFlushToDBMaxThreshold,
+                    reconContainerMetadataManager)) {
+                  throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
+                }
+              } finally {
+                isFlushingInProgress.set(false);  // Reset flag after flush completes
               }
             } finally {
               lock.writeLock().unlock();
