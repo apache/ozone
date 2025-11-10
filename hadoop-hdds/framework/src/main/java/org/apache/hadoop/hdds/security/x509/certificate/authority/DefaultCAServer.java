@@ -207,8 +207,7 @@ public class DefaultCAServer implements CertificateServer {
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role,
       String certSerialId) {
-    LocalDateTime beginDate = LocalDateTime.now();
-    Duration certDuration = getDuration(beginDate, role);
+    Duration certDuration = getDuration(role);
 
     CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
     CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
@@ -226,7 +225,7 @@ public class DefaultCAServer implements CertificateServer {
         break;
       case KERBEROS_TRUSTED:
       case TESTING_AUTOMATIC:
-        X509Certificate signedCertificate = signAndStoreCertificate(beginDate, certDuration, csr, role, certSerialId);
+        X509Certificate signedCertificate = signAndStoreCertificate(certDuration, csr, role, certSerialId);
         CertificateCodec codec = new CertificateCodec(config, componentName);
         CertPath certPath = codec.getCertPath();
         CertPath updatedCertPath = codec.prependCertToCertPath(signedCertificate, certPath);
@@ -242,7 +241,7 @@ public class DefaultCAServer implements CertificateServer {
     return certPathPromise;
   }
 
-  private Duration getDuration(LocalDateTime beginDate, NodeType role) {
+  private Duration getDuration(NodeType role) {
     // When issuing certificates for sub-ca use the max certificate duration similar to self-signed root certificate.
     if (role == NodeType.SCM) {
       return config.getMaxCertificateDuration();
@@ -251,11 +250,11 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private X509Certificate signAndStoreCertificate(
-      LocalDateTime beginDate, Duration duration, PKCS10CertificationRequest csr, NodeType role, String certSerialId
+      Duration duration, PKCS10CertificationRequest csr, NodeType role, String certSerialId
   ) throws IOException, OperatorCreationException, CertificateException {
 
-    ZoneId zoneId = ZoneId.systemDefault();
-    ZonedDateTime endDate = beginDate.atZone(zoneId).plus(duration);
+    ZonedDateTime beginDate = ZonedDateTime.now();
+    ZonedDateTime endDate = beginDate.plus(duration);
 
     lock.lock();
     X509Certificate xcert;
@@ -264,7 +263,7 @@ public class DefaultCAServer implements CertificateServer {
       xcert = approver.sign(config,
           getPrivateKey(),
           getCACertificate(),
-          Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
+          Date.from(beginDate.toInstant()),
           Date.from(endDate.toInstant()),
           csr, scmID, clusterID, certSerialId);
       if (store != null) {
