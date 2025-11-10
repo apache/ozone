@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -161,15 +162,41 @@ public abstract class FileSizeCountTaskHelper {
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
     
+    // Use fair lock to prevent write lock starvation when flushing
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    final int FLUSH_THRESHOLD = 100000;
+    
     // Use parallel table iteration
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
-      handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+      try {
+        lock.readLock().lock();
+        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+      } finally {
+        lock.readLock().unlock();
+      }
+      
+      // Periodic flush to prevent unbounded memory growth
+      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
+        try {
+          lock.writeLock().lock();
+          // Double-check after acquiring write lock
+          if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
+            LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
+            writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+            fileSizeCountMap.clear();
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Failed to flush file size counts", e);
+        } finally {
+          lock.writeLock().unlock();
+        }
+      }
       return null;
     };
     
     try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, 100000)) {
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, FLUSH_THRESHOLD)) {
       keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
     } catch (Exception ex) {
       LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);

@@ -110,7 +110,8 @@ public abstract class ContainerKeyMapperHelper {
       // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
-      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+      // Use fair lock to prevent write lock starvation when flushing
+      ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
       // Use parallel table iteration
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         try {

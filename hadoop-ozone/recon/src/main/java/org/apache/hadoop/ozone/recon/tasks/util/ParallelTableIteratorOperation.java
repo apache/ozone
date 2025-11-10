@@ -71,9 +71,11 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     this.maxIteratorTasks = 2 * iteratorCount;
     this.maxWorkerTasks = workerCount * 2;
     this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
-                    new ArrayBlockingQueue<>(iteratorCount * 2));
+                    new ArrayBlockingQueue<>(iteratorCount * 2),
+                    new ThreadPoolExecutor.CallerRunsPolicy());
     this.valueExecutors = new ThreadPoolExecutor(workerCount, workerCount, 1, TimeUnit.MINUTES,
-            new ArrayBlockingQueue<>(workerCount * 2));
+            new ArrayBlockingQueue<>(workerCount * 2),
+            new ThreadPoolExecutor.CallerRunsPolicy());
     this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
     this.logCountThreshold = logThreshold;
   }
@@ -211,6 +213,18 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   public void close() throws IOException {
     iteratorExecutor.shutdown();
     valueExecutors.shutdown();
+    try {
+      if (!iteratorExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
+        iteratorExecutor.shutdownNow();
+      }
+      if (!valueExecutors.awaitTermination(60, TimeUnit.SECONDS)) {
+        valueExecutors.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      iteratorExecutor.shutdownNow();
+      valueExecutors.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 }
 
