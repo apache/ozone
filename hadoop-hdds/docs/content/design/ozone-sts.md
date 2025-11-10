@@ -64,7 +64,14 @@ an IAM policy is specified, the temporary credential will have the permissions c
 and the IAM policy permissions. **Note:** If the IAM policy is specified and does not grant any permissions, then
 the generated temporary credentials won't have any permissions and will essentially be useless.
 
-## 3.2 Limitations in IAM Session Policy Support
+## 3.2 Limitations in AssumeRole API Support
+
+The AWS AssumeRole API has various required and optional fields.  We will support the two required fields, i.e. `RoleArn` 
+and `RoleSessionName`.  Additionally, we will support the following optional fields (all others will be rejected):
+- `DurationSeconds`
+- `Policy`
+
+## 3.3 Limitations in IAM Session Policy Support
 
 The AWS IAM policy specification is vast and wide-ranging.  The initial Ozone STS supports a limited
 subset of its capabilities.  The restrictions are outlined below:
@@ -100,29 +107,34 @@ A sample IAM policy that allows read access to all objects in the `example-bucke
 
 ```
 
-## 3.3 SessionToken Format
+## 3.4 SessionToken Format
 
 As mentioned above, one of the return values from the AssumeRole call will be the sessionToken. To support not
 storing temporary credentials server-side in Ozone, the sessionToken will comprise various components needed to validate
 subsequent S3 calls that use the token.  The sessionToken will have the following information encoded:
 
-- The originalAccessKeyId - this is the Kerberos identity of the user that created the sessionToken via the AssumeRole call.
+- originalAccessKeyId - this is the Kerberos identity of the user that created the sessionToken via the AssumeRole call.
 When the temporary credentials are used to make S3 API calls, this Kerberos identity (in conjunction with the role permissions and
-optional session policy) will be used to authorize the call.
-- The roleArn - the role used in the original AssumeRole call
-- The encrypted secretAccessKey - this will be used to validate the AWS signature when the temporary credentials are used 
+optional session policy) will be used to authorize the call.  This identity is included in the sessionToken because 
+S3 API calls (such as PutObject) require a Kerberos identity, but the temporary credentials don't have a
+Kerberos identity associated to them, therefore the Kerberos identity of the user that created the token will be used in
+these cases.
+- roleArn - the role used in the original AssumeRole call
+- encrypted secretAccessKey - this will be used to validate the AWS signature when the temporary credentials are used 
 to make S3 API calls
-- (Optional) sessionPolicy - when using the RangerOzoneAuthorizer, if Ranger successfully authorizes the AssumeRole call,
-it will return a String representing the resources (i.e. buckets, keys, etc.) and permissions (i.e. ACLType) that the token
-has been granted access to.  This sessionPolicy will be included in the sessionToken sent back to the client so it can be sent to Ranger to 
-authorize subsequent S3 API calls that use the sessionToken.
+- sessionPolicy - when using the RangerOzoneAuthorizer, if Ranger successfully authorizes the AssumeRole call,
+it will return a String representing the role the token was authorized for.  Furthermore, if an AWS IAM Session Policy 
+was included with the AssumeRole request, the String return value will also include resources (i.e. buckets, keys, etc.) 
+and permissions (i.e. ACLType) corresponding to the AWS IAM Session Policy.  These resources and permissions, if present, 
+would further limit the scope of the permissions and resources granted by the role in Ranger, such that the temporary 
+credential will have the permissions comprising the intersection of the role permissions and the sessionPolicy permissions.
 - HMAC-SHA256 signature - used to ensure the sessionToken was created by Ozone and was not altered since it was created.
-- The expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
-- The UUID of the secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
+- expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
+- UUID of the OzoneManager private key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
 
 ## 3.5 STS Token Revocation
 
-In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in RocksDB will be created
+In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in the OzoneManager RocksDB will be created
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
 will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.  The
 input parameter for the command-line utility will be the accessKeyId of the temporary token - this value is returned in
@@ -180,10 +192,11 @@ created in Ranger as per the Prerequisites above.
 - This authorized user (having permanent S3 credentials) makes the AssumeRole STS call to Ozone.
 - If successful, Ozone responds with the temporary credentials.
 - A client makes S3 API calls with the temporary credentials for up to as long as the credentials last.  
-- When Ozone receives an S3 api call using temporary credentials, it will perform the following checks:
+- When Ozone receives an S3 api call using temporary credentials, it will use the Kerberos identity associated with the 
+originalAccessKeyId in the session token and perform the following checks:
   - Ensure that if the accessKeyId starts with "ASIA", that a sessionToken was included in the `x-amz-security-token` header
   - Ensure the sessionToken is not expired
-  - Ensure the sessionToken is not revoked
+  - Ensure the sessionToken is not revoked via a `keyMayExist` check in OzoneManager RocksDB
   - Validate the HMAC-SHA256 signature in the sessionToken
   - Decrypt the secretAccessKey from the sessionToken and validate the AWS signature
   - Authorize the call with either RangerOzoneAuthorizer or OzoneNativeAuthorizer
