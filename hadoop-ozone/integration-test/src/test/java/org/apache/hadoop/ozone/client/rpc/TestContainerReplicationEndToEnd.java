@@ -80,7 +80,7 @@ public class TestContainerReplicationEndToEnd {
   private static long containerReportInterval;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -127,9 +127,6 @@ public class TestContainerReplicationEndToEnd {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

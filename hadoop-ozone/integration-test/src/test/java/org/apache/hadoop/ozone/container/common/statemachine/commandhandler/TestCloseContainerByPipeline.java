@@ -73,7 +73,7 @@ public class TestCloseContainerByPipeline {
   private static ObjectStore objectStore;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -97,9 +97,6 @@ public class TestCloseContainerByPipeline {
     objectStore.getVolume("test").createBucket("test");
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

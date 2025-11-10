@@ -101,9 +101,6 @@ public class TestSCMInstallSnapshotWithHA {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {

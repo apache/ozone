@@ -92,7 +92,7 @@ public class TestDeleteWithInAdequateDN {
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -169,9 +169,6 @@ public class TestDeleteWithInAdequateDN {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

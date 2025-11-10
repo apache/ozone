@@ -82,7 +82,7 @@ public class TestFailureHandlingByClientFlushDelay {
   private String keyString;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -149,9 +149,6 @@ public class TestFailureHandlingByClientFlushDelay {
     init();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

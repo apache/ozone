@@ -93,7 +93,7 @@ public class TestScmSafeMode {
       storageContainerLocationClient;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true and
    * OZONE_HANDLER_TYPE_KEY = "distributed"
@@ -118,9 +118,6 @@ public class TestScmSafeMode {
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

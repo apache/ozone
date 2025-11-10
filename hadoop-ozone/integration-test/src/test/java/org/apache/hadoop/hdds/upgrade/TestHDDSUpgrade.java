@@ -131,7 +131,7 @@ public class TestHDDSUpgrade {
   private static MiniOzoneClusterProvider clusterProvider;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -188,9 +188,6 @@ public class TestHDDSUpgrade {
     loadSCMState();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   public void shutdown() throws IOException, InterruptedException {
     if (cluster != null) {
       clusterProvider.destroy(cluster);

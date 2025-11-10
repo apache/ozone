@@ -52,7 +52,7 @@ public class TestNodeFailure {
   private static final String FLOOD_TOKEN = "pipeline Action CLOSE";
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -84,9 +84,6 @@ public class TestNodeFailure {
         .getFollowerSlownessTimeout();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

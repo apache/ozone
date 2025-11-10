@@ -71,7 +71,7 @@ public class TestMultiBlockWritesWithDnFailures {
   private String keyString;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -121,9 +121,6 @@ public class TestMultiBlockWritesWithDnFailures {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

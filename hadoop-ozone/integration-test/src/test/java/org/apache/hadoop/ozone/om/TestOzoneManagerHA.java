@@ -128,7 +128,7 @@ public abstract class TestOzoneManagerHA {
   }
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -181,7 +181,7 @@ public abstract class TestOzoneManagerHA {
   }
 
   /**
-   * Shutdown MiniDFSCluster after all tests of a class have run.
+   * Shutdown MiniOzoneCluster after all tests of a class have run.
    */
   @AfterAll
   public static void shutdown() {

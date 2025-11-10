@@ -124,7 +124,7 @@ public class TestContainerStateMachineFailures {
   private static XceiverClientManager xceiverClientManager;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -183,9 +183,6 @@ public class TestContainerStateMachineFailures {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

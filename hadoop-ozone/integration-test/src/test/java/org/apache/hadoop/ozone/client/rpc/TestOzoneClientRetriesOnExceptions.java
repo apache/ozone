@@ -84,7 +84,7 @@ public class TestOzoneClientRetriesOnExceptions {
   private XceiverClientManager xceiverClientManager;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -131,9 +131,6 @@ public class TestOzoneClientRetriesOnExceptions {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

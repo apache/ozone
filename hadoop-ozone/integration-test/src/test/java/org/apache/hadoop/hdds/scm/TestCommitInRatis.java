@@ -63,7 +63,7 @@ public class TestCommitInRatis {
       storageContainerLocationClient;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -106,9 +106,6 @@ public class TestCommitInRatis {
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   private void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {

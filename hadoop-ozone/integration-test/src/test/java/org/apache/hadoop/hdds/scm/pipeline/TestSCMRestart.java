@@ -49,7 +49,7 @@ public class TestSCMRestart {
   private static PipelineManager pipelineManager;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -90,9 +90,6 @@ public class TestSCMRestart {
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

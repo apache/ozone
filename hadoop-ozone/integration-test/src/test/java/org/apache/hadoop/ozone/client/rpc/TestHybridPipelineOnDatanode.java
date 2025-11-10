@@ -60,7 +60,7 @@ public class TestHybridPipelineOnDatanode {
   private static ObjectStore objectStore;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -78,9 +78,6 @@ public class TestHybridPipelineOnDatanode {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

@@ -96,7 +96,7 @@ public class TestFailureHandlingByClient {
   private final List<DatanodeDetails> restartDataNodes = new ArrayList<>();
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -169,9 +169,6 @@ public class TestFailureHandlingByClient {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);

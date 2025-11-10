@@ -77,9 +77,6 @@ public class TestTransferLeadershipShell {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {

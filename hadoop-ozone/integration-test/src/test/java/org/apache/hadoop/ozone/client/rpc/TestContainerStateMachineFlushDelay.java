@@ -76,7 +76,7 @@ public class TestContainerStateMachineFlushDelay {
   private String keyString;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -123,9 +123,6 @@ public class TestContainerStateMachineFlushDelay {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

@@ -86,7 +86,7 @@ public class TestPipelineClose {
   private PipelineManager pipelineManager;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    *
    * @throws IOException
    */
@@ -120,9 +120,6 @@ public class TestPipelineClose {
     // the other with an open container.
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {

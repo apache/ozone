@@ -80,7 +80,7 @@ public class TestSCMDbCheckpointServlet {
   private SCMDBCheckpointServlet scmDbCheckpointServletMock;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -129,9 +129,6 @@ public class TestSCMDbCheckpointServlet {
         .thenReturn(cluster.getStorageContainerManager());
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {

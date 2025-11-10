@@ -47,7 +47,7 @@ public class TestFreonWithPipelineDestroy {
   private static MiniOzoneCluster cluster;
 
   /**
-   * Create a MiniDFSCluster for testing.
+   * Create a MiniOzoneCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    *
@@ -79,9 +79,6 @@ public class TestFreonWithPipelineDestroy {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {
