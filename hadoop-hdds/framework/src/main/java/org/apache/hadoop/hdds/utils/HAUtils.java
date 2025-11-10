@@ -42,6 +42,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -97,10 +98,17 @@ public final class HAUtils {
         configuration.setFromObject(scmClientConfig);
       }
       return getScmBlockClient(configuration).getScmInfo();
+    } catch (ConfigurationException e) {
+      throw new IOException("Failed to get SCM info due to configuration error. " +
+          "Please verify SCM HA configuration properties: " +
+          "ozone.scm.service.ids, ozone.scm.nodes.<serviceId>, " +
+          "ozone.scm.address.<serviceId>.<nodeId>. " +
+          "Common issues: missing service IDs, incorrect hostnames, or missing port numbers. " +
+          "Details: " + e.getMessage(), e);
     } catch (IOException e) {
       throw e;
     } catch (Exception e) {
-      throw new IOException("Failed to get SCM info", e);
+      throw new IOException("Failed to get SCM info: " + e.getMessage(), e);
     }
   }
 

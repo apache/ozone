@@ -74,6 +74,14 @@ public class SCMNodeInfo {
     // First figure out scm client address from HA style config.
     // If service Id is not defined, fall back to non-HA config.
 
+    // Check for common configuration typo
+    if (conf.get("ozone.scm.service.id") != null) {
+      throw new ConfigurationException(
+          "Configuration property 'ozone.scm.service.id' is invalid. " +
+          "Did you mean 'ozone.scm.service.ids' (with 's' at the end)? " +
+          "For SCM HA configuration, use 'ozone.scm.service.ids' to specify service IDs.");
+    }
+
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {

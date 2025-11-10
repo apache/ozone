@@ -155,13 +155,21 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         throw new ConfigurationException(protocolClass.getSimpleName() + " SCM Address could not " +
             "be obtained from config. Config is not properly defined");
       } else {
-        InetSocketAddress protocolAddr = NetUtils.createSocketAddr(protocolAddress);
+        try {
+          InetSocketAddress protocolAddr = NetUtils.createSocketAddr(protocolAddress);
 
-        String scmServiceId = scmNodeInfo.getServiceId();
-        String scmNodeId = scmNodeInfo.getNodeId();
-        scmNodeIds.add(scmNodeId);
-        SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId, protocolAddr);
-        scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
+          String scmServiceId = scmNodeInfo.getServiceId();
+          String scmNodeId = scmNodeInfo.getNodeId();
+          scmNodeIds.add(scmNodeId);
+          SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId, protocolAddr);
+          scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
+        } catch (IllegalArgumentException e) {
+          throw new ConfigurationException(
+              "Invalid SCM address format: '" + protocolAddress + "'. " +
+              "Expected format: 'hostname:port'. " +
+              "This often happens when 'ozone.scm.service.ids' is misspelled as 'ozone.scm.service.id'. " +
+              "Please check your SCM HA configuration. Original error: " + e.getMessage());
+        }
       }
     }
   }
