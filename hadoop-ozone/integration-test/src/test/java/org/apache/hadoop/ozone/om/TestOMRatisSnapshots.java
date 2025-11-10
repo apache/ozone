@@ -126,13 +126,6 @@ public class TestOMRatisSnapshots {
   private OzoneClient client;
   private GenericTestUtils.PrintStreamCapturer output;
 
-  /**
-   * Create a MiniOzoneCluster for testing. The cluster initially has one
-   * inactive OM. So at the start of the cluster, there will be 2 active and 1
-   * inactive OM.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
@@ -184,9 +177,6 @@ public class TestOMRatisSnapshots {
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

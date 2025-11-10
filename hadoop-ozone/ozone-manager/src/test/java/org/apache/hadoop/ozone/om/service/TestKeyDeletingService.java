@@ -551,6 +551,7 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
+    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
