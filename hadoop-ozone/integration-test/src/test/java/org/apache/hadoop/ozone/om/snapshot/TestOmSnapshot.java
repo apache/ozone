@@ -219,9 +219,6 @@ public abstract class TestOmSnapshot {
     }
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);

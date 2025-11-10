@@ -251,10 +251,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     output = GenericTestUtils.captureOut();
   }
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * @param conf Configurations to start the cluster.
-   */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     startCluster(conf, MiniOzoneCluster.newBuilder(conf));
   }
