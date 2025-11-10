@@ -2306,6 +2306,7 @@ public class KeyManagerImpl implements KeyManager {
           consumedSize += objectSerializedSize;
         }
       }
+      keyInfos.replaceAll(keyInfo -> new OmKeyInfo.Builder(keyInfo).setAcls(Collections.emptyList()).build());
       return new DeleteKeysResult(keyInfos, consumedSize, !iterator.hasNext());
     }
   }
