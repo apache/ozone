@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,7 +215,7 @@ public class DBCheckpointServlet extends HttpServlet
     Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
     DBCheckpoint checkpoint = null;
     Path tmpdir = null;
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireWriteLock()) {
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
           "bootstrap-data-");
       checkpoint = getCheckpoint(tmpdir, flush);
@@ -394,17 +395,21 @@ public class DBCheckpointServlet extends HttpServlet
    * This lock is a no-op but can overridden by child classes.
    */
   public static class Lock extends BootstrapStateHandler.Lock {
+
+    private final UncheckedAutoCloseable noopLock = () -> {
+    };
+
     public Lock() {
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
-      return this;
+    public UncheckedAutoCloseable acquireReadLock() {
+      return noopLock;
     }
 
     @Override
-    public void unlock() {
+    public UncheckedAutoCloseable acquireWriteLock() {
+      return noopLock;
     }
   }
 }

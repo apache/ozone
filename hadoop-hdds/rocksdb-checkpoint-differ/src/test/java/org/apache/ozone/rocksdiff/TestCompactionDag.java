@@ -65,9 +65,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -699,8 +699,8 @@ public class TestCompactionDag {
 
     Future<Boolean> future;
     // Take the lock and start the consumer.
-    try (BootstrapStateHandler.Lock lock =
-             differ.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock =
+             differ.getBootstrapStateLock().acquireWriteLock()) {
       future = executorService.submit(
           () -> {
             c.accept(differ);
