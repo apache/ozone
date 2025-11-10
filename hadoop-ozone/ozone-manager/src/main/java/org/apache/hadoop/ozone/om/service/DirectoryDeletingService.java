@@ -291,8 +291,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           continue;
         }
         PurgePathRequest requestVal = request.get();
-        int cost = 1 + requestVal.getDeletedSubFilesCount() + requestVal.getMarkDeletedSubDirsCount();
-        remainNum.addAndGet(-cost);
         purgePathRequestList.add(requestVal);
         // Count up the purgeDeletedDir, subDirs and subFiles
         if (requestVal.hasDeletedDir() && !StringUtils.isBlank(requestVal.getDeletedDir())) {
