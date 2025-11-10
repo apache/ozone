@@ -17,14 +17,21 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
@@ -35,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
@@ -186,7 +194,6 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     Pair<List<String>, List<String>> deleteKeysAndRenamedEntry = createAndDeleteKeysAndRenamedEntry(1, null);
-
     SnapshotInfo snapInfo = createSnapshot("snap1");
     assertEquals(snapInfo.getLastTransactionInfo(),
         TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
@@ -235,6 +242,14 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setStatus(Status.OK)
         .build();
 
+    IOzoneManagerLock lock = spy(omMetadataManager.getLock());
+    when(omMetadataManager.getLock()).thenReturn(lock);
+    List<String> locks = Lists.newArrayList();
+    doAnswer(i -> {
+      locks.add(i.getArgument(1));
+      return i.callRealMethod();
+    }).when(lock).acquireReadLock(eq(SNAPSHOT_DB_CONTENT_LOCK), anyString());
+    List<String> snapshotIds = Collections.singletonList(snapInfo.getSnapshotId().toString());
     try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
 
@@ -245,6 +260,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       // Do manual commit and see whether addToBatch is successful or not.
       omMetadataManager.getStore().commitBatchOperation(batchOperation);
     }
+    assertEquals(snapshotIds, locks);
     snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapInfo.getTableKey());
     assertEquals(snapshotInfoOnDisk, snapInfo);
     // The keys should not exist in the DeletedKeys table

@@ -27,7 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
@@ -53,7 +53,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
@@ -67,15 +66,19 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,6 +213,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     DBCheckpoint checkpoint = null;
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     OMMetadataManager omMetadataManager = om.getMetadataManager();
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     boolean includeSnapshotData = includeSnapshotData(request);
     AtomicLong maxTotalSstSize = new AtomicLong(getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT));
@@ -219,7 +223,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     if (!includeSnapshotData) {
       maxTotalSstSize.set(Long.MAX_VALUE);
     } else {
-      snapshotPaths = getSnapshotDirs(omMetadataManager);
+      snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, omMetadataManager, snapshotLocalDataManager);
     }
 
     if (sstFilesToExclude.isEmpty()) {
@@ -253,23 +257,44 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        // get the list of sst files of the checkpoint.
-        checkpoint = createAndPrepareCheckpoint(true);
-        List<Path> sstBackupFiles = extractSSTFilesFromCompactionLog(checkpoint);
-        // unlimited files as we want the Active DB contents to be transferred in a single batch
-        maxTotalSstSize.set(Long.MAX_VALUE);
-        Path checkpointDir = checkpoint.getCheckpointLocation();
         Map<String, String> hardLinkFileMap = new HashMap<>();
-        writeDBToArchive(sstFilesToExclude, checkpointDir,
-            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
-        if (includeSnapshotData) {
-          writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
+        SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
+        /*
+         * Acquire snapshot cache lock when includeSnapshotData is true to prevent race conditions
+         * between checkpoint operations and snapshot purge operations. Without this lock, a purge
+         * operation (e.g., from a Ratis transaction on follower OM) could delete snapshot directories
+         * while checkpoint is reading snapshot data, leading to FileNotFoundException or corrupted
+         * checkpoint data. The lock ensures checkpoint completes reading snapshot data before purge
+         * can delete the snapshot directory.
+         *
+         * When includeSnapshotData is false, lock is set to null and no locking is performed.
+         * In this case, the try-with-resources block does not call close() on any resource,
+         * which is intentional because snapshot consistency is not required.
+         */
+        try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = includeSnapshotData ? snapshotCache.lock() : null) {
+          // get the list of sst files of the checkpoint.
+          checkpoint = createAndPrepareCheckpoint(true);
+          // unlimited files as we want the Active DB contents to be transferred in a single batch
+          maxTotalSstSize.set(Long.MAX_VALUE);
+          Path checkpointDir = checkpoint.getCheckpointLocation();
+          writeDBToArchive(sstFilesToExclude, checkpointDir, maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, false);
-          writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(),
-              maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
-          // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
-          transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
-              archiveOutputStream, hardLinkFileMap);
+          if (includeSnapshotData) {
+            List<Path> sstBackupFiles = extractSSTFilesFromCompactionLog(checkpoint);
+            // get the list of snapshots from the checkpoint
+            try (OmMetadataManagerImpl checkpointMetadataManager = OmMetadataManagerImpl
+                    .createCheckpointMetadataManager(om.getConfiguration(), checkpoint)) {
+              snapshotPaths = getSnapshotDirsFromDB(omMetadataManager, checkpointMetadataManager,
+                  snapshotLocalDataManager);
+            }
+            writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
+                hardLinkFileMap, false);
+            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, archiveOutputStream, tmpdir,
+                hardLinkFileMap, false);
+            // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
+            transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize, archiveOutputStream,
+                hardLinkFileMap);
+          }
         }
         writeHardlinkFile(getConf(), hardLinkFileMap, archiveOutputStream);
         includeRatisSnapshotCompleteFlag(archiveOutputStream);
@@ -295,28 +320,18 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param hardLinkFileMap     Map of hardlink file paths to their unique identifiers for deduplication.
    * @throws IOException if an I/O error occurs during processing.
    */
-  private void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
+  void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
       AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       Map<String, String> hardLinkFileMap) throws IOException {
-    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
-    OMMetadataManager omMetadataManager = om.getMetadataManager();
     for (Path snapshotDir : snapshotPaths) {
-      String snapshotId = OmSnapshotManager.extractSnapshotIDFromCheckpointDirName(snapshotDir.toString());
-      omMetadataManager.getLock().acquireReadLock(SNAPSHOT_DB_LOCK, snapshotId);
-      try {
-        // invalidate closes the snapshot DB
-        om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
-        writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-            hardLinkFileMap, false);
-        Path snapshotLocalPropertyYaml = Paths.get(
-            OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
-        if (Files.exists(snapshotLocalPropertyYaml)) {
-          File yamlFile = snapshotLocalPropertyYaml.toFile();
-          hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
-          linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
-        }
-      } finally {
-        omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
+      writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap,
+          false);
+      Path snapshotLocalPropertyYaml = Paths.get(
+          OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
+      if (Files.exists(snapshotLocalPropertyYaml)) {
+        File yamlFile = snapshotLocalPropertyYaml.toFile();
+        hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
+        linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
       }
     }
   }
@@ -380,20 +395,27 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   }
 
   /**
-   * Collects paths to all snapshot databases.
+   * Collects paths to all snapshot databases from the OM DB.
    *
-   * @param omMetadataManager OMMetadataManager instance
+   * @param activeOMMetadataManager OMMetadataManager instance
    * @return Set of paths to snapshot databases
    * @throws IOException if an I/O error occurs
    */
-  Set<Path> getSnapshotDirs(OMMetadataManager omMetadataManager) throws IOException {
+  Set<Path> getSnapshotDirsFromDB(OMMetadataManager activeOMMetadataManager, OMMetadataManager omMetadataManager,
+      OmSnapshotLocalDataManager localDataManager) throws IOException {
     Set<Path> snapshotPaths = new HashSet<>();
-    SnapshotChainManager snapshotChainManager = new SnapshotChainManager(omMetadataManager);
-    for (SnapshotChainInfo snapInfo : snapshotChainManager.getGlobalSnapshotChain().values()) {
-      String snapshotDir =
-          OmSnapshotManager.getSnapshotPath(getConf(), SnapshotInfo.getCheckpointDirName(snapInfo.getSnapshotId()));
-      Path path = Paths.get(snapshotDir);
-      snapshotPaths.add(path);
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iter =
+        omMetadataManager.getSnapshotInfoTable().iterator()) {
+      while (iter.hasNext()) {
+        Table.KeyValue<String, SnapshotInfo> kv = iter.next();
+        SnapshotInfo snapshotInfo = kv.getValue();
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapLocalMeta =
+                 localDataManager.getOmSnapshotLocalDataMeta(snapshotInfo.getSnapshotId())) {
+          Path snapshotDir = getSnapshotPath(activeOMMetadataManager, snapshotInfo.getSnapshotId(),
+              snapLocalMeta.getMeta().getVersion());
+          snapshotPaths.add(snapshotDir);
+        }
+      }
     }
     return snapshotPaths;
   }
@@ -482,7 +504,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param flush  If true, flushes in-memory data to disk before checkpointing.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
+  DBCheckpoint createAndPrepareCheckpoint(boolean flush) throws IOException {
     // Create & return the checkpoint.
     return getDbStore().getCheckpoint(flush);
   }

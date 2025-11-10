@@ -289,7 +289,6 @@ public class TestSnapshotDiffManager {
         .setBucketName(BUCKET_NAME)
         .setName(baseSnapshotName)
         .setSnapshotPath(snapshotPath)
-        .setCheckpointDir(snapshotCheckpointDir)
         .build();
 
     for (JobStatus jobStatus : jobStatuses) {
@@ -302,7 +301,6 @@ public class TestSnapshotDiffManager {
           .setBucketName(BUCKET_NAME)
           .setName(targetSnapshotName)
           .setSnapshotPath(snapshotPath)
-          .setCheckpointDir(snapshotCheckpointDir)
           .build();
 
       SnapshotDiffJob diffJob = new SnapshotDiffJob(System.currentTimeMillis(),
@@ -1395,7 +1393,6 @@ public class TestSnapshotDiffManager {
           .setBucketName(BUCKET_NAME)
           .setName(snapshotName)
           .setSnapshotPath("fromSnapshotPath")
-          .setCheckpointDir("fromSnapshotCheckpointDir")
           .build();
       snapshotInfos.add(snapInfo);
 

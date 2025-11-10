@@ -173,12 +173,24 @@ class TestSnapshotCache {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 5, 10})
   @DisplayName("Tests lock() holds a write lock")
-  public void testGetHoldsWriteLock(int numberOfLocks) {
+  public void testLockHoldsWriteLock(int numberOfLocks) {
     clearInvocations(lock);
     for (int i = 0; i < numberOfLocks; i++) {
       snapshotCache.lock();
     }
     verify(lock, times(numberOfLocks)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 5, 10})
+  @DisplayName("Tests lock(snapshotId) holds a write lock")
+  public void testLockHoldsWriteLockSnapshotId(int numberOfLocks) {
+    clearInvocations(lock);
+    UUID snapshotId = UUID.randomUUID();
+    for (int i = 0; i < numberOfLocks; i++) {
+      snapshotCache.lock(snapshotId);
+    }
+    verify(lock, times(numberOfLocks)).acquireWriteLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
   }
 
   @Test

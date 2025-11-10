@@ -199,6 +199,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   @Test
+  @Flaky("HDDS-13889")
   @DisplayName("testSnapshotAndKeyDeletionBackgroundServices")
   @SuppressWarnings("methodlength")
   public void testSnapshotAndKeyDeletionBackgroundServices()
@@ -633,7 +634,7 @@ public class TestSnapshotBackgroundServices {
         .getSnapshotInfoTable()
         .get(tableKey);
     // Allow the snapshot to be written to disk
-    String fileName = getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
