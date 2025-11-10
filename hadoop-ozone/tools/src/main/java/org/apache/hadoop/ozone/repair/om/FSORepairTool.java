@@ -82,7 +82,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "fso-tree",
     description = "Identify and repair a disconnected FSO tree by marking unreferenced (orphaned) entries for " +
-        "deletion. OM should be stopped while this tool is run."
+        "deletion. OM should be stopped for this tool."
 )
 public class FSORepairTool extends RepairTool {
   private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);

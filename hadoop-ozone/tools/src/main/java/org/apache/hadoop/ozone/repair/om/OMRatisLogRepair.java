@@ -51,7 +51,8 @@ import picocli.CommandLine;
         "The command should be run for the same transaction on all 3 OMs only when all the OMs are crashing " +
         "while applying the same transaction. If only one OM is crashing and the " +
         "other OMs have executed the log successfully, then the DB should be manually copied " +
-        "from one of the good OMs to the crashing OM instead.",
+        "from one of the good OMs to the crashing OM instead." + 
+        " OM should be stopped for this tool.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
