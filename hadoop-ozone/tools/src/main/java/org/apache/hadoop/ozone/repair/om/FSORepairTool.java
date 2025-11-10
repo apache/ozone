@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -624,7 +623,7 @@ public class FSORepairTool extends RepairTool {
     // Load RocksDB and tables needed.
     // Use the actual directory name from the provided path (e.g., "om.db", "om-db-backup")
     String dbName = omDBFile.getName();
-    return OmMetadataManagerImpl.newDBStoreBuilder(new OzoneConfiguration(), dbName, omDBFile.getParentFile())
+    return DBStoreBuilder.newBuilder(new OzoneConfiguration(), OMDBDefinition.get(), dbName, omDBFile.getParentFile().toPath())
         .setOpenReadOnly(false)
         .setEnableCompactionDag(true)
         .setCreateCheckpointDirs(true)
