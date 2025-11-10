@@ -199,6 +199,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   @Test
+  @Flaky("HDDS-13889")
   @DisplayName("testSnapshotAndKeyDeletionBackgroundServices")
   @SuppressWarnings("methodlength")
   public void testSnapshotAndKeyDeletionBackgroundServices()
