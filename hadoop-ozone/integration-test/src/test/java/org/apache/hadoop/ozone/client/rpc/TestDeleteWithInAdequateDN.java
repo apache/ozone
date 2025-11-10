@@ -91,11 +91,6 @@ public class TestDeleteWithInAdequateDN {
   private static XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     final int numOfDatanodes = 3;

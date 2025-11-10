@@ -95,13 +95,6 @@ public class TestFailureHandlingByClient {
   private String keyString;
   private final List<DatanodeDetails> restartDataNodes = new ArrayList<>();
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     conf = new OzoneConfiguration();

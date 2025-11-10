@@ -75,11 +75,6 @@ public class TestContainerStateMachineFlushDelay {
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
     keyString = UUID.randomUUID().toString();

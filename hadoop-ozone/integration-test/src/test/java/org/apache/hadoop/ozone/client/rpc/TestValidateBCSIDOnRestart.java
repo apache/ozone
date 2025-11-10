@@ -81,11 +81,6 @@ public class TestValidateBCSIDOnRestart {
   private static String volumeName;
   private static String bucketName;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();

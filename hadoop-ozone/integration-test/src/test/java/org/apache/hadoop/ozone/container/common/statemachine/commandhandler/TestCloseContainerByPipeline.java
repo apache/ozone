@@ -72,13 +72,6 @@ public class TestCloseContainerByPipeline {
   private static OzoneClient client;
   private static ObjectStore objectStore;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();

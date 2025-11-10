@@ -35,13 +35,6 @@ public class TestOmInit {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();

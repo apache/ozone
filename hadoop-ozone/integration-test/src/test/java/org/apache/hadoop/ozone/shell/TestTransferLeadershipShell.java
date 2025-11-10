@@ -55,11 +55,6 @@ public class TestTransferLeadershipShell {
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException Exception
-   */
   @BeforeAll
   public void init() throws Exception {
     ozoneAdmin = new OzoneAdmin();

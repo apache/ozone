@@ -130,11 +130,6 @@ public class TestHDDSUpgrade {
 
   private static MiniOzoneClusterProvider clusterProvider;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setUp() throws Exception {
     init();

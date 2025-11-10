@@ -81,13 +81,6 @@ public class TestFailureHandlingByClientFlushDelay {
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);

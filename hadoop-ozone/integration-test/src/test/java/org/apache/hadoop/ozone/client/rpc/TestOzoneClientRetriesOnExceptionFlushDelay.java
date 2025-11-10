@@ -74,13 +74,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
   private String keyString;
   private XceiverClientManager xceiverClientManager;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);

@@ -70,13 +70,6 @@ public class TestMultiBlockWritesWithDnFailures {
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void startCluster(int datanodes) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;

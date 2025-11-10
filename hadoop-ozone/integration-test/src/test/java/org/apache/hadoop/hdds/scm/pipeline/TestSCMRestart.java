@@ -48,11 +48,6 @@ public class TestSCMRestart {
   private static ContainerManager newContainerManager;
   private static PipelineManager pipelineManager;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     final int numOfNodes = 4;

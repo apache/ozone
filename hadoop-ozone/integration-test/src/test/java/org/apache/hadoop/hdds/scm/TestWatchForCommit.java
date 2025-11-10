@@ -92,13 +92,6 @@ public class TestWatchForCommit {
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();

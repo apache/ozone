@@ -62,13 +62,6 @@ public class TestCommitInRatis {
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void startCluster(OzoneConfiguration conf) throws Exception {
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 60000,

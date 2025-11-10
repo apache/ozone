@@ -82,11 +82,6 @@ public class TestOMSnapshotDAG {
   private static ObjectStore store;
   private static OzoneClient client;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();

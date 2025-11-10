@@ -58,13 +58,6 @@ public class TestOzoneManagerRestart {
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

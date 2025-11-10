@@ -51,11 +51,6 @@ public class TestNodeFailure {
 
   private static final String FLOOD_TOKEN = "pipeline Action CLOSE";
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();

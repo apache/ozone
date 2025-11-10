@@ -66,11 +66,6 @@ public class TestFailoverWithSCMHA {
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();

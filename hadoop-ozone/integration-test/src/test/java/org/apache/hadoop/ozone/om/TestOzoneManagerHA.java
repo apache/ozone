@@ -127,13 +127,6 @@ public abstract class TestOzoneManagerHA {
     return RETRY_CACHE_DURATION;
   }
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -180,9 +173,6 @@ public abstract class TestOzoneManagerHA {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniOzoneCluster after all tests of a class have run.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

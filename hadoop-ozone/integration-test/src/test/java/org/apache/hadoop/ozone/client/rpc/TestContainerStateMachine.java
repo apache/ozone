@@ -75,11 +75,6 @@ public class TestContainerStateMachine {
   private String volumeName;
   private String bucketName;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
 

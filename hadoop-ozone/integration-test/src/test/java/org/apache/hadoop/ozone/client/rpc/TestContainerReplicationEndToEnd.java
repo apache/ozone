@@ -79,11 +79,6 @@ public class TestContainerReplicationEndToEnd {
   private static XceiverClientManager xceiverClientManager;
   private static long containerReportInterval;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

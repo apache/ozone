@@ -85,11 +85,6 @@ public class TestPipelineClose {
   private ContainerManager containerManager;
   private PipelineManager pipelineManager;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

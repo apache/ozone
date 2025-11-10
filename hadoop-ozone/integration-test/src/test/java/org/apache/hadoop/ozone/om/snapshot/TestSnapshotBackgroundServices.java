@@ -104,11 +104,6 @@ public class TestSnapshotBackgroundServices {
   private OzoneClient client;
   private final AtomicInteger counter = new AtomicInteger();
 
-  /**
-   * Create a MiniOzoneCluster for testing. The cluster initially has one
-   * inactive OM. So at the start of the cluster, there will be 2 active and 1
-   * inactive OM.
-   */
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
