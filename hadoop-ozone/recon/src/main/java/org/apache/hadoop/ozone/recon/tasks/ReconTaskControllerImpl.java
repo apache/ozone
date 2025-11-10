@@ -662,8 +662,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           if (checkpointedManager != null) {
             LOG.info("Cleaning up unprocessed checkpoint from drained ReconTaskReInitializationEvent");
             // Close the database connections first
-            checkpointedManager.close();
-            LOG.debug("Closed checkpointed OM metadata manager database connections");
+            try {
+              checkpointedManager.close();
+              LOG.debug("Closed checkpointed OM metadata manager database connections");
+            } catch (Exception e) {
+              LOG.warn("Failed to close checkpointed OM metadata manager", e);
+            }
             // Then clean up the files
             cleanupCheckpointFiles(checkpointedManager);
           }
