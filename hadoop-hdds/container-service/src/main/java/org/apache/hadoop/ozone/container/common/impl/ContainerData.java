@@ -50,8 +50,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ratis.util.Preconditions;
 import org.yaml.snakeyaml.Yaml;
+
 
 /**
  * ContainerData is the in-memory representation of container metadata and is
@@ -527,21 +529,31 @@ public abstract class ContainerData {
   }
 
   /**
-   * Compute the checksum for ContainerData using the specified Yaml (based
-   * on ContainerType) and set the checksum.
+   * Compute the checksum for ContainerData and set the checksum.
    *
    * Checksum of ContainerData is calculated by setting the
    * {@link ContainerData#checksum} field to a 64-byte array with all 0's -
    * {@link ContainerData#ZERO_CHECKSUM}. After the checksum is calculated,
    * the checksum field is updated with this value.
    *
-   * @param yaml Yaml for ContainerType to get the ContainerData as Yaml String
    * @throws IOException
    */
-  public void computeAndSetContainerFileChecksum(Yaml yaml) throws IOException {
+  public void computeAndSetContainerFileChecksum() throws IOException {
     // Set checksum to dummy value - 0 byte array, to calculate the checksum
     // of rest of the data.
     this.checksum = ZERO_CHECKSUM;
+
+    // Create Yaml for checksum calculation that excludes storageType for backward compatibility
+    boolean withReplicaIndex = this instanceof KeyValueContainerData &&
+        ((KeyValueContainerData) this).getReplicaIndex() > 0;
+    // IMPORTANT: Pass null for storageType to ensure rollback compatibility.
+    // Ozone calculates checksum by reading the YAML file into a Java object, then converting
+    // it back to YAML string (not directly using the YAML file content).
+    // If storageType participates in checksum calculation, when rolling back to older versions that don't
+    // support storageType, they would recalculate checksum without storageType field
+    // (as it's unknown to them), causing checksum mismatch and validation failure.
+    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+        this.containerType, withReplicaIndex, null);
 
     // Dump yaml data into a string to compute its checksum
     String containerDataYamlStr = yaml.dump(this);
@@ -599,7 +611,7 @@ public abstract class ContainerData {
    * - writeCount += 1 (one operation)
    * - usedSpace/committedBytes NOT updated here (delta handled separately)
    * - blockBytes NOT updated here (delta=4 handled by incrementBlockBytes)
-   * 
+   *
    * @param bytesWritten Number of bytes in the I/O operation
    * @param overwrite Whether this is an overwrite operation
    */

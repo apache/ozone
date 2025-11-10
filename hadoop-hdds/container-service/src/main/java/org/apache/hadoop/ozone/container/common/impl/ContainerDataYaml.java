@@ -84,7 +84,7 @@ public final class ContainerDataYaml {
     Yaml yaml = getYamlForContainerType(containerData.getContainerType(),
         withReplicaIndex, storageType);
     // Compute Checksum and update ContainerData
-    containerData.computeAndSetContainerFileChecksum(yaml);
+    containerData.computeAndSetContainerFileChecksum();
     // Write the ContainerData with checksum to Yaml file.
     YamlUtils.dump(yaml, containerData, containerFile, LOG);
   }

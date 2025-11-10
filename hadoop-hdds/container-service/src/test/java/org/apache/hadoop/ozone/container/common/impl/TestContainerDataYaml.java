@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * This class tests create/read .container files.
@@ -293,6 +294,44 @@ public class TestContainerDataYaml {
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
 
     cleanup();
+  }
+
+  @Test
+  public void testChecksumCanBeVerifiedAfterRollbackWithStorageType()
+      throws IOException {
+    setLayoutVersion(FILE_PER_CHUNK);
+    long containerID = testContainerID++;
+
+    File containerFile = createContainerFile(containerID, 7, StorageType.SSD);
+
+    final String content =
+        FileUtils.readFileToString(containerFile, Charset.defaultCharset());
+    assertThat(content).contains(CONTAINER_STORAGE_TYPE);
+
+    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
+        .readContainerFile(containerFile);
+    String storedChecksum = kvData.getContainerFileChecksum();
+
+    assertEquals(computeContainerFileChecksum(kvData, null), storedChecksum);
+    assertThat(computeContainerFileChecksum(kvData, kvData.getStorageType()))
+        .isNotEqualTo(storedChecksum);
+    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
+
+    cleanup();
+  }
+
+  private String computeContainerFileChecksum(KeyValueContainerData kvData,
+      StorageType storageType) throws IOException {
+    String storedChecksum = kvData.getContainerFileChecksum();
+    try {
+      kvData.setContainerFileChecksum(ContainerData.ZERO_CHECKSUM);
+      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+          kvData.getContainerType(), kvData.getReplicaIndex() > 0,
+          storageType);
+      return ContainerUtils.getContainerFileChecksum(yaml.dump(kvData));
+    } finally {
+      kvData.setContainerFileChecksum(storedChecksum);
+    }
   }
 
   private KeyValueContainerData getKeyValueContainerData() throws IOException {

@@ -247,16 +247,9 @@ public final class ContainerUtils {
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
     if (enabled) {
       String storedChecksum = containerData.getContainerFileChecksum();
-      StorageType storageType =
-          containerData instanceof KeyValueContainerData
-              ? containerData.getStorageType() : null;
 
-      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-          containerData.getContainerType(),
-          containerData instanceof KeyValueContainerData
-              && ((KeyValueContainerData) containerData).getReplicaIndex() > 0,
-          storageType);
-      containerData.computeAndSetContainerFileChecksum(yaml);
+      // Compute checksum (storageTypeis automatically excluded for rollback compatibility)
+      containerData.computeAndSetContainerFileChecksum();
       String computedChecksum = containerData.getContainerFileChecksum();
 
       if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
@@ -380,7 +373,7 @@ public final class ContainerUtils {
           + currentUsage + ", minimum free space spared="  + spared, DISK_OUT_OF_SPACE);
     }
   }
-  
+
   public static long getPendingDeletionBytes(ContainerData containerData) {
     if (containerData.getContainerType()
         .equals(ContainerProtos.ContainerType.KeyValueContainer)) {

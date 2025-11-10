@@ -600,7 +600,7 @@ public class TestSchemaOneBackwardsCompatibility {
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType(),
         kvData.getReplicaIndex() > 0, kvData.getStorageType());
-    kvData.computeAndSetContainerFileChecksum(yaml);
+    kvData.computeAndSetContainerFileChecksum();
 
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
