@@ -1260,7 +1260,6 @@ class TestKeyDeletingService extends OzoneTestBase {
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count.get(), expectedCount);
     });
-    System.out.println("Swaminathan \t" + count.get() + "\t" + expectedCount);
     return count.get() == expectedCount;
   }
 
