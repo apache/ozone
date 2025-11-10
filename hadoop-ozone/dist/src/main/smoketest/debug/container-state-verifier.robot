@@ -14,7 +14,10 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test container state on a UNHEALTHY, DELETED and INVALID container
+Documentation       Test container state on a UNHEALTHY, DELETED and INVALID container.
+                   ... The output message format includes replication status information
+                   ... (UNDER_REPLICATED, OVER_REPLICATED, or HEALTHY_REPLICATION) in addition
+                   ... to the container state information.
 Resource            ../ozone-fi/BytemanKeywords.robot
 Resource            ozone-debug-keywords.robot
 
