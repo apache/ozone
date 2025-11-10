@@ -259,11 +259,13 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     }
 
     if (!isSufficientlyReplicated()) {
-      result += " UNDER_REPLICATED: need " + additionalReplicaNeeded() + " more";
+      result += " " + ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED + ": need "
+          + additionalReplicaNeeded() + " more";
     } else if (isOverReplicated()) {
-      result += " OVER_REPLICATED: excess " + getExcessRedundancy(true) + " replica(s)";
+      result += " " + ContainerHealthResult.ReplicationStatus.OVER_REPLICATED + ": excess "
+          + getExcessRedundancy(true) + " replica(s)";
     } else {
-      result += " HEALTHY_REPLICATION";
+      result += " " + ContainerHealthResult.ReplicationStatus.HEALTHY_REPLICATION;
     }
     
     return result;

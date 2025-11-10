@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -178,7 +179,7 @@ public class ContainerStateVerifier implements ReplicaVerifier {
           containerOperationClient.getContainerReplicas(containerId);
       
       if (replicaInfos.isEmpty()) {
-        return "UNDER_REPLICATED: no replicas found";
+        return ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED + ": no replicas found";
       }
       
       int replicationFactor = containerInfo.getReplicationFactor().getNumber();
@@ -191,13 +192,13 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       }
       
       if (healthyReplicas < replicationFactor) {
-        return String.format("UNDER_REPLICATED: %d/%d healthy replicas", 
-            healthyReplicas, replicationFactor);
+        return String.format("%s: %d/%d healthy replicas", 
+            ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED, healthyReplicas, replicationFactor);
       } else if (healthyReplicas > replicationFactor) {
-        return String.format("OVER_REPLICATED: %d/%d healthy replicas", 
-            healthyReplicas, replicationFactor);
+        return String.format("%s: %d/%d healthy replicas", 
+            ContainerHealthResult.ReplicationStatus.OVER_REPLICATED, healthyReplicas, replicationFactor);
       } else {
-        return "HEALTHY_REPLICATION";
+        return ContainerHealthResult.ReplicationStatus.HEALTHY_REPLICATION.toString();
       }
       
     } catch (Exception e) {

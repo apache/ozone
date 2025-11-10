@@ -402,4 +402,21 @@ public class ContainerHealthResult {
     OVER_REPLICATED,
     MIS_REPLICATED
   }
+
+  /**
+   * Enum representing replication status for containers.
+   * Used to indicate whether a container is under-replicated, over-replicated,
+   * or has healthy replication. This is specifically used for toString() output
+   * and display purposes.
+   */
+  public enum ReplicationStatus {
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    HEALTHY_REPLICATION;
+
+    @Override
+    public String toString() {
+      return name();
+    }
+  }
 }
