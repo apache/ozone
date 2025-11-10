@@ -294,7 +294,9 @@ public class TestDirectoryDeletingService {
     dds.optimizeDirDeletesAndSubmitRequest(0L, 0L, 0L, new ArrayList<>(), purgeList, null, Time.monotonicNow(), km,
         kv -> true, kv -> true, bucketNameInfoMap, null, 1L, new AtomicInteger(Integer.MAX_VALUE));
 
-    assertThat(captured.size()).as("Expect multiple PurgeDirectories requests due to batching").isGreaterThan(1);
+    assertThat(captured.size())
+        .as("Expect batching to respect Ratis byte limit")
+        .isBetween(3, 5);
 
     for (OzoneManagerProtocolProtos.OMRequest omReq : captured) {
       assertThat(omReq.getCmdType()).isEqualTo(OzoneManagerProtocolProtos.Type.PurgeDirectories);
