@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
