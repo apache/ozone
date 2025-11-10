@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,9 +226,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", bg.getDeletedBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
+      for (DeletedBlock deletedBlock : bg.getDeletedBlocks()) {
+        BlockID block = deletedBlock.getBlockID();
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {
           containerBlocks.get(containerID).add(block.getLocalID());

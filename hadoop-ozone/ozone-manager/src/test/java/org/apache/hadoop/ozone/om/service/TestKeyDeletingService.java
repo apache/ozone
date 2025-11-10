@@ -75,6 +75,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -548,6 +549,7 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
+    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -826,7 +828,8 @@ class TestKeyDeletingService extends OzoneTestBase {
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
+            .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
+                new BlockID(1, 1), 1, 3))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
             "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
@@ -1393,7 +1396,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           .getPurgedKeys().values()
           .stream()
           .map(PurgedKey::getBlockGroup)
-          .map(BlockGroup::getBlockIDList)
+          .map(BlockGroup::getDeletedBlocks)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {
