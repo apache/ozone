@@ -29,6 +29,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -394,6 +395,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         keyManager.getPendingDeletionSubDirs(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> true, remainingBufLimit);
     List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
+    subDirs.replaceAll(keyInfo -> new OmKeyInfo.Builder(keyInfo).setAcls(Collections.emptyList()).build());
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
@@ -412,6 +414,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         keyManager.getPendingDeletionSubFiles(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo), remainingBufLimit);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
+    subFiles.replaceAll(keyInfo -> new OmKeyInfo.Builder(keyInfo).setAcls(Collections.emptyList()).build());
 
     if (LOG.isDebugEnabled()) {
       for (OmKeyInfo fileInfo : subFiles) {
