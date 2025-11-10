@@ -31,6 +31,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -470,26 +471,45 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return purgePathsRequest.build();
   }
 
-  private void submitPurgePaths(List<PurgePathRequest> requests,
+  private List<OzoneManagerProtocolProtos.OMResponse> submitPurgePaths(List<PurgePathRequest> requests,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap)
       throws InterruptedException {
 
-    int consumedSize = 0;
-    List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
-    for (PurgePathRequest purgePathRequest : requests) {
-      consumedSize += purgePathRequest.getSerializedSize();
-      if (consumedSize <= ratisByteLimit) {
-        purgePathRequestList.add(purgePathRequest);
-      } else {
-        submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestList);
-        purgePathRequestList.clear();
-        purgePathRequestList.add(purgePathRequest);
-        consumedSize = 0;
+    List<OzoneManagerProtocolProtos.OMResponse> responses = new ArrayList<>();
+    List<PurgePathRequest> purgePathRequestBatch = new ArrayList<>();
+    int batchBytes = 0;
+
+    for (PurgePathRequest req : requests) {
+      int reqSize = req.getSerializedSize();
+
+      // If adding this request would exceed the limit, flush the current batch first
+      if (batchBytes + reqSize > ratisByteLimit && !purgePathRequestBatch.isEmpty()) {
+        OzoneManagerProtocolProtos.OMResponse resp =
+            submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
+        if (!resp.getSuccess()) {
+          return Collections.emptyList();
+        }
+        responses.add(resp);
+        purgePathRequestBatch.clear();
+        batchBytes = 0;
       }
+
+      // Add current request to batch
+      purgePathRequestBatch.add(req);
+      batchBytes += reqSize;
     }
-    if (!purgePathRequestList.isEmpty()) {
-      submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestList);
+
+    // Flush remaining batch if any
+    if (!purgePathRequestBatch.isEmpty()) {
+      OzoneManagerProtocolProtos.OMResponse resp =
+          submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
+      if (!resp.getSuccess()) {
+        return Collections.emptyList();
+      }
+      responses.add(resp);
     }
+
+    return responses;
   }
 
   @VisibleForTesting
