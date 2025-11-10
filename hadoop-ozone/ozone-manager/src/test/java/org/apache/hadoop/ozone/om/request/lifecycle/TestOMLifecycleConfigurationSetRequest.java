@@ -110,7 +110,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
     OMClientResponse omClientResponse = request.validateAndUpdateCache(ozoneManager, txLogIndex);
     OMResponse omResponse = omClientResponse.getOMResponse();
     OMLifecycleConfigurationSetResponse response = (OMLifecycleConfigurationSetResponse) omClientResponse;
-    assertNotEquals(-1, response.getOmLifecycleConfiguration().getBucketObjectID());
+    assertNotNull(response.getOmLifecycleConfiguration().getBucketObjectID());
     assertNotNull(omResponse.getSetLifecycleConfigurationResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
@@ -179,6 +179,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
     String ownerName = "ownerName";
 
     OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
 
     OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, ownerName, false);

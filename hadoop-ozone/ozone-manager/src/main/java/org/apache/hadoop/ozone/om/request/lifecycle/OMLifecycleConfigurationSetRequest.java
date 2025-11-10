@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -127,30 +128,31 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     UserInfo userInfo = getOmRequest().getUserInfo();
 
-    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
     IOException exception = null;
     boolean acquiredBucketLock = false;
     OMClientResponse omClientResponse = null;
     Map<String, String> auditMap = new HashMap<>();
-
     try {
-      OmLifecycleConfiguration omLifecycleConfiguration =
-          OmLifecycleConfiguration.getFromProtobuf(lifecycleConfiguration);
-      auditMap = omLifecycleConfiguration.toAuditMap();
-
       mergeOmLockDetails(metadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
-      omLifecycleConfiguration.valid();
 
-      if (!metadataManager.getBucketTable().isExist(bucketKey)) {
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(bucketKey);
+      if (bucketInfo == null) {
         LOG.debug("bucket: {} in volume: {} doesn't exist", bucketName,
             volumeName);
         throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
       }
-      omLifecycleConfiguration.setUpdateID(transactionLogIndex);
-      omLifecycleConfiguration.setBucketObjectID(metadataManager.getBucketId(volumeName, bucketName));
 
+      OmLifecycleConfiguration.Builder lcBuilder =
+          OmLifecycleConfiguration.getBuilderFromProtobuf(lifecycleConfiguration);
+      OmLifecycleConfiguration omLifecycleConfiguration =
+          lcBuilder.setBucketObjectID(bucketInfo.getObjectID()).build();
+      omLifecycleConfiguration.valid();
+      auditMap = omLifecycleConfiguration.toAuditMap();
+
+      omLifecycleConfiguration.setUpdateID(transactionLogIndex);
       metadataManager.getLifecycleConfigurationTable().addCacheEntry(
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex, omLifecycleConfiguration));

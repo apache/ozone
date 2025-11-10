@@ -158,6 +158,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private DirectoryDeletingService directoryDeletingService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
   private KeyLifecycleServiceMetrics metrics;
+  private long bucketObjectID;
 
   @BeforeAll
   void setup() {
@@ -1779,6 +1780,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         .setVolume(volume)
         .setBucket(bucket)
         .setBucketLayout(layout)
+        .setBucketObjectID(bucketObjectID)
         .setRules(Collections.singletonList(new OmLCRule.Builder()
             .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
             .setEnabled(enabled)
@@ -1803,6 +1805,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
         .setVolume(volume)
         .setBucket(bucket)
+        .setBucketObjectID(bucketObjectID)
         .setBucketLayout(layout)
         .setRules(ruleList)
         .build();
@@ -1835,12 +1838,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
             .setObjectID(OBJECT_ID_COUNTER.incrementAndGet())
             .build());
 
+    bucketObjectID = OBJECT_ID_COUNTER.incrementAndGet();
     OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
             .setOwner(owner)
-            .setObjectID(OBJECT_ID_COUNTER.incrementAndGet())
+            .setObjectID(bucketObjectID)
             .build());
   }
 

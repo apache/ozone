@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 /**
  * A class that encapsulates lifecycle configuration.
  */
+@Immutable
 public final class OmLifecycleConfiguration extends WithObjectID
     implements Auditable, CopyObject<OmLifecycleConfiguration> {
 
@@ -54,7 +56,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static final int LC_MAX_RULES = 1000;
   private final String volume;
   private final String bucket;
-  private long bucketObjectID = -1L;
+  private final Long bucketObjectID;
   private final BucketLayout bucketLayout;
   private final long creationTime;
   private final List<OmLCRule> rules;
@@ -85,12 +87,8 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return volume;
   }
 
-  public long getBucketObjectID() {
+  public Long getBucketObjectID() {
     return bucketObjectID;
-  }
-
-  public void setBucketObjectID(long objID) {
-    bucketObjectID = objID;
   }
 
   public long getCreationTime() {
@@ -150,13 +148,16 @@ public final class OmLifecycleConfiguration extends WithObjectID
   }
 
   public Builder toBuilder() {
-    return new Builder(this)
-        .setVolume(this.volume)
+    Builder builder = new Builder(this);
+    builder.setVolume(this.volume)
         .setBucket(this.bucket)
-        .setBucketObjectID(this.bucketObjectID)
         .setBucketLayout(bucketLayout)
         .setCreationTime(this.creationTime)
         .setRules(this.rules);
+    if (bucketObjectID != null) {
+      builder.setBucketObjectID(bucketObjectID);
+    }
+    return builder;
   }
 
   @Override
@@ -177,7 +178,9 @@ public final class OmLifecycleConfiguration extends WithObjectID
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volume);
     auditMap.put(OzoneConsts.BUCKET, this.bucket);
-    auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.bucketObjectID));
+    if (this.bucketObjectID != null) {
+      auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.bucketObjectID));
+    }
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
 
     return auditMap;
@@ -200,17 +203,25 @@ public final class OmLifecycleConfiguration extends WithObjectID
     LifecycleConfiguration.Builder b = LifecycleConfiguration.newBuilder()
         .setVolume(volume)
         .setBucket(bucket)
-        .setBucketObjectID(bucketObjectID)
         .setBucketLayout(bucketLayout.toProto())
         .setCreationTime(creationTime)
         .addAllRules(rulesProtoBuf)
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID());
 
+    if (bucketObjectID != null) {
+      b.setBucketObjectID(bucketObjectID);
+    }
+
     return b.build();
   }
 
   public static OmLifecycleConfiguration getFromProtobuf(
+      LifecycleConfiguration lifecycleConfiguration) throws OMException {
+    return getBuilderFromProtobuf(lifecycleConfiguration).build();
+  }
+
+  public static OmLifecycleConfiguration.Builder getBuilderFromProtobuf(
       LifecycleConfiguration lifecycleConfiguration) throws OMException {
     List<OmLCRule> rulesList = new ArrayList<>();
     BucketLayout layout = BucketLayout.fromProto(lifecycleConfiguration.getBucketLayout());
@@ -236,7 +247,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
       builder.setBucketObjectID(lifecycleConfiguration.getBucketObjectID());
     }
 
-    return builder.build();
+    return builder;
   }
 
   /**
@@ -245,7 +256,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   public static class Builder extends WithObjectID.Builder {
     private String volume = "";
     private String bucket = "";
-    private long bucketObjectID = -1L;
+    private Long bucketObjectID;
     private BucketLayout bucketLayout;
     private long creationTime;
     private List<OmLCRule> rules = new ArrayList<>();
