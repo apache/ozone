@@ -19,7 +19,7 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  stale:
+  close-stale-prs:
     permissions:
       pull-requests: write
     runs-on: ubuntu-latest
@@ -29,6 +29,7 @@ jobs:
         with:
           stale-pr-label: 'stale'
           exempt-draft-pr: false
+          days-before-issue-stale: -1
           days-before-pr-stale: 21
           days-before-pr-close: 7
           remove-pr-stale-when-updated: true
