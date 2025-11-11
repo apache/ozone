@@ -43,7 +43,7 @@ Verify Container State with Rule
 
     ${output} =           Execute replicas verify container state debug tool
     ${json} =             Parse replicas verify JSON output    ${output}
-    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${FAULT_INJ_DATANODE}  Replica state is ${expected_state}
+    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${DATANODE}  Replica state is ${expected_state}
 
     Remove Byteman Rule  ${FAULT_INJ_DATANODE}    ${rule_file}
 
