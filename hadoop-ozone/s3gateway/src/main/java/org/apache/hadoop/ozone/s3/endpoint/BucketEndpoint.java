@@ -99,7 +99,6 @@ public class BucketEndpoint extends EndpointBase {
       @PathParam(BUCKET) String bucketName
   ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.GET_BUCKET;
 
     // Chain of responsibility: let each handler try to handle the request
     for (BucketOperationHandler handler : handlers) {
@@ -117,6 +116,9 @@ public class BucketEndpoint extends EndpointBase {
     final int maxUploads = queryParams().getInt(QueryParams.MAX_UPLOADS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX);
     String startAfter = queryParams().get(QueryParams.START_AFTER);
+
+    // Actual bucket processing starts here
+    S3GAction s3GAction = S3GAction.GET_BUCKET;
 
     try {
       final String uploads = queryParams().get(QueryParams.UPLOADS);
