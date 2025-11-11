@@ -43,9 +43,14 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -91,6 +96,7 @@ public class TestNSSummaryTaskControllerIntegration {
 
     // Setup other task mock
     when(mockOtherTask.getTaskName()).thenReturn("MockTask");
+    when(mockOtherTask.getStagedTask(any(), any())).thenReturn(mockOtherTask);
     when(mockOtherTask.reprocess(any())).thenReturn(
         new TaskResult.Builder()
             .setTaskName("MockTask")
@@ -102,8 +108,15 @@ public class TestNSSummaryTaskControllerIntegration {
     ReconTaskStatusUpdater mockTaskStatusUpdater = mock(ReconTaskStatusUpdater.class);
     when(mockTaskStatusUpdaterManager.getTaskStatusUpdater(any())).thenReturn(mockTaskStatusUpdater);
 
-    taskController =
-        new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(), mockTaskStatusUpdaterManager);
+    ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
+    ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
+    ReconDBProvider reconDbProvider = mock(ReconDBProvider.class);
+    when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
+    when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
+    taskController = new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(),
+        mockTaskStatusUpdaterManager, reconDbProvider, reconContainerMgr, mockNamespaceSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
     taskController.start(); // Initialize the executor service
     taskController.registerTask(nsSummaryTask);
     taskController.registerTask(mockOtherTask);
@@ -137,8 +150,14 @@ public class TestNSSummaryTaskControllerIntegration {
       public TaskResult buildTaskResult(boolean success) {
         return super.buildTaskResult(success);
       }
-      
-      @Override 
+
+      @Override
+      public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+          throws IOException {
+        return this;
+      }
+
+      @Override
       protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
         // Simplified test implementation that mimics the real execution flow
         // but bypasses the complex sub-task execution while maintaining proper state management
@@ -476,6 +495,7 @@ public class TestNSSummaryTaskControllerIntegration {
     ReconOmTask failTask = mock(ReconOmTask.class);
 
     when(successTask.getTaskName()).thenReturn("SuccessTask");
+    when(successTask.getStagedTask(any(), any())).thenReturn(successTask);
     when(successTask.reprocess(any())).thenReturn(
         new TaskResult.Builder()
             .setTaskName("SuccessTask") 
@@ -483,6 +503,7 @@ public class TestNSSummaryTaskControllerIntegration {
             .build());
 
     when(failTask.getTaskName()).thenReturn("FailTask");
+    when(failTask.getStagedTask(any(), any())).thenReturn(failTask);
     when(failTask.reprocess(any())).thenReturn(
         new TaskResult.Builder()
             .setTaskName("FailTask")

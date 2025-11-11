@@ -86,7 +86,7 @@ public final class OmSnapshotUtils {
    * @throws IOException if an I/O error occurs
    */
   public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
-    Object inode = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+    Object inode = getINode(file);
     FileTime mTime = Files.getLastModifiedTime(file);
     return String.format("%s-%s", inode, mTime.toMillis());
   }

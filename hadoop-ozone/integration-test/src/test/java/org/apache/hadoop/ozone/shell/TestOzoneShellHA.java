@@ -156,12 +156,6 @@ public class TestOzoneShellHA {
 
   private static OzoneConfiguration ozoneConfiguration;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

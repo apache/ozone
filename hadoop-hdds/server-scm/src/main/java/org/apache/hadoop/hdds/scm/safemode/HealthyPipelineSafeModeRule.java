@@ -56,8 +56,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
 
-  private static final String NAME = "HealthyPipelineSafeModeRule";
-
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
@@ -71,7 +69,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
       ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
-    super(manager, NAME, eventQueue);
+    super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;

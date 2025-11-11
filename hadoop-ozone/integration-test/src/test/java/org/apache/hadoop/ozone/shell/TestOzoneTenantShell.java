@@ -85,7 +85,6 @@ public class TestOzoneTenantShell {
 
   @TempDir
   private static Path path;
-  private static File testFile;
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
@@ -101,12 +100,6 @@ public class TestOzoneTenantShell {
 
   private static final boolean USE_ACTUAL_RANGER = false;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
@@ -126,7 +119,7 @@ public class TestOzoneTenantShell {
       conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     }
 
-    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    File testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
     FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();

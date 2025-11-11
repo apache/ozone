@@ -40,7 +40,6 @@ import java.util.stream.Stream;
 
 public class ContainerLogFileParser {
 
-  private ExecutorService executorService;
   private static final int MAX_OBJ_IN_LIST = 5000;
 
   private static final String LOG_FILE_MARKER = ".log.";
@@ -67,7 +66,7 @@ public class ContainerLogFileParser {
 
       List<Path> files = paths.filter(Files::isRegularFile).collect(Collectors.toList());
 
-      executorService = Executors.newFixedThreadPool(threadCount);
+      ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
 
       CountDownLatch latch = new CountDownLatch(files.size());
       for (Path file : files) {

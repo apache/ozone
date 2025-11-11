@@ -108,6 +108,10 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.task.thread.count";
   public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 8;
 
+  public static final String OZONE_RECON_OM_EVENT_BUFFER_CAPACITY =
+      "ozone.recon.om.event.buffer.capacity";
+  public static final int OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT = 20000;
+
   public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.recon.http.auth.";
 

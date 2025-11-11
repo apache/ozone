@@ -28,9 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -53,7 +52,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,21 +61,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -89,7 +85,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.LiveFileMetaData;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.slf4j.event.Level;
 
 /**
@@ -102,6 +100,7 @@ class TestOmSnapshotManager {
   private SnapshotChainManager snapshotChainManager;
   private OmMetadataManagerImpl omMetadataManager;
   private OmSnapshotManager omSnapshotManager;
+  private OmSnapshotLocalDataManager snapshotLocalDataManager;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -134,6 +133,7 @@ class TestOmSnapshotManager {
     om = omTestManagers.getOzoneManager();
     omMetadataManager = (OmMetadataManagerImpl) om.getMetadataManager();
     omSnapshotManager = om.getOmSnapshotManager();
+    snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     snapshotChainManager = omMetadataManager.getSnapshotChainManager();
   }
 
@@ -153,8 +153,8 @@ class TestOmSnapshotManager {
       SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotInfoKey);
       snapshotChainManager.deleteSnapshot(snapshotInfo);
       snapshotInfoTable.delete(snapshotInfoKey);
-      Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-          om.getMetadataManager(), snapshotInfo));
+
+      Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
       Files.deleteIfExists(snapshotYaml);
     }
     omSnapshotManager.invalidateCache();
@@ -262,63 +262,6 @@ class TestOmSnapshotManager {
     GenericTestUtils.waitFor(() -> {
       return logCapture.getOutput().contains(msg);
     }, 100, 30_000);
-  }
-
-  private LiveFileMetaData createMockLiveFileMetadata(String cfname, String fileName) {
-    LiveFileMetaData lfm = mock(LiveFileMetaData.class);
-    when(lfm.columnFamilyName()).thenReturn(cfname.getBytes(StandardCharsets.UTF_8));
-    when(lfm.fileName()).thenReturn(fileName);
-    return lfm;
-  }
-
-  @Test
-  public void testCreateNewSnapshotLocalYaml() throws IOException {
-    SnapshotInfo snapshotInfo = createSnapshotInfo("vol1", "buck1");
-
-    Map<String, Set<String>> expUncompactedSSTFileList = new HashMap<>();
-    expUncompactedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toSet()));
-    expUncompactedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toSet()));
-    expUncompactedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toSet()));
-
-    List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
-    for (Map.Entry<String, Set<String>> entry : expUncompactedSSTFileList.entrySet()) {
-      String cfname = entry.getKey();
-      for (String fname : entry.getValue()) {
-        mockedLiveFiles.add(createMockLiveFileMetadata(cfname, fname));
-      }
-    }
-    // Add some other column families and files that should be ignored
-    mockedLiveFiles.add(createMockLiveFileMetadata("otherTable", "ot1.sst"));
-    mockedLiveFiles.add(createMockLiveFileMetadata("otherTable", "ot2.sst"));
-
-    RDBStore mockedStore = mock(RDBStore.class);
-    RocksDatabase mockedDb = mock(RocksDatabase.class);
-    when(mockedStore.getDb()).thenReturn(mockedDb);
-    when(mockedDb.getLiveFilesMetaData()).thenReturn(mockedLiveFiles);
-
-    Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-        omMetadataManager, snapshotInfo));
-
-    // Create an existing YAML file for the snapshot
-    assertTrue(snapshotYaml.toFile().createNewFile());
-    assertEquals(0, Files.size(snapshotYaml));
-    // Create a new YAML file for the snapshot
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, mockedStore);
-    // Verify that previous file was overwritten
-    assertTrue(Files.exists(snapshotYaml));
-    assertTrue(Files.size(snapshotYaml) > 0);
-    // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotYaml.toFile());
-    assertNotNull(localData);
-    assertEquals(0, localData.getVersion());
-    assertEquals(expUncompactedSSTFileList, localData.getUncompactedSSTFileList());
-    assertFalse(localData.getSstFiltered());
-    assertEquals(0L, localData.getLastCompactionTime());
-    assertFalse(localData.getNeedsCompaction());
-    assertTrue(localData.getCompactedSSTFileList().isEmpty());
-
-    // Cleanup
-    Files.delete(snapshotYaml);
   }
 
   @Test
@@ -725,6 +668,43 @@ class TestOmSnapshotManager {
         destAddNonSstToCopiedFiles);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPath(int version) {
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    RDBStore store = mock(RDBStore.class);
+    when(metadataManager.getStore()).thenReturn(store);
+    File file = new File("test-db");
+    when(store.getDbLocation()).thenReturn(file);
+    String path = "dir1/dir2";
+    when(store.getSnapshotsParentDir()).thenReturn(path);
+    UUID snapshotId = UUID.randomUUID();
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(metadataManager, snapshotId, version).toString();
+    String expectedPath = "dir1/dir2/test-db-" + snapshotId;
+    if (version != 0) {
+      expectedPath = expectedPath + "-" + version;
+    }
+    assertEquals(expectedPath, snapshotPath);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPathFromConf(int version) {
+    try (MockedStatic<OMStorage> mocked = mockStatic(OMStorage.class)) {
+      String omDir = "dir1/dir2";
+      mocked.when(() -> OMStorage.getOmDbDir(any())).thenReturn(new File(omDir));
+      OzoneConfiguration conf = mock(OzoneConfiguration.class);
+      SnapshotInfo snapshotInfo = createSnapshotInfo("volumeName", "bucketname");
+      String snapshotPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, version);
+      String expectedPath = omDir + OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+          OM_DB_NAME + "-" + snapshotInfo.getSnapshotId();
+      if (version != 0) {
+        expectedPath = expectedPath + "-" + version;
+      }
+      assertEquals(expectedPath, snapshotPath);
+    }
+  }
+
   @Test
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
@@ -758,6 +738,7 @@ class TestOmSnapshotManager {
     when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
 
     SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    first.setPathPreviousSnapshotId(null);
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
@@ -775,16 +756,19 @@ class TestOmSnapshotManager {
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
 
-    assertThat(logCapturer.getOutput()).contains(
-        "for snapshot " + first.getName() + " already exists.");
+    assertThat(logCapturer.getOutput())
+        .contains("for snapshot " + first.getTableKey() + " already exists.");
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,
                                           String bucketName) {
-    return SnapshotInfo.newInstance(volumeName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         UUID.randomUUID().toString(),
         UUID.randomUUID(),
         Time.now());
+    snapshotInfo.setPathPreviousSnapshotId(null);
+    snapshotInfo.setGlobalPreviousSnapshotId(null);
+    return snapshotInfo;
   }
 }

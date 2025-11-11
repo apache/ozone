@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -90,9 +91,6 @@ import org.mockito.stubbing.Answer;
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
-  private OzoneConfiguration conf;
-  private ContainerLayoutVersion layout;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private DeleteBlocksCommandHandler handler;
   private String schemaVersion;
@@ -101,20 +99,37 @@ public class TestDeleteBlocksCommandHandler {
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
   }
 
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    return volume;
+  }
+
   private void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     containerSet = newContainerSet();
-    volume1 = mock(HddsVolume.class);
-    when(volume1.getStorageID()).thenReturn("uuid-1");
+    volume1 = mockHddsVolume("uuid-1");
     for (int i = 0; i <= 10; i++) {
       KeyValueContainerData data =
           new KeyValueContainerData(i,

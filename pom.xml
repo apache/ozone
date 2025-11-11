@@ -16,7 +16,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
   <artifactId>ozone-main</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone Main</name>
   <description>Apache Ozone Main</description>
@@ -33,22 +33,26 @@
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
+    <aspectj.java11.version>1.9.20</aspectj.java11.version>
+    <aspectj.java21.version>1.9.24</aspectj.java21.version>
+    <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.3</assertj.version>
-    <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.32.14</aws-java-sdk2.version>
+    <assertj.version>3.27.6</assertj.version>
+    <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
+    <aws-java-sdk2.version>2.38.2</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.81</bouncycastle.version>
+    <bouncycastle.version>1.82</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
-    <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
+    <common-pool2.version>2.12.1</common-pool2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.18.0</commons-codec.version>
-    <commons-collections.version>3.2.2</commons-collections.version>
+    <commons-collections.version>4.4</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
@@ -58,8 +62,8 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.13.1</commons-text.version>
-    <commons-validator.version>1.6</commons-validator.version>
-    <compile-testing.version>0.21.0</compile-testing.version>
+    <commons-validator.version>1.10.0</commons-validator.version>
+    <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
@@ -85,15 +89,17 @@
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
-    <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
+    <exec-maven-plugin.version>3.6.2</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
-    <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
-    <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
-    <gson.version>2.10.1</gson.version>
-    <guava.version>32.1.3-jre</guava.version>
+    <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
+    <gson.version>2.13.1</gson.version>
+    <guava.version>33.5.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
+    <!-- versions included in hadoop-thirdparty, update in sync (+ jar-report and LICENSE) -->
+    <hadoop-thirdparty.protobuf.artifact>hadoop-shaded-protobuf_3_25</hadoop-thirdparty.protobuf.artifact>
+    <hadoop-thirdparty.protobuf.version>3.25.5</hadoop-thirdparty.protobuf.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
-    <hadoop.version>3.4.1</hadoop.version>
+    <hadoop.version>3.4.2</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hamcrest.version>2.2</hamcrest.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
@@ -103,8 +109,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <io.grpc.version>1.71.0</io.grpc.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
-    <jacoco.version>0.8.13</jacoco.version>
-    <jaeger.version>1.8.1</jaeger.version>
+    <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
@@ -117,24 +122,25 @@
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
+    <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.47</jersey2.version>
-    <jetty.version>9.4.57.v20241219</jetty.version>
+    <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.4</jline.version>
+    <jline.version>3.30.6</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <jnr-posix.version>3.1.20</jnr-posix.version>
+    <jnr-posix.version>3.1.21</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.13.4</junit5.version>
+    <junit5.version>5.14.1</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
-    <license-maven-plugin.version>2.6.0</license-maven-plugin.version>
+    <license-maven-plugin.version>2.7.0</license-maven-plugin.version>
     <log4j2.version>2.25.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
@@ -161,6 +167,7 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
+    <maven.compiler.release>${javac.version}</maven.compiler.release>
     <maven.core.version>3.9.10</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
@@ -172,10 +179,10 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentracing.version>0.33.0</opentracing.version>
+    <opentelemetry.version>1.56.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
-    <ozone.release>Joshua Tree</ozone.release>
-    <ozone.version>2.1.0-SNAPSHOT</ozone.version>
+    <ozone.release>Katmai</ozone.release>
+    <ozone.version>2.2.0-SNAPSHOT</ozone.version>
     <!--
       4.7.6: https://github.com/remkop/picocli/issues/2309
       4.7.7: https://github.com/remkop/picocli/issues/2407
@@ -191,13 +198,14 @@
     <prometheus.version>0.16.0</prometheus.version>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
-    <!-- ProtocolBuffer version, used to verify the protoc version and -->
-    <!-- define the protobuf JAR version                               -->
-    <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
-    <proto3.hadooprpc.protobuf.version>3.25.5</proto3.hadooprpc.protobuf.version>
-    <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+    <protobuf2.version>2.5.0</protobuf2.version>
+    <protobuf3.version>3.25.8</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
+    <!-- versions included in ratis-thirdparty, update in sync -->
+    <ratis-thirdparty.grpc.version>1.71.0</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.119.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.protobuf.version>3.25.5</ratis-thirdparty.protobuf.version>
     <ratis.thirdparty.version>1.0.9</ratis.thirdparty.version>
     <ratis.version>3.2.0</ratis.version>
     <re2j.version>1.7</re2j.version>
@@ -208,7 +216,7 @@
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
-    <snakeyaml.version>2.0</snakeyaml.version>
+    <snakeyaml.version>2.5</snakeyaml.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
@@ -217,7 +225,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.50.3.0</sqlite.version>
+    <sqlite.version>3.51.0.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -232,7 +240,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.7-4</zstd-jni.version>
+    <zstd-jni.version>1.5.7-6</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -409,7 +417,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${proto2.hadooprpc.protobuf.version}</version>
+        <version>${protobuf2.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
@@ -484,11 +492,6 @@
         <version>${commons-codec.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>${commons-collections.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-daemon</groupId>
         <artifactId>commons-daemon</artifactId>
         <version>${commons-daemon.version}</version>
@@ -541,35 +544,34 @@
         <version>${dropwizard-metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-client</artifactId>
-        <version>${jaeger.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-api</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-core</artifactId>
-        <version>${jaeger.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-context</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-api</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-exporter-otlp</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-noop</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-util</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-common</artifactId>
+        <version>${opentelemetry.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-trace</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
@@ -683,6 +685,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
+        <artifactId>commons-collections4</artifactId>
+        <version>${commons-collections.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
         <version>${commons-compress.version}</version>
       </dependency>
@@ -711,6 +718,11 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-math3</artifactId>
         <version>${commons-math3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-pool2</artifactId>
+        <version>${common-pool2.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -951,7 +963,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+        <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
         <version>${hadoop-thirdparty.version}</version>
       </dependency>
       <dependency>
@@ -1233,6 +1245,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-multitenancy-ranger</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-recon</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -1387,6 +1404,11 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>${properties.maven.plugin.version}</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
@@ -1660,6 +1682,11 @@
         <version>${spring.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.vafer</groupId>
+        <artifactId>jdeb</artifactId>
+        <version>${jdeb.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.xerial</groupId>
         <artifactId>sqlite-jdbc</artifactId>
         <version>${sqlite.version}</version>
@@ -1831,6 +1858,11 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
+            <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.proto3:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.protocol.proto3:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.security.proto3:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
+            <sourceFileExcludes>
+              <exclude>**/package-info.java</exclude>
+              <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
+            </sourceFileExcludes>
             <doclint>none</doclint>
             <notimestamp>true</notimestamp>
           </configuration>
@@ -2001,6 +2033,17 @@
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
+                    <reason>Prefer JDK built-in</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.HadoopIllegalArgumentException</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
                     <reason>Use Ozone's version of the same class</reason>
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.test.GenericTestUtils</bannedImport>
@@ -2068,6 +2111,17 @@
                     <reason>Use commons-lang v3</reason>
                     <bannedImports>
                       <bannedImport>org.apache.commons.lang.**</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use commons-collections v4</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.commons.collections.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2168,6 +2222,12 @@
             <printFailingErrors>true</printFailingErrors>
             <includeTests>true</includeTests>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.xolstice.maven.plugins</groupId>
+          <artifactId>protobuf-maven-plugin</artifactId>
+          <version>${protobuf-maven-plugin.version}</version>
+          <extensions>true</extensions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2652,25 +2712,23 @@
         </plugins>
       </build>
     </profile>
-    <!-- Profiles for specific JDK versions -->
+    <!-- Profiles for specific aspectj versions -->
     <profile>
-      <id>java8</id>
+      <id>aspectj-java11-20</id>
       <activation>
-        <jdk>[,8]</jdk>
+        <jdk>[11,20]</jdk>
       </activation>
       <properties>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
+        <aspectj.version>${aspectj.java11.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
-      <id>java9-or-later</id>
+      <id>aspectj-java21-or-later</id>
       <activation>
-        <jdk>[9,]</jdk>
+        <jdk>[21,]</jdk>
       </activation>
       <properties>
-        <!-- supported since Java 9 -->
-        <maven.compiler.release>${javac.version}</maven.compiler.release>
+        <aspectj.version>${aspectj.java21.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
@@ -2679,8 +2737,8 @@
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
-        <skip.installnodenpm>true</skip.installnodenpm>
-        <skip.npx>true</skip.npx>
+        <skip.installnodepnpm>true</skip.installnodepnpm>
+        <skip.pnpm>true</skip.pnpm>
         <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
@@ -2693,8 +2751,8 @@
         </property>
       </activation>
       <properties>
-        <skip.installnodenpm>true</skip.installnodenpm>
-        <skip.npx>true</skip.npx>
+        <skip.installnodepnpm>true</skip.installnodepnpm>
+        <skip.pnpm>true</skip.pnpm>
       </properties>
     </profile>
     <!-- The following profiles define test splits for CI -->

@@ -94,6 +94,10 @@
               {
                 "name": "Echo",
                 "integer": 22
+              },
+              {
+                "name": "GetContainerChecksumInfo",
+                "integer": 23
               }
             ]
           },
@@ -283,6 +287,10 @@
               {
                 "name": "BLOCK_ALREADY_FINALIZED",
                 "integer": 47
+              },
+              {
+                "name": "CONTAINER_ID_MISMATCH",
+                "integer": 48
               }
             ]
           },
@@ -618,6 +626,12 @@
                 "name": "echo",
                 "type": "EchoRequestProto",
                 "optional": true
+              },
+              {
+                "id": 27,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoRequestProto",
+                "optional": true
               }
             ]
           },
@@ -760,6 +774,12 @@
                 "id": 23,
                 "name": "echo",
                 "type": "EchoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoResponseProto",
                 "optional": true
               }
             ]
@@ -1200,6 +1220,34 @@
             ]
           },
           {
+            "name": "GetContainerChecksumInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerChecksumInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerChecksumInfo",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "ChunkInfo",
             "fields": [
               {
@@ -1601,11 +1649,132 @@
                 "name": "compression",
                 "type": "CopyContainerCompressProto",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "size",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
           {
             "name": "SendContainerResponse"
+          },
+          {
+            "name": "ChunkMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "offset",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "length",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "checksumMatches",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "BlockMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "chunkMerkleTree",
+                "type": "ChunkMerkleTree",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "deleted",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "blockMerkleTree",
+                "type": "BlockMerkleTree",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerChecksumInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerMerkleTree",
+                "type": "ContainerMerkleTree",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerCreateInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "ContainerDataProto.State",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
+              }
+            ]
           }
         ],
         "services": [
@@ -3166,6 +3335,12 @@
                 "name": "state",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -3217,6 +3392,12 @@
               {
                 "id": 8,
                 "name": "replicaIndex",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "dataChecksum",
                 "type": "int64",
                 "optional": true
               }
@@ -3448,6 +3629,12 @@
                 "id": 4,
                 "name": "columnFamily",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "pruned",
+                "type": "bool",
                 "optional": true
               }
             ]

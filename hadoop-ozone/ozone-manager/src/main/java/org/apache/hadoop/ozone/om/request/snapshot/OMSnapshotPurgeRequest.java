@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -26,6 +27,9 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
@@ -51,6 +55,10 @@ import org.slf4j.LoggerFactory;
 public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
+
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
+  private static final String AUDIT_PARAM_SNAPSHOT_DB_KEYS = "snapshotsDBKeys";
+  private static final String AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN = "snapshotsSetForDeepClean";
 
   /**
    * This map contains up to date snapshotInfo and works as a local cache for OMSnapshotPurgeRequest.
@@ -81,9 +89,10 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     SnapshotPurgeRequest snapshotPurgeRequest = getOmRequest()
         .getSnapshotPurgeRequest();
 
+    List<String> snapshotDbKeys = snapshotPurgeRequest
+        .getSnapshotDBKeysList();
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
     try {
-      List<String> snapshotDbKeys = snapshotPurgeRequest
-          .getSnapshotDBKeysList();
 
       // Each snapshot purge operation does three things:
       //  1. Update the deep clean flag for the next active snapshot (So that it can be
@@ -115,21 +124,34 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       }
       // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
-        snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+        snapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), snapshotInfo));
       }
 
-      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos);
+      omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos,
+          transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
       LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
           snapshotPurgeRequest, updatedSnapshotInfos);
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
+        auditParams.put(AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN, String.join(",", updatedSnapshotInfos.keySet()));
+        AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_PURGE, auditParams));
+      }
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
       omSnapshotIntMetrics.incNumSnapshotPurgeFails();
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_PURGE, auditParams, ex));
+      }
+
     }
 
     return omClientResponse;

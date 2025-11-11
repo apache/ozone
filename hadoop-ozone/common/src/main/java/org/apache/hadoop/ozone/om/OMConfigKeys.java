@@ -62,6 +62,8 @@ public final class OMConfigKeys {
       "ozone.om.node.id";
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
+  public static final String OZONE_OM_LISTENER_NODES_KEY =
+      "ozone.om.listener.nodes";
 
   public static final String OZONE_OM_FEATURES_DISABLED =
       "ozone.om.features.disabled";
@@ -204,9 +206,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT =
       "ozone.om.ratis.server.pending.write.element-limit";
   public static final int OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT = 4096;
-
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT = "ozone.om.ratis.server.pending.write.byte-limit";
-  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT = "64MB";
 
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
@@ -426,10 +425,21 @@ public final class OMConfigKeys {
       "ozone.snapshot.deleting.limit.per.task";
   public static final int SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT = 10;
 
+  // Snapshot defragmentation service configuration
+  public static final String SNAPSHOT_DEFRAG_LIMIT_PER_TASK =
+      "ozone.snapshot.defrag.limit.per.task";
+  public static final int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT = 1;
+
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
       "ozone.snapshot.filtering.service.interval";
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL =
+      "ozone.snapshot.defrag.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT = "-1";
+  // TODO: Disabled by default. Do not enable by default until upgrade handling is complete.
 
   public static final String
       OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT =
@@ -639,7 +649,7 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Compaction Service.
    */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
   public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
   public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
       "ozone.om.compaction.service.run.interval";
@@ -660,6 +670,17 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
       "ozone.om.snapshot.compact.non.snapshot.diff.tables";
   public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
+
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT =
+      "ozone.om.hierarchical.resource.locks.soft.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT = 1024;
+
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT =
+      "ozone.om.hierarchical.resource.locks.hard.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT = 10000;
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
+      "ozone.om.snapshot.local.data.manager.service.interval";
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
   /**
    * Never constructed.
