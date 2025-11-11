@@ -44,8 +44,8 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -508,8 +508,8 @@ public class TestDefaultCAServer {
   }
 
   private X509Certificate generateExternalCert(KeyPair keyPair) throws Exception {
-    LocalDateTime notBefore = LocalDateTime.now();
-    LocalDateTime notAfter = notBefore.plusYears(1);
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    ZonedDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";

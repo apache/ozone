@@ -35,8 +35,6 @@ import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
@@ -490,15 +488,14 @@ public class DefaultCAServer implements CertificateServer {
       SecurityConfig securityConfig, KeyPair key)
       throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
-    LocalDateTime beginDate = LocalDateTime.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    ZonedDateTime endDate = beginDate.atZone(zoneId).plus(securityConfig.getMaxCertificateDuration());
+    ZonedDateTime beginDate = ZonedDateTime.now();
+    ZonedDateTime endDate = beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
         .setSubject(this.subject)
         .setScmID(this.scmID)
         .setClusterID(this.clusterID)
         .setBeginDate(beginDate)
-        .setEndDate(endDate.toLocalDateTime())
+        .setEndDate(endDate)
         .makeCA(rootCertificateId)
         .setConfiguration(securityConfig)
         .setKey(key);

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +72,7 @@ public class TestRootCaRotationPoller {
   public void testPollerDoesNotInvokeRootCaProcessor() throws Exception {
     //Given the root ca poller that knows a set of root ca certificates
     X509Certificate knownCert = generateX509Cert(
-        LocalDateTime.now(), Duration.ofSeconds(50));
+        ZonedDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
@@ -104,9 +104,9 @@ public class TestRootCaRotationPoller {
     //Given the root ca poller knowing a root ca certificate, and an unknown
     //root ca certificate
     X509Certificate knownCert = generateX509Cert(
-        LocalDateTime.now(), Duration.ofSeconds(50));
+        ZonedDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
-        LocalDateTime.now(), Duration.ofSeconds(50));
+        ZonedDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
@@ -137,9 +137,9 @@ public class TestRootCaRotationPoller {
     //Given a the root ca poller knowing about a root ca certificate and the
     // SCM providing a new one
     X509Certificate knownCert = generateX509Cert(
-        LocalDateTime.now(), Duration.ofSeconds(50));
+        ZonedDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
-        LocalDateTime.now(), Duration.ofSeconds(50));
+        ZonedDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
@@ -174,10 +174,10 @@ public class TestRootCaRotationPoller {
   }
 
   private X509Certificate generateX509Cert(
-      LocalDateTime startDate, Duration certLifetime) throws Exception {
+      ZonedDateTime startDate, Duration certLifetime) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return SelfSignedCertificate.newBuilder()
         .setBeginDate(start)
         .setEndDate(end)
