@@ -476,7 +476,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     List<OzoneManagerProtocolProtos.OMResponse> responses = new ArrayList<>();
     List<PurgePathRequest> purgePathRequestBatch = new ArrayList<>();
-    int batchBytes = 0;
+    long batchBytes = 0;
 
     for (PurgePathRequest req : requests) {
       int reqSize = req.getSerializedSize();
