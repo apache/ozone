@@ -99,20 +99,24 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       }
       ContainerDataProto.State state = containerData.getState();
       replicaCheckMsg.append(state.name());
-      if (areContainerAndReplicasInGoodState(state, containerInfoToken.getContainerState())) {
-        pass = true;
-      }
+      boolean replicaStateGood = areContainerAndReplicasInGoodState(state, containerInfoToken.getContainerState());
       replicaCheckMsg.append(", Container state in SCM is ").append(containerInfoToken.getContainerState());
 
       String replicationStatus = checkReplicationStatus(keyLocation.getContainerID());
       replicaCheckMsg.append(", ").append(replicationStatus);
-      if (replicationStatus.contains("REPLICATION_CHECK_FAILED")) {
-        pass = false;
+
+      // Replication status check evaluates container-level health by counting healthy replicas
+      // across all datanodes. Therefore, when a container is UNDER_REPLICATED or OVER_REPLICATED,
+      // this information should be reflected in all replica outputs, not just the unhealthy ones.
+      if (replicationStatus.contains("HEALTHY_REPLICATION") && replicaStateGood) {
+        pass = true;
       }
 
-      // Always return failCheck to include replication status information in the output
-      // This allows users to see replication health status even when container state is good
-      return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
+      if (pass) {
+        return BlockVerificationResult.pass();
+      } else {
+        return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
+      }
     } catch (IOException e) {
       if (e.getMessage().contains("ContainerID") && e.getMessage().contains("does not exist")) {
         // if container "does not exist", mark it as failed instead of incomplete
