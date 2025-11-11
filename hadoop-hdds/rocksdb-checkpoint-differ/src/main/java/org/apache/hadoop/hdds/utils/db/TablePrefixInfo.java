@@ -15,21 +15,38 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
-import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is enabled.
+ * Encapsulates a store's prefix info corresponding to tables in a db.
  */
-@EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-@Unhealthy("HDDS-13466")
-class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
-  TestOmSnapshotFsoWithNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false);
+public class TablePrefixInfo {
+  private final Map<String, String> tablePrefixes;
+
+  public TablePrefixInfo(Map<String, String> tablePrefixes) {
+    this.tablePrefixes = Collections.unmodifiableMap(tablePrefixes);
+  }
+
+  public String getTablePrefix(String tableName) {
+    return tablePrefixes.getOrDefault(tableName, "");
+  }
+
+  public int size() {
+    return tablePrefixes.size();
+  }
+
+  public Set<String> getTableNames() {
+    return tablePrefixes.keySet();
+  }
+
+  @Override
+  public String toString() {
+    return "TablePrefixInfo{" +
+        "tablePrefixes=" + tablePrefixes +
+        '}';
   }
 }

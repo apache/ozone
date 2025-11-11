@@ -685,7 +685,7 @@ public class TestOmSnapshotLocalDataManager {
       addVersionsToLocalData(localDataManager, snapshotIds.get(i), versionMaps.get(i));
     }
     for (int start = 0; start < snapshotIds.size(); start++) {
-      for (int end = start + 1; end < snapshotIds.size(); end++) {
+      for (int end = 0; end < snapshotIds.size(); end++) {
         UUID prevSnapId = snapshotIds.get(start);
         UUID snapId = snapshotIds.get(end);
         Map<Integer, Integer> versionMap = new HashMap<>(versionMaps.get(end));
@@ -695,19 +695,29 @@ public class TestOmSnapshotLocalDataManager {
             version.setValue(versionMaps.get(idx).getOrDefault(version.getValue(), 0));
           }
         }
-        try (ReadableOmSnapshotLocalDataProvider snap = read ?
-            localDataManager.getOmSnapshotLocalData(snapId, prevSnapId) :
-            localDataManager.getWritableOmSnapshotLocalData(snapId, prevSnapId)) {
-          OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
-          OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData();
-          assertEquals(prevSnapshotLocalData.getSnapshotId(), snapshotLocalData.getPreviousSnapshotId());
-          assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
-          assertEquals(snapId, snapshotLocalData.getSnapshotId());
-          assertTrue(snapshotLocalData.getVersionSstFileInfos().size() > 1);
-          snapshotLocalData.getVersionSstFileInfos()
-              .forEach((version, versionMeta) -> {
-                assertEquals(versionMap.get(version), versionMeta.getPreviousSnapshotVersion());
-              });
+        if (start >= end) {
+          assertThrows(IOException.class, () -> {
+            if (read) {
+              localDataManager.getOmSnapshotLocalData(snapId, prevSnapId);
+            } else {
+              localDataManager.getWritableOmSnapshotLocalData(snapId, prevSnapId);
+            }
+          });
+        } else {
+          try (ReadableOmSnapshotLocalDataProvider snap = read ?
+              localDataManager.getOmSnapshotLocalData(snapId, prevSnapId) :
+              localDataManager.getWritableOmSnapshotLocalData(snapId, prevSnapId)) {
+            OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
+            OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData();
+            assertEquals(prevSnapshotLocalData.getSnapshotId(), snapshotLocalData.getPreviousSnapshotId());
+            assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
+            assertEquals(snapId, snapshotLocalData.getSnapshotId());
+            assertTrue(snapshotLocalData.getVersionSstFileInfos().size() > 1);
+            snapshotLocalData.getVersionSstFileInfos()
+                .forEach((version, versionMeta) -> {
+                  assertEquals(versionMap.get(version), versionMeta.getPreviousSnapshotVersion());
+                });
+          }
         }
       }
     }

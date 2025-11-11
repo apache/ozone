@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.graph.MutableGraph;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
@@ -621,12 +622,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
    * @param rocksDB open rocksDB instance.
+   * @param tableFilter set of column-family/table names to include when collecting live SSTs.
    * @return a list of SST files (without extension) in the DB.
    */
-  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
+  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB, Set<String> tableFilter) {
     HashSet<String> liveFiles = new HashSet<>();
 
-    final List<String> cfs = Arrays.asList(
+    final Set<String> cfs = Sets.newHashSet(
         org.apache.hadoop.hdds.StringUtils.bytes2String(
             RocksDB.DEFAULT_COLUMN_FAMILY), "keyTable", "directoryTable",
         "fileTable");
@@ -636,6 +638,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         RdbUtil.getLiveSSTFilesForCFs(rocksDB, cfs);
     LOG.debug("SST File Metadata for DB: " + rocksDB.get().getName());
     for (LiveFileMetaData m : liveFileMetaDataList) {
+      if (!tableFilter.contains(StringUtils.bytes2String(m.columnFamilyName()))) {
+        continue;
+      }
       LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
       final String trimmedFilename = trimSSTFilename(m.fileName());
       liveFiles.add(trimmedFilename);
@@ -819,6 +824,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
    * @return A list of SST files without extension.
@@ -826,10 +832,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public synchronized Optional<List<String>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest,
+      DifferSnapshotInfo dest, Set<String> tablesToLookup,
       String sstFilesDirForSnapDiffJob) {
 
-    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest);
+    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest, tablesToLookup);
 
     return sstDiffList.map(diffList -> diffList.stream()
         .map(
@@ -853,15 +859,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
+   *                       must be non-null.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized Optional<List<String>> getSSTDiffList(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest) {
+      DifferSnapshotInfo dest, Set<String> tablesToLookup) {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
-    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
+    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB(), tablesToLookup);
+    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB(), tablesToLookup);
 
     Set<String> fwdDAGSameFiles = new HashSet<>();
     Set<String> fwdDAGDifferentFiles = new HashSet<>();
@@ -897,9 +905,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       }
     }
 
-    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
+    if (src.getTablePrefixes() != null && src.getTablePrefixes().size() != 0) {
       RocksDiffUtils.filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes(),
-          compactionDag.getCompactionMap(), src.getRocksDB(), dest.getRocksDB());
+          compactionDag.getCompactionMap(), tablesToLookup, src.getRocksDB(), dest.getRocksDB());
     }
     return Optional.of(new ArrayList<>(fwdDAGDifferentFiles));
   }

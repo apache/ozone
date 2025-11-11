@@ -17,7 +17,6 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,21 +42,20 @@ public final class RdbUtil {
   private RdbUtil() { }
 
   public static List<LiveFileMetaData> getLiveSSTFilesForCFs(
-      final ManagedRocksDB rocksDB, List<String> cfs) {
-    final Set<String> cfSet = Sets.newHashSet(cfs);
+      final ManagedRocksDB rocksDB, Set<String> cfs) {
     return rocksDB.get().getLiveFilesMetaData().stream()
-        .filter(lfm -> cfSet.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
+        .filter(lfm -> cfs.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
         .collect(Collectors.toList());
   }
 
   public static Set<String> getSSTFilesForComparison(
-      final ManagedRocksDB rocksDB, List<String> cfs) {
+      final ManagedRocksDB rocksDB, Set<String> cfs) {
     return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
         .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
         .collect(Collectors.toCollection(HashSet::new));
   }
 
-  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, List<String> cfs)
+  public static Map<Object, String> getSSTFilesWithInodesForComparison(final ManagedRocksDB rocksDB, Set<String> cfs)
       throws IOException {
     List<LiveFileMetaData> liveSSTFilesForCFs = getLiveSSTFilesForCFs(rocksDB, cfs);
     Map<Object, String> inodeToSstMap = new HashMap<>();

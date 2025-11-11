@@ -17,7 +17,7 @@
 
 package org.apache.ozone.rocksdiff;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.hdds.StringUtils.getFirstNChars;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
@@ -25,9 +25,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
@@ -49,41 +48,26 @@ public final class RocksDiffUtils {
   public static boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
                                                String firstDbKey,
                                                String lastDbKey) {
-    String firstKeyPrefix = constructBucketKey(firstDbKey);
-    String endKeyPrefix = constructBucketKey(lastDbKey);
+    String firstKeyPrefix = getFirstNChars(firstDbKey, prefixForColumnFamily.length());
+    String endKeyPrefix = getFirstNChars(lastDbKey, prefixForColumnFamily.length());
     return firstKeyPrefix.compareTo(prefixForColumnFamily) <= 0
         && prefixForColumnFamily.compareTo(endKeyPrefix) <= 0;
   }
 
-  public static String constructBucketKey(String keyName) {
-    if (!keyName.startsWith(OM_KEY_PREFIX)) {
-      keyName = OM_KEY_PREFIX.concat(keyName);
-    }
-    String[] elements = keyName.split(OM_KEY_PREFIX);
-    String volume = elements[1];
-    String bucket = elements[2];
-    StringBuilder builder =
-        new StringBuilder().append(OM_KEY_PREFIX).append(volume);
-
-    if (StringUtils.isNotBlank(bucket)) {
-      builder.append(OM_KEY_PREFIX).append(bucket);
-    }
-    builder.append(OM_KEY_PREFIX);
-    return builder.toString();
-  }
-
   public static void filterRelevantSstFiles(Set<String> inputFiles,
-                                            Map<String, String> tableToPrefixMap,
+                                            TablePrefixInfo tablePrefixInfo,
+                                            Set<String> columnFamiliesToLookup,
                                             ManagedRocksDB... dbs) {
-    filterRelevantSstFiles(inputFiles, tableToPrefixMap, Collections.emptyMap(), dbs);
+    filterRelevantSstFiles(inputFiles, tablePrefixInfo, Collections.emptyMap(), columnFamiliesToLookup, dbs);
   }
 
   /**
    * Filter sst files based on prefixes.
    */
   public static void filterRelevantSstFiles(Set<String> inputFiles,
-                                            Map<String, String> tableToPrefixMap,
+                                            TablePrefixInfo tablePrefixInfo,
                                             Map<String, CompactionNode> preExistingCompactionNodes,
+                                            Set<String> columnFamiliesToLookup,
                                             ManagedRocksDB... dbs) {
     Map<String, LiveFileMetaData> liveFileMetaDataMap = new HashMap<>();
     int dbIdx = 0;
@@ -100,41 +84,38 @@ public final class RocksDiffUtils {
         compactionNode = new CompactionNode(new CompactionFileInfo.Builder(filename)
             .setValues(liveFileMetaDataMap.get(filename)).build());
       }
-      if (shouldSkipNode(compactionNode, tableToPrefixMap)) {
+      if (shouldSkipNode(compactionNode, tablePrefixInfo, columnFamiliesToLookup)) {
         fileIterator.remove();
       }
     }
   }
 
   @VisibleForTesting
-  static boolean shouldSkipNode(SstFileInfo node,
-                                Map<String, String> columnFamilyToPrefixMap) {
+  static boolean shouldSkipNode(SstFileInfo node, TablePrefixInfo tablePrefixInfo, Set<String> columnFamiliesToLookup) {
     // This is for backward compatibility. Before the compaction log table
     // migration, startKey, endKey and columnFamily information is not persisted
     // in compaction log files.
     // Also for the scenario when there is an exception in reading SST files
     // for the file node.
-    if (node.getStartKey() == null || node.getEndKey() == null ||
-        node.getColumnFamily() == null) {
+    if (node.getStartKey() == null || node.getEndKey() == null || node.getColumnFamily() == null) {
       LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +
           "endKey and columnFamily details.", node.getFileName());
       return false;
     }
 
-    if (MapUtils.isEmpty(columnFamilyToPrefixMap)) {
-      LOG.debug("Provided columnFamilyToPrefixMap is null or empty.");
+    if (tablePrefixInfo.size() == 0) {
+      LOG.debug("Provided tablePrefixInfo is null or empty.");
       return false;
     }
 
-    if (!columnFamilyToPrefixMap.containsKey(node.getColumnFamily())) {
+    if (!columnFamiliesToLookup.contains(node.getColumnFamily())) {
       LOG.debug("SstFile node: {} is for columnFamily: {} while filter map " +
               "contains columnFamilies: {}.", node.getFileName(),
-          node.getColumnFamily(), columnFamilyToPrefixMap.keySet());
+          node.getColumnFamily(), tablePrefixInfo);
       return true;
     }
 
-    String keyPrefix = columnFamilyToPrefixMap.get(node.getColumnFamily());
-    return !isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
-        node.getEndKey());
+    String keyPrefix = tablePrefixInfo.getTablePrefix(node.getColumnFamily());
+    return !isKeyWithPrefixPresent(keyPrefix, node.getStartKey(), node.getEndKey());
   }
 }
