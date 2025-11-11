@@ -120,6 +120,7 @@ public class BucketEndpoint extends EndpointBase {
     String prefix = queryParams().get(QueryParams.PREFIX);
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
+    // Actual bucket processing starts here
     try {
       final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
