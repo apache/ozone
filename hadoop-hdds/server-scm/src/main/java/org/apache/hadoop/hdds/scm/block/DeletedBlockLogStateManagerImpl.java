@@ -231,6 +231,10 @@ public class DeletedBlockLogStateManagerImpl
           LOG.debug("txId {} is not found in deletedTable.", txId);
           continue;
         }
+        if (deletingTxIDs.contains(txId)) {
+          LOG.debug("txId {} is already in deletingTxIDs.", txId);
+          continue;
+        }
         transactions.add(transaction);
       } catch (IOException ex) {
         LOG.error("Could not get deleted block transaction {}.", txId, ex);
