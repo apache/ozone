@@ -90,9 +90,6 @@ public class TestECContainerRecovery {
   private static int dataBlocks = 3;
   private static byte[][] inputChunks = new byte[dataBlocks][CHUNK_SIZE];
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
@@ -153,9 +150,6 @@ public class TestECContainerRecovery {
     initInputChunks();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

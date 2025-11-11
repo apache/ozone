@@ -16,11 +16,7 @@
  * limitations under the License.
  */
 
-import React, {
-  useEffect,
-  useRef,
-  useState
-} from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import moment from 'moment';
 import { ValueType } from 'react-select';
 
@@ -29,9 +25,9 @@ import Search from '@/v2/components/search/search';
 import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 import PipelinesTable, { COLUMNS } from '@/v2/components/tables/pipelinesTable';
 import { showDataFetchError } from '@/utils/common';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
 import {
   Pipeline,
@@ -41,7 +37,6 @@ import {
 
 import './pipelines.less';
 
-
 const defaultColumns = COLUMNS.map(column => ({
   label: (typeof column.title === 'string')
     ? column.title
@@ -49,76 +44,74 @@ const defaultColumns = COLUMNS.map(column => ({
   value: column.key as string,
 }));
 
-const Pipelines: React.FC<{}> = () => {
-  const cancelSignal = useRef<AbortController>();
+const DEFAULT_PIPELINES_RESPONSE: PipelinesResponse = {
+  totalCount: 0,
+  pipelines: []
+};
 
+const Pipelines: React.FC<{}> = () => {
   const [state, setState] = useState<PipelinesState>({
     activeDataSource: [],
     columnOptions: defaultColumns,
     lastUpdated: 0,
   });
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  const loadData = () => {
-    setLoading(true);
-    //Cancel any previous requests
-    cancelRequests([cancelSignal.current!]);
+  // Use the modern hooks pattern
+  const pipelinesData = useApiData<PipelinesResponse>(
+    '/api/v1/pipelines',
+    DEFAULT_PIPELINES_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/pipelines',
-      cancelSignal.current
-    );
-
-    cancelSignal.current = controller;
-    request.then(response => {
-      const pipelinesResponse: PipelinesResponse = response.data;
-      const pipelines: Pipeline[] = pipelinesResponse?.pipelines ?? {};
+  // Process pipelines data when it changes
+  useEffect(() => {
+    if (pipelinesData.data && pipelinesData.data.pipelines) {
+      const pipelines: Pipeline[] = pipelinesData.data.pipelines;
       setState({
         ...state,
         activeDataSource: pipelines,
         lastUpdated: Number(moment())
-      })
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError(error.toString());
-    })
-  }
-
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
-
-  useEffect(() => {
-    autoReloadHelper.startPolling();
-    loadData();
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!]);
-    })
-  }, []);
+      });
+    }
+  }, [pipelinesData.data]);
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
 
-  const {
-    activeDataSource,
-    columnOptions,
-    lastUpdated
-  } = state;
+  function handleTagClose(label: string) {
+    setSelectedColumns(
+      selectedColumns.filter((column) => column.label !== label)
+    );
+  }
+
+  // Create refresh function for auto-reload
+  const loadPipelinesData = () => {
+    pipelinesData.refetch();
+  };
+
+  const autoReload = useAutoReload(loadPipelinesData);
+
+  const { activeDataSource, lastUpdated, columnOptions } = state;
 
   return (
     <>
       <div className='page-header-v2'>
         Pipelines
         <AutoReloadPanel
-          isLoading={loading}
+          isLoading={pipelinesData.loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData} />
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadPipelinesData}
+        />
       </div>
       <div className='data-container'>
         <div className='content-div'>
@@ -130,7 +123,7 @@ const Pipelines: React.FC<{}> = () => {
                 selected={selectedColumns}
                 placeholder='Columns'
                 onChange={handleColumnChange}
-                onTagClose={() => { }}
+                onTagClose={handleTagClose}
                 fixedColumn='pipelineId'
                 columnLength={COLUMNS.length} />
             </div>
@@ -141,14 +134,14 @@ const Pipelines: React.FC<{}> = () => {
                 value: 'pipelineId'
               }]}
               searchInput={searchTerm}
-              searchColumn={'pipelineId'}
+              searchColumn='pipelineId'
               onSearchChange={
                 (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
               }
-              onChange={() => { }} />
+              onChange={() => setSearchTerm('')} />
           </div>
           <PipelinesTable
-            loading={loading}
+            loading={pipelinesData.loading}
             data={activeDataSource}
             selectedColumns={selectedColumns}
             searchTerm={debouncedSearch} />
@@ -157,4 +150,5 @@ const Pipelines: React.FC<{}> = () => {
     </>
   );
 }
+
 export default Pipelines;

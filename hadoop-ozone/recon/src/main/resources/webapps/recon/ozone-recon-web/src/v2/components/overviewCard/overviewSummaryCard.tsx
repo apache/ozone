@@ -21,6 +21,8 @@ import { Card, Row, Table } from 'antd';
 
 import { ColumnType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
+import ErrorMessage from '@/v2/components/errors/errorCard';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
 type TableData = {
@@ -40,6 +42,7 @@ type OverviewTableCardProps = {
   linkToUrl?: string;
   showHeader?: boolean;
   state?: Record<string, any>;
+  error?: string | null;
 }
 
 // ------------- Styles -------------- //
@@ -65,8 +68,14 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   tableData = [],
   linkToUrl = '',
   showHeader = false,
-  state
+  state,
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title={title} />;
+  }
+
   const titleElement = (linkToUrl)
     ? (
       <div className='card-title-div'>

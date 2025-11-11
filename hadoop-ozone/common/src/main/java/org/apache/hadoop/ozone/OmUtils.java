@@ -382,6 +382,22 @@ public final class OmUtils {
   }
 
   /**
+   * Returns active OM node IDs that are not listener nodes for the given service
+   * ID.
+   *
+   * @param conf        Configuration source
+   * @param omServiceId OM service ID
+   * @return Collection of active non-listener node IDs
+   */
+  public static Collection<String> getActiveNonListenerOMNodeIds(
+      ConfigurationSource conf, String omServiceId) {
+    Collection<String> nodeIds = getActiveOMNodeIds(conf, omServiceId);
+    Collection<String> listenerNodeIds = getListenerOMNodeIds(conf, omServiceId);
+    nodeIds.removeAll(listenerNodeIds);
+    return nodeIds;
+  }
+
+  /**
    * Returns a collection of configured nodeId's that are to be decommissioned.
    * Aggregate results from both config keys - with and without serviceId
    * suffix. If ozone.om.service.ids contains a single service ID, then a config
@@ -410,10 +426,8 @@ public final class OmUtils {
       String omServiceId) {
     String listenerNodesKey = ConfUtils.addKeySuffixes(
         OZONE_OM_LISTENER_NODES_KEY, omServiceId);
-    Collection<String> listenerNodeIds = conf.getTrimmedStringCollection(
+    return conf.getTrimmedStringCollection(
         listenerNodesKey);
-
-    return listenerNodeIds;
   }
 
   /**
@@ -517,6 +531,7 @@ public final class OmUtils {
    * repeatedOmKeyInfo instance.
    * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
+   * @param bucketId bucket id
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
@@ -524,7 +539,7 @@ public final class OmUtils {
    *                     the same updateID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    */
-  public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
+  public static RepeatedOmKeyInfo prepareKeyForDelete(long bucketId, OmKeyInfo keyInfo,
       long trxnLogIndex) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
@@ -542,7 +557,7 @@ public final class OmUtils {
     keyInfo.setUpdateID(trxnLogIndex);
 
     //The key doesn't exist in deletedTable, so create a new instance.
-    return new RepeatedOmKeyInfo(keyInfo);
+    return new RepeatedOmKeyInfo(keyInfo, bucketId);
   }
 
   /**

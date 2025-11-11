@@ -22,9 +22,8 @@ import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeAc
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
-import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +49,16 @@ public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
           "Guice injector not initialized. NSSummary rebuild cannot proceed during upgrade.");
     }
 
-    ReconNamespaceSummaryManager nsMgr = injector.getInstance(ReconNamespaceSummaryManager.class);
-    ReconOMMetadataManager omMgr = injector.getInstance(ReconOMMetadataManager.class);
-
-    // Fire and forget: unified control using ReconUtils -> NSSummaryTask
+    ReconTaskController reconTaskController = injector.getInstance(ReconTaskController.class);
     LOG.info("Triggering asynchronous NSSummary tree rebuild for materialized totals (upgrade action).");
-    ReconUtils.triggerAsyncNSSummaryRebuild(nsMgr, omMgr);
+    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+      LOG.error(
+          "Failed to queue reinitialization event for manual trigger (result: {}), failing the reinitialization " +
+              "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
+              "scheduler task.", result);
+    }
   }
 
   @Override

@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,6 +36,7 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,20 +51,25 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /**
  * Test functions of SCMCommonPlacementPolicy.
@@ -520,6 +528,44 @@ public class TestSCMCommonPlacementPolicy {
     assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 
+  /**
+   * Tests that the placement validation logic is able to figure out a dead maintenance node's rack using
+   * {@link DatanodeDetails#getNetworkLocation()}. So when there are three datanodes, two on one rack and the dead +
+   * maintenance one on another rack (for a ratis container), the placement is valid. It is expected that the
+   * maintenance node will return to the cluster later.
+   */
+  @Test
+  public void testValidatePlacementWithDeadMaintenanceNode() throws NodeNotFoundException {
+    DatanodeDetails maintenanceDn = MockDatanodeDetails.randomDatanodeDetails();
+    // create 4 Datanodes: 2 in-service healthy + 1 extra in-service healthy + 1 dead and in-maintenance
+    List<DatanodeDetails> allNodes = ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails(), maintenanceDn);
+    Map<Integer, Integer> datanodeRackMap = new HashMap<>();
+    // dead, in-maintenance dn does not get any rack to simulate that it was removed from topology on dying
+    datanodeRackMap.put(0, 0); // dn0 on rack 0
+    datanodeRackMap.put(1, 0); // dn1 on rack 1
+    datanodeRackMap.put(2, 1); // dn2 (extra) on rack 2
+    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    when(mockNodeManager.getNodeStatus(any(DatanodeDetails.class))).thenAnswer(invocation -> {
+      DatanodeDetails dn = invocation.getArgument(0);
+      if (dn.equals(maintenanceDn)) {
+        return NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_MAINTENANCE, HddsProtos.NodeState.DEAD);
+      }
+      return NodeStatus.inServiceHealthy();
+    });
+    when(mockNodeManager.getAllNodes()).thenAnswer(inv -> allNodes);
+
+    NetworkTopology topology = mock(NetworkTopology.class);
+    when(topology.getMaxLevel()).thenReturn(3); // leaf level
+    when(topology.getNumOfNodes(anyInt())).thenReturn(2); // total racks in the cluster
+    when(mockNodeManager.getClusterNetworkTopologyMap()).thenReturn(topology);
+
+    DummyPlacementPolicy placementPolicy = new DummyPlacementPolicy(mockNodeManager, conf, datanodeRackMap, 2);
+    ContainerPlacementStatus placementStatus = placementPolicy.validateContainerPlacement(
+        ImmutableList.of(allNodes.get(0), allNodes.get(1), allNodes.get(3)), 3);
+    assertTrue(placementStatus.isPolicySatisfied());
+  }
+
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> rackMap;
     private List<Node> racks;
@@ -551,7 +597,11 @@ public class TestSCMCommonPlacementPolicy {
       super(nodeManager, conf);
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
-      .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
+      .mapToObj(i -> {
+        Node node = mock(Node.class);
+        when(node.getNetworkFullPath()).thenReturn(String.valueOf(i));
+        return node;
+      }).collect(Collectors.toList());
       final List<? extends DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(

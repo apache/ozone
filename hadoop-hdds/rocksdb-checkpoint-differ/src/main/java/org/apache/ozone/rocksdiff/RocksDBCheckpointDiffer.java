@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.graph.MutableGraph;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
@@ -492,16 +493,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         CompactionLogEntry.Builder builder;
         builder = new CompactionLogEntry.Builder(trxId,
             System.currentTimeMillis(),
-            inputFileCompactions.keySet().stream()
-                .map(inputFile -> {
-                  if (!inflightCompactions.containsKey(inputFile)) {
-                    LOG.warn("Input file not found in inflightCompactionsMap : {} which should have been added on " +
-                            "compactionBeginListener.",
-                        inputFile);
-                  }
-                  return inflightCompactions.getOrDefault(inputFile, inputFileCompactions.get(inputFile));
-                })
-                .collect(Collectors.toList()),
+            inputFileCompactions.entrySet().stream()
+                .map(inputFileEntry -> {
+                  final CompactionFileInfo f = inflightCompactions.get(inputFileEntry.getKey());
+                  return f != null ? f : inputFileEntry.getValue();
+                }).collect(Collectors.toList()),
             new ArrayList<>(toFileInfoList(compactionJobInfo.outputFiles(), db).values()));
 
         if (LOG.isDebugEnabled()) {
@@ -530,7 +526,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               compactionLogEntry.getOutputFileInfoList(),
               compactionLogEntry.getDbSequenceNumber());
           for (String inputFile : inputFileCompactions.keySet()) {
-            inflightCompactions.remove(inputFile);
+            CompactionFileInfo removed = inflightCompactions.remove(inputFile);
+            if (removed == null) {
+              String columnFamily = StringUtils.bytes2String(compactionJobInfo.columnFamilyName());
+              // Before compaction starts in rocksdb onCompactionBegin event listener is called and here the
+              // inflightCompactionsMap is populated. So, if the compaction log entry is not found in the map, then
+              // there could be a possible race condition on rocksdb compaction behavior.
+              LOG.info("Input file not found in inflightCompactionsMap : {} for compaction with jobId : {} for " +
+                      "column family : {} which should have been added on rocksdb's onCompactionBegin event listener." +
+                      " SnapDiff computation which has this diff file would fallback to full diff.",
+                  inputFile, compactionJobInfo.jobId(), columnFamily);
+            }
           }
         }
         // Add the compaction log entry to the prune queue
@@ -615,12 +621,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
    * @param rocksDB open rocksDB instance.
+   * @param tableFilter set of column-family/table names to include when collecting live SSTs.
    * @return a list of SST files (without extension) in the DB.
    */
-  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
+  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB, Set<String> tableFilter) {
     HashSet<String> liveFiles = new HashSet<>();
 
-    final List<String> cfs = Arrays.asList(
+    final Set<String> cfs = Sets.newHashSet(
         org.apache.hadoop.hdds.StringUtils.bytes2String(
             RocksDB.DEFAULT_COLUMN_FAMILY), "keyTable", "directoryTable",
         "fileTable");
@@ -630,6 +637,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         RdbUtil.getLiveSSTFilesForCFs(rocksDB, cfs);
     LOG.debug("SST File Metadata for DB: " + rocksDB.get().getName());
     for (LiveFileMetaData m : liveFileMetaDataList) {
+      if (!tableFilter.contains(StringUtils.bytes2String(m.columnFamilyName()))) {
+        continue;
+      }
       LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
       final String trimmedFilename = trimSSTFilename(m.fileName());
       liveFiles.add(trimmedFilename);
@@ -813,6 +823,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
    * @return A list of SST files without extension.
@@ -820,10 +831,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public synchronized Optional<List<String>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest,
+      DifferSnapshotInfo dest, Set<String> tablesToLookup,
       String sstFilesDirForSnapDiffJob) {
 
-    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest);
+    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest, tablesToLookup);
 
     return sstDiffList.map(diffList -> diffList.stream()
         .map(
@@ -847,15 +858,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
+   *                       must be non-null.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized Optional<List<String>> getSSTDiffList(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest) {
+      DifferSnapshotInfo dest, Set<String> tablesToLookup) {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
-    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
+    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB(), tablesToLookup);
+    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB(), tablesToLookup);
 
     Set<String> fwdDAGSameFiles = new HashSet<>();
     Set<String> fwdDAGDifferentFiles = new HashSet<>();
@@ -891,9 +904,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       }
     }
 
-    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
+    if (src.getTablePrefixes() != null && src.getTablePrefixes().size() != 0) {
       RocksDiffUtils.filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes(),
-          compactionDag.getCompactionMap(), src.getRocksDB(), dest.getRocksDB());
+          compactionDag.getCompactionMap(), tablesToLookup, src.getRocksDB(), dest.getRocksDB());
     }
     return Optional.of(new ArrayList<>(fwdDAGDifferentFiles));
   }
