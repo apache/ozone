@@ -360,15 +360,15 @@ public class TestOMRatisSnapshots {
           }
           // If it is a hard link on the leader, it should be a hard
           // link on the follower
-          if (OmSnapshotUtils.getINode(leaderActiveSST)
-              .equals(OmSnapshotUtils.getINode(leaderSnapshotSST))) {
+          if (org.apache.hadoop.hdds.utils.IOUtils.getINode(leaderActiveSST)
+              .equals(org.apache.hadoop.hdds.utils.IOUtils.getINode(leaderSnapshotSST))) {
             Path followerSnapshotSST =
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
             assertEquals(
-                OmSnapshotUtils.getINode(followerActiveSST),
-                OmSnapshotUtils.getINode(followerSnapshotSST),
+                org.apache.hadoop.hdds.utils.IOUtils.getINode(followerActiveSST),
+                org.apache.hadoop.hdds.utils.IOUtils.getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
             hardLinkCount++;
           }
