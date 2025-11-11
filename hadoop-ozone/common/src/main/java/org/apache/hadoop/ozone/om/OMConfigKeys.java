@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.util.TimeDuration;
 
 /**
