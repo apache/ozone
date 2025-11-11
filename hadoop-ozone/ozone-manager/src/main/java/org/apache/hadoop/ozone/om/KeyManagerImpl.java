@@ -2301,12 +2301,12 @@ public class KeyManagerImpl implements KeyManager {
         }
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
         if (deleteKeyFilter.apply(keyInfo)) {
-          keyInfos.add(keyInfo.getValue());
+          OmKeyInfo prunedKeyInfo = new OmKeyInfo.Builder(keyInfo.getValue()).setAcls(Collections.emptyList()).build();
+          keyInfos.add(prunedKeyInfo);
           remainingBufLimit -= objectSerializedSize;
           consumedSize += objectSerializedSize;
         }
       }
-      keyInfos.replaceAll(keyInfo -> new OmKeyInfo.Builder(keyInfo).setAcls(Collections.emptyList()).build());
       return new DeleteKeysResult(keyInfos, consumedSize, !iterator.hasNext());
     }
   }
