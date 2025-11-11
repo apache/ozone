@@ -721,8 +721,6 @@ public final class OzoneManagerRatisServer {
 
     setRaftLeaderElectionProperties(properties, conf);
 
-    setRaftFollowerReadProperties(properties, conf);
-
     setRaftRpcProperties(properties, conf);
 
     setRaftRetryCacheProperties(properties, conf);
@@ -788,15 +786,6 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Write.setElementLimit(properties, conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT));
-  }
-
-  private static void setRaftFollowerReadProperties(RaftProperties properties, ConfigurationSource conf) {
-    RaftServerConfigKeys.Read.setOption(properties,
-        conf.getEnum(OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION,
-            OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION_DEFAULT));
-    RaftServerConfigKeys.Read.setLeaderLeaseEnabled(properties,
-        conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_LEADER_LEASE_ENABLED,
-            OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_LEADER_LEASE_ENABLED_DEFAULT));
   }
 
   private static void setRaftRpcProperties(RaftProperties properties, ConfigurationSource conf) {

@@ -2267,7 +2267,7 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.read.option</name>
+    <name>ozone.om.ha.ratis.server.read.option</name>
     <value>DEFAULT</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Select the Ratis server read option.
@@ -2277,6 +2277,13 @@
       LINEARIZABLE - Use ReadIndex (see Raft Paper section 6.4) to maintain linearizability.
       Both the leader and the followers can serve read requests.
     </description>
+  </property>
+
+  <property>
+    <name>ozone.om.ha.raft.server.read.leader.lease.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>If we enabled the leader lease on Ratis Leader</description>
   </property>
 
   <property>
