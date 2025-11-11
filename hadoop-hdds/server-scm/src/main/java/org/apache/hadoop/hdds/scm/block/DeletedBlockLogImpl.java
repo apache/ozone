@@ -366,8 +366,8 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          final ContainerInfo container = containerManager.getContainer(id);
           try {
+            final ContainerInfo container = containerManager.getContainer(id);
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
             if (container.isDeleted()) {
