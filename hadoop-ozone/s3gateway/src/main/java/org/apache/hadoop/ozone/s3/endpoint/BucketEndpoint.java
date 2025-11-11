@@ -125,18 +125,21 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("upload-id-marker") String uploadIdMarker,
       @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
+
+    // Handle ACL requests
+    if (aclMarker != null) {
+      return handleGetBucketAcl(bucketName, startNanos);
+    }
+
+    // Handle multipart uploads requests
+    if (uploads != null) {
+      return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+    }
+
+    // Actual bucket processing starts here
     S3GAction s3GAction = S3GAction.GET_BUCKET;
 
     try {
-      // Handle ACL requests
-      if (aclMarker != null) {
-        return handleGetBucketAcl(bucketName, startNanos);
-      }
-
-      // Handle multipart uploads requests
-      if (uploads != null) {
-        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
-      }
 
       // Validate and prepare parameters
       BucketListingContext context = validateAndPrepareParameters(
@@ -174,9 +177,18 @@ public class BucketEndpoint extends EndpointBase {
     }
 
     // Return empty response if no keys found
+    // This path is reached when FILE_NOT_FOUND exception is caught and handled
     ListObjectResponse emptyResponse = new ListObjectResponse();
     emptyResponse.setName(bucketName);
     emptyResponse.setKeyCount(0);
+    
+    // Log audit entry for empty response to align with previous behavior
+    long opLatencyNs = getMetrics().updateGetBucketSuccessStats(startNanos);
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
+    perf.appendCount(0);
+    perf.appendOpLatencyNanos(opLatencyNs);
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction, getAuditParameters(), perf));
+    
     return Response.ok(emptyResponse).build();
   }
 
