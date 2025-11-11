@@ -2301,8 +2301,7 @@ public class KeyManagerImpl implements KeyManager {
         }
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
         if (deleteKeyFilter.apply(keyInfo)) {
-          OmKeyInfo prunedKeyInfo = new OmKeyInfo.Builder(keyInfo.getValue()).setAcls(Collections.emptyList()).build();
-          keyInfos.add(prunedKeyInfo);
+          keyInfos.add(keyInfo.getValue());
           remainingBufLimit -= objectSerializedSize;
           consumedSize += objectSerializedSize;
         }
