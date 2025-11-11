@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -82,11 +82,6 @@ public class TestOMSnapshotDAG {
   private static ObjectStore store;
   private static OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -118,9 +113,6 @@ public class TestOMSnapshotDAG {
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.INFO);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -154,8 +146,7 @@ public class TestOMSnapshotDAG {
     // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
-        getColumnFamilyToKeyPrefixMap(omMetadataManager, volumeName,
-            bucketName),
+        omMetadataManager.getTableBucketPrefix(volumeName, bucketName),
         snapshotDB);
   }
 
@@ -229,7 +220,8 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap2 = new File(snap2.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
 
-    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1).orElse(Collections.emptyList());
+    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
     LOG.debug("Got diff list: {}", sstDiffList21);
 
     // Delete 1000 keys, take a 3rd snapshot, and do another diff
@@ -248,13 +240,16 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
-    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2).orElse(Collections.emptyList());
+    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
 
     // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
-    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1).orElse(Collections.emptyList());
+    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
 
     // Same snapshot. Result should be empty list
-    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2).orElse(Collections.emptyList());
+    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
     assertThat(sstDiffList22).isEmpty();
     snapDB1.close();
     snapDB2.close();
@@ -280,13 +275,16 @@ public class TestOMSnapshotDAG {
         volumeName, bucketName, "snap3",
         ((RDBStore) snapDB3.get()
             .getMetadataManager().getStore()).getDb().getManagedRocksDb());
-    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1).orElse(Collections.emptyList());
+    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
     assertEquals(sstDiffList21, sstDiffList21Run2);
 
-    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2).orElse(Collections.emptyList());
+    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
     assertEquals(sstDiffList32, sstDiffList32Run2);
 
-    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1).orElse(Collections.emptyList());
+    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1, COLUMN_FAMILIES_TO_TRACK_IN_DAG)
+        .orElse(Collections.emptyList());
     assertEquals(sstDiffList31, sstDiffList31Run2);
     snapDB1.close();
     snapDB2.close();

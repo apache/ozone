@@ -15,29 +15,38 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.freon;
+package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Tests Freon, with MiniOzoneCluster and validate data.
+ * Encapsulates a store's prefix info corresponding to tables in a db.
  */
+public class TablePrefixInfo {
+  private final Map<String, String> tablePrefixes;
 
-public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
-
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
-        false);
-    startCluster(conf);
+  public TablePrefixInfo(Map<String, String> tablePrefixes) {
+    this.tablePrefixes = Collections.unmodifiableMap(tablePrefixes);
   }
 
-  @AfterAll
-  public static void shutdown() {
-    shutdownCluster();
+  public String getTablePrefix(String tableName) {
+    return tablePrefixes.getOrDefault(tableName, "");
+  }
+
+  public int size() {
+    return tablePrefixes.size();
+  }
+
+  public Set<String> getTableNames() {
+    return tablePrefixes.keySet();
+  }
+
+  @Override
+  public String toString() {
+    return "TablePrefixInfo{" +
+        "tablePrefixes=" + tablePrefixes +
+        '}';
   }
 }

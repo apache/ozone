@@ -15,29 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.freon;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-
 /**
- * Tests Freon, with MiniOzoneCluster and validate data.
+ *  Util package for rocksdb.
  */
-
-public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
-
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
-        false);
-    startCluster(conf);
-  }
-
-  @AfterAll
-  public static void shutdown() {
-    shutdownCluster();
-  }
-}
+package org.apache.hadoop.hdds.utils.db;

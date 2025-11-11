@@ -90,6 +90,7 @@ import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -151,6 +152,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private OMMetadataManager metadataManager;
   private KeyDeletingService keyDeletingService;
   private DirectoryDeletingService directoryDeletingService;
+  private SstFilteringService sstFilteringService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
   private DeletingServiceMetrics metrics;
 
@@ -184,7 +186,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private void createSubject() throws Exception {
     OmTestManagers omTestManagers = new OmTestManagers(conf, scmBlockTestingClient, null);
     keyManager = omTestManagers.getKeyManager();
-
+    sstFilteringService = keyManager.getSnapshotSstFilteringService();
     keyDeletingService = keyManager.getDeletingService();
     directoryDeletingService = keyManager.getDirDeletingService();
     writeClient = omTestManagers.getWriteClient();
@@ -559,6 +561,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           om.getMetadataManager().getKeyTable(BucketLayout.DEFAULT);
 
       // Suspend KeyDeletingService
+      sstFilteringService.pause();
       keyDeletingService.suspend();
       directoryDeletingService.suspend();
 
@@ -627,6 +630,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
         checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+      sstFilteringService.resume();
     }
 
     @Test
@@ -804,7 +808,9 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @AfterEach
     void resume() {
+      directoryDeletingService.resume();
       keyDeletingService.resume();
+      sstFilteringService.resume();
     }
 
     @AfterAll

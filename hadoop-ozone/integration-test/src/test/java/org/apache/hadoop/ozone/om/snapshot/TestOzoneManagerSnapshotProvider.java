@@ -53,9 +53,6 @@ public class TestOzoneManagerSnapshotProvider {
 
   private OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -69,9 +66,6 @@ public class TestOzoneManagerSnapshotProvider {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
