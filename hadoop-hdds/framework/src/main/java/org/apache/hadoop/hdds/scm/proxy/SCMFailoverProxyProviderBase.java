@@ -165,10 +165,11 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
         } catch (IllegalArgumentException e) {
           throw new ConfigurationException(
-              "Invalid SCM address format: '" + protocolAddress + "'. " +
-              "Expected format: 'hostname:port'. " +
-              "This often happens when 'ozone.scm.service.ids' is misspelled as 'ozone.scm.service.id'. " +
-              "Please check your SCM HA configuration. Original error: " + e.getMessage());
+              "Invalid SCM address format: '" + protocolAddress + "'.\n" +
+              "Expected format: 'hostname:port'.\n" +
+              "This often happens when 'ozone.scm.service.ids' is misspelled as 'ozone.scm.service.id'.\n" +
+              "Please check your SCM HA configuration.\n" +
+              "Original error: " + e.getMessage());
         }
       }
     }

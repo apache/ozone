@@ -99,11 +99,12 @@ public final class HAUtils {
       }
       return getScmBlockClient(configuration).getScmInfo();
     } catch (ConfigurationException e) {
-      throw new IOException("Failed to get SCM info due to configuration error. " +
-          "Please verify SCM HA configuration properties: " +
-          "ozone.scm.service.ids, ozone.scm.nodes.<serviceId>, " +
-          "ozone.scm.address.<serviceId>.<nodeId>. " +
-          "Common issues: missing service IDs, incorrect hostnames, or missing port numbers. " +
+      throw new IOException("Failed to get SCM info due to configuration error.\n" +
+          "Please verify SCM HA configuration properties:\n" +
+          "  - ozone.scm.service.ids\n" +
+          "  - ozone.scm.nodes.<serviceId>\n" +
+          "  - ozone.scm.address.<serviceId>.<nodeId>\n" +
+          "Common issues: missing service IDs, incorrect hostnames, or missing port numbers.\n" +
           "Details: " + e.getMessage(), e);
     } catch (IOException e) {
       throw e;

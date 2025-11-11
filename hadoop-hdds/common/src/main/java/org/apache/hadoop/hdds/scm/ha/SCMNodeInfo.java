@@ -75,11 +75,15 @@ public class SCMNodeInfo {
     // If service Id is not defined, fall back to non-HA config.
 
     // Check for common configuration typo
-    if (conf.get("ozone.scm.service.id") != null) {
-      throw new ConfigurationException(
-          "Configuration property 'ozone.scm.service.id' is invalid. " +
-          "Did you mean 'ozone.scm.service.ids' (with 's' at the end)? " +
-          "For SCM HA configuration, use 'ozone.scm.service.ids' to specify service IDs.");
+    if (conf.get("ozone.scm.service.ids") == null) {
+      String typo = conf.get("ozone.scm.service.id");
+      String errorMsg = "Configuration property 'ozone.scm.service.ids' is missing.\n";
+      if (typo != null) {
+        errorMsg += "Found 'ozone.scm.service.id=" + typo + "' in configuration.\n" +
+                    "Did you mean 'ozone.scm.service.ids'?\n";
+      }
+      errorMsg += "For SCM HA configuration, use 'ozone.scm.service.ids' to specify service IDs.";
+      throw new ConfigurationException(errorMsg);
     }
 
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
