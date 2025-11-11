@@ -97,7 +97,7 @@ public class DBCheckpointServlet extends HttpServlet
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
-    lock = new Lock();
+    lock = new NoOpLock();
 
     // Create a directory for temp bootstrap data
     File dbLocation = dbStore.getDbLocation();
@@ -394,12 +394,12 @@ public class DBCheckpointServlet extends HttpServlet
   /**
    * This lock is a no-op but can overridden by child classes.
    */
-  public static class Lock extends BootstrapStateHandler.Lock {
+  public static class NoOpLock extends BootstrapStateHandler.Lock {
 
     private final UncheckedAutoCloseable noopLock = () -> {
     };
 
-    public Lock() {
+    public NoOpLock() {
     }
 
     @Override
