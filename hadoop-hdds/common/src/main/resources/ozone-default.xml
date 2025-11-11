@@ -2267,7 +2267,7 @@
   </property>
 
   <property>
-    <name>ozone.om.ha.ratis.server.read.option</name>
+    <name>ozone.om.ha.raft.server.read.option</name>
     <value>DEFAULT</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Select the Ratis server read option.
