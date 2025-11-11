@@ -28,8 +28,7 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -71,8 +70,8 @@ public final class SelfSignedCertificate {
   private String subject;
   private String clusterID;
   private String scmID;
-  private LocalDateTime beginDate;
-  private LocalDateTime endDate;
+  private ZonedDateTime beginDate;
+  private ZonedDateTime endDate;
   private KeyPair key;
   private SecurityConfig config;
   private List<GeneralName> altNames;
@@ -128,12 +127,10 @@ public final class SelfSignedCertificate {
     X500Name name = new X500Name(dnName);
 
     // Valid from the Start of the day when we generate this Certificate.
-    Date validFrom =
-        Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant());
+    Date validFrom = Date.from(beginDate.toInstant());
 
     // Valid till end day finishes.
-    Date validTill =
-        Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant());
+    Date validTill = Date.from(endDate.toInstant());
 
     X509v3CertificateBuilder builder = new X509v3CertificateBuilder(name,
         serial, validFrom, validTill, name, publicKeyInfo);
@@ -168,8 +165,8 @@ public final class SelfSignedCertificate {
     private String subject;
     private String clusterID;
     private String scmID;
-    private LocalDateTime beginDate;
-    private LocalDateTime endDate;
+    private ZonedDateTime beginDate;
+    private ZonedDateTime endDate;
     private KeyPair key;
     private SecurityConfig config;
     private BigInteger caCertSerialId;
@@ -200,12 +197,12 @@ public final class SelfSignedCertificate {
       return this;
     }
 
-    public Builder setBeginDate(LocalDateTime date) {
+    public Builder setBeginDate(ZonedDateTime date) {
       this.beginDate = date;
       return this;
     }
 
-    public Builder setEndDate(LocalDateTime date) {
+    public Builder setEndDate(ZonedDateTime date) {
       this.endDate = date;
       return this;
     }
