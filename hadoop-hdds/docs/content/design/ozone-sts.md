@@ -73,7 +73,7 @@ and `RoleSessionName`.  Additionally, we will support the following optional fie
 
 ## 3.3 Limitations in IAM Session Policy Support
 
-The AWS IAM policy specification is vast and wide-ranging.  The initial Ozone STS supports a limited
+The AWS IAM policy specification is vast and wide-ranging.  The initial Ozone STS implementation supports a limited
 subset of its capabilities.  The restrictions are outlined below:
 
 - The only supported prefix in ResourceArn is `arn:aws:s3:::` - all others will be rejected.  **Note**: a ResourceArn 
@@ -107,6 +107,18 @@ A sample IAM policy that allows read access to all objects in the `example-bucke
 
 ```
 
+### 3.3.1 Additional Context on Design Behavior
+
+As mentioned above, some limitations in IAM Session Policy support result in API calls being rejected, while others are
+silently ignored.  This design behavior came after (much) discussion with external teams. One external team will send 
+S3 actions that Ozone doesn't support, and they don't have flexibility to change what they are sending, so that's one 
+reason for the silent ignore. This external team also mentioned that some research indicates AWS also does not fail 
+the AssumeRole request just because the inline session policy references unknown or unsupported actions, but rather 
+it will fail when the temporary credentials are used, so this design is accordance with that finding. Another external 
+team agreed that behavior is fine for actions, but does not work for Conditions, because one can have a Condition to 
+restrict calls by sourceIp, and if we silently ignore this, the client may incorrectly think the temporary credentials 
+are restricted for use by that IP address, so the consensus was to reject the request for that scenario.
+
 ## 3.4 SessionToken Format
 
 As mentioned above, one of the return values from the AssumeRole call will be the sessionToken. To support not
@@ -130,7 +142,7 @@ would further limit the scope of the permissions and resources granted by the ro
 credential will have the permissions comprising the intersection of the role permissions and the sessionPolicy permissions.
 - HMAC-SHA256 signature - used to ensure the sessionToken was created by Ozone and was not altered since it was created.
 - expiration time of the token (via `ShortLivedTokenIdentifier#getExpiry()`)
-- UUID of the OzoneManager private key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
+- UUID of the OzoneManager secret key used to sign the sessionToken and encrypt the secretAccessKey (via `ShortLivedTokenIdentifier#getSecretKeyId()`)
 
 ## 3.5 STS Token Revocation
 
