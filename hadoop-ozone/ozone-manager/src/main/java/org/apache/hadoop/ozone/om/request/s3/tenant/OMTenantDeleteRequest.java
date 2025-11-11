@@ -96,6 +96,29 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     // Get tenant object by tenant name
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
 
+    // Perform ACL check during preExecute (WRITE_ACL on volume if applicable)
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        final OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+        final OmDBTenantState dbTenantState =
+            omMetadataManager.getTenantStateTable().get(tenantId);
+        if (dbTenantState != null) {
+          final String volumeName = dbTenantState.getBucketNamespaceName();
+          if (volumeName != null && !volumeName.isEmpty()) {
+            checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+                OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+                volumeName, null, null);
+          }
+        }
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.DELETE_TENANT, new HashMap<>(), ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
     try {
@@ -167,13 +190,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
       // Decrement volume refCount
       if (decVolumeRefCount) {
-        // Check Acl
-        if (ozoneManager.getAclsEnabled()) {
-          checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-              OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-              volumeName, null, null);
-        }
-
         omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
         // Decrement volume ref count
         omVolumeArgs.decRefCount();
