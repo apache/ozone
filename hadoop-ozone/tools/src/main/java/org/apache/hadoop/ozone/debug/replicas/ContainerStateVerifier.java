@@ -110,11 +110,9 @@ public class ContainerStateVerifier implements ReplicaVerifier {
         pass = false;
       }
 
-      if (pass) {
-        return BlockVerificationResult.pass();
-      } else {
-        return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
-      }
+      // Always return failCheck to include replication status information in the output
+      // This allows users to see replication health status even when container state is good
+      return BlockVerificationResult.failCheck(replicaCheckMsg.toString());
     } catch (IOException e) {
       if (e.getMessage().contains("ContainerID") && e.getMessage().contains("does not exist")) {
         // if container "does not exist", mark it as failed instead of incomplete
