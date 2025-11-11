@@ -1193,16 +1193,14 @@ public class SnapshotDiffManager implements AutoCloseable {
 
         recordActivity(jobKey, SST_FILE_DELTA_DAG_WALK);
         LOG.debug("Calling RocksDBCheckpointDiffer");
-        try {
-          final Map<Integer, Integer> versionMap = toSnapshotLocalData.getVersionSstFileInfos().entrySet()
-              .stream().collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getPreviousSnapshotVersion()));
-          deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, versionMap, tablePrefixInfo, tablesToLookUp,
-              diffDir).map(HashSet::new);
-        } catch (Exception exception) {
-          recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
-          LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
-              "It will fallback to full diff now.", exception);
-        }
+        final Map<Integer, Integer> versionMap = toSnapshotLocalData.getVersionSstFileInfos().entrySet()
+            .stream().collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getPreviousSnapshotVersion()));
+        deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, versionMap, tablePrefixInfo, tablesToLookUp,
+            diffDir).map(HashSet::new);
+      } catch (Exception exception) {
+        recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
+        LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
+            "It will fallback to full diff now.", exception);
       }
     }
 
