@@ -105,13 +105,20 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
 
   Path createLink(Path path) throws IOException {
     Path source = path.toAbsolutePath();
-    Path link = deltaDir.resolve(linkFileCounter.incrementAndGet() +
-        "." + getExtension(source.getFileName().toString()));
-    try {
-      Files.createLink(link, source);
-    } catch (FileAlreadyExistsException ignored) {
-      LOG.debug("File for source {} already exists: at {}", source, link);
-    }
+    Path link;
+    boolean createdLink = false;
+    do {
+      link = deltaDir.resolve(linkFileCounter.incrementAndGet() +
+          "." + getExtension(source.getFileName().toString()));
+      try {
+        Files.createLink(link, source);
+        createdLink = true;
+      }  catch (FileAlreadyExistsException ignored) {
+        LOG.info("File for source {} already exists: at {}. Will attempt to create link with a different path", source,
+            link);
+      }
+
+    } while (!createdLink);
     return link;
   }
 
