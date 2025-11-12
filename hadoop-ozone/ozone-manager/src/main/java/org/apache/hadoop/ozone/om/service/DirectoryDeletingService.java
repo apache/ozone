@@ -54,14 +54,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -209,8 +207,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   @Override
-  public BackgroundTaskQueue getTasks() {
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+  public DeletingServiceTaskQueue getTasks() {
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new DirDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
@@ -267,7 +265,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
       Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap,
-      UUID expectedPreviousSnapshotId, long rnCnt) throws InterruptedException {
+      UUID expectedPreviousSnapshotId, long rnCnt) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -464,8 +462,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitPurgePaths(List<PurgePathRequest> requests,
-      String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap)
-      throws InterruptedException {
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -492,7 +489,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             .build();
 
     // Submit Purge paths request to OM. Acquire bootstrap lock when processing deletes for snapshots.
-    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+    try {
       return submitRequest(omRequest);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
@@ -558,9 +555,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             try {
               return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier, remainingBufLimit,
                   expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt);
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              return false;
             } catch (Throwable e) {
               return false;
             }
@@ -609,7 +603,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      */
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, long remainingBufLimit, UUID expectedPreviousSnapshotId,
-        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount) throws InterruptedException {
+        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount) {
       OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
       IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();
