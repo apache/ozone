@@ -112,8 +112,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         }
       } catch (IOException ex) {
         // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new HashMap<>();
+        auditMap.put(OzoneConsts.TENANT, tenantId);
         markForAudit(ozoneManager.getAuditLogger(),
-            buildAuditMessage(OMAction.DELETE_TENANT, new HashMap<>(), ex,
+            buildAuditMessage(OMAction.DELETE_TENANT, auditMap, ex,
                 omRequest.getUserInfo()));
         throw ex;
       }
