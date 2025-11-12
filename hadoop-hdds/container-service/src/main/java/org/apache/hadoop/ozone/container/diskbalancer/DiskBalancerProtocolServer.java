@@ -26,14 +26,19 @@ import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.Datanode
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Server-side implementation of {@link DiskBalancerProtocol} for datanodes.
  */
 public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DiskBalancerProtocolServer.class);
 
   private final DatanodeStateMachine datanodeStateMachine;
   private final PrivilegedOperation adminChecker;
@@ -84,24 +89,8 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
           .setSuccessMoveCount(info.getSuccessCount())
           .setFailureMoveCount(info.getFailureCount())
           .setBytesToMove(info.getBytesToMove())
-          .setBytesMoved(info.getBalancedBytes());
-
-      // Map operational state to running status
-      DiskBalancerOperationalState state = info.getOperationalState();
-      DiskBalancerRunningStatus runningStatus;
-      switch (state) {
-      case RUNNING:
-        runningStatus = DiskBalancerRunningStatus.RUNNING;
-        break;
-      case PAUSED_BY_NODE_STATE:
-        runningStatus = DiskBalancerRunningStatus.UNKNOWN;
-        break;
-      case STOPPED:
-      default:
-        runningStatus = DiskBalancerRunningStatus.STOPPED;
-        break;
-      }
-      builder.setRunningStatus(runningStatus);
+          .setBytesMoved(info.getBalancedBytes())
+          .setRunningStatus(info.getOperationalState());
     }
 
     return builder.build();
@@ -112,10 +101,23 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
       throws IOException {
     adminChecker.check("startDiskBalancer");
     DiskBalancerInfo info = getDiskBalancerInfo();
+
+    // Check node operational state before starting DiskBalancer
+    // Only IN_SERVICE nodes should actively balance disks
+    NodeOperationalState nodeState = 
+        datanodeStateMachine.getDatanodeDetails().getPersistedOpState();
+    
+    if (nodeState == NodeOperationalState.IN_SERVICE) {
+      info.setOperationalState(DiskBalancerRunningStatus.RUNNING);
+    } else {
+      LOG.warn("Cannot start DiskBalancer as node is in {} state. Pausing instead.", 
+          nodeState);
+      info.setOperationalState(DiskBalancerRunningStatus.PAUSED);
+    }
+
     if (configProto != null) {
       info.updateFromConf(DiskBalancerConfiguration.fromProtobuf(configProto));
     }
-    info.setOperationalState(DiskBalancerOperationalState.RUNNING);
     refreshService(info);
   }
 
@@ -123,7 +125,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
   public void stopDiskBalancer() throws IOException {
     adminChecker.check("stopDiskBalancer");
     DiskBalancerInfo info = getDiskBalancerInfo();
-    info.setOperationalState(DiskBalancerOperationalState.STOPPED);
+    info.setOperationalState(DiskBalancerRunningStatus.STOPPED);
     refreshService(info);
   }
 

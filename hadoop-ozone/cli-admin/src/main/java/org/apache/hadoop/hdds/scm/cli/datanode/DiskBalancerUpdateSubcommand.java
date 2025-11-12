@@ -15,25 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.diskbalancer;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- * Handler to start disk balancer.
+ * Handler to update disk balancer configuration.
  */
 @Command(
-    name = "start",
-    description = "Start DiskBalancer",
+    name = "update",
+    description = "Update DiskBalancer configuration",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand {
+public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
@@ -54,32 +54,35 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
   private Boolean stopAfterDiskEven;
 
   @Override
+  protected String validateParameters() {
+    if (threshold == null && bandwidthInMB == null && 
+        parallelThread == null && stopAfterDiskEven == null) {
+      return "At least one configuration parameter must be specified for configuration update.";
+    }
+    return null;
+  }
+
+  @Override
   protected boolean executeCommand(String hostName) {
     try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName)) {
       
-      // Build configuration if any parameters are specified
-      DiskBalancerConfigurationProto config = null;
-      if (threshold != null || bandwidthInMB != null || 
-          parallelThread != null || stopAfterDiskEven != null) {
-        DiskBalancerConfigurationProto.Builder builder =
-            DiskBalancerConfigurationProto.newBuilder();
-        if (threshold != null) {
-          builder.setThreshold(threshold);
-        }
-        if (bandwidthInMB != null) {
-          builder.setDiskBandwidthInMB(bandwidthInMB);
-        }
-        if (parallelThread != null) {
-          builder.setParallelThread(parallelThread);
-        }
-        if (stopAfterDiskEven != null) {
-          builder.setStopAfterDiskEven(stopAfterDiskEven);
-        }
-        config = builder.build();
+      HddsProtos.DiskBalancerConfigurationProto.Builder builder =
+          HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+      if (threshold != null) {
+        builder.setThreshold(threshold);
+      }
+      if (bandwidthInMB != null) {
+        builder.setDiskBandwidthInMB(bandwidthInMB);
+      }
+      if (parallelThread != null) {
+        builder.setParallelThread(parallelThread);
+      }
+      if (stopAfterDiskEven != null) {
+        builder.setStopAfterDiskEven(stopAfterDiskEven);
       }
       
-      diskBalancerProxy.startDiskBalancer(config);
+      diskBalancerProxy.updateDiskBalancerConfiguration(builder.build());
       return true;
     } catch (IOException e) {
       System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
@@ -91,20 +94,21 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
   protected void displayResults(List<String> successNodes,
       List<String> failedNodes) {
     if (isBatchMode()) {
+      // Simpler message for batch mode
       if (!failedNodes.isEmpty()) {
-        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
+        System.err.printf("Failed to update DiskBalancer configuration on nodes: [%s]%n",
             String.join(", ", failedNodes));
       } else {
-        System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
+        System.out.println("Updated DiskBalancer configuration on all IN_SERVICE nodes.");
       }
     } else {
       // Detailed message for specific nodes
       if (!successNodes.isEmpty()) {
-        System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
+        System.out.printf("Updated DiskBalancer configuration on nodes: [%s]%n", 
             String.join(", ", successNodes));
       }
       if (!failedNodes.isEmpty()) {
-        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
+        System.err.printf("Failed to update DiskBalancer configuration on nodes: [%s]%n", 
             String.join(", ", failedNodes));
       }
     }

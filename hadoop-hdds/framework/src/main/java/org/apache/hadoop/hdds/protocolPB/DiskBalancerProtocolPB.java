@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.protocolPB;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DiskBalancerProtocolService;
 import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * Protocol that clients use to communicate directly with Datanodes
@@ -27,6 +29,7 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.hdds.protocol.DiskBalancerProtocol",
     protocolVersion = 1)
+@KerberosInfo(serverPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface DiskBalancerProtocolPB extends
     DiskBalancerProtocolService.BlockingInterface {
 }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.diskbalancer;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.List;

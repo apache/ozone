@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfiguratio
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer.PrivilegedOperation;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +68,7 @@ class TestDiskBalancerProtocolServer {
     
     // Create DiskBalancerInfo with test data
     diskBalancerInfo = new DiskBalancerInfo(
-        DiskBalancerOperationalState.STOPPED,
+        DiskBalancerRunningStatus.STOPPED,
         TEST_THRESHOLD,
         TEST_BANDWIDTH,
         TEST_THREADS,
@@ -115,7 +114,7 @@ class TestDiskBalancerProtocolServer {
   @Test
   void testGetDiskBalancerInfoStatus() throws IOException {
     // Set operational state to RUNNING
-    diskBalancerInfo.setOperationalState(DiskBalancerOperationalState.RUNNING);
+    diskBalancerInfo.setOperationalState(DiskBalancerRunningStatus.RUNNING);
     diskBalancerInfo.setSuccessCount(10);
     diskBalancerInfo.setFailureCount(2);
     diskBalancerInfo.setBytesToMove(1000000);
@@ -145,13 +144,13 @@ class TestDiskBalancerProtocolServer {
   @Test
   void testStartDiskBalancer() throws IOException {
     // Verify initial state is STOPPED
-    assertEquals(DiskBalancerOperationalState.STOPPED, diskBalancerInfo.getOperationalState());
+    assertEquals(DiskBalancerRunningStatus.STOPPED, diskBalancerInfo.getOperationalState());
     
     // Start DiskBalancer without configuration
     server.startDiskBalancer(null);
     
     // Verify state changed to RUNNING
-    assertEquals(DiskBalancerOperationalState.RUNNING, diskBalancerInfo.getOperationalState());
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerInfo.getOperationalState());
     
     // Verify service was refreshed
     verify(diskBalancerService, times(1)).refresh(diskBalancerInfo);
@@ -171,7 +170,7 @@ class TestDiskBalancerProtocolServer {
     server.startDiskBalancer(config);
     
     // Verify state changed to RUNNING
-    assertEquals(DiskBalancerOperationalState.RUNNING, diskBalancerInfo.getOperationalState());
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerInfo.getOperationalState());
     
     // Verify configuration was updated
     assertEquals(5.0, diskBalancerInfo.getThreshold(), 0.001);
@@ -187,11 +186,11 @@ class TestDiskBalancerProtocolServer {
   void testStopDiskBalancer() throws IOException {
     //initial start DiskBalancer and verify state is RUNNING
     server.startDiskBalancer(null);
-    assertEquals(DiskBalancerOperationalState.RUNNING, diskBalancerInfo.getOperationalState());
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerInfo.getOperationalState());
 
     // Stop DiskBalancer and verify state changed to STOPPED
     server.stopDiskBalancer();
-    assertEquals(DiskBalancerOperationalState.STOPPED, diskBalancerInfo.getOperationalState());
+    assertEquals(DiskBalancerRunningStatus.STOPPED, diskBalancerInfo.getOperationalState());
     
     // Verify service was refreshed
     verify(diskBalancerService, times(2)).refresh(diskBalancerInfo);

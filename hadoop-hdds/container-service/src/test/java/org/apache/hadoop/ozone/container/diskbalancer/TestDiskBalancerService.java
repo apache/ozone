@@ -40,6 +40,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
@@ -130,7 +130,7 @@ public class TestDiskBalancerService {
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
     // Set a low bandwidth to delay job
-    DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerOperationalState.RUNNING, 10.0d, 1L, 5,
+    DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 1L, 5,
         true, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(initialInfo);
 
@@ -142,7 +142,7 @@ public class TestDiskBalancerService {
     assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
     assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerOperationalState.STOPPED, 20.0d, 5L, 10, false);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.STOPPED, 20.0d, 5L, 10, false);
     svc.refresh(newInfo);
 
     assertFalse(svc.getDiskBalancerInfo().isShouldRun());
@@ -274,7 +274,7 @@ public class TestDiskBalancerService {
 
     // Set operational state to RUNNING
     DiskBalancerInfo info = new DiskBalancerInfo(
-        DiskBalancerOperationalState.RUNNING, 10.0d, 100L, parallelThread,
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, parallelThread,
         false, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 

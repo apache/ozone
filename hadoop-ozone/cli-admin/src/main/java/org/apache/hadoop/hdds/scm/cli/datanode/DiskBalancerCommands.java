@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.diskbalancer;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine.Command;

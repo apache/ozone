@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.diskbalancer;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,7 +46,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     if (!conf.getBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
         HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
       System.err.println("Disk Balancer is not enabled. Please enable the " +
-          "'hdds.datanode.disk.balancer.enabled' configuration key.");
+          HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " configuration key.");
       return null;
     }
 

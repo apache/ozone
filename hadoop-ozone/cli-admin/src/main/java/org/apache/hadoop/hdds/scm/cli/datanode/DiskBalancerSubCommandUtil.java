@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.diskbalancer;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;

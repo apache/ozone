@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import java.util.ArrayList;
 import java.util.List;
 import picocli.CommandLine;
 
@@ -26,58 +25,26 @@ import picocli.CommandLine;
  */
 public class DiskBalancerCommonOptions {
 
-  @CommandLine.Option(names = {"-a", "--all"},
-      description = "Run commands on all datanodes.")
-  private boolean allHosts;
-
   @CommandLine.Option(names = {"-d", "--datanodes"},
-      description = "Run commands on specific datanodes, the content can be " +
-          "a list of hostnames or IPs. " +
-          "Examples: hostname1,hostname2,hostname3 or ip1,ip2,ip3",
+      description = "Datanode address(es) in the format <hostname[:port]> or <ip[:port]>. " +
+          "Port is optional and defaults to 9858 (CLIENT_RPC port). " +
+          "Multiple addresses can be comma-separated. " +
+          "Examples: 'DN-1', 'DN-1:9858', '192.168.1.10', 'DN-1,DN-2:9999,DN-3'",
+      required = false,
       split = ",")
-  private List<String> datanodes = new ArrayList<>();
+  private List<String> datanodes;
 
-  /**
-   * Check the common options of DiskBalancerCommand.
-   * @return if the check passed
-   */
-  public boolean check() {
-    if (datanodes.isEmpty() && !allHosts) {
-      System.out.println("Datanode not specified. Please specify at least " +
-          "one datanode or use \"-a(--all)\" to start diskBalancer " +
-          "on all datanodes");
-      return false;
-    }
-    if (!datanodes.isEmpty() && allHosts) {
-      System.out.println("Invalid option selection. " +
-          "Use either \"-a(--all)\" or \"-d(--datanodes)\".");
-      return false;
-    }
-    return true;
-  }
-
-  public String getHostString() {
-    return isAllHosts() ? "which are IN_SERVICE and HEALTHY."
-        :  ":\n" + String.join("\n", getDatanodes());
-  }
-
-  public List<String> getSpecifiedDatanodes() {
-    return getDatanodes().isEmpty() ? null : getDatanodes();
-  }
-
-  public boolean isAllHosts() {
-    return allHosts;
-  }
-
-  public void setAllHosts(boolean allHosts) {
-    this.allHosts = allHosts;
-  }
+  @CommandLine.Option(names = {"--in-service-datanodes"},
+      description = "If set, the client will send DiskBalancer requests " +
+          "to all available DataNodes in the HEALTHY and IN_SERVICE operational state.",
+      required = false)
+  private boolean inServiceDatanodes;
 
   public List<String> getDatanodes() {
     return datanodes;
   }
 
-  public void setDatanodes(List<String> datanodes) {
-    this.datanodes = datanodes;
+  public boolean isInServiceDatanodes() {
+    return inServiceDatanodes;
   }
 }
