@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -398,8 +399,7 @@ public class BucketEndpoint extends EndpointBase {
       result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
       String prevDir = null;
-      for (org.apache.hadoop.ozone.client.OzoneMultipartUpload upload :
-          ozoneMultipartUploadList.getUploads()) {
+      for (OzoneMultipartUpload upload : ozoneMultipartUploadList.getUploads()) {
         String keyName = upload.getKeyName();
         if (bucket.getBucketLayout().isFileSystemOptimized() &&
             StringUtils.isNotEmpty(prefix) &&
