@@ -22,38 +22,37 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Input stream implementation to read body of a signed chunked upload. This should also work
- * with the chunked payloads with trailer.
- *
+ * Input stream implementation to read body of an unsigned chunked upload.
+ * <p>
+ * Currently, the only valid value of x-amz-content-sha256 header to indicate
+ * transfer unsigned payload in multiple chunks is STREAMING-UNSIGNED-PAYLOAD-TRAILER.
+ * Therefore, the input stream should work with chunked payloads with checksum trailer.
+ * Nevertheless, this input stream also supports chunked upload without trailer.
+ * </p>
  * <p>
  * Example chunk data:
  * <pre>
- * 10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
+ * 10000\r\n
  * &lt;65536-bytes&gt;\r\n
- * 400;chunk-signature=1c1344b170168f8e65b41376b44b20fe354e373826ccbbe2c1d40a8cae51e5c7\r\n
- * &lt;1024-bytes&gt;\r\n
- * 0;chunk-signature=b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9\r\n
- * x-amz-checksum-crc32c:sOO8/Q==\r\n
- * x-amz-trailer-signature:63bddb248ad2590c92712055f51b8e78ab024eead08276b24f010b0efd74843f\r\n
+ * 0\r\n
+ * x-amz-checksum-crc64nvme:2wstOANdZ/o=\r\n
  * </pre>
  * </p>
- * For the first chunk 10000 will be read and decoded from base-16 representation to 65536, which is the size of
- * the first chunk payload. Each chunk upload ends with a zero-byte final additional chunk.
- * At the end, there might be a trailer checksum payload and signature, depending on whether the x-amz-content-sha256
- * header value contains "-TRAILER" suffix (e.g. STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
- * and STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER) and "x-amz-trailer" is specified (e.g. x-amz-checksum-crc32c).
  * <p>
- *
- * <p>
- * The logic is similar to {@link UnsignedChunksInputStream}, but there is a "chunk-signature" to parse.
+ * The 10000 will be read and decoded from base-16 representation to 65536, which is the size of
+ * the subsequent chunk payload. Each chunk upload ends with a zero-byte final additional chunk.
+ * At the end, there will be a trailer checksum payload
  * </p>
  *
  * <p>
- * Note that there are no actual chunk signature verification taking place. The InputStream only
+ * The logic is similar to {@link SignedChunksInputStream}, but since it is an unsigned chunked upload
+ * there is no "chunk-signature" to parse.
+ * </p>
+ *
+ * <p>
+ * Note that there is not actual trailer checksum verification taking place. The InputStream only
  * returns the actual chunk payload from chunked signatures format.
  * </p>
  *
@@ -69,15 +68,12 @@ import java.util.regex.Pattern;
  *   </li>
  * </ul>
  */
-public class SignedChunksInputStream extends InputStream {
-
-  private final Pattern signatureLinePattern =
-      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=.*");
+public class UnsignedChunksInputStream extends InputStream {
 
   private final InputStream originalStream;
 
   /**
-   * Size of the chunk payload. If zero, the signature line should be parsed to
+   * Size of the chunk payload. If zero, the content length should be parsed to
    * retrieve the subsequent chunk payload size.
    */
   private int remainingData = 0;
@@ -88,7 +84,7 @@ public class SignedChunksInputStream extends InputStream {
    */
   private boolean isFinalChunkEncountered = false;
 
-  public SignedChunksInputStream(InputStream inputStream) {
+  public UnsignedChunksInputStream(InputStream inputStream) {
     originalStream = inputStream;
   }
 
@@ -109,8 +105,8 @@ public class SignedChunksInputStream extends InputStream {
     } else {
       remainingData = readContentLengthFromHeader();
       if (remainingData <= 0) {
-        // there is always a final zero byte chunk so we can stop reading
-        // if we encounter this chunk
+        // since currently trailer checksum verification is not supported, we can
+        // stop reading after encountering the final zero-byte chunk.
         isFinalChunkEncountered = true;
         return -1;
       }
@@ -181,22 +177,15 @@ public class SignedChunksInputStream extends InputStream {
       curr = next;
     }
     // Example of a single chunk data:
-    //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
+    //  10000\r\n
     //  <65536-bytes>\r\n
     //
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
-    String signatureLine = buf.toString().trim();
-    if (signatureLine.isEmpty()) {
+    String readString = buf.toString().trim();
+    if (readString.isEmpty()) {
       return -1;
     }
-
-    //parse the data length.
-    Matcher matcher = signatureLinePattern.matcher(signatureLine);
-    if (matcher.matches()) {
-      return Integer.parseInt(matcher.group(1), 16);
-    } else {
-      throw new IOException("Invalid signature line: " + signatureLine);
-    }
+    return Integer.parseInt(readString, 16);
   }
 }

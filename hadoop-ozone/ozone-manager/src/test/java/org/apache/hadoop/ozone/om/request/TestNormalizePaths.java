@@ -58,6 +58,9 @@ public class TestNormalizePaths {
         validateAndNormalizeKey(true, "a/b/c/d/"));
     assertEquals("a/b/c/...../d",
         validateAndNormalizeKey(true, "////a/b/////c/...../d/"));
+    assertEquals("a/b/c", validateAndNormalizeKey(true, "/a/b/c"));
+    assertEquals("a/b/c", validateAndNormalizeKey(true, "//a/b/c"));
+    assertEquals("a/b/c", validateAndNormalizeKey(true, "///a/b/c"));
   }
 
   @Test

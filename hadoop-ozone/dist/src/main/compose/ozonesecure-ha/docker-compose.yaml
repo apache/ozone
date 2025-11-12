@@ -54,10 +54,10 @@ services:
       - 19864:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
     env_file:
       - docker-config
     environment:
@@ -77,10 +77,10 @@ services:
       - 9866:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
     env_file:
       - docker-config
     environment:
@@ -100,10 +100,10 @@ services:
       - 9868:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "recon=172.25.0.115"
     env_file:
       - docker-config
     environment:
@@ -132,9 +132,9 @@ services:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.111
@@ -158,9 +158,9 @@ services:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.112
@@ -184,9 +184,9 @@ services:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.113
@@ -246,12 +246,12 @@ services:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
     extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "om1=172.25.0.111"
+      - "om2=172.25.0.112"
+      - "om3=172.25.0.113"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.116
@@ -275,12 +275,12 @@ services:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
     extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "om1=172.25.0.111"
+      - "om2=172.25.0.112"
+      - "om3=172.25.0.113"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.117
@@ -304,12 +304,12 @@ services:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
     extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "om1=172.25.0.111"
+      - "om2=172.25.0.112"
+      - "om3=172.25.0.113"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.118
@@ -329,12 +329,12 @@ services:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","recon"]
     extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "om1=172.25.0.111"
+      - "om2=172.25.0.112"
+      - "om3=172.25.0.113"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
         ipv4_address: 172.25.0.115

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -86,6 +87,8 @@ public class TestPermissionCheck {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);

@@ -39,7 +39,6 @@ Check OM Pre Finalized
     [Tags]    om    pre-finalized
     ${result} =        OM Finalization Status
                        Should Contain Any    ${result}    FINALIZATION_REQUIRED
-
 Check SCM Pre Finalized
     [Tags]    scm    pre-finalized
     ${result} =        SCM Finalization Status

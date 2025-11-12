@@ -1175,6 +1175,7 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
 }
 
 message DirectoryInfo {

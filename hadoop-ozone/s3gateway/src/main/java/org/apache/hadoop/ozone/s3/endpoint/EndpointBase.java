@@ -87,8 +87,9 @@ public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   @Inject
-  private SignatureInfo signatureInfo;
+  protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
 
@@ -494,6 +495,11 @@ public abstract class EndpointBase implements Auditor {
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
+  }
+
+  @VisibleForTesting
+  public void setSignatureInfo(SignatureInfo signatureInfo) {
+    this.signatureInfo = signatureInfo;
   }
 
   public OzoneClient getClient() {

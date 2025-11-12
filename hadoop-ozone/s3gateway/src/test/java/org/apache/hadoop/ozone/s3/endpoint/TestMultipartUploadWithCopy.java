@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -120,11 +122,16 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
     REST.setRequestIdentifier(new RequestIdentifier());
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    REST.setSignatureInfo(signatureInfo);
   }
 
   @Test
@@ -432,6 +439,8 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));

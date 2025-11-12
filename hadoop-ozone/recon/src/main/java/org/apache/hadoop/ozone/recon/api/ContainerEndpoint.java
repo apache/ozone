@@ -233,10 +233,14 @@ public class ContainerEndpoint {
     // Last key prefix to be used for pagination. It will be exposed in the response.
     String lastKey = "";
 
+    // If -1 is passed, set limit to the maximum integer value to retrieve all records
+    if (limit == -1) {
+      limit = Integer.MAX_VALUE;
+    }
+
     try {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
-          reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
-              prevKeyPrefix);
+          reconContainerMetadataManager.getKeyPrefixesForContainer(containerID, prevKeyPrefix, limit);
       // Get set of Container-Key mappings for given containerId.
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
@@ -265,10 +269,7 @@ public class ContainerEndpoint {
           List<ContainerBlockMetadata> blockIds =
               getBlocks(matchedKeys, containerID);
 
-          String ozoneKey = omMetadataManager.getOzoneKey(
-              omKeyInfo.getVolumeName(),
-              omKeyInfo.getBucketName(),
-              omKeyInfo.getKeyName());
+          String ozoneKey = containerKeyPrefix.getKeyPrefix();
           lastKey = ozoneKey;
           if (keyMetadataMap.containsKey(ozoneKey)) {
             keyMetadataMap.get(ozoneKey).getVersions()
@@ -277,10 +278,6 @@ public class ContainerEndpoint {
             keyMetadataMap.get(ozoneKey).getBlockIds()
                 .put(containerKeyPrefix.getKeyVersion(), blockIds);
           } else {
-            // break the for loop if limit has been reached
-            if (keyMetadataMap.size() == limit) {
-              break;
-            }
             KeyMetadata keyMetadata = new KeyMetadata();
             keyMetadata.setBucket(omKeyInfo.getBucketName());
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
@@ -303,11 +300,9 @@ public class ContainerEndpoint {
       totalCount =
           reconContainerMetadataManager.getKeyCountForContainer(containerID);
     } catch (IOException ioEx) {
-      throw new WebApplicationException(ioEx,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      throw new WebApplicationException(ioEx, Response.Status.INTERNAL_SERVER_ERROR);
     }
-    KeysResponse keysResponse =
-        new KeysResponse(totalCount, keyMetadataMap.values(), lastKey);
+    KeysResponse keysResponse = new KeysResponse(totalCount, keyMetadataMap.values(), lastKey);
     return Response.ok(keysResponse).build();
   }
 

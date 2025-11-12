@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -760,7 +761,7 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = new Path(keyName).toUri().getPath();
+        normalizedKeyName = new Path(normalizeLeadingSlashes(keyName)).toUri().getPath();
       } else {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
@@ -775,6 +776,20 @@ public final class OmUtils {
       return normalizedKeyName.substring(1);
     }
 
+    return keyName;
+  }
+
+  /**
+   * Normalizes paths by replacing multiple leading slashes with a single slash.
+   */
+  private static String normalizeLeadingSlashes(String keyName) {
+    if (keyName.startsWith(DOUBLE_SLASH_OM_KEY_PREFIX)) {
+      int index = 0;
+      while (index < keyName.length() && keyName.charAt(index) == OM_KEY_PREFIX.charAt(0)) {
+        index++;
+      }
+      return OM_KEY_PREFIX + keyName.substring(index);
+    }
     return keyName;
   }
 

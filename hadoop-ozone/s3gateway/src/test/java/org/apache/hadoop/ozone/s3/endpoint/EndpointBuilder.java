@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 
 /**
  * Base builder class for S3 endpoints in tests.
@@ -37,11 +41,14 @@ public class EndpointBuilder<T extends EndpointBase> {
   private HttpHeaders httpHeaders;
   private ContainerRequestContext requestContext;
   private RequestIdentifier identifier;
+  private SignatureInfo signatureInfo;
 
   protected EndpointBuilder(Supplier<T> constructor) {
     this.constructor = constructor;
     this.ozoneConfig = new OzoneConfiguration();
     this.identifier = new RequestIdentifier();
+    this.signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
   }
 
   public EndpointBuilder<T> setBase(T base) {
@@ -74,6 +81,11 @@ public class EndpointBuilder<T extends EndpointBase> {
     return this;
   }
 
+  public EndpointBuilder<T> setSignatureInfo(SignatureInfo newSignatureInfo) {
+    this.signatureInfo = newSignatureInfo;
+    return this;
+  }
+
   public T build() {
     T endpoint = base != null ? base : constructor.get();
 
@@ -82,6 +94,7 @@ public class EndpointBuilder<T extends EndpointBase> {
     }
 
     endpoint.setRequestIdentifier(identifier);
+    endpoint.setSignatureInfo(signatureInfo);
 
     return endpoint;
   }
@@ -104,6 +117,10 @@ public class EndpointBuilder<T extends EndpointBase> {
 
   protected RequestIdentifier getRequestId() {
     return identifier;
+  }
+
+  protected SignatureInfo getSignatureInfo() {
+    return signatureInfo;
   }
 
   public static EndpointBuilder<RootEndpoint> newRootEndpointBuilder() {

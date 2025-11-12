@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -106,6 +107,9 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+      // Reverting back the full path to key name
+      // Eg: a/b/c/d/e/file1 -> file1
+      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(keyName));
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,

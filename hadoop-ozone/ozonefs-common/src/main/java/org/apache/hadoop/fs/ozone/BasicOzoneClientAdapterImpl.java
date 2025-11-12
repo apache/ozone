@@ -577,7 +577,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         owner,
         null,
         getBlockLocations(null),
-        false,
+        keyInfo.isEncrypted(),
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }

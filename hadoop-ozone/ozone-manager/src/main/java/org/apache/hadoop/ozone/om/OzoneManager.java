@@ -2937,6 +2937,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
       SnapshotInfo snapshotInfo =
           metadataManager.getSnapshotInfo(resolvedBucket.realVolume(), resolvedBucket.realBucket(), snapshotName);
 
@@ -4890,6 +4894,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
     // permission check, since linked bucket permissions and source bucket permissions could be different.
     ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
+    if (isAclEnabled) {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+          ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    }
     return omSnapshotManager.getSnapshotDiffReport(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
   }
@@ -4901,6 +4909,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String toSnapshot)
       throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
+    if (isAclEnabled) {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+          ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    }
     return omSnapshotManager.cancelSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
         fromSnapshot, toSnapshot);
   }
