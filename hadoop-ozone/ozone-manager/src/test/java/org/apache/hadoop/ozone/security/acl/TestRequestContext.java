@@ -92,12 +92,14 @@ public class TestRequestContext {
     context = new RequestContext.Builder()
         .setSessionPolicy(policy)
         .build();
-    assertEquals(policy,
+    assertEquals(
+        policy,
         context.getSessionPolicy(),
         "sessionPolicy should be set via builder"
     );
 
-    context = new RequestContext("host",
+    context = new RequestContext(
+        "host",
         null,
         null,
         "serviceId",
@@ -108,35 +110,38 @@ public class TestRequestContext {
         policy
     );
     assertTrue(context.isRecursiveAccessCheck(), "recursiveAccessCheck should be true");
-    assertEquals(policy,
+    assertEquals(
+        policy,
         context.getSessionPolicy(),
         "sessionPolicy should be set via constructor"
     );
 
-    context = RequestContext.getBuilder(UserGroupInformation.createRemoteUser("user1"),
+    context = RequestContext.getBuilder(
+        UserGroupInformation.createRemoteUser("user1"),
             null,
             null,
             IAccessAuthorizer.ACLType.CREATE,
             "volume1",
             true
-        )
-        .setSessionPolicy(policy)
+        ).setSessionPolicy(policy)
         .build();
-    assertEquals(policy,
+    assertEquals(
+        policy,
         context.getSessionPolicy(),
         "sessionPolicy should be set via getBuilder + builder"
     );
 
-    context = RequestContext.getBuilder(UserGroupInformation.createRemoteUser("user1"),
+    context = RequestContext.getBuilder(
+        UserGroupInformation.createRemoteUser("user1"),
             null,
             null,
             IAccessAuthorizer.ACLType.CREATE,
             "volume1",
             true,
             policy
-        )
-        .build();
-    assertEquals(policy,
+        ).build();
+    assertEquals(
+        policy,
         context.getSessionPolicy(),
         "sessionPolicy should be set via getBuilder (all params) + builder"
     );

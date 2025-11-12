@@ -73,7 +73,9 @@ public class AssumeRoleRequest {
   }
 
   @Override
-  public boolean equals(Object o) {
+  public boolean equals(
+      Object o
+  ) {
     if (this == o) {
       return true;
     } else if (o == null || getClass() != o.getClass()) {
@@ -101,8 +103,10 @@ public class AssumeRoleRequest {
     private final Set<IOzoneObj> objects;
     private final Set<IAccessAuthorizer.ACLType> permissions;
 
-    public OzoneGrant(Set<IOzoneObj> objects,
-                      Set<IAccessAuthorizer.ACLType> permissions) {
+    public OzoneGrant(
+        Set<IOzoneObj> objects,
+        Set<IAccessAuthorizer.ACLType> permissions
+    ) {
       this.objects = objects;
       this.permissions = permissions;
     }
@@ -116,7 +120,9 @@ public class AssumeRoleRequest {
     }
 
     @Override
-    public boolean equals(final Object o) {
+    public boolean equals(
+        Object o
+    ) {
       if (this == o) {
         return true;
       } else if (o == null || getClass() != o.getClass()) {

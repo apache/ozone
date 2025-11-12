@@ -37,25 +37,29 @@ public class TestAssumeRoleRequest {
   public void testConstructorAndGetters() {
     final UserGroupInformation ugi = UserGroupInformation.createRemoteUser("om");
     final Set<AssumeRoleRequest.OzoneGrant> grants = new HashSet<>();
-    grants.add(new AssumeRoleRequest.OzoneGrant(
-        Collections.singleton(
-            OzoneObjInfo.Builder.newBuilder()
-                .setResType(OzoneObj.ResourceType.BUCKET)
-                .setStoreType(OzoneObj.StoreType.OZONE)
-                .setVolumeName("s3v")
-                .setBucketName("myBucket")
-                .build()
-        ),
-        Collections.singleton(IAccessAuthorizer.ACLType.READ)
-    ));
+    grants.add(
+        new AssumeRoleRequest.OzoneGrant(
+            Collections.singleton(
+                OzoneObjInfo.Builder.newBuilder()
+                    .setResType(OzoneObj.ResourceType.BUCKET)
+                    .setStoreType(OzoneObj.StoreType.OZONE)
+                    .setVolumeName("s3v")
+                    .setBucketName("myBucket")
+                    .build()
+            ),
+            Collections.singleton(IAccessAuthorizer.ACLType.READ)
+        )
+    );
 
-    final AssumeRoleRequest assumeRoleRequest1 = new AssumeRoleRequest("host",
+    final AssumeRoleRequest assumeRoleRequest1 = new AssumeRoleRequest(
+        "host",
         null,
         ugi,
         "roleA",
         grants
     );
-    final AssumeRoleRequest assumeRoleRequest2 = new AssumeRoleRequest("host",
+    final AssumeRoleRequest assumeRoleRequest2 = new AssumeRoleRequest(
+        "host",
         null,
         ugi,
         "roleA",
@@ -71,7 +75,8 @@ public class TestAssumeRoleRequest {
     assertEquals(assumeRoleRequest1, assumeRoleRequest2);
     assertEquals(assumeRoleRequest1.hashCode(), assumeRoleRequest2.hashCode());
 
-    final AssumeRoleRequest assumeRoleRequest3 = new AssumeRoleRequest("host",
+    final AssumeRoleRequest assumeRoleRequest3 = new AssumeRoleRequest(
+        "host",
         null,
         ugi,
         "roleB",
