@@ -26,6 +26,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -271,32 +272,35 @@ public class DeletedBlockLogImpl
   private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
       DeletedBlocksTransaction txn,
       Set<DatanodeDetails> dnList) throws ContainerNotFoundException {
+    long containerId = txn.getContainerID();
     ContainerInfo containerInfo = containerManager
         .getContainer(ContainerID.valueOf(txn.getContainerID()));
     ReplicationManager replicationManager =
         scmContext.getScm().getReplicationManager();
-    ContainerHealthResult result = replicationManager
-        .getContainerReplicationHealth(containerInfo, replicas);
 
-    // We have made an improvement here, and we expect that all replicas
-    // of the Container being sent will be included in the dnList.
-    // This change benefits ACK confirmation and improves deletion speed.
-    // The principle behind it is that
-    // DN can receive the command to delete a certain Container at the same time and provide
-    // feedback to SCM at roughly the same time.
-    // This avoids the issue of deletion blocking,
-    // where some replicas of a Container are deleted while others do not receive the delete command.
-    long containerId = txn.getContainerID();
-    for (ContainerReplica replica : replicas) {
-      DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
-      if (!dnList.contains(datanodeDetails)) {
-        DatanodeDetails dnDetail = replica.getDatanodeDetails();
-        LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
-            containerId, dnDetail);
-        return true;
+    // Filter replicas based on dnList, only consider replicas located on target DNs
+    Set<ContainerReplica> filtered = new HashSet<>(replicas.size());
+    for (ContainerReplica r : replicas) {
+      DatanodeDetails dn = r.getDatanodeDetails();
+      if (dnList.contains(dn)) {
+        filtered.add(r);
+      } else {
+        LOG.debug("Filter out replica of Container {} on DN {} not in dnList.",
+            containerId, dn);
       }
     }
 
+    // If there are no replicas on the target DNs, treat the container as inadequate
+    // (or skip it, depending on the higher-level logic)
+    if (filtered.isEmpty()) {
+      LOG.debug("Container {} has no replicas on target dnList; treat as inadequate.",
+          containerId);
+      return true;
+    }
+
+    // Perform health check using the filtered replica set
+    ContainerHealthResult result = replicationManager
+        .getContainerReplicationHealth(containerInfo, filtered);
     return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
