@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -92,6 +93,7 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
   abstract Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshot,
       SnapshotInfo toSnapshot, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException;
 
+  @Override
   public Optional<Collection<Pair<Path, SstFileInfo>>> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
       Set<String> tablesToLookup) throws IOException {
     TablePrefixInfo tablePrefixInfo = activeMetadataManager.getTableBucketPrefix(fromSnapshot.getVolumeName(),
@@ -107,9 +109,14 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
     Path source = path.toAbsolutePath();
     Path link;
     boolean createdLink = false;
+    Path fileName = source.getFileName();
+    if (source.getFileName() == null) {
+      throw new IOException("Unable to create link for path " + source + " since it has no file name");
+    }
+    String extension = getExtension(fileName.toString());
+    extension = StringUtils.isBlank(extension) ? "" : ("." + extension);
     do {
-      link = deltaDir.resolve(linkFileCounter.incrementAndGet() +
-          "." + getExtension(source.getFileName().toString()));
+      link = deltaDir.resolve(linkFileCounter.incrementAndGet() + extension);
       try {
         Files.createLink(link, source);
         createdLink = true;
@@ -117,7 +124,6 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
         LOG.info("File for source {} already exists: at {}. Will attempt to create link with a different path", source,
             link);
       }
-
     } while (!createdLink);
     return link;
   }

@@ -92,7 +92,7 @@ public class SstFileInfo implements CopyObject<SstFileInfo> {
   }
 
   public Path getFilePath(Path directoryPath) {
-    return directoryPath.resolve(fileName + SST_FILE_EXTENSION);
+    return directoryPath.resolve(getFileName() + SST_FILE_EXTENSION);
   }
 
   @Override

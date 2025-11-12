@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff.delta;
 
+import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -136,7 +138,7 @@ public class TestFileLinkDeltaFileComputer {
     // Create a source file
     Path sourceFile = tempDir.resolve("source.sst");
     Files.createFile(sourceFile);
-    Files.write(sourceFile, "test data".getBytes());
+    Files.write(sourceFile, string2Bytes("test data"));
 
     // Create a hard link
     Path linkPath = deltaFileComputer.createLink(sourceFile);
@@ -144,7 +146,7 @@ public class TestFileLinkDeltaFileComputer {
     assertNotNull(linkPath, "Link path should not be null");
     assertTrue(Files.exists(linkPath), "Link should be created");
     assertTrue(linkPath.getFileName().toString().endsWith(".sst"), "Link should preserve file extension");
-    assertEquals("test data", new String(Files.readAllBytes(linkPath)), "Link should point to same data");
+    assertEquals("test data", bytes2String(Files.readAllBytes(linkPath)), "Link should point to same data");
   }
 
   /**
@@ -167,7 +169,7 @@ public class TestFileLinkDeltaFileComputer {
     Set<String> linkNames = new HashSet<>();
     for (Path sourceFile : sourceFiles) {
       Path linkPath = deltaFileComputer.createLink(sourceFile);
-      linkNames.add(linkPath.getFileName().toString());
+      linkNames.add(Optional.ofNullable(linkPath.getFileName()).map(Path::toString).orElse("null"));
     }
 
     assertEquals(5, linkNames.size(), "All links should have unique names");

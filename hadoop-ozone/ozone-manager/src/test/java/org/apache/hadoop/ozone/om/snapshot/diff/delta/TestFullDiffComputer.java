@@ -33,7 +33,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -206,14 +205,14 @@ public class TestFullDiffComputer {
         deltaDirPath, activityReporter);
 
     File sstFileDirPath = tempDir.resolve("sstFiles").toFile();
-    sstFileDirPath.mkdirs();
+    assertTrue(sstFileDirPath.mkdirs() || sstFileDirPath.exists());
     Map<Integer, Path> paths = Stream.concat(sourceSnapshotFiles.values().stream(),
             targetSnapshotFiles.values().stream())
         .distinct().collect(Collectors.toMap(Function.identity(), i -> {
           // Create mock SST files
           try {
             Path sstFilePath = sstFileDirPath.toPath().resolve(UUID.randomUUID() + ".sst").toAbsolutePath();
-            sstFilePath.toFile().createNewFile();
+            assertTrue(sstFilePath.toFile().createNewFile() || sstFilePath.toFile().exists());
             return sstFilePath;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -296,8 +295,9 @@ public class TestFullDiffComputer {
 
   private LiveFileMetaData getMockLiveFileMetaData(Path dbLocation, SstFileInfo sstFileInfo) {
     LiveFileMetaData liveFileMetaData = mock(LiveFileMetaData.class);
-    String path = sstFileInfo.getFilePath(dbLocation).getParent().toAbsolutePath().toString();
-    when(liveFileMetaData.fileName()).thenReturn(sstFileInfo.getFilePath(dbLocation).getFileName().toString());
+    String path = dbLocation.toAbsolutePath().toString();
+    String fileName = sstFileInfo.getFilePath(dbLocation).toFile().getName();
+    when(liveFileMetaData.fileName()).thenReturn(fileName);
     when(liveFileMetaData.path()).thenReturn(path);
     when(liveFileMetaData.columnFamilyName()).thenReturn(StringUtils.string2Bytes(sstFileInfo.getColumnFamily()));
     when(liveFileMetaData.smallestKey()).thenReturn(StringUtils.string2Bytes(sstFileInfo.getStartKey()));
@@ -318,17 +318,17 @@ public class TestFullDiffComputer {
     RocksDB rocksDB = mock(RocksDB.class);
     when(managedRocksDB.get()).thenReturn(rocksDB);
 
-    File dbLocation = snapshotDir.resolve(snapshotInfo.getName()).toFile();
+    Path dbLocationPath = snapshotDir.resolve(snapshotInfo.getName());
+    File dbLocation = dbLocationPath.toFile();
     List<LiveFileMetaData> liveFileMetaDataList = sstFilesLinks.keySet().stream()
-        .map(sstFileInfo -> getMockLiveFileMetaData(dbLocation.toPath(), sstFileInfo))
+        .map(sstFileInfo -> getMockLiveFileMetaData(dbLocationPath, sstFileInfo))
         .collect(Collectors.toList());
     when(rocksDB.getLiveFilesMetaData()).thenReturn(liveFileMetaDataList);
-    dbLocation.mkdirs();
-    Map<SstFileInfo, Path> sstFilesPaths = new HashMap<>();
+    assertTrue(dbLocation.mkdirs() || dbLocation.exists());
+
     for (Map.Entry<SstFileInfo, Path> sstFile : sstFilesLinks.entrySet()) {
       File path = sstFile.getKey().getFilePath(dbLocation.toPath()).toFile();
       Files.createLink(path.toPath(), sstFile.getValue());
-      sstFilesPaths.put(sstFile.getKey(), path.toPath());
     }
     when(snapshot.getMetadataManager()).thenReturn(metadataManager);
     when(metadataManager.getStore()).thenReturn(store);
