@@ -43,6 +43,10 @@ solutions that want to aggregate data across multiple cloud providers.
 
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
 API from the AWS specification.  A new STS endpoint `/sts` on port `9880` will be created to service STS requests in the S3 Gateway.
+We use a separate port for STS to align with AWS so we don't have conflicts at a later time.  This means we have:
+- Admin port for Ozone specific S3 admin operations
+- STS port for STS APIs, analogous to AWS' separate STS endpoint
+- Existing dedicated port/endpoint for S3 object APIs.
 
 Furthermore, the initial implementation of Ozone STS focuses only on Apache Ranger for authorization in the first phase, 
 as it aligns more with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.  
