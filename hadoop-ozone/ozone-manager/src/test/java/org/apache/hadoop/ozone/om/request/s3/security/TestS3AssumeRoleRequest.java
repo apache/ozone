@@ -55,18 +55,22 @@ public class TestS3AssumeRoleRequest {
   @BeforeEach
   public void setup() {
     ozoneManager = mock(OzoneManager.class);
-    when(ozoneManager.getOmRpcServerAddr())
-        .thenReturn(new InetSocketAddress("localhost", 9876));
+    when(
+        ozoneManager.getOmRpcServerAddr()
+    ).thenReturn(
+        new InetSocketAddress("localhost", 9876)
+    );
     context = ExecutionContext.of(1L, null);
   }
 
   @Test
   public void testInvalidDurationTooShort() {
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(899)  // less than 900
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(899)  // less than 900
         ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
@@ -81,11 +85,12 @@ public class TestS3AssumeRoleRequest {
   @Test
   public void testInvalidDurationTooLong() {
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(43201)) // more than 43200
-        .build();
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(43201)  // more than 43200
+        ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
         .validateAndUpdateCache(ozoneManager, context);
@@ -99,10 +104,11 @@ public class TestS3AssumeRoleRequest {
   @Test
   public void testValidDurationMaxBoundary() {
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(43200)  // exactly max
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(43200)  // exactly max
         ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
@@ -116,10 +122,11 @@ public class TestS3AssumeRoleRequest {
   @Test
   public void testValidDurationMinBoundary() {
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(900)  // exactly min
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(900)  // exactly min
         ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
@@ -135,10 +142,11 @@ public class TestS3AssumeRoleRequest {
     final OMRequest omRequest = OMRequest.newBuilder()  // note: not using baseOMRequestBuilder that has S3 auth
         .setCmdType(Type.AssumeRole)
         .setClientId("client-1")
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(3600)
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
         ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
@@ -154,15 +162,16 @@ public class TestS3AssumeRoleRequest {
   public void testSuccessfulAssumeRoleGeneratesCredentials() {
     final int durationSeconds = 3600;
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(durationSeconds)
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(durationSeconds)
         ).build();
 
     final long before = Instant.now().getEpochSecond();
-    final OMClientResponse clientResponse =
-        new S3AssumeRoleRequest(omRequest).validateAndUpdateCache(ozoneManager, context);
+    final OMClientResponse clientResponse = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = clientResponse.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
@@ -179,7 +188,9 @@ public class TestS3AssumeRoleRequest {
     assertThat(assumeRoleResponse.getSecretAccessKey().length()).isEqualTo(40);
 
     // AssumedRoleId: prefix AROA + 16 chars, followed by ":" and sessionName
-    assertThat(assumeRoleResponse.getAssumedRoleId())
+    assertThat(
+        assumeRoleResponse.getAssumedRoleId()
+    )
         .startsWith("AROA")
         .contains(":" + SESSION_NAME);
     final int expectedAssumedRoleIdLength = 4 + 16 + 1 + SESSION_NAME.length(); // 4 for AROA, 16 chars, 1 for ":"
@@ -211,56 +222,64 @@ public class TestS3AssumeRoleRequest {
   @Test
   public void testValidateAndExtractRoleNameFromArnFailureCases() {
     // Improper structure
-    final OMException e1 = assertThrows(OMException.class,
+    final OMException e1 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("roleNoSlashNorColons")
     );
     assertThat(e1.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e1.getMessage()).isEqualTo("Invalid role ARN: roleNoSlashNorColons");
 
     // Null
-    final OMException e2 = assertThrows(OMException.class,
+    final OMException e2 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(null)
     );
     assertThat(e2.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e2.getMessage()).isEqualTo("Role ARN is required");
 
     // String without role name
-    final OMException e3 = assertThrows(OMException.class,
+    final OMException e3 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/")
     );
     assertThat(e3.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e3.getMessage()).isEqualTo("Invalid role ARN: missing role name");
 
     // No role resource and no role name
-    final OMException e4 = assertThrows(OMException.class,
+    final OMException e4 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012")
     );
     assertThat(e4.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e4.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012");
 
     // No role resource but contains role name
-    final OMException e5 = assertThrows(OMException.class,
+    final OMException e5 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:WebRole")
     );
     assertThat(e5.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e5.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012:WebRole");
 
     // Empty string
-    final OMException e6 = assertThrows(OMException.class,
+    final OMException e6 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("")
     );
     assertThat(e6.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e6.getMessage()).isEqualTo("Role ARN is required");
 
     // String with only slash
-    final OMException e7 = assertThrows(OMException.class,
+    final OMException e7 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("/")
     );
     assertThat(e7.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e7.getMessage()).isEqualTo("Role ARN length: 1 is not valid");
 
     // String with only whitespace
-    final OMException e8 = assertThrows(OMException.class,
+    final OMException e8 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("     ")
     );
     assertThat(e8.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
@@ -269,23 +288,26 @@ public class TestS3AssumeRoleRequest {
     // Path name too long (> 511 characters)
     final String arnPrefixLen512 = repeat('q', 511) + "/"; // 511 chars + '/' = 512
     final String arnTooLongPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen512 + "RoleA";
-    final OMException e9 = assertThrows(OMException.class,
+    final OMException e9 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arnTooLongPath)
     );
     assertThat(e9.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e9.getMessage()).isEqualTo("Role path length must be between 1 and 512 characters");
 
     // Otherwise valid role ending in /
-    final OMException e10 = assertThrows(OMException.class,
+    final OMException e10 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/MyRole/")
     );
     assertThat(e10.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e10.getMessage()).isEqualTo("Invalid role ARN: missing role name");
+    assertThat(e10.getMessage()).isEqualTo("Invalid role ARN: missing role name");  // MyRole/ is considered a path
 
     // 65-char role name
     final String roleName65 = repeat('B', 65);
     final String roleArn65 = "arn:aws:iam::123456789012:role/" + roleName65;
-    final OMException e11 = assertThrows(OMException.class,
+    final OMException e11 = assertThrows(
+        OMException.class,
         () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(roleArn65)
     );
     assertThat(e11.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
@@ -296,21 +318,24 @@ public class TestS3AssumeRoleRequest {
   public void testGenerateSecureRandomStringUsingChars() {
     final String chars = "ABC";
     final int length = 32;
-    final String s = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(chars,
+    final String s = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
+        chars,
         chars.length(),
         length
     );
     assertThat(s).hasSize(length).matches(Pattern.compile("^[ABC]{" + length + "}$"));
 
     // Test with length 0
-    final String empty = S3AssumeRoleRequest.generateSecureRandomStringUsingChars("ABC",
+    final String empty = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
+        "ABC",
         3,
         0
     );
     assertThat(empty).isEmpty();
 
     // Test with length 1
-    final String single = S3AssumeRoleRequest.generateSecureRandomStringUsingChars("XYZ",
+    final String single = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
+        "XYZ",
         3,
         1
     );
@@ -321,10 +346,11 @@ public class TestS3AssumeRoleRequest {
   public void testAssumeRoleCredentialsAreUnique() {
     // Test that multiple calls generate different credentials
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(3600)
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
         ).build();
 
     final OMClientResponse response1 = new S3AssumeRoleRequest(omRequest)
@@ -341,6 +367,9 @@ public class TestS3AssumeRoleRequest {
     // Different secret keys
     assertThat(assumeRoleResponse1.getSecretAccessKey()).isNotEqualTo(assumeRoleResponse2.getSecretAccessKey());
 
+    // Different session tokens
+    assertThat(assumeRoleResponse1.getSessionToken()).isNotEqualTo(assumeRoleResponse2.getSessionToken());
+
     // Different assumed role IDs
     assertThat(assumeRoleResponse1.getAssumedRoleId()).isNotEqualTo(assumeRoleResponse2.getAssumedRoleId());
   }
@@ -348,10 +377,11 @@ public class TestS3AssumeRoleRequest {
   @Test
   public void testAssumeRoleWithEmptySessionName() {
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName("")
-            .setDurationSeconds(3600)
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName("")
+                .setDurationSeconds(3600)
         ).build();
 
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
@@ -364,15 +394,16 @@ public class TestS3AssumeRoleRequest {
   public void testAssumeRoleWithSessionPolicyPresent() {
     final String sessionPolicy = "{\"Version\":\"2012-10-17\",\"Statement\":[]}";
     final OMRequest omRequest = baseOmRequestBuilder()
-        .setAssumeRoleRequest(AssumeRoleRequest.newBuilder()
-            .setRoleArn(ROLE_ARN_1)
-            .setRoleSessionName(SESSION_NAME)
-            .setDurationSeconds(3600)
-            .setAwsIamSessionPolicy(sessionPolicy))
-        .build();
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(3600)
+                .setAwsIamSessionPolicy(sessionPolicy)
+        ).build();
 
-    final OMClientResponse response =
-        new S3AssumeRoleRequest(omRequest).validateAndUpdateCache(ozoneManager, context);
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
   }
 
@@ -380,11 +411,15 @@ public class TestS3AssumeRoleRequest {
     return OMRequest.newBuilder()
         .setCmdType(Type.AssumeRole)
         .setClientId("client-1")
-        .setS3Authentication(S3Authentication.newBuilder()
-            .setAccessId(ORIGINAL_ACCESS_KEY_ID)
+        .setS3Authentication(
+            S3Authentication.newBuilder()
+                .setAccessId(ORIGINAL_ACCESS_KEY_ID)
         );
   }
 
+  /**
+   * Generates a string of length count containing the char c repeated.
+   */
   private static String repeat(char c, int count) {
     final StringBuilder sb = new StringBuilder(count);
     for (int i = 0; i < count; i++) {

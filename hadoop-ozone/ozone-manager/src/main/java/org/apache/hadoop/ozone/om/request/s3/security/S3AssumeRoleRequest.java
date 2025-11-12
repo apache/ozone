@@ -60,13 +60,17 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       "abcdefghijklmnopqrstuvwxyz/+";
   private static final int CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH = CHARS_FOR_SECRET_ACCESS_KEYS.length();
 
-  public S3AssumeRoleRequest(OMRequest omRequest) {
+  public S3AssumeRoleRequest(
+      OMRequest omRequest
+  ) {
     super(omRequest);
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 ExecutionContext context) {
+  public OMClientResponse validateAndUpdateCache(
+      OzoneManager ozoneManager,
+      ExecutionContext context
+  ) {
     final OMRequest omRequest = getOmRequest();
     final AssumeRoleRequest assumeRoleRequest = omRequest.getAssumeRoleRequest();
     final int durationSeconds = assumeRoleRequest.getDurationSeconds();
@@ -74,8 +78,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     // Validate duration
     if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS ||
         durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
-      final OMException omException = new OMException("Duration: " + durationSeconds +
-          " is not valid",
+      final OMException omException = new OMException(
+          "Duration: " + durationSeconds + " is not valid",
           OMException.ResultCodes.INVALID_REQUEST
       );
       return new S3AssumeRoleResponse(
@@ -86,8 +90,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     // Validate role session name
     final String roleSessionName = assumeRoleRequest.getRoleSessionName();
     if (StringUtils.isBlank(roleSessionName)) {
-      final OMException omException = new OMException("RoleSessionName: " + roleSessionName +
-          " is not valid",
+      final OMException omException = new OMException(
+          "RoleSessionName: " + roleSessionName + " is not valid",
           OMException.ResultCodes.INVALID_REQUEST
       );
       return new S3AssumeRoleResponse(
@@ -110,23 +114,28 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
       // Generate temporary AWS credentials using cryptographically strong SecureRandom
       final String tempAccessKeyId = STS_TOKEN_PREFIX +
-          generateSecureRandomStringUsingChars(CHARS_FOR_ACCESS_KEY_IDS,
+          generateSecureRandomStringUsingChars(
+              CHARS_FOR_ACCESS_KEY_IDS,
               CHARS_FOR_ACCESS_KEY_IDS_LENGTH,
               STS_ACCESS_KEY_ID_LENGTH
           );
-      final String secretAccessKey = generateSecureRandomStringUsingChars(CHARS_FOR_SECRET_ACCESS_KEYS,
+      final String secretAccessKey = generateSecureRandomStringUsingChars(
+          CHARS_FOR_SECRET_ACCESS_KEYS,
           CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH,
           STS_SECRET_ACCESS_KEY_LENGTH
       );
-      final String sessionToken = generateSessionToken(targetRoleName,
+      final String sessionToken = generateSessionToken(
+          targetRoleName,
           omRequest,
           ozoneManager,
           assumeRoleRequest,
-          secretAccessKey);
+          secretAccessKey
+      );
 
       // Generate AssumedRoleId for response
       final String roleId = ASSUME_ROLE_ID_PREFIX +
-          generateSecureRandomStringUsingChars(CHARS_FOR_ACCESS_KEY_IDS,
+          generateSecureRandomStringUsingChars(
+              CHARS_FOR_ACCESS_KEY_IDS,
               CHARS_FOR_ACCESS_KEY_IDS_LENGTH,
               STS_ROLE_ID_LENGTH
           );
@@ -153,7 +162,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e)
       );
     } catch (IOException e) {
-      final OMException omException = new OMException("Failed to generate STS token for role: " + roleArn,
+      final OMException omException = new OMException(
+          "Failed to generate STS token for role: " + roleArn,
           e,
           OMException.ResultCodes.INTERNAL_ERROR
       );
@@ -166,11 +176,13 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Generates session token using components from the AssumeRoleRequest.
    */
-  private String generateSessionToken(String targetRoleName,
-                                      OMRequest omRequest,
-                                      OzoneManager ozoneManager,
-                                      AssumeRoleRequest assumeRoleRequest,
-                                      String secretAccessKey) throws IOException {
+  private String generateSessionToken(
+      String targetRoleName,
+      OMRequest omRequest,
+      OzoneManager ozoneManager,
+      AssumeRoleRequest assumeRoleRequest,
+      String secretAccessKey
+  ) throws IOException {
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteIp == null) {
@@ -191,7 +203,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final UserGroupInformation ugi = UserGroupInformation.createRemoteUser(principal);
 
     final String roleArn = assumeRoleRequest.getRoleArn();
-    final String sessionPolicy = getSessionPolicy(ozoneManager,
+    final String sessionPolicy = getSessionPolicy(
+        ozoneManager,
         originalAccessKeyId,
         assumeRoleRequest.getAwsIamSessionPolicy(),
         hostName,
@@ -210,13 +223,15 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    * to IAccessAuthorizer.generateAssumeRoleSessionPolicy() which is currently only implemented
    * by RangerOzoneAuthorizer.
    */
-  private String getSessionPolicy(OzoneManager ozoneManager,
-                                  String originalAccessKeyId,
-                                  String awsIamPolicy,
-                                  String hostName,
-                                  InetAddress remoteIp,
-                                  UserGroupInformation ugi,
-                                  String targetRoleName) throws IOException {
+  private String getSessionPolicy(
+      OzoneManager ozoneManager,
+      String originalAccessKeyId,
+      String awsIamPolicy,
+      String hostName,
+      InetAddress remoteIp,
+      UserGroupInformation ugi,
+      String targetRoleName
+  ) throws IOException {
     // TODO sts - implement in a future PR
     return null;
   }
@@ -225,9 +240,11 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    * Generates a cryptographically strong String of the supplied stringLength using supplied chars.
    */
   @VisibleForTesting
-  static String generateSecureRandomStringUsingChars(String chars,
-                                                     int charsLength,
-                                                     int stringLength) {
+  static String generateSecureRandomStringUsingChars(
+      String chars,
+      int charsLength,
+      int stringLength
+  ) {
     final StringBuilder sb = new StringBuilder(stringLength);
     for (int i = 0; i < stringLength; i++) {
       sb.append(chars.charAt(SECURE_RANDOM.nextInt(charsLength)));
@@ -242,19 +259,20 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    * arn:aws:iam::123456789012:role/path/RoleB -> RoleB
    */
   @VisibleForTesting
-  static String validateAndExtractRoleNameFromArn(String roleArn) throws OMException {
+  static String validateAndExtractRoleNameFromArn(
+      String roleArn
+  ) throws OMException {
     if (StringUtils.isBlank(roleArn)) {
       throw new OMException("Role ARN is required", OMException.ResultCodes.INVALID_REQUEST);
     }
 
     final int roleArnLength = roleArn.length();
     if (roleArnLength < ASSUME_ROLE_ARN_MIN_LENGTH || roleArnLength > ASSUME_ROLE_ARN_MAX_LENGTH) {
-      throw new OMException("Role ARN length: " + roleArnLength +
-          " is not valid",
+      throw new OMException(
+          "Role ARN length: " + roleArnLength + " is not valid",
           OMException.ResultCodes.INVALID_REQUEST
       );
     }
-
 
     // Expected format: arn:aws:iam::123456789012:role/[optional path segments/]RoleName
     if (!roleArn.startsWith("arn:aws:iam::")) {
@@ -283,9 +301,11 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final String roleName = pathSegments[pathSegments.length - 1];
 
     // Validate role name
-    if (roleName.isEmpty() ||
+    if (
+        roleName.isEmpty() ||
         roleName.length() > ASSUME_ROLE_NAME_MAX_LENGTH ||
-        hasCharNotAllowedInIamRoleArn(roleName)) {
+        hasCharNotAllowedInIamRoleArn(roleName)
+    ) {
       throw new OMException("Invalid role name: " + roleName, OMException.ResultCodes.INVALID_REQUEST);
     }
 
@@ -293,8 +313,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     if (pathSegments.length > 1) {
       final String pathPrefix = rolePath.substring(0, rolePath.lastIndexOf('/') + 1);
       if (pathPrefix.length() > 511) {
-        throw new OMException("Role path length must be between 1 and 512 characters",
-            OMException.ResultCodes.INVALID_REQUEST);
+        throw new OMException(
+            "Role path length must be between 1 and 512 characters",
+            OMException.ResultCodes.INVALID_REQUEST
+        );
       }
       for (String segment : pathSegments) {
         if (segment.isEmpty() || hasCharNotAllowedInIamRoleArn(segment)) {
@@ -309,7 +331,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Checks if all the characters in a String are numbers.
    */
-  private static boolean isAllDigits(String s) {
+  private static boolean isAllDigits(
+      String s
+  ) {
     for (int i = 0; i < s.length(); i++) {
       if (!Character.isDigit(s.charAt(i))) {
         return false;
@@ -321,7 +345,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Checks if supplied string contains a char that is not allowed in IAM Role ARN.
    */
-  private static boolean hasCharNotAllowedInIamRoleArn(String s) {
+  private static boolean hasCharNotAllowedInIamRoleArn(
+      String s
+  ) {
     for (int i = 0; i < s.length(); i++) {
       if (!isCharAllowedInIamRoleArn(s.charAt(i))) {
         return true;
@@ -333,7 +359,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Checks if the supplied chars is allowed in IAM Role ARN.
    */
-  private static boolean isCharAllowedInIamRoleArn(char c) {
+  private static boolean isCharAllowedInIamRoleArn(
+      char c
+  ) {
     return (c >= 'A' && c <= 'Z')
         || (c >= 'a' && c <= 'z')
         || (c >= '0' && c <= '9')
