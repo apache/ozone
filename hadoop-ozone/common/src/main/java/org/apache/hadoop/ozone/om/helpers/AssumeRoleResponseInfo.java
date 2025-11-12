@@ -101,7 +101,9 @@ public class AssumeRoleResponseInfo {
   }
 
   @Override
-  public boolean equals(Object o) {
+  public boolean equals(
+      Object o
+  ) {
     if (this == o) {
       return true;
     }
@@ -120,7 +122,8 @@ public class AssumeRoleResponseInfo {
 
   @Override
   public int hashCode() {
-    return Objects.hash(accessKeyId,
+    return Objects.hash(
+        accessKeyId,
         secretAccessKey,
         sessionToken,
         expirationEpochSeconds,
