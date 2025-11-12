@@ -179,8 +179,8 @@ public class ListMultipartUploadsResult {
     this.commonPrefixes = commonPrefixes;
   }
 
-  public void addPrefix(EncodingTypeObject prefix) {
-    commonPrefixes.add(new CommonPrefix(prefix));
+  public void addPrefix(EncodingTypeObject relativeKeyName) {
+    commonPrefixes.add(new CommonPrefix(relativeKeyName));
   }
 
   /**
