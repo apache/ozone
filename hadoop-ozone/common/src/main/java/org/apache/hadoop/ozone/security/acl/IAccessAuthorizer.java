@@ -65,7 +65,9 @@ public interface IAccessAuthorizer {
    * @throws OMException        if the caller is not authorized, either for the role and/or policy or for the
    *                            {@link ACLType#ASSUME_ROLE} permission
    */
-  default String generateAssumeRoleSessionPolicy(AssumeRoleRequest assumeRoleRequest) throws OMException {
+  default String generateAssumeRoleSessionPolicy(
+      AssumeRoleRequest assumeRoleRequest
+  ) throws OMException {
     throw new OMException("The generateAssumeRoleSessionPolicy call is not supported", NOT_SUPPORTED_OPERATION);
   }
 
