@@ -25,7 +25,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.apache.hadoop.ozone.s3.commontypes.CommonPrefix;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
+import org.apache.hadoop.ozone.s3.commontypes.ObjectKeyNameAdapter;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
@@ -49,8 +52,16 @@ public class ListMultipartUploadsResult {
   @XmlElement(name = "NextKeyMarker")
   private String nextKeyMarker;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Prefix")
-  private String prefix;
+  private EncodingTypeObject prefix;
+
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
+  @XmlElement(name = "Delimiter")
+  private EncodingTypeObject delimiter;
+
+  @XmlElement(name = "EncodingType")
+  private String encodingType;
 
   @XmlElement(name = "NextUploadIdMarker")
   private String nextUploadIdMarker;
@@ -63,6 +74,9 @@ public class ListMultipartUploadsResult {
 
   @XmlElement(name = "Upload")
   private List<Upload> uploads = new ArrayList<>();
+
+  @XmlElement(name = "CommonPrefixes")
+  private List<CommonPrefix> commonPrefixes = new ArrayList<>();
 
   public String getBucket() {
     return bucket;
@@ -96,12 +110,28 @@ public class ListMultipartUploadsResult {
     this.nextKeyMarker = nextKeyMarker;
   }
 
-  public String getPrefix() {
+  public EncodingTypeObject getPrefix() {
     return prefix;
   }
 
-  public void setPrefix(String prefix) {
+  public void setPrefix(EncodingTypeObject prefix) {
     this.prefix = prefix;
+  }
+
+  public EncodingTypeObject getDelimiter() {
+    return delimiter;
+  }
+
+  public void setDelimiter(EncodingTypeObject delimiter) {
+    this.delimiter = delimiter;
+  }
+
+  public String getEncodingType() {
+    return encodingType;
+  }
+
+  public void setEncodingType(String encodingType) {
+    this.encodingType = encodingType;
   }
 
   public String getNextUploadIdMarker() {
@@ -139,6 +169,18 @@ public class ListMultipartUploadsResult {
 
   public void addUpload(Upload upload) {
     this.uploads.add(upload);
+  }
+
+  public List<CommonPrefix> getCommonPrefixes() {
+    return commonPrefixes;
+  }
+
+  public void setCommonPrefixes(List<CommonPrefix> commonPrefixes) {
+    this.commonPrefixes = commonPrefixes;
+  }
+
+  public void addPrefix(EncodingTypeObject prefix) {
+    commonPrefixes.add(new CommonPrefix(prefix));
   }
 
   /**
