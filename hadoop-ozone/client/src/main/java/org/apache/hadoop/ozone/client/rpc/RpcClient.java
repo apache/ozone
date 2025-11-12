@@ -2792,10 +2792,12 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public AssumeRoleResponseInfo assumeRole(String roleArn,
-                                           String roleSessionName,
-                                           int durationSeconds,
-                                           String awsIamSessionPolicy) throws IOException {
+  public AssumeRoleResponseInfo assumeRole(
+      String roleArn,
+      String roleSessionName,
+      int durationSeconds,
+      String awsIamSessionPolicy
+  ) throws IOException {
     return ozoneManagerClient.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy);
   }
 

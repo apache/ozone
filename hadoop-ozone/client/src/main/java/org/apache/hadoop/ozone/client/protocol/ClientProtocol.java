@@ -1370,8 +1370,10 @@ public interface ClientProtocol {
    * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
    * @throws IOException            if an error occurs during the AssumeRole operation
    */
-  AssumeRoleResponseInfo assumeRole(String roleArn,
-                                    String roleSessionName,
-                                    int durationSeconds,
-                                    String awsIamSessionPolicy) throws IOException;
+  AssumeRoleResponseInfo assumeRole(
+      String roleArn,
+      String roleSessionName,
+      int durationSeconds,
+      String awsIamSessionPolicy
+  ) throws IOException;
 }

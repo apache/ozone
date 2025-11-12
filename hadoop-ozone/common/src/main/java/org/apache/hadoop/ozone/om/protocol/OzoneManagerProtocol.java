@@ -1187,12 +1187,14 @@ public interface OzoneManagerProtocol
    * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
    * @throws IOException            if an error occurs during the AssumeRole operation
    */
-  default AssumeRoleResponseInfo assumeRole(String roleArn,
-                                            String roleSessionName,
-                                            int durationSeconds,
-                                            String awsIamSessionPolicy) throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented"
+  default AssumeRoleResponseInfo assumeRole(
+      String roleArn,
+      String roleSessionName,
+      int durationSeconds,
+      String awsIamSessionPolicy
+  ) throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneManager does not require this to be implemented"
     );
   }
 }

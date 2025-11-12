@@ -53,11 +53,13 @@ public class AssumeRoleResponseInfo {
     return assumedRoleId;
   }
 
-  public AssumeRoleResponseInfo(String accessKeyId,
-                                String secretAccessKey,
-                                String sessionToken,
-                                long expirationEpochSeconds,
-                                String assumedRoleId) {
+  public AssumeRoleResponseInfo(
+      String accessKeyId,
+      String secretAccessKey,
+      String sessionToken,
+      long expirationEpochSeconds,
+      String assumedRoleId
+  ) {
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
@@ -65,7 +67,9 @@ public class AssumeRoleResponseInfo {
     this.assumedRoleId = assumedRoleId;
   }
 
-  public static AssumeRoleResponseInfo fromProtobuf(AssumeRoleResponse response) {
+  public static AssumeRoleResponseInfo fromProtobuf(
+      AssumeRoleResponse response
+  ) {
     return new AssumeRoleResponseInfo(
         response.getAccessKeyId(),
         response.getSecretAccessKey(),
