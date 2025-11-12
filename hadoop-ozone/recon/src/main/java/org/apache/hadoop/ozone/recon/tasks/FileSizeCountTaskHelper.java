@@ -164,7 +164,7 @@ public abstract class FileSizeCountTaskHelper {
     long startTime = Time.monotonicNow();
     
     // Use fair lock to prevent write lock starvation when flushing
-    ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
     AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
     final int FLUSH_THRESHOLD = 100000;
