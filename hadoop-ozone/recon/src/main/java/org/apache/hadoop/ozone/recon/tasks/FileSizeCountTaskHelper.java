@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -29,7 +27,6 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -49,6 +46,14 @@ public abstract class FileSizeCountTaskHelper {
   
   // Static lock object for table truncation synchronization
   private static final Object TRUNCATE_LOCK = new Object();
+
+  /**
+   * Static write lock for cross-task synchronization during DB writes.
+   * Ensures read-modify-write operations are atomic when FSO and OBS tasks
+   * flush concurrently to the same FileSizeCountKey bins.
+   */
+  private static final ReentrantReadWriteLock FILE_COUNT_WRITE_LOCK = 
+      new ReentrantReadWriteLock();
 
   /**
    * Increments the count for a given key on a PUT event.
@@ -288,70 +293,37 @@ public abstract class FileSizeCountTaskHelper {
   /**
    * Writes the accumulated file size counts to RocksDB using ReconFileMetadataManager.
    */
-  /**
-   * Checks if the file count table is empty by trying to get the first entry.
-   * This mimics the SQL Derby behavior of isFileCountBySizeTableEmpty().
-   */
-  private static boolean isFileCountTableEmpty(ReconFileMetadataManager reconFileMetadataManager) {
-    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
-         reconFileMetadataManager.getFileCountTable().iterator()) {
-      return !iterator.hasNext();
-    } catch (Exception e) {
-      LOG.warn("Error checking if file count table is empty, assuming not empty", e);
-      return false;
-    }
-  }
-
   public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
                                      ReconFileMetadataManager reconFileMetadataManager) {
     if (fileSizeCountMap.isEmpty()) {
       return;
     }
-    
-    boolean isTableEmpty = isFileCountTableEmpty(reconFileMetadataManager);
-    
-    LOG.debug("writeCountsToDB: processing {} entries, isTableEmpty={}", 
-        fileSizeCountMap.size(), isTableEmpty);
 
+    // Global write lock ensures atomic read-modify-write across concurrent FSO/OBS flushes
+    FILE_COUNT_WRITE_LOCK.writeLock().lock();
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
         FileSizeCountKey key = entry.getKey();
         Long deltaCount = entry.getValue();
-        
-        LOG.debug("Processing key: {}, deltaCount: {}", key, deltaCount);
-        
-        if (isTableEmpty) {
-          // Direct insert when table is empty (like SQL Derby reprocess behavior)
-          LOG.debug("Direct insert (table empty): key={}, deltaCount={}", key, deltaCount);
-          if (deltaCount > 0L) {
-            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, deltaCount);
-            LOG.debug("Storing key={} with deltaCount={}", key, deltaCount);
-          }
-        } else {
-          // Incremental update when table has data (like SQL Derby incremental behavior)
-          Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
-          Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
-          
-          LOG.debug("Incremental update: key={}, existingCount={}, deltaCount={}, newCount={}", 
-              key, existingCount, deltaCount, newCount);
-          
-          if (newCount > 0L) {
-            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, newCount);
-            LOG.debug("Storing key={} with newCount={}", key, newCount);
-          } else if (existingCount != null) {
-            // Delete key if count becomes 0 or negative
-            reconFileMetadataManager.batchDeleteFileSizeCount(rdbBatchOperation, key);
-            LOG.debug("Deleting key={} as newCount={} <= 0", key, newCount);
-          }
+
+        // Always do read-modify-write to handle concurrent task flushes correctly
+        Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
+        Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
+
+        if (newCount > 0L) {
+          reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, newCount);
+        } else if (existingCount != null) {
+          // Delete key if count becomes 0 or negative
+          reconFileMetadataManager.batchDeleteFileSizeCount(rdbBatchOperation, key);
         }
       }
-      
-      LOG.debug("Committing batch operation with {} operations", fileSizeCountMap.size());
+
       reconFileMetadataManager.commitBatchOperation(rdbBatchOperation);
-      LOG.debug("Batch operation committed successfully");
     } catch (Exception e) {
       LOG.error("Error writing file size counts to RocksDB", e);
       throw new RuntimeException("Failed to write to RocksDB", e);
+    } finally {
+      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
     }
   }
 
