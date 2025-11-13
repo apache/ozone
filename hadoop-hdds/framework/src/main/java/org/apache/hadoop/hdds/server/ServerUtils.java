@@ -306,16 +306,82 @@ public final class ServerUtils {
    * under ozone.metadata.dirs to avoid conflicts when multiple components
    * are colocated on the same host.
    *
+   * <p>For backward compatibility during upgrades, this method checks for
+   * existing Ratis data in old locations before using the new component-specific
+   * location. See {@link #findExistingRatisDirectory} for details on old locations.
+   *
    * @param conf Configuration source
    * @param componentName Name of the component (e.g., "scm", "om", "dn")
    * @return Path to the component-specific ratis directory
    */
   public static String getDefaultRatisDirectory(ConfigurationSource conf,
-                                                 String componentName) {
+      String componentName) {
     LOG.warn("Storage directory for Ratis is not configured. It is a good " +
             "idea to map this to an SSD disk. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    
+    // Check for existing Ratis data from old versions for backward compatibility
+    String existingDir = findExistingRatisDirectory(metaDirPath, componentName);
+    if (existingDir != null) {
+      return existingDir;
+    }
+    
+    // Use new component-specific location for new installations
     return (new File(metaDirPath, componentName + ".ratis")).getPath();
+  }
+
+  /**
+   * Checks for existing Ratis directories from previous versions for backward
+   * compatibility during upgrades.
+   *
+   * <p>Older versions of Ozone used different directory structures:
+   * <ul>
+   *   <li>Versions up to 2.0.0: Shared {@code <ozone.metadata.dirs>/ratis} for all components</li>
+   *   <li>Some SCM versions: Used {@code <ozone.metadata.dirs>/scm-ha}</li>
+   * </ul>
+   *
+   * @param metaDirPath The ozone metadata directory path
+   * @param componentName Name of the component (e.g., "scm", "om", "dn")
+   * @return Path to existing old Ratis directory if found, null otherwise
+   */
+  private static String findExistingRatisDirectory(File metaDirPath,
+                                                   String componentName) {
+    // Check old shared Ratis location first (used by version 2.0.0 and earlier)
+    // All components (OM, SCM) shared /data/metadata/ratis
+    File oldSharedRatisDir = new File(metaDirPath, "ratis");
+    if (isNonEmptyDirectory(oldSharedRatisDir)) {
+      LOG.info("Found existing Ratis directory at old shared location: {}. " +
+              "Using it for backward compatibility during upgrade.",
+          oldSharedRatisDir.getPath());
+      return oldSharedRatisDir.getPath();
+    }
+
+    // Check component-specific old location (SCM used scm-ha in some versions)
+    if ("scm".equals(componentName)) {
+      File oldScmRatisDir = new File(metaDirPath, "scm-ha");
+      if (isNonEmptyDirectory(oldScmRatisDir)) {
+        LOG.info("Found existing SCM Ratis directory at old location: {}. " +
+                "Using it for backward compatibility during upgrade.",
+            oldScmRatisDir.getPath());
+        return oldScmRatisDir.getPath();
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Checks if a directory exists and is non-empty.
+   *
+   * @param dir Directory to check
+   * @return true if directory exists and contains at least one file
+   */
+  private static boolean isNonEmptyDirectory(File dir) {
+    if (dir != null && dir.exists() && dir.isDirectory()) {
+      File[] files = dir.listFiles();
+      return files != null && files.length > 0;
+    }
+    return false;
   }
 }

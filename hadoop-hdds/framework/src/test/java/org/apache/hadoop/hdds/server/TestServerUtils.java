@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -289,9 +290,9 @@ public class TestServerUtils {
       assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
 
       // Verify all Ratis directories are different
-      assertFalse(scmRatisDir.equals(omRatisDir));
-      assertFalse(scmRatisDir.equals(dnRatisDir));
-      assertFalse(omRatisDir.equals(dnRatisDir));
+      assertNotEquals(scmRatisDir, omRatisDir);
+      assertNotEquals(scmRatisDir, dnRatisDir);
+      assertNotEquals(omRatisDir, dnRatisDir);
 
       // Verify the base metadata dir exists
       assertTrue(metaDir.exists());
