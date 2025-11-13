@@ -240,9 +240,7 @@ public final class OzoneObjInfo extends OzoneObj {
   }
 
   @Override
-  public boolean equals(
-      Object o
-  ) {
+  public boolean equals(Object o) {
     if (this == o) {
       return true;
     } else if (!super.equals(o)) {
@@ -250,11 +248,8 @@ public final class OzoneObjInfo extends OzoneObj {
     }
 
     final OzoneObjInfo that = (OzoneObjInfo) o;
-
-    return Objects.equals(volumeName, that.volumeName) &&
-        Objects.equals(bucketName, that.bucketName) &&
-        Objects.equals(name, that.name) &&
-        Objects.equals(ozonePrefixPath, that.ozonePrefixPath);
+    return Objects.equals(volumeName, that.volumeName) && Objects.equals(bucketName, that.bucketName) &&
+        Objects.equals(name, that.name) && Objects.equals(ozonePrefixPath, that.ozonePrefixPath);
   }
 
   @Override

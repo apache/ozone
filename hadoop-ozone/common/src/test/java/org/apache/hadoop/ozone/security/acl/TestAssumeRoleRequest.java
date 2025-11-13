@@ -45,26 +45,13 @@ public class TestAssumeRoleRequest {
                     .setStoreType(OzoneObj.StoreType.OZONE)
                     .setVolumeName("s3v")
                     .setBucketName("myBucket")
-                    .build()
-            ),
-            Collections.singleton(IAccessAuthorizer.ACLType.READ)
-        )
-    );
+                    .build()),
+            Collections.singleton(IAccessAuthorizer.ACLType.READ)));
 
     final AssumeRoleRequest assumeRoleRequest1 = new AssumeRoleRequest(
-        "host",
-        null,
-        ugi,
-        "roleA",
-        grants
-    );
+        "host", null, ugi, "roleA", grants);
     final AssumeRoleRequest assumeRoleRequest2 = new AssumeRoleRequest(
-        "host",
-        null,
-        ugi,
-        "roleA",
-        grants
-    );
+        "host", null, ugi, "roleA", grants);
 
     assertEquals("host", assumeRoleRequest1.getHost());
     assertNull(assumeRoleRequest1.getIp());
@@ -76,12 +63,7 @@ public class TestAssumeRoleRequest {
     assertEquals(assumeRoleRequest1.hashCode(), assumeRoleRequest2.hashCode());
 
     final AssumeRoleRequest assumeRoleRequest3 = new AssumeRoleRequest(
-        "host",
-        null,
-        ugi,
-        "roleB",
-        null
-    );
+        "host", null, ugi, "roleB", null);
     assertNotEquals(assumeRoleRequest1, assumeRoleRequest3);
   }
 }

@@ -37,13 +37,8 @@ public class AssumeRoleRequest {
   private final String targetRoleName;
   private final Set<OzoneGrant> grants;
 
-  public AssumeRoleRequest(
-      String host,
-      InetAddress ip,
-      UserGroupInformation clientUgi,
-      String targetRoleName,
-      Set<OzoneGrant> grants
-  ) {
+  public AssumeRoleRequest(String host, InetAddress ip, UserGroupInformation clientUgi, String targetRoleName,
+      Set<OzoneGrant> grants) {
 
     this.host = host;
     this.ip = ip;
@@ -73,9 +68,7 @@ public class AssumeRoleRequest {
   }
 
   @Override
-  public boolean equals(
-      Object o
-  ) {
+  public boolean equals(Object o) {
     if (this == o) {
       return true;
     } else if (o == null || getClass() != o.getClass()) {
@@ -83,10 +76,8 @@ public class AssumeRoleRequest {
     }
 
     final AssumeRoleRequest that = (AssumeRoleRequest) o;
-    return Objects.equals(host, that.host) &&
-        Objects.equals(ip, that.ip) &&
-        Objects.equals(clientUgi, that.clientUgi) &&
-        Objects.equals(targetRoleName, that.targetRoleName) &&
+    return Objects.equals(host, that.host) && Objects.equals(ip, that.ip) &&
+        Objects.equals(clientUgi, that.clientUgi) && Objects.equals(targetRoleName, that.targetRoleName) &&
         Objects.equals(grants, that.grants);
   }
 
@@ -103,10 +94,7 @@ public class AssumeRoleRequest {
     private final Set<IOzoneObj> objects;
     private final Set<IAccessAuthorizer.ACLType> permissions;
 
-    public OzoneGrant(
-        Set<IOzoneObj> objects,
-        Set<IAccessAuthorizer.ACLType> permissions
-    ) {
+    public OzoneGrant(Set<IOzoneObj> objects, Set<IAccessAuthorizer.ACLType> permissions) {
       this.objects = objects;
       this.permissions = permissions;
     }
@@ -120,9 +108,7 @@ public class AssumeRoleRequest {
     }
 
     @Override
-    public boolean equals(
-        Object o
-    ) {
+    public boolean equals(Object o) {
       if (this == o) {
         return true;
       } else if (o == null || getClass() != o.getClass()) {
@@ -130,8 +116,7 @@ public class AssumeRoleRequest {
       }
 
       final OzoneGrant that = (OzoneGrant) o;
-      return Objects.equals(objects, that.objects) &&
-          Objects.equals(permissions, that.permissions);
+      return Objects.equals(objects, that.objects) && Objects.equals(permissions, that.permissions);
     }
 
     @Override

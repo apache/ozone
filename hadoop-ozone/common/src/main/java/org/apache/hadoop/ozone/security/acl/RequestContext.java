@@ -47,6 +47,7 @@ public class RequestContext {
    * Represents optional session policy JSON for Ranger to use when authorizing
    * an STS token.  This value would have come as a result of a previous
    * {@link IAccessAuthorizer#generateAssumeRoleSessionPolicy(AssumeRoleRequest)} call.
+   * The sessionPolicy includes the roleName.
    */
   private final String sessionPolicy;
 
@@ -69,17 +70,8 @@ public class RequestContext {
   }
 
   @SuppressWarnings("parameternumber")
-  public RequestContext(
-      String host,
-      InetAddress ip,
-      UserGroupInformation clientUgi,
-      String serviceId,
-      ACLIdentityType aclType,
-      ACLType aclRights,
-      String ownerName,
-      boolean recursiveAccessCheck,
-      String sessionPolicy
-  ) {
+  public RequestContext(String host, InetAddress ip, UserGroupInformation clientUgi, String serviceId,
+      ACLIdentityType aclType, ACLType aclRights, String ownerName, boolean recursiveAccessCheck, String sessionPolicy) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
@@ -155,9 +147,7 @@ public class RequestContext {
       return this;
     }
 
-    public Builder setSessionPolicy(
-        String sessionPolicy
-    ) {
+    public Builder setSessionPolicy(String sessionPolicy) {
       this.sessionPolicy = sessionPolicy;
       return this;
     }
@@ -185,15 +175,8 @@ public class RequestContext {
     return getBuilder(ugi, remoteAddress, hostName, aclType, ownerName, recursiveAccessCheck, null);
   }
 
-  public static RequestContext.Builder getBuilder(
-      UserGroupInformation ugi,
-      InetAddress remoteAddress,
-      String hostName,
-      ACLType aclType,
-      String ownerName,
-      boolean recursiveAccessCheck,
-      String sessionPolicy
-  ) {
+  public static RequestContext.Builder getBuilder(UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      ACLType aclType, String ownerName, boolean recursiveAccessCheck, String sessionPolicy) {
     return RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)

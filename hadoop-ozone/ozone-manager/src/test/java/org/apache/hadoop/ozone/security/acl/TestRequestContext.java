@@ -92,59 +92,28 @@ public class TestRequestContext {
     context = new RequestContext.Builder()
         .setSessionPolicy(policy)
         .build();
-    assertEquals(
-        policy,
-        context.getSessionPolicy(),
-        "sessionPolicy should be set via builder"
-    );
+    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via builder");
 
     context = new RequestContext(
-        "host",
-        null,
-        null,
-        "serviceId",
-        IAccessAuthorizer.ACLIdentityType.GROUP,
-        IAccessAuthorizer.ACLType.CREATE,
-        "owner",
-        true,
-        policy
-    );
+        "host", null, null, "serviceId", IAccessAuthorizer.ACLIdentityType.GROUP,
+        IAccessAuthorizer.ACLType.CREATE, "owner", true, policy);
     assertTrue(context.isRecursiveAccessCheck(), "recursiveAccessCheck should be true");
-    assertEquals(
-        policy,
-        context.getSessionPolicy(),
-        "sessionPolicy should be set via constructor"
-    );
+    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via constructor");
 
     context = RequestContext.getBuilder(
-        UserGroupInformation.createRemoteUser("user1"),
-            null,
-            null,
-            IAccessAuthorizer.ACLType.CREATE,
-            "volume1",
-            true
-        ).setSessionPolicy(policy)
+        UserGroupInformation.createRemoteUser("user1"), null, null,
+        IAccessAuthorizer.ACLType.CREATE, "volume1", true)
+        .setSessionPolicy(policy)
+        .build();
+    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via getBuilder + builder");
+
+    context = RequestContext.getBuilder(
+        UserGroupInformation.createRemoteUser("user1"), null, null,
+        IAccessAuthorizer.ACLType.CREATE, "volume1", true, policy)
         .build();
     assertEquals(
-        policy,
-        context.getSessionPolicy(),
-        "sessionPolicy should be set via getBuilder + builder"
-    );
-
-    context = RequestContext.getBuilder(
-        UserGroupInformation.createRemoteUser("user1"),
-            null,
-            null,
-            IAccessAuthorizer.ACLType.CREATE,
-            "volume1",
-            true,
-            policy
-        ).build();
-    assertEquals(
-        policy,
-        context.getSessionPolicy(),
-        "sessionPolicy should be set via getBuilder (all params) + builder"
-    );
+        policy, context.getSessionPolicy(),
+        "sessionPolicy should be set via getBuilder (all params) + builder");
   }
 
   private RequestContext getUserRequestContext(String username,

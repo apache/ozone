@@ -148,9 +148,7 @@ public abstract class OzoneObj implements IOzoneObj {
   }
 
   @Override
-  public boolean equals(
-      Object o
-  ) {
+  public boolean equals(Object o) {
     if (this == o) {
       return true;
     } else if (o == null || getClass() != o.getClass()) {
