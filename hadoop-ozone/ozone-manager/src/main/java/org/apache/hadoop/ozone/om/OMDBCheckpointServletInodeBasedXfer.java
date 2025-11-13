@@ -78,6 +78,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,7 +149,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
     Set<String> receivedSstFiles = extractFilesToExclude(sstParam);
     Path tmpdir = null;
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireWriteLock()) {
       tmpdir = Files.createTempDirectory(getBootstrapTempData().toPath(),
           "bootstrap-data-");
       if (tmpdir == null) {
