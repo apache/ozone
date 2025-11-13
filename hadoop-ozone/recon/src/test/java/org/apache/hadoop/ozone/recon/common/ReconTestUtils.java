@@ -15,17 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.ozone.recon.common;
 
-import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
+import java.net.InetSocketAddress;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 
 /**
- * In memory test table for String keys.
- * @param <V> Value type.
+ * This is a utility class for common code for test cases.
  */
-public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
-  @Override
-  public KeyValueIterator<String, V> iterator(String prefix, KeyValueIterator.Type type) {
-    return new MapBackedTableIterator<>(getMap(), prefix);
+public final class ReconTestUtils {
+
+  public static SCMNodeDetails getReconNodeDetails() {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
+    return builder.build();
+  }
+
+  private ReconTestUtils() {
+    // no instances
   }
 }

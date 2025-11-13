@@ -81,7 +81,6 @@ LOG4J2.PROPERTIES_appender.rolling.policies.time.interval=86400
 LOG4J2.PROPERTIES_appender.rolling.policies.size.type=SizeBasedTriggeringPolicy
 LOG4J2.PROPERTIES_appender.rolling.policies.size.size=64MB
 LOG4J2.PROPERTIES_loggers=audit
-LOG4J2.PROPERTIES_logger.audit.type=AsyncLogger
 LOG4J2.PROPERTIES_logger.audit.name=OMAudit
 LOG4J2.PROPERTIES_logger.audit.level=INFO
 LOG4J2.PROPERTIES_logger.audit.appenderRefs=rolling

@@ -136,8 +136,8 @@ public class TestECOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED);
     availableReplicas.add(excess);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(DELETE,
-        excess.getDatanodeDetails(), 5));
+    pendingOps.add(new ContainerReplicaOp(DELETE,
+        excess.getDatanodeDetails(), 5, null, Long.MAX_VALUE, 0));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         pendingOps);
   }

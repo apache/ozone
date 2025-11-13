@@ -1073,7 +1073,7 @@ public class TestECUnderReplicationHandler {
     Set<ContainerReplica> availableReplicas = createReplicas(3);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn, 4));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD, dn, 4, null, System.currentTimeMillis(), 0));
 
     /*
     Mock the placement policy. If the list of nodes to be excluded does not

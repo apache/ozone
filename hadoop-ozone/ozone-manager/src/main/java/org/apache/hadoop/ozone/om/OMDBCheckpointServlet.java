@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -684,21 +686,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
+    public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
       // First lock all the handlers.
+      List<UncheckedAutoCloseable> acquiredLocks = new ArrayList<>(locks.size());
       for (BootstrapStateHandler.Lock lock : locks) {
-        lock.lock();
+        acquiredLocks.add(lock.acquireWriteLock());
       }
 
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
-      return this;
+      return () -> acquiredLocks.forEach(UncheckedAutoCloseable::close);
     }
 
     @Override
-    public void unlock() {
-      locks.forEach(BootstrapStateHandler.Lock::unlock);
+    public UncheckedAutoCloseable acquireReadLock() {
+      throw new UnsupportedOperationException("Read locks are not supported for OMDBCheckpointServlet");
     }
   }
 }

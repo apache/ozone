@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -360,15 +361,14 @@ public class TestOMRatisSnapshots {
           }
           // If it is a hard link on the leader, it should be a hard
           // link on the follower
-          if (org.apache.hadoop.hdds.utils.IOUtils.getINode(leaderActiveSST)
-              .equals(org.apache.hadoop.hdds.utils.IOUtils.getINode(leaderSnapshotSST))) {
+          if (getINode(leaderActiveSST).equals(getINode(leaderSnapshotSST))) {
             Path followerSnapshotSST =
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
             assertEquals(
-                org.apache.hadoop.hdds.utils.IOUtils.getINode(followerActiveSST),
-                org.apache.hadoop.hdds.utils.IOUtils.getINode(followerSnapshotSST),
+                getINode(followerActiveSST),
+                getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
             hardLinkCount++;
           }
