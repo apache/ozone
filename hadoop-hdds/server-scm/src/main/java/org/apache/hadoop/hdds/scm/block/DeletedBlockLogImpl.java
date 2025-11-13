@@ -271,7 +271,7 @@ public class DeletedBlockLogImpl
 
   private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
       DeletedBlocksTransaction txn,
-      Set<DatanodeDetails> dnList) throws ContainerNotFoundException {
+      Set<DatanodeDetails> includedDnSet) throws ContainerNotFoundException {
     long containerId = txn.getContainerID();
     ContainerInfo containerInfo = containerManager
         .getContainer(ContainerID.valueOf(txn.getContainerID()));
@@ -282,7 +282,7 @@ public class DeletedBlockLogImpl
     Set<ContainerReplica> filtered = new HashSet<>(replicas.size());
     for (ContainerReplica r : replicas) {
       DatanodeDetails dn = r.getDatanodeDetails();
-      if (dnList.contains(dn)) {
+      if (includedDnSet.contains(dn)) {
         filtered.add(r);
       } else {
         LOG.debug("Filter out replica of Container {} on DN {} not in dnList.",
