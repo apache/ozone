@@ -226,13 +226,13 @@ public class DeletedBlockLogStateManagerImpl
     ArrayList<DeletedBlocksTransaction> transactions = new ArrayList<>();
     for (long txId: txIDs) {
       try {
+        if (deletingTxIDs.contains(txId)) {
+          LOG.debug("txId {} is already in deletingTxIDs.", txId);
+          continue;
+        }
         DeletedBlocksTransaction transaction = deletedTable.get(txId);
         if (transaction == null) {
           LOG.debug("txId {} is not found in deletedTable.", txId);
-          continue;
-        }
-        if (deletingTxIDs.contains(txId)) {
-          LOG.debug("txId {} is already in deletingTxIDs.", txId);
           continue;
         }
         transactions.add(transaction);
