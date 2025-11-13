@@ -300,11 +300,22 @@ public final class ServerUtils {
     return remoteUser != null ? remoteUser.getUserName() : null;
   }
 
-  public static String getDefaultRatisDirectory(ConfigurationSource conf) {
+  /**
+   * Get the default Ratis directory for a component when the specific
+   * configuration is not set. This creates a component-specific subdirectory
+   * under ozone.metadata.dirs to avoid conflicts when multiple components
+   * are colocated on the same host.
+   *
+   * @param conf Configuration source
+   * @param componentName Name of the component (e.g., "scm", "om", "dn")
+   * @return Path to the component-specific ratis directory
+   */
+  public static String getDefaultRatisDirectory(ConfigurationSource conf,
+                                                 String componentName) {
     LOG.warn("Storage directory for Ratis is not configured. It is a good " +
             "idea to map this to an SSD disk. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-    return (new File(metaDirPath, "ratis")).getPath();
+    return (new File(metaDirPath, componentName + ".ratis")).getPath();
   }
 }

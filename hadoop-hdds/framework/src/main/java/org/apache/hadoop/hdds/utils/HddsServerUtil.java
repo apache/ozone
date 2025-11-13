@@ -422,7 +422,7 @@ public final class HddsServerUtil {
 
     if (rawLocations.isEmpty()) {
       rawLocations = new ArrayList<>(1);
-      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf, "dn"));
     }
     return rawLocations;
   }

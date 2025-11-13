@@ -97,7 +97,7 @@ public final class SCMHAUtils {
             conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(scmRatisDirectory)) {
-      scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf);
+      scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf, "scm");
     }
     return scmRatisDirectory;
   }

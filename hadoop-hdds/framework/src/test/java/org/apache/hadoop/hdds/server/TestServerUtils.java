@@ -263,4 +263,42 @@ public class TestServerUtils {
         () -> ServerUtils.getOzoneMetaDirPath(conf));
   }
 
+  /**
+   * Test that SCM, OM, and Datanode colocated on the same host with only
+   * ozone.metadata.dirs configured don't conflict with Ratis directories.
+   */
+  @Test
+  public void testColocatedComponentsWithSharedMetadataDir() {
+    final File metaDir = new File(folder.toFile(), "sharedMetaDir");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Only configure ozone.metadata.dirs (the fallback config)
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      assertFalse(metaDir.exists());
+
+      // Test Ratis directories - each component should get its own with flat naming
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+
+      // Verify Ratis directories use flat naming pattern (component.ratis)
+      assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
+      assertEquals(new File(metaDir, "om.ratis").getPath(), omRatisDir);
+      assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
+
+      // Verify all Ratis directories are different
+      assertFalse(scmRatisDir.equals(omRatisDir));
+      assertFalse(scmRatisDir.equals(dnRatisDir));
+      assertFalse(omRatisDir.equals(dnRatisDir));
+
+      // Verify the base metadata dir exists
+      assertTrue(metaDir.exists());
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
 }
