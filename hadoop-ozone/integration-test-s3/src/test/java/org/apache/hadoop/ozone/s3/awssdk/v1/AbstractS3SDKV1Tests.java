@@ -86,6 +86,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,6 +123,7 @@ import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.kerby.util.Hex;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -1077,6 +1079,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   class PresignedUrlTests {
     private static final String BUCKET_NAME = "presigned-url-bucket";
     private static final String CONTENT = "bar";
+    private final byte[] requestBody = CONTENT.getBytes(StandardCharsets.UTF_8);
     // Set the presigned URL to expire after one hour.
     private final Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
 
@@ -1159,10 +1162,18 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
       URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      md.update(requestBody);
+      String sha256 = Hex.encode(md.digest()).toLowerCase();
+      Map<String, List<String>> headers = new HashMap<>();
+      List<String> sha256Value = new ArrayList<>();
+      sha256Value.add(sha256);
+      headers.put("x-amz-content-sha256", sha256Value);
+
       HttpURLConnection connection = null;
       try {
         connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
-            null, CONTENT.getBytes(StandardCharsets.UTF_8));
+            headers, requestBody);
         int responseCode = connection.getResponseCode();
         assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
         String actualContent;
@@ -1171,6 +1182,33 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
         }
         assertEquals(CONTENT, actualContent, "Downloaded content should match uploaded content");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+    }
+
+    @Test
+    public void testPresignedUrlPutObjectWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      // Test PutObjectRequest presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      Map<String, List<String>> headers = new HashMap<>();
+      List<String> sha256Value = new ArrayList<>();
+      sha256Value.add("wrong-sha245-value");
+      headers.put("x-amz-content-sha256", sha256Value);
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
+            headers, requestBody);
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
       } finally {
         if (connection != null) {
           connection.disconnect();
