@@ -55,11 +55,8 @@ public class TestS3AssumeRoleRequest {
   @BeforeEach
   public void setup() {
     ozoneManager = mock(OzoneManager.class);
-    when(
-        ozoneManager.getOmRpcServerAddr()
-    ).thenReturn(
-        new InetSocketAddress("localhost", 9876)
-    );
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(
+        new InetSocketAddress("localhost", 9876));
     context = ExecutionContext.of(1L, null);
   }
 
@@ -188,9 +185,7 @@ public class TestS3AssumeRoleRequest {
     assertThat(assumeRoleResponse.getSecretAccessKey().length()).isEqualTo(40);
 
     // AssumedRoleId: prefix AROA + 16 chars, followed by ":" and sessionName
-    assertThat(
-        assumeRoleResponse.getAssumedRoleId()
-    )
+    assertThat(assumeRoleResponse.getAssumedRoleId())
         .startsWith("AROA")
         .contains(":" + SESSION_NAME);
     final int expectedAssumedRoleIdLength = 4 + 16 + 1 + SESSION_NAME.length(); // 4 for AROA, 16 chars, 1 for ":"
@@ -223,65 +218,52 @@ public class TestS3AssumeRoleRequest {
   public void testValidateAndExtractRoleNameFromArnFailureCases() {
     // Improper structure
     final OMException e1 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("roleNoSlashNorColons")
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("roleNoSlashNorColons"));
     assertThat(e1.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e1.getMessage()).isEqualTo("Invalid role ARN: roleNoSlashNorColons");
 
     // Null
     final OMException e2 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(null)
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(null));
     assertThat(e2.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e2.getMessage()).isEqualTo("Role ARN is required");
 
     // String without role name
     final OMException e3 = assertThrows(
         OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/")
-    );
+        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/"));
     assertThat(e3.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e3.getMessage()).isEqualTo("Invalid role ARN: missing role name");
 
     // No role resource and no role name
     final OMException e4 = assertThrows(
         OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012")
-    );
+        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012"));
     assertThat(e4.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e4.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012");
 
     // No role resource but contains role name
     final OMException e5 = assertThrows(
         OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:WebRole")
-    );
+        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:WebRole"));
     assertThat(e5.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e5.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012:WebRole");
 
     // Empty string
     final OMException e6 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("")
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(""));
     assertThat(e6.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e6.getMessage()).isEqualTo("Role ARN is required");
 
     // String with only slash
     final OMException e7 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("/")
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("/"));
     assertThat(e7.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e7.getMessage()).isEqualTo("Role ARN length: 1 is not valid");
 
     // String with only whitespace
     final OMException e8 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("     ")
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("     "));
     assertThat(e8.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e8.getMessage()).isEqualTo("Role ARN is required");
 
@@ -289,17 +271,14 @@ public class TestS3AssumeRoleRequest {
     final String arnPrefixLen512 = repeat('q', 511) + "/"; // 511 chars + '/' = 512
     final String arnTooLongPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen512 + "RoleA";
     final OMException e9 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arnTooLongPath)
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arnTooLongPath));
     assertThat(e9.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e9.getMessage()).isEqualTo("Role path length must be between 1 and 512 characters");
 
     // Otherwise valid role ending in /
     final OMException e10 = assertThrows(
         OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/MyRole/")
-    );
+        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/MyRole/"));
     assertThat(e10.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e10.getMessage()).isEqualTo("Invalid role ARN: missing role name");  // MyRole/ is considered a path
 
@@ -307,9 +286,7 @@ public class TestS3AssumeRoleRequest {
     final String roleName65 = repeat('B', 65);
     final String roleArn65 = "arn:aws:iam::123456789012:role/" + roleName65;
     final OMException e11 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(roleArn65)
-    );
+        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(roleArn65));
     assertThat(e11.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(e11.getMessage()).isEqualTo("Invalid role name: " + roleName65);
   }
@@ -319,26 +296,17 @@ public class TestS3AssumeRoleRequest {
     final String chars = "ABC";
     final int length = 32;
     final String s = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
-        chars,
-        chars.length(),
-        length
-    );
+        chars, chars.length(), length);
     assertThat(s).hasSize(length).matches(Pattern.compile("^[ABC]{" + length + "}$"));
 
     // Test with length 0
     final String empty = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
-        "ABC",
-        3,
-        0
-    );
+        "ABC", 3, 0);
     assertThat(empty).isEmpty();
 
     // Test with length 1
     final String single = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
-        "XYZ",
-        3,
-        1
-    );
+        "XYZ", 3, 1);
     assertThat(single).hasSize(1).matches(Pattern.compile("^[XYZ]$"));
   }
 

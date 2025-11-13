@@ -36,8 +36,7 @@ public class S3AssumeRoleResponse extends OMClientResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
-                           BatchOperation batchOperation) throws IOException {
+  public void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
     // No database changes for assume role - it's stateless
   }
 }
