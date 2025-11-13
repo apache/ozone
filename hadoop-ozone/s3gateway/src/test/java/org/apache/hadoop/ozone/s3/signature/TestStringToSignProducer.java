@@ -24,6 +24,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -50,6 +51,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestStringToSignProducer {
 
+  private static final String EMPTY_CONTENT_SHA_256 =
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
           format(LocalDateTime.now());
 
@@ -59,7 +62,7 @@ public class TestStringToSignProducer {
     LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
     headers.put("Content-Length", "123");
     headers.put("Host", "0.0.0.0:9878");
-    headers.put("X-AMZ-Content-Sha256", "Content-SHA");
+    headers.put("X-AMZ-Content-Sha256", EMPTY_CONTENT_SHA_256);
     headers.put("X-AMZ-Date", DATETIME);
     headers.put("Content-Type", "ozone/mpu");
     headers.put(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "streaming");
@@ -67,11 +70,11 @@ public class TestStringToSignProducer {
     String canonicalRequest = "GET\n"
         + "/buckets\n"
         + "\n"
-        + "host:0.0.0.0:9878\nx-amz-content-sha256:Content-SHA\n"
+        + "host:0.0.0.0:9878\nx-amz-content-sha256:" + EMPTY_CONTENT_SHA_256 + "\n"
         + "x-amz-date:" + DATETIME + "\ncontent-type:streaming\n"
         + "\n"
         + "host;x-amz-content-sha256;x-amz-date;content-type\n"
-        + "Content-SHA";
+        + EMPTY_CONTENT_SHA_256;
 
     String authHeader =
         "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
@@ -131,6 +134,7 @@ public class TestStringToSignProducer {
     when(context.getUriInfo()).thenReturn(uriInfo);
     when(context.getMethod()).thenReturn(method);
     when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getEntityStream()).thenReturn(new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8)));
 
     return context;
   }
@@ -149,7 +153,7 @@ public class TestStringToSignProducer {
     headersMap1.putSingle("Authorization", authHeader);
     headersMap1.putSingle("Content-Type", "application/octet-stream");
     headersMap1.putSingle("Host", "0.0.0.0:9878");
-    headersMap1.putSingle("X-Amz-Content-Sha256", "Content-SHA");
+    headersMap1.putSingle("X-Amz-Content-Sha256", EMPTY_CONTENT_SHA_256);
     headersMap1.putSingle("X-Amz-Date", DATETIME);
     //Missing X-Amz-Date Header
     MultivaluedMap<String, String> headersMap2 =
@@ -248,7 +252,7 @@ public class TestStringToSignProducer {
     headerMap.putSingle("Content-Length", "123");
     headerMap.putSingle("content-type", "application/octet-stream");
     headerMap.putSingle("host", "0.0.0.0:9878");
-    headerMap.putSingle("x-amz-content-sha256", "Content-SHA");
+    headerMap.putSingle("x-amz-content-sha256", EMPTY_CONTENT_SHA_256);
     headerMap.putSingle("x-amz-date", DATETIME);
     headerMap.putSingle("x-amz-security-token", "dummy");
     ContainerRequestContext context = setupContext(

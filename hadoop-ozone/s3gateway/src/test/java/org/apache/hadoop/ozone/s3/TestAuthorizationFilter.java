@@ -66,6 +66,7 @@ public class TestAuthorizationFilter {
       format(LocalDateTime.now());
 
   private static final String CURDATE = DATE_FORMATTER.format(LocalDate.now());
+  private static final String EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
   private static Stream<Arguments>testAuthFilterFailuresInput() {
     return Stream.of(
@@ -179,7 +180,7 @@ public class TestAuthorizationFilter {
                 "65f46a14cd745ad",
             "Content-SHA",
             "s3g:9878",
-            "Content-SHA",
+            EMPTY_SHA256,
             DATETIME,
             "",
             "/bucket1/key1"
@@ -196,7 +197,7 @@ public class TestAuthorizationFilter {
                 "65f46a14cd745ad",
             "Content-SHA",
             "bucket1.s3g.internal:9878",
-            "Content-SHA",
+            EMPTY_SHA256,
             DATETIME,
             "",
             "/key1"
@@ -291,7 +292,7 @@ public class TestAuthorizationFilter {
         .thenReturn(queryMap);
     when(context.getUriInfo().getPathParameters())
         .thenReturn(pathParamsMap);
-
+    when(context.getEntityStream()).thenReturn(new java.io.ByteArrayInputStream(new byte[0]));
     return context;
   }
 
