@@ -520,10 +520,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
       if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfo.setMetadata(dbOpenKeyInfo.getMetadata());
+        omKeyInfo = omKeyInfo.withMetadata(dbOpenKeyInfo.getMetadata());
       }
-      omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
-          multipartUploadedKeyHash(partKeyInfoMap));
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      omKeyInfo = omKeyInfo.withMetadataMutations(
+          metadata -> metadata.put(OzoneConsts.ETAG, multipartHash));
       if (dbOpenKeyInfo.getTags() != null) {
         omKeyInfo.setTags(dbOpenKeyInfo.getTags());
       }

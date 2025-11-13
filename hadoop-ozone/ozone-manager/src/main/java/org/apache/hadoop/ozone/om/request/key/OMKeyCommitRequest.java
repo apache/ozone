@@ -274,7 +274,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         dbOpenKeyToDeleteKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             keyName, Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
-        openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
+        openKeyToDelete = openKeyToDelete.withMetadataMutations(
+            metadata -> metadata.put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true"));
         openKeyToDelete.setModificationTime(Time.now());
         openKeyToDelete.setUpdateID(trxnLogIndex);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -288,7 +289,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (isHSync) {
         if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey)) {
           // Update open key as well if it is the first hsync of this key
-          omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+          omKeyInfo = omKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString));
           newOpenKeyInfo = omKeyInfo.copyObject();
         }
       }
@@ -298,8 +300,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // not persisted in the key table.
       omKeyInfo.setExpectedDataGeneration(null);
 
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getMetadataList()));
+      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
+          metadata.putAll(KeyValueUtil.getFromProtobuf(
+              commitKeyArgs.getMetadataList())));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       // Update the block length for each block, return the allocated but
@@ -343,9 +346,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         long totalNamespace = 0;
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
           oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
-          for (OmKeyInfo olderKeyVersions : oldVerKeyInfo.getOmKeyInfoList()) {
-            olderKeyVersions.setCommittedKeyDeletedFlag(true);
-            totalSize += sumBlockLengths(olderKeyVersions);
+          List<OmKeyInfo> oldKeys = oldVerKeyInfo.getOmKeyInfoList();
+          for (int i = 0; i < oldKeys.size(); i++) {
+            OmKeyInfo updatedOlderKeyVersions =
+                oldKeys.get(i).withCommittedKeyDeletedFlag(true);
+            oldKeys.set(i, updatedOlderKeyVersions);
+            totalSize += sumBlockLengths(updatedOlderKeyVersions);
             totalNamespace += 1;
           }
         }
@@ -379,9 +385,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             dbOpenKey, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
-        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        omKeyInfo = omKeyInfo.withMetadataMutations(
+            metadata -> metadata.remove(OzoneConsts.HSYNC_CLIENT_ID));
         if (isRecovery) {
-          omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
+          omKeyInfo = omKeyInfo.withMetadataMutations(
+              metadata -> metadata.remove(OzoneConsts.LEASE_RECOVERY));
         }
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable

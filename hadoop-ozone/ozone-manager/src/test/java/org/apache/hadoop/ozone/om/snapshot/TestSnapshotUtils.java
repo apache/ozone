@@ -68,7 +68,8 @@ public class TestSnapshotUtils {
         .setObjectID(objectId)
         .build();
     if (hsync) {
-      keyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+      keyInfo = keyInfo.withMetadataMutations(metadata ->
+          metadata.put(OzoneConsts.HSYNC_CLIENT_ID, "clientid"));
     }
     return keyInfo;
   }
