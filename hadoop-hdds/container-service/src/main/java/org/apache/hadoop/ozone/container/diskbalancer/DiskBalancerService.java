@@ -43,10 +43,10 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -95,9 +95,9 @@ public class DiskBalancerService extends BackgroundService {
   private boolean stopAfterDiskEven;
   private DiskBalancerVersion version;
 
-  // State field using the new enum
-  private volatile DiskBalancerOperationalState operationalState =
-      DiskBalancerOperationalState.STOPPED;
+  // State field using proto enum
+  private volatile DiskBalancerRunningStatus operationalState =
+      DiskBalancerRunningStatus.STOPPED;
 
   private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
@@ -124,31 +124,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
   private long containerDefaultSize;
-
-  /**
-   * Defines the operational states of the DiskBalancerService.
-   */
-  public enum DiskBalancerOperationalState {
-    /**
-     * DiskBalancer is stopped and will not run unless explicitly started.
-     * This is the initial state, can be set by admin STOP commands,
-     * or if the balancer stops itself after disks are even.
-     */
-    STOPPED,
-
-    /**
-     * DiskBalancer is running normally.
-     * The service is actively performing disk balancing operations.
-     */
-    RUNNING,
-
-    /**
-     * DiskBalancer was running but is temporarily paused due to node state changes
-     * (e.g., node entering maintenance or decommissioning).
-     * When the node returns to IN_SERVICE, it can resume to RUNNING state.
-     */
-    PAUSED_BY_NODE_STATE
-  }
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -264,7 +239,7 @@ public class DiskBalancerService extends BackgroundService {
    * @param diskBalancerInfo The DiskBalancerInfo containing shouldRun and paused flags.
    */
   private void updateOperationalStateFromInfo(DiskBalancerInfo diskBalancerInfo) {
-    DiskBalancerOperationalState newOperationalState = diskBalancerInfo.getOperationalState();
+    DiskBalancerRunningStatus newOperationalState = diskBalancerInfo.getOperationalState();
 
     if (this.operationalState != newOperationalState) {
       LOG.info("DiskBalancer operational state changing from {} to {} " +
@@ -362,8 +337,8 @@ public class DiskBalancerService extends BackgroundService {
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
-    if (this.operationalState == DiskBalancerOperationalState.STOPPED ||
-        this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
+    if (this.operationalState == DiskBalancerRunningStatus.STOPPED ||
+        this.operationalState == DiskBalancerRunningStatus.PAUSED) {
       return queue;
     }
     metrics.incrRunningLoopCount();
@@ -407,7 +382,7 @@ public class DiskBalancerService extends BackgroundService {
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
             " the property StopAfterDiskEven is set to true.");
-        this.operationalState = DiskBalancerOperationalState.STOPPED;
+        this.operationalState = DiskBalancerRunningStatus.STOPPED;
         try {
           // Persist the updated shouldRun status into the YAML file
           writeDiskBalancerInfoTo(getDiskBalancerInfo(), diskBalancerInfoFile);
@@ -626,7 +601,7 @@ public class DiskBalancerService extends BackgroundService {
     volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(immutableVolumeSet, deltaSizes);
 
     long bytesToMove = 0;
-    if (this.operationalState == DiskBalancerOperationalState.RUNNING) {
+    if (this.operationalState == DiskBalancerRunningStatus.RUNNING) {
       // this calculates live changes in bytesToMove
       // calculate bytes to move if the balancer is in a running state, else 0.
       bytesToMove = calculateBytesToMove(immutableVolumeSet);
@@ -719,19 +694,19 @@ public class DiskBalancerService extends BackgroundService {
    * Handle state changes for DiskBalancerService.
    */
   public synchronized void nodeStateUpdated(HddsProtos.NodeOperationalState state) {
-    DiskBalancerOperationalState originalServiceState = this.operationalState;
+    DiskBalancerRunningStatus originalServiceState = this.operationalState;
     boolean stateChanged = false;
 
     if ((state == HddsProtos.NodeOperationalState.DECOMMISSIONING ||
         state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) &&
-        this.operationalState == DiskBalancerOperationalState.RUNNING) {
+        this.operationalState == DiskBalancerRunningStatus.RUNNING) {
       LOG.info("Stopping DiskBalancerService as Node state changed to {}.", state);
-      this.operationalState = DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
+      this.operationalState = DiskBalancerRunningStatus.PAUSED;
       stateChanged = true;
     } else if (state == HddsProtos.NodeOperationalState.IN_SERVICE &&
-        this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
+        this.operationalState == DiskBalancerRunningStatus.PAUSED) {
       LOG.info("Resuming DiskBalancerService to running state as Node state changed to {}. ", state);
-      this.operationalState = DiskBalancerOperationalState.RUNNING;
+      this.operationalState = DiskBalancerRunningStatus.RUNNING;
       stateChanged = true;
     }
 

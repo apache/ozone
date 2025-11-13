@@ -59,8 +59,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -78,14 +76,11 @@ public class TestHeartbeatEndpointTask {
       new InetSocketAddress("test-scm-1", 9861);
 
   private DatanodeStateMachine datanodeStateMachine;
-  private OzoneContainer container;
 
   @BeforeEach
   public void setup() {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
-    container = mock(OzoneContainer.class);
-    when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(
-        DiskBalancerOperationalState.RUNNING, 10, 20, 30, true));
+    OzoneContainer container = mock(OzoneContainer.class);
     when(datanodeStateMachine.getContainer()).thenReturn(container);
     PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
     when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());
@@ -357,8 +352,6 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    DiskBalancerInfo mockInfo = container.getDiskBalancerInfo();
-
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
@@ -367,7 +360,6 @@ public class TestHeartbeatEndpointTask {
     context.addIncrementalReport(
         CommandStatusReportsProto.getDefaultInstance());
     context.addContainerAction(getContainerAction());
-    context.refreshFullReport(mockInfo.toDiskBalancerReportProto());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     assertTrue(heartbeat.hasDatanodeDetails());
@@ -383,7 +375,6 @@ public class TestHeartbeatEndpointTask {
       assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
           queueCount.getCount(i));
     }
-    assertTrue(heartbeat.hasDiskBalancerReport());
   }
 
   /**

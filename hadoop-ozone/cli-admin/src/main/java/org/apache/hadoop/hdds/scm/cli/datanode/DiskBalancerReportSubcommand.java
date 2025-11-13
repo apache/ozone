@@ -21,35 +21,60 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
+import org.apache.hadoop.ozone.ClientVersion;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 /**
- * Handler to get Datanode Volume Density report.
+ * Handler to get disk balancer report.
  */
 @Command(
     name = "report",
-    description = "Get Datanode Volume Density Report",
+    description = "Get DiskBalancer volume density report",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DiskBalancerReportSubcommand extends ScmSubcommand {
-  @Option(names = {"-c", "--count"},
-      description = "Result count to return. Sort by Volume Density " +
-          "in descending order. Defaults to 25")
-  private int count = 25;
+public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand {
+
+  private final List<HddsProtos.DatanodeDiskBalancerInfoProto> reports = new ArrayList<>();
 
   @Override
-  public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> resultProto =
-        scmClient.getDiskBalancerReport(count);
-    System.out.println(generateReport(resultProto));
+  protected boolean executeCommand(String hostName) {
+    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName)) {
+      HddsProtos.DatanodeDiskBalancerInfoProto report = 
+          diskBalancerProxy.getDiskBalancerInfo(
+              DatanodeDiskBalancerInfoType.REPORT,
+              ClientVersion.CURRENT_VERSION);
+      reports.add(report);
+      return true;
+    } catch (IOException e) {
+      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
+      return false;
+    }
   }
 
-  private String generateReport(
-      List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
+  @Override
+  protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+    if (!failedNodes.isEmpty()) {
+      System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n", 
+          String.join(", ", failedNodes));
+    }
+
+    // Display consolidated report for successful nodes
+    if (!reports.isEmpty()) {
+      System.out.println(generateReport(reports));
+    }
+  }
+
+  private String generateReport(List<DatanodeDiskBalancerInfoProto> protos) {
+    // Sort by volume density in descending order (highest imbalance first)
+    List<DatanodeDiskBalancerInfoProto> sortedProtos = new ArrayList<>(protos);
+    sortedProtos.sort((a, b) ->
+        Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
+
     StringBuilder formatBuilder = new StringBuilder("Report result:%n" +
         "%-50s %s%n");
 
@@ -57,7 +82,7 @@ public class DiskBalancerReportSubcommand extends ScmSubcommand {
     contentList.add("Datanode");
     contentList.add("VolumeDensity");
 
-    for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
+    for (DatanodeDiskBalancerInfoProto proto : sortedProtos) {
       formatBuilder.append("%-50s %s%n");
       contentList.add(proto.getNode().getHostName());
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));

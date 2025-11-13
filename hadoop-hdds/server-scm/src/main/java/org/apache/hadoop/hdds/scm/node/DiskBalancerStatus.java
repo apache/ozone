@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
-import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

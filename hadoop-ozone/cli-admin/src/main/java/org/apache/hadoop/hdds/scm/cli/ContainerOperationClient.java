@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
 import com.google.common.base.Preconditions;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -589,45 +588,6 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public String getMetrics(String query) throws IOException {
     return storageContainerLocationClient.getMetrics(query);
-  }
-
-  @Override
-  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
-      int count) throws IOException {
-    return storageContainerLocationClient.getDiskBalancerReport(count,
-        ClientVersion.CURRENT_VERSION);
-  }
-
-  @Override
-  public List<DatanodeAdminError> startDiskBalancer(@Nullable Double threshold,
-      @Nullable Long bandwidthInMB, @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven,
-      @Nullable List<String> hosts) throws IOException {
-    return storageContainerLocationClient.startDiskBalancer(threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
-  }
-
-  @Override
-  public List<DatanodeAdminError> stopDiskBalancer(@Nullable List<String> hosts)
-      throws IOException {
-    return storageContainerLocationClient.stopDiskBalancer(hosts);
-  }
-
-  @Override
-  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      @Nullable List<String> hosts,
-      @Nullable HddsProtos.DiskBalancerRunningStatus runningStatus)
-      throws IOException {
-    return storageContainerLocationClient.getDiskBalancerStatus(hosts,
-        runningStatus, ClientVersion.CURRENT_VERSION);
-  }
-
-  @Override
-  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      @Nullable Double threshold, @Nullable Long bandwidth,
-      @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
-      throws IOException {
-    return storageContainerLocationClient.updateDiskBalancerConfiguration(
-        threshold, bandwidth, parallelThread, stopAfterDiskEven, hosts);
   }
 
   @Override

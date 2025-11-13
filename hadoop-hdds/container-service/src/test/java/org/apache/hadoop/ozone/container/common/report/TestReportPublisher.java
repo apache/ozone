@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -26,9 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -36,14 +33,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.junit.jupiter.api.BeforeAll;
@@ -172,46 +164,6 @@ public class TestReportPublisher {
         ((CommandStatusReportPublisher) publisher).getReport()
             .getCmdStatusCount(),
         "Should publish report with 2 status objects");
-    executorService.shutdown();
-  }
-
-  @Test
-  public void testDiskBalancerReportPublisher() throws IOException {
-    StateContext dummyContext = mock(StateContext.class);
-    DatanodeStateMachine dummyStateMachine =
-        mock(DatanodeStateMachine.class);
-    OzoneContainer dummyContainer = mock(OzoneContainer.class);
-    DiskBalancerInfo dummyInfo = mock(DiskBalancerInfo.class);
-
-    DiskBalancerReportProto.Builder builder = DiskBalancerReportProto.newBuilder();
-    builder.setIsRunning(true);
-    builder.setBalancedBytes(1L);
-    builder.setDiskBalancerConf(
-        HddsProtos.DiskBalancerConfigurationProto.newBuilder().build());
-    DiskBalancerReportProto dummyReport = builder.build();
-
-    ReportPublisher publisher = new DiskBalancerReportPublisher();
-    when(dummyContext.getParent()).thenReturn(dummyStateMachine);
-    when(dummyStateMachine.getContainer()).thenReturn(dummyContainer);
-    when(dummyContainer.getDiskBalancerInfo()).thenReturn(dummyInfo);
-    when(dummyInfo.toDiskBalancerReportProto()).thenReturn(dummyReport);
-    publisher.setConf(config);
-
-    ScheduledExecutorService executorService = HadoopExecutors
-        .newScheduledThreadPool(1,
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
-    publisher.init(dummyContext, executorService);
-    Message report =
-        ((DiskBalancerReportPublisher) publisher).getReport();
-    assertNotNull(report);
-    for (Descriptors.FieldDescriptor descriptor :
-        report.getDescriptorForType().getFields()) {
-      if (descriptor.getNumber() ==
-          DiskBalancerReportProto.ISRUNNING_FIELD_NUMBER) {
-        assertEquals(true, report.getField(descriptor));
-      }
-    }
     executorService.shutdown();
   }
 }

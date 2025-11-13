@@ -95,7 +95,6 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
@@ -438,12 +437,6 @@ public class SCMDatanodeProtocolServer implements
           .setCommandType(reconcileContainerCommand)
           .setReconcileContainerCommandProto(
               ((ReconcileContainerCommand)cmd).getProto())
-          .build();
-
-    case diskBalancerCommand:
-      return builder
-          .setCommandType(SCMCommandProto.Type.diskBalancerCommand)
-          .setDiskBalancerCommandProto(((DiskBalancerCommand)cmd).getProto())
           .build();
     default:
       throw new IllegalArgumentException("Scm command " +

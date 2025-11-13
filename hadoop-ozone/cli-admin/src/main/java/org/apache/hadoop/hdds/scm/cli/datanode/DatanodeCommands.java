@@ -37,7 +37,7 @@ import picocli.CommandLine;
         RecommissionSubCommand.class,
         StatusSubCommand.class,
         UsageInfoSubcommand.class,
-        DiskBalancerCommands.class
+        DiskBalancerCommands.class,
     })
 @MetaInfServices(AdminSubcommand.class)
 public class DatanodeCommands implements AdminSubcommand {

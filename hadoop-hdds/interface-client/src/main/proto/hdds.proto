@@ -561,7 +561,7 @@ message DiskBalancerConfigurationProto {
 enum DiskBalancerRunningStatus {
     RUNNING = 1;
     STOPPED = 2;
-    UNKNOWN = 3;
+    PAUSED = 3;
 }
 
 enum DiskBalancerOpType{

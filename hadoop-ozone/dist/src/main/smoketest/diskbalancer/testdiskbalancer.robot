@@ -18,24 +18,31 @@ Documentation       Test ozone admin datanode diskbalancer command
 Library             OperatingSystem
 Resource            ../commonlib.robot
 
-** Test Cases ***
-Check failure with non-admin user to start, stop and update diskbalancer
-    Requires admin privilege     ozone admin datanode diskbalancer start -a
-    Requires admin privilege     ozone admin datanode diskbalancer stop -a
-    Requires admin privilege     ozone admin datanode diskbalancer update -t 0.0002 -a
+*** Test Cases ***
+# TODO: HDDS-13878 - DiskBalancer robot tests need to be updated for direct client-to-DN communication
+# The following test cases are commented out and will be implemented as part of HDDS-13878:
+#
+# 1. Check failure with non-admin user to start, stop and update diskbalancer
+#    - Test that non-admin users cannot execute start, stop, update commands
+#    - Verify proper access denied error messages
+#
+# 2. Check success with admin user for start, stop and update diskbalancer
+#    - Test --in-service-datanodes option for batch operations
+#    - Verify start, stop, and update commands work correctly with admin privileges
+#    - Validate success messages for batch operations
+#
+# 3. Check success with non-admin user for status and report diskbalancer
+#    - Test that non-admin users can access read-only operations (status, report)
+#    - Verify status and report output format
+#    - Test --in-service-datanodes option for read-only operations
+#
+# 4. Check diskbalancer with specific datanodes
+#    - Test -d/--datanodes option with specific datanode addresses
+#    - Verify hostname extraction from datanode list
+#    - Test commands with multiple specific datanodes
+#    - Validate output format for specific datanode operations
+#
 
-Check success with admin user for start, stop and update diskbalancer
-    Run Keyword         Kinit test user                 testuser                testuser.keytab
-    ${result} =         Execute                         ozone admin datanode diskbalancer start -a
-                        Should Contain                  ${result}                Starting DiskBalancer on datanode(s)
-    ${result} =         Execute                         ozone admin datanode diskbalancer stop -a
-                        Should Contain                  ${result}                Stopping DiskBalancer on datanode(s)
-    ${result} =         Execute                         ozone admin datanode diskbalancer update -t 0.0002 -a
-                        Should Contain                  ${result}                Update DiskBalancer Configuration on datanode(s)
-
-Check success with non-admin user for status and report diskbalancer
-    Run Keyword         Kinit test user                 testuser2               testuser2.keytab
-    ${result} =         Execute                         ozone admin datanode diskbalancer status
-                        Should Contain                  ${result}                Status result:
-    ${result} =         Execute                         ozone admin datanode diskbalancer report
-                        Should Contain                  ${result}                Report result:
+# Placeholder test to prevent empty test suite error
+Diskbalancer tests pending implementation
+    Log    DiskBalancer tests will be implemented in HDDS-13878

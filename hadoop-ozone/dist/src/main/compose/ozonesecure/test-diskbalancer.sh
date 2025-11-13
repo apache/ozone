@@ -17,6 +17,8 @@
 
 #suite:diskbalancer
 
+# TODO: HDDS-13878 - DiskBalancer tests for secure clusters
+
 set -u -o pipefail
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -30,4 +32,8 @@ export COMPOSE_FILE=docker-compose.yaml:diskbalancer.yaml
 
 start_docker_env
 
-execute_robot_test scm diskbalancer
+# Temporarily disabled - see TODO above
+# execute_robot_test scm diskbalancer
+
+echo "DiskBalancer tests are temporarily disabled in secure mode (HDDS-13878)"
+exit 0

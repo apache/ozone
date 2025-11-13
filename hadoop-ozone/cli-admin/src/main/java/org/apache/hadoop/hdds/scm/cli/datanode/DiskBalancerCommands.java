@@ -17,61 +17,89 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine.Command;
 
 /**
- * Subcommand to group disk balancer related operations.
+ * DiskBalancer command group for managing disk space balancing on Ozone datanodes.
  *
  * <p>The balancer is a tool that balances space usage on an Ozone datanode
  * when some disks become full or when new empty disks were added to a datanode.
  *
- * <p>SYNOPSIS
+ * <h2>SYNOPSIS</h2>
  * <pre>
  * To start:
- *      ozone admin datanode diskbalancer start
+ *      ozone admin datanode diskbalancer start -d {@literal <host[:port]>}
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
- *      [ -a/--all {@literal <alldatanodes>}]
- *      [ -d/--datanodes {@literal <datanodes>}]
- *      [ {@literal <hosts>}]
+ *
  *      Examples:
- *      ozone admin datanode diskbalancer start -d {@literal <hosts>}
- *        start balancer with default values in the configuration on specified
- *        datanodes
- *      ozone admin datanode diskbalancer start -a
- *        start balancer with default values in the configuration on all
- *        datanodes in the cluster and stops automatically after balancing
- *      ozone admin datanode diskbalancer start -t 5 -d {@literal <hosts>}
- *        start balancer with a threshold of 5%
- *      ozone admin datanode diskbalancer start -b 20 -d {@literal <hosts>}
- *        start balancer with maximum 20MB/s diskbandwidth
- *      ozone admin datanode diskbalancer start -p 5 -d {@literal <hosts>}
- *        start balancer with 5 parallel thread on each datanode
- *      ozone admin datanode diskbalancer start -s=false -a}
- *        start balancer on each datanode and will keep running even after
- *        disks are balanced until stopped by the stop command.
+ *      ozone admin datanode diskbalancer start -d DN-1
+ *        Start balancer on DN-1 using default port (9858)
+ *
+ *      ozone admin datanode diskbalancer start -d 192.168.1.10:9858
+ *        Start balancer with explicit port specification
+ *
+ *      ozone admin datanode diskbalancer start -d DN-1,DN-2,DN-3
+ *        Start balancer on multiple datanodes (using default port)
+ *
+ *      ozone admin datanode diskbalancer start --datanodes DN-1:9858,DN-2:9999
+ *        Start balancer on multiple datanodes with explicit ports
+ *
+ *      ozone admin datanode diskbalancer start -d DN-1 -t 5
+ *        Start balancer with a threshold of 5%
+ *
+ *      ozone admin datanode diskbalancer start -d 192.168.1.10 -b 20
+ *        Start balancer with maximum 20MB/s disk bandwidth
+ *
+ *      ozone admin datanode diskbalancer start -d DN-1 -p 5
+ *        Start balancer with 5 parallel threads
+ *
+ *      ozone admin datanode diskbalancer start -d DN-1 -s false
+ *        Start balancer and keep running even after disks are balanced
+ *
  * To stop:
- *      ozone admin datanode diskbalancer stop -a
- *        stop diskblancer on all datanodes
- *      ozone admin datanode diskbalancer stop -d {@literal <hosts>};
- *        stop diskblancer on all datanodes
+ *      ozone admin datanode diskbalancer stop -d {@literal <host[:port]>}
+ *
+ *      Examples:
+ *      ozone admin datanode diskbalancer stop -d DN-1
+ *        Stop diskbalancer on DN-1 (using default port)
+ *
+ *      ozone admin datanode diskbalancer stop --datanodes DN-1,DN-2,DN-3
+ *        Stop diskbalancer on multiple datanodes
+ *
  * To update:
- *      ozone admin datanode diskbalancer update -a
- *        update diskblancer configuration on all datanodes
- *      ozone admin datanode diskbalancer update -d {@literal <hosts>};
- *        update diskblancer configuration on all datanodes
+ *      ozone admin datanode diskbalancer update -d {@literal <host[:port]>}
+ *      [ -t/--threshold {@literal <threshold>}]
+ *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
+ *      [ -p/--parallel-thread {@literal <parallelThread>}]
+ *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
+ *
+ *      Examples:
+ *      ozone admin datanode diskbalancer update -d DN-1 -t 10
+ *        Update diskbalancer threshold to 10% on DN-1
+ *
  * To get report:
- *      ozone admin datanode diskbalancer report -c 10
- *        retrieve at most 10 datanodes that needs diskbalance most
+ *      ozone admin datanode diskbalancer report -d {@literal <host[:port]>}
+ *
+ *      Examples:
+ *      ozone admin datanode diskbalancer report -d DN-1
+ *        Retrieve volume density report from DN-1
+ *
+ *      ozone admin datanode diskbalancer report --datanodes DN-1,DN-2,DN-3
+ *        Retrieve volume density report from multiple datanodes
+ *
  * To get status:
- *      ozone admin datanode diskbalancer status -s RUNNING -d
- *      {@literal <hosts>}
- *        return the diskbalancer status on datanodes where diskbalancer are in
- *        Running state
+ *      ozone admin datanode diskbalancer status -d {@literal <host[:port]>}
+ *
+ *      Examples:
+ *      ozone admin datanode diskbalancer status -d DN-1
+ *        Return the diskbalancer status on DN-1
+ *
+ *      ozone admin datanode diskbalancer status --datanodes DN-1,DN-2,DN-3
+ *        Return the diskbalancer status on multiple datanodes
  *
  * </pre>
  */
@@ -82,7 +110,6 @@ import picocli.CommandLine.Command;
         " To enable it, set 'hdds.datanode.disk.balancer.enabled' as true",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
-    hidden = true,
     subcommands = {
         DiskBalancerStartSubcommand.class,
         DiskBalancerStopSubcommand.class,
@@ -90,5 +117,5 @@ import picocli.CommandLine.Command;
         DiskBalancerReportSubcommand.class,
         DiskBalancerStatusSubcommand.class
     })
-public class DiskBalancerCommands implements AdminSubcommand {
+public class DiskBalancerCommands {
 }

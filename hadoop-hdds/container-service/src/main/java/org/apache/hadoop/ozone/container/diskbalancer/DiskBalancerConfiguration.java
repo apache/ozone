@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.storage;
+package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
@@ -294,3 +294,4 @@ public final class DiskBalancerConfiguration {
     return config;
   }
 }
+

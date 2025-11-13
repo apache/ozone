@@ -21,8 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.server.YamlUtils;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -92,7 +92,7 @@ public final class DiskBalancerYaml {
    * Datanode DiskBalancer Info to be written to the yaml file.
    */
   public static class DiskBalancerInfoYaml {
-    private DiskBalancerOperationalState operationalState;
+    private DiskBalancerRunningStatus operationalState;
     private double threshold;
     private long bandwidthInMB;
     private int parallelThread;
@@ -104,7 +104,7 @@ public final class DiskBalancerYaml {
       // Needed for snake-yaml introspection.
     }
 
-    private DiskBalancerInfoYaml(DiskBalancerOperationalState operationalState, double threshold,
+    private DiskBalancerInfoYaml(DiskBalancerRunningStatus operationalState, double threshold,
         long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, int version) {
       this.operationalState = operationalState;
       this.threshold = threshold;
@@ -114,11 +114,11 @@ public final class DiskBalancerYaml {
       this.version = version;
     }
 
-    public DiskBalancerOperationalState getOperationalState() {
+    public DiskBalancerRunningStatus getOperationalState() {
       return operationalState;
     }
 
-    public void setOperationalState(DiskBalancerOperationalState operationalState) {
+    public void setOperationalState(DiskBalancerRunningStatus operationalState) {
       this.operationalState = operationalState;
     }
 

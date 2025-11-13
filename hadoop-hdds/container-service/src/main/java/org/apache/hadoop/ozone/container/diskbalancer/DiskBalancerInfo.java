@@ -18,16 +18,13 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 
 /**
  * DiskBalancer's information to persist.
  */
 public class DiskBalancerInfo {
-  private DiskBalancerOperationalState operationalState;
+  private DiskBalancerRunningStatus operationalState;
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
@@ -39,13 +36,13 @@ public class DiskBalancerInfo {
   private long balancedBytes;
   private double volumeDataDensity;
 
-  public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
+  public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
     this(operationalState, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
         DiskBalancerVersion.DEFAULT_VERSION);
   }
 
-  public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
+  public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
     this.operationalState = operationalState;
     this.threshold = threshold;
@@ -56,7 +53,7 @@ public class DiskBalancerInfo {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
+  public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version,
       long successCount, long failureCount, long bytesToMove, long balancedBytes, double volumeDataDensity) {
     this.operationalState = operationalState;
@@ -75,9 +72,9 @@ public class DiskBalancerInfo {
   public DiskBalancerInfo(boolean shouldRun,
       DiskBalancerConfiguration diskBalancerConf) {
     if (shouldRun) {
-      this.operationalState = DiskBalancerOperationalState.RUNNING;
+      this.operationalState = DiskBalancerRunningStatus.RUNNING;
     } else {
-      this.operationalState = DiskBalancerOperationalState.STOPPED;
+      this.operationalState = DiskBalancerRunningStatus.STOPPED;
     }
     this.threshold = diskBalancerConf.getThreshold();
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
@@ -101,34 +98,16 @@ public class DiskBalancerInfo {
     }
   }
 
-  public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
-    DiskBalancerConfiguration conf = new DiskBalancerConfiguration(threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven);
-    HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
-
-    StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
-        StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.newBuilder();
-    builder.setIsRunning(this.operationalState == DiskBalancerOperationalState.RUNNING);
-    builder.setDiskBalancerConf(confProto);
-    builder.setSuccessMoveCount(successCount);
-    builder.setFailureMoveCount(failureCount);
-    builder.setBytesToMove(bytesToMove);
-    builder.setBalancedBytes(balancedBytes);
-    builder.setVolumeDataDensity(volumeDataDensity);
-    
-    return builder.build();
-  }
-
-  public DiskBalancerOperationalState getOperationalState() {
+  public DiskBalancerRunningStatus getOperationalState() {
     return operationalState;
   }
 
-  public void setOperationalState(DiskBalancerOperationalState operationalState) {
+  public void setOperationalState(DiskBalancerRunningStatus operationalState) {
     this.operationalState = operationalState;
   }
 
   public boolean isShouldRun() {
-    return this.operationalState == DiskBalancerOperationalState.RUNNING;
+    return this.operationalState == DiskBalancerRunningStatus.RUNNING;
   }
 
   public double getThreshold() {
@@ -164,7 +143,7 @@ public class DiskBalancerInfo {
   }
 
   public boolean isPaused() {
-    return this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
+    return this.operationalState == DiskBalancerRunningStatus.PAUSED;
   }
 
   public DiskBalancerVersion getVersion() {
@@ -173,6 +152,46 @@ public class DiskBalancerInfo {
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
+  }
+
+  public long getSuccessCount() {
+    return successCount;
+  }
+
+  public void setSuccessCount(long successCount) {
+    this.successCount = successCount;
+  }
+
+  public long getFailureCount() {
+    return failureCount;
+  }
+
+  public void setFailureCount(long failureCount) {
+    this.failureCount = failureCount;
+  }
+
+  public long getBytesToMove() {
+    return bytesToMove;
+  }
+
+  public void setBytesToMove(long bytesToMove) {
+    this.bytesToMove = bytesToMove;
+  }
+
+  public long getBalancedBytes() {
+    return balancedBytes;
+  }
+
+  public void setBalancedBytes(long balancedBytes) {
+    this.balancedBytes = balancedBytes;
+  }
+
+  public double getVolumeDataDensity() {
+    return volumeDataDensity;
+  }
+
+  public void setVolumeDataDensity(double volumeDataDensity) {
+    this.volumeDataDensity = volumeDataDensity;
   }
 
   @Override

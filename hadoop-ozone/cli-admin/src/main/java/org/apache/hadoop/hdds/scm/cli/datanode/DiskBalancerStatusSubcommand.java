@@ -21,43 +21,54 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import picocli.CommandLine;
+import org.apache.hadoop.ozone.ClientVersion;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 /**
  * Handler to get disk balancer status.
  */
 @Command(
     name = "status",
-    description = "Get Datanode DiskBalancer Status for inServiceHealthy DNs",
+    description = "Get DiskBalancer status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DiskBalancerStatusSubcommand extends ScmSubcommand {
+public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand {
 
-  @Option(names = {"-s", "--state"},
-      description = "Display only datanodes with the given status: RUNNING, STOPPED, UNKNOWN.")
-  private HddsProtos.DiskBalancerRunningStatus state = null;
-
-  @CommandLine.Option(names = {"-d", "--datanodes"},
-      description = "Get diskBalancer status on specific datanodes.")
-  private List<String> hosts = new ArrayList<>();
+  private final List<HddsProtos.DatanodeDiskBalancerInfoProto> statuses = new ArrayList<>();
 
   @Override
-  public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> resultProto =
-        scmClient.getDiskBalancerStatus(
-            hosts.isEmpty() ? null : hosts,
-            state);
-
-    System.out.println(generateStatus(resultProto));
+  protected boolean executeCommand(String hostName) {
+    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName)) {
+      HddsProtos.DatanodeDiskBalancerInfoProto status = 
+          diskBalancerProxy.getDiskBalancerInfo(
+              DatanodeDiskBalancerInfoType.STATUS,
+              ClientVersion.CURRENT_VERSION);
+      statuses.add(status);
+      return true;
+    } catch (IOException e) {
+      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
+      return false;
+    }
   }
 
-  private String generateStatus(
-      List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
+  @Override
+  protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+    if (!failedNodes.isEmpty()) {
+      System.err.printf("Failed to get DiskBalancer status from nodes: [%s]%n", 
+          String.join(", ", failedNodes));
+    }
+
+    // Display consolidated status for successful nodes
+    if (!statuses.isEmpty()) {
+      System.out.println(generateStatus(statuses));
+    }
+  }
+
+  private String generateStatus(List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
         "%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
 
@@ -73,7 +84,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
     contentList.add("EstBytesToMove(MB)");
     contentList.add("EstTimeLeft(min)");
 
-    for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
+    for (HddsProtos.DatanodeDiskBalancerInfoProto proto : protos) {
       formatBuilder.append("%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesMovedMB = (long) Math.ceil(proto.getBytesMoved() / (1024.0 * 1024.0));

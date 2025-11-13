@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import picocli.CommandLine;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -36,7 +33,7 @@ import picocli.CommandLine.Option;
     description = "Start DiskBalancer",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DiskBalancerStartSubcommand extends ScmSubcommand {
+public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
@@ -56,36 +53,60 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
       description = "Stop DiskBalancer automatically after disk utilization is even.")
   private Boolean stopAfterDiskEven;
 
-  @CommandLine.Mixin
-  private DiskBalancerCommonOptions commonOptions =
-      new DiskBalancerCommonOptions();
-
   @Override
-  public void execute(ScmClient scmClient) throws IOException {
-    if (!commonOptions.check()) {
-      return;
-    }
-    List<DatanodeAdminError> errors =
-        scmClient.startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-            commonOptions.getSpecifiedDatanodes());
-
-    if (errors.isEmpty()) {
-      System.out.println("Starting DiskBalancer on datanode(s) " +
-          commonOptions.getHostString());
-    } else {
-      for (DatanodeAdminError error : errors) {
-        System.err.println("Error: " + error.getHostname() + ": "
-            + error.getError());
+  protected boolean executeCommand(String hostName) {
+    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName)) {
+      
+      // Build configuration if any parameters are specified
+      DiskBalancerConfigurationProto config = null;
+      if (threshold != null || bandwidthInMB != null || 
+          parallelThread != null || stopAfterDiskEven != null) {
+        DiskBalancerConfigurationProto.Builder builder =
+            DiskBalancerConfigurationProto.newBuilder();
+        if (threshold != null) {
+          builder.setThreshold(threshold);
+        }
+        if (bandwidthInMB != null) {
+          builder.setDiskBandwidthInMB(bandwidthInMB);
+        }
+        if (parallelThread != null) {
+          builder.setParallelThread(parallelThread);
+        }
+        if (stopAfterDiskEven != null) {
+          builder.setStopAfterDiskEven(stopAfterDiskEven);
+        }
+        config = builder.build();
       }
-      // Throwing the exception will cause a non-zero exit status for the
-      // command.
-      throw new IOException(
-          "Some nodes could not start DiskBalancer.");
+      
+      diskBalancerProxy.startDiskBalancer(config);
+      return true;
+    } catch (IOException e) {
+      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
+      return false;
     }
   }
 
-  @VisibleForTesting
-  public void setAllHosts(boolean allHosts) {
-    this.commonOptions.setAllHosts(allHosts);
+  @Override
+  protected void displayResults(List<String> successNodes,
+      List<String> failedNodes) {
+    if (isBatchMode()) {
+      if (!failedNodes.isEmpty()) {
+        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
+            String.join(", ", failedNodes));
+      } else {
+        System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
+      }
+    } else {
+      // Detailed message for specific nodes
+      if (!successNodes.isEmpty()) {
+        System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
+            String.join(", ", successNodes));
+      }
+      if (!failedNodes.isEmpty()) {
+        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
+            String.join(", ", failedNodes));
+      }
+    }
   }
 }

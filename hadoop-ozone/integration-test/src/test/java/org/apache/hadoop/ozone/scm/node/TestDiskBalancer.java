@@ -17,24 +17,12 @@
 
 package org.apache.hadoop.ozone.scm.node;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -42,16 +30,8 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
-import org.apache.hadoop.hdds.scm.node.DiskBalancerReportHandler;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,14 +39,14 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests disk balancer operations.
+ * TODO: HDDS-13598 - Rewrite tests for direct client-to-DN DiskBalancer communication
  */
+@Unhealthy("Tests need to be rewritten for direct client-to-DN communication")
 @Timeout(300)
 public class TestDiskBalancer {
 
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
-  private static DiskBalancerManager diskBalancerManager;
-  private static DiskBalancerReportHandler diskBalancerReportHandler;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -78,10 +58,6 @@ public class TestDiskBalancer {
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     storageClient = new ContainerOperationClient(ozoneConf);
     cluster.waitForClusterToBeReady();
-    diskBalancerManager = cluster.getStorageContainerManager()
-        .getDiskBalancerManager();
-    diskBalancerReportHandler =
-        new DiskBalancerReportHandler(diskBalancerManager);
 
     for (DatanodeDetails dn: cluster.getStorageContainerManager()
         .getScmNodeManager().getAllNodes()) {
@@ -99,118 +75,30 @@ public class TestDiskBalancer {
 
   @Test
   public void testDatanodeDiskBalancerReport() throws IOException {
-    // Populate disk balancer reports for all datanodes to avoid Double.NaN comparison issues.
-    for (DatanodeDetails dn : cluster.getStorageContainerManager()
-        .getScmNodeManager().getAllNodes()) {
-      diskBalancerReportHandler.onMessage(
-          new SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode(dn, generateRandomReport()), null);
-    }
-
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> reportProtoList =
-        storageClient.getDiskBalancerReport(2);
-
-    assertEquals(2, reportProtoList.size());
-    assertTrue(
-        reportProtoList.get(0).getCurrentVolumeDensitySum()
-        >= reportProtoList.get(1).getCurrentVolumeDensitySum());
+    // TODO: HDDS-13598 - Test that verifies:
+    //  1. Query DiskBalancer report from multiple DNs using direct client-to-DN RPC
+    //  2. Verify report contains volume density information for each DN
+    //  3. Verify reports are sorted by volume density (highest imbalance first)
+    //  Use direct client-to-DN communication to get reports from specific DNs
   }
 
   @Test
   public void testDiskBalancerStopAfterEven() throws IOException,
       InterruptedException, TimeoutException {
-    //capture LOG for DiskBalancerManager and DiskBalancerService
-    LogCapturer logCapturer = LogCapturer.captureLogs(DiskBalancerManager.LOG);
-    LogCapturer dnLogCapturer = LogCapturer.captureLogs(DiskBalancerService.class);
-
-    // Start DiskBalancer on all datanodes
-    diskBalancerManager.startDiskBalancer(
-        10.0, // threshold
-        10L,  // bandwidth in MB
-        5,    // parallel threads
-        true, // stopAfterDiskEven
-        null); // apply to all datanodes
-
-    // verify logs for all DNs has started
-    String logs = logCapturer.getOutput();
-    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-      String uuid = dn.getDatanodeDetails().getUuidString();
-      assertTrue(logs.contains("Sending diskBalancerCommand: opType=START") &&
-              logs.contains(uuid));
-    }
-
-    // Wait up to 5 seconds for all DNs to log the stop message
-    GenericTestUtils.waitFor(() -> {
-      String dnLogs = dnLogCapturer.getOutput();
-      long count = Arrays.stream(dnLogs.split("\n"))
-          .filter(line -> line.contains("Disk balancer is stopped due to disk even as" +
-              " the property StopAfterDiskEven is set to true"))
-          .count();
-      return count >= cluster.getHddsDatanodes().size();
-    }, 100, 10000); // check every 100ms, timeout after 10s
+    // TODO: HDDS-13598 - Test that verifies:
+    //  1. Start DiskBalancer on a DN using direct client-to-DN RPC
+    //  2. Update DiskBalancer to set stopAfterDiskEven=true using direct client-to-DN RPC
+    //  3. Wait for some time and query status to verify the RUNNING status changes to STOPPED
   }
 
   @Test
   public void testDatanodeDiskBalancerStatus() throws IOException, InterruptedException, TimeoutException {
-    List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-    DatanodeDetails toDecommission = dns.get(0).getDatanodeDetails();
-
-    diskBalancerManager.startDiskBalancer(
-        10.0, // threshold
-        10L,  // bandwidth in MB
-        5,    // parallel threads
-        true, // stopAfterDiskEven
-        null);
-
-    //all DNs IN_SERVICE, so disk balancer status for all should be present
-    List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
-        diskBalancerManager.getDiskBalancerStatus(null,
-            null,
-            ClientVersion.CURRENT_VERSION);
-    assertEquals(3, statusProtoList.size());
-
-    NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
-
-    // Decommission the first DN
-    storageClient.decommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)), false);
-    waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONING);
-
-    //one DN is in DECOMMISSIONING state, so disk balancer status for it should not be present
-    statusProtoList = diskBalancerManager.getDiskBalancerStatus(null,
-        null,
-        ClientVersion.CURRENT_VERSION);
-    assertEquals(2, statusProtoList.size());
-
-    // Check status for the decommissioned DN should not be present
-    statusProtoList = diskBalancerManager.getDiskBalancerStatus(
-        Collections.singletonList(getDNHostAndPort(toDecommission)),
-        null,
-        ClientVersion.CURRENT_VERSION);
-    assertEquals(0, statusProtoList.size());
-
-    storageClient.recommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)));
-    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
-
-    // Check status for the recommissioned DN should now be present
-    statusProtoList = diskBalancerManager.getDiskBalancerStatus(
-        Collections.singletonList(getDNHostAndPort(toDecommission)),
-        null,
-        ClientVersion.CURRENT_VERSION);
-    assertEquals(1, statusProtoList.size());
-  }
-
-  private DiskBalancerReportProto generateRandomReport() {
-    return DiskBalancerReportProto.newBuilder()
-        .setIsRunning(true)
-        .setBalancedBytes(1000)
-        .setVolumeDataDensity(Math.random() * 10)
-        .setDiskBalancerConf(
-            HddsProtos.DiskBalancerConfigurationProto.newBuilder()
-                .setThreshold(10)
-                .setParallelThread(2)
-                .setDiskBandwidthInMB(50)
-                .build())
-        .build();
+    // TODO: HDDS-13598 - Test that verifies:
+    //  1. Start DiskBalancer on all DNs using direct client-to-DN RPC
+    //  2. Query status from all DNs and verify all show RUNNING status
+    //  3. Decommission one DN and verify its status query returns appropriate state
+    //  4. Query status from remaining IN_SERVICE DNs and verify they still show RUNNING
+    //  5. Recommission the DN and verify its status can be queried again
+    //  Use direct client-to-DN communication for start/status operations on specific DNs
   }
 }
