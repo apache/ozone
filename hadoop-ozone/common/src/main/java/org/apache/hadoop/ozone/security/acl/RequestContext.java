@@ -71,7 +71,8 @@ public class RequestContext {
 
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip, UserGroupInformation clientUgi, String serviceId,
-      ACLIdentityType aclType, ACLType aclRights, String ownerName, boolean recursiveAccessCheck, String sessionPolicy) {
+      ACLIdentityType aclType, ACLType aclRights, String ownerName, boolean recursiveAccessCheck,
+      String sessionPolicy) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
