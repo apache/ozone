@@ -541,7 +541,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         user != null ? user : getRemoteUser(),
         remoteIp != null ? remoteIp :
             ozoneManager.getOmRpcServerAddr().getAddress(),
-        remoteIp != null ? remoteIp.getHostName() :
+        // We set Address directly to avoid reverse DNS lookup
+        remoteIp != null ? remoteIp.getHostAddress() :
             ozoneManager.getOmRpcServerAddr().getHostName());
   }
 
