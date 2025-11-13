@@ -102,7 +102,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -110,6 +109,7 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotVersion;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1212,8 +1212,8 @@ public class TestRocksDBCheckpointDiffer {
 
     Future<Boolean> future;
     // Take the lock and start the consumer.
-    try (BootstrapStateHandler.Lock lock =
-             differ.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock =
+             differ.getBootstrapStateLock().acquireWriteLock()) {
       future = executorService.submit(
           () -> {
             c.accept(differ);
