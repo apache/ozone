@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.admin.om.snapshot;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
@@ -41,10 +41,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class DefragSubCommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private SnapshotSubCommand parent;
+public class DefragSubCommand extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.Mixin
   private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
@@ -66,9 +63,7 @@ public class DefragSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    // Navigate up to get OMAdmin
-    OMAdmin omAdmin = getOMAdmin();
-    OzoneConfiguration conf = omAdmin.getParent().getOzoneConf();
+    OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceOption.getServiceID(), nodeId);
 
@@ -110,10 +105,5 @@ public class DefragSubCommand implements Callable<Void> {
         System.out.println("Snapshot defragmentation task failed or was interrupted.");
       }
     }
-  }
-
-  private OMAdmin getOMAdmin() {
-    // The parent hierarchy is: DefragSubCommand -> SnapshotSubCommand -> OMAdmin
-    return parent.getParent();
   }
 }
