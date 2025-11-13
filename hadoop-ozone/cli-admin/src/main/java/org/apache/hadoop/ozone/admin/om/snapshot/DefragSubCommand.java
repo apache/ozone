@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.admin.om.OMAdmin;
+import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -45,11 +46,8 @@ public class DefragSubCommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private SnapshotSubCommand parent;
 
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
       names = {"--node-id"},
@@ -72,7 +70,7 @@ public class DefragSubCommand implements Callable<Void> {
     OMAdmin omAdmin = getOMAdmin();
     OzoneConfiguration conf = omAdmin.getParent().getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
-        conf, omServiceId, nodeId);
+        conf, omServiceOption.getServiceID(), nodeId);
 
     if (omNodeDetails == null) {
       System.err.println("Error: OMNodeDetails could not be determined with given " +
