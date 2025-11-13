@@ -42,10 +42,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Unsupported Condition operator - StringLike",
-        NOT_SUPPORTED_OPERATION
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Unsupported Condition operator - StringLike", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -59,10 +57,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Unsupported Condition attribute - aws:SourceArn",
-        NOT_SUPPORTED_OPERATION
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Unsupported Condition attribute - aws:SourceArn", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -75,10 +71,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Unsupported Effect - Deny",
-        NOT_SUPPORTED_OPERATION
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Unsupported Effect - Deny", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -92,10 +86,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Invalid policy JSON - missing Statement",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Invalid policy JSON - missing Statement", INVALID_REQUEST);
   }
 
   @Test
@@ -108,10 +100,9 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
+        INVALID_REQUEST);
   }
 
   @Test
@@ -123,10 +114,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Effect is missing from JSON policy",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Effect is missing from JSON policy", INVALID_REQUEST);
   }
 
   @Test
@@ -153,10 +142,8 @@ public class TestIamSessionPolicyResolver {
         "  ]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Only one Condition is supported",
-        NOT_SUPPORTED_OPERATION
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Only one Condition is supported", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -172,11 +159,9 @@ public class TestIamSessionPolicyResolver {
         "  ]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Invalid Condition (must have operator StringEquals and attribute " +
-            "s3:prefix) - [\"RandomCondition\"]",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Invalid Condition (must have operator StringEquals and attribute " +
+        "s3:prefix) - [\"RandomCondition\"]", INVALID_REQUEST);
   }
 
   @Test
@@ -190,10 +175,8 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Missing Condition attribute - StringEquals",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Missing Condition attribute - StringEquals", INVALID_REQUEST);
   }
 
   @Test
@@ -207,30 +190,27 @@ public class TestIamSessionPolicyResolver {
         "  }]\n" +
         "}";
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Invalid Condition attribute structure - [{\"s3:prefix\":\"folder/\"}]",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Invalid Condition attribute structure - [{\"s3:prefix\":\"folder/\"}]",
+        INVALID_REQUEST);
   }
 
   @Test
   public void testInvalidJsonThrows() {
     final String invalidJson = "{[{{}]\"\"";
 
-    expectResolveThrowsForBothAuthorizers(invalidJson,
-        "Invalid policy JSON (most likely JSON structure is incorrect)",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        invalidJson, "Invalid policy JSON (most likely JSON structure is incorrect)",
+        INVALID_REQUEST);
   }
 
   @Test
   public void testJsonExceedsMaxLengthThrows() {
     final String json = createJsonStringLargerThan2048Characters();
 
-    expectResolveThrowsForBothAuthorizers(json,
-        "Invalid policy JSON - exceeds maximum length of 2048 characters",
-        INVALID_REQUEST
-    );
+    expectResolveThrowsForBothAuthorizers(
+        json, "Invalid policy JSON - exceeds maximum length of 2048 characters",
+        INVALID_REQUEST);
   }
 
   @Test
@@ -245,9 +225,8 @@ public class TestIamSessionPolicyResolver {
   }
 
   private static void expectResolveThrows(String json,
-                                          IamSessionPolicyResolver.AuthorizerType authorizerType,
-                                          String expectedMessage,
-                                          OMException.ResultCodes expectedCode) {
+      IamSessionPolicyResolver.AuthorizerType authorizerType, String expectedMessage,
+      OMException.ResultCodes expectedCode) {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, authorizerType);
       throw new AssertionError("Expected exception not thrown");
@@ -256,10 +235,9 @@ public class TestIamSessionPolicyResolver {
       assertThat(ex.getResult()).isEqualTo(expectedCode);
     }
   }
-
+  
   private static void expectResolveThrowsForBothAuthorizers(String json,
-                                                            String expectedMessage,
-                                                            OMException.ResultCodes expectedCode) {
+      String expectedMessage, OMException.ResultCodes expectedCode) {
     expectResolveThrows(json, IamSessionPolicyResolver.AuthorizerType.NATIVE, expectedMessage, expectedCode);
     expectResolveThrows(json, IamSessionPolicyResolver.AuthorizerType.RANGER, expectedMessage, expectedCode);
   }

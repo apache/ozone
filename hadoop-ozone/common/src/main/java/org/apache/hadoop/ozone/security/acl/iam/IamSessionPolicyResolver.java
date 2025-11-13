@@ -91,9 +91,8 @@ public final class IamSessionPolicyResolver {
    * the session policy grants (if any)
    * @throws OMException if the policy JSON is invalid, malformed, or contains unsupported features
    */
-  public static Set<AssumeRoleRequest.OzoneGrant> resolve(String policyJson,
-                                                          String volumeName,
-                                                          AuthorizerType authorizerType) throws OMException {
+  public static Set<AssumeRoleRequest.OzoneGrant> resolve(String policyJson, String volumeName,
+      AuthorizerType authorizerType) throws OMException {
 
     validateInputParameters(policyJson, volumeName, authorizerType);
 
@@ -122,12 +121,8 @@ public final class IamSessionPolicyResolver {
       final List<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
 
       // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
-      final Set<AssumeRoleRequest.OzoneGrant> stmtResults = createPathsAndPermissions(volumeName,
-          authorizerType,
-          mappedS3Actions,
-          resourceSpecs,
-          prefixes
-      );
+      final Set<AssumeRoleRequest.OzoneGrant> stmtResults = createPathsAndPermissions(
+          volumeName, authorizerType, mappedS3Actions, resourceSpecs, prefixes);
 
       result.addAll(stmtResults);
     }
@@ -138,9 +133,8 @@ public final class IamSessionPolicyResolver {
   /**
    * Ensures required input parameters are supplied.
    */
-  private static void validateInputParameters(String policyJson,
-                                              String volumeName,
-                                              AuthorizerType authorizerType) throws OMException {
+  private static void validateInputParameters(String policyJson, String volumeName,
+      AuthorizerType authorizerType) throws OMException {
     if (StringUtils.isBlank(policyJson)) {
       throw new OMException("The IAM session policy JSON is required", INVALID_REQUEST);
     }
@@ -197,8 +191,8 @@ public final class IamSessionPolicyResolver {
         return;
       }
 
-      throw new OMException("Invalid Effect in JSON policy (must be a String) - " +
-          effectNode, INVALID_REQUEST);
+      throw new OMException(
+          "Invalid Effect in JSON policy (must be a String) - " + effectNode, INVALID_REQUEST);
     }
 
     throw new OMException("Effect is missing from JSON policy", INVALID_REQUEST);
@@ -245,8 +239,9 @@ public final class IamSessionPolicyResolver {
       }
 
       if (!cond.isObject()) {
-        throw new OMException("Invalid Condition (must have operator StringEquals " +
-            "and attribute s3:prefix) - " + cond, INVALID_REQUEST);
+        throw new OMException(
+            "Invalid Condition (must have operator StringEquals " + "and attribute s3:prefix) - " +
+            cond, INVALID_REQUEST);
       }
 
       final String operator = cond.fieldNames().next();
@@ -293,7 +288,7 @@ public final class IamSessionPolicyResolver {
    * It also validates that the Resource Arn(s) are valid and supported.
    */
   private static List<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
-                                                                   List<String> resources) throws OMException {
+      List<String> resources) throws OMException {
     // TODO implement in future PR
     return Collections.emptyList();
   }
@@ -302,14 +297,9 @@ public final class IamSessionPolicyResolver {
    * Iterates over all resources, finds applicable actions (if any) and constructs
    * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
    */
-  private static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(
-      String volumeName,
-      AuthorizerType authorizerType,
-      Set<S3Action> mappedS3Actions,
-      List<ResourceSpec> resourceSpecs,
-      List<String> prefixes
-  ) {
-
+  private static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName,
+      AuthorizerType authorizerType, Set<S3Action> mappedS3Actions, List<ResourceSpec> resourceSpecs,
+      List<String> prefixes) {
     // TODO implement in future PR
     return Collections.emptySet();
   }
