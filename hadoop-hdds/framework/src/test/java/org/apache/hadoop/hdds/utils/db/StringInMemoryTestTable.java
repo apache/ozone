@@ -20,7 +20,8 @@ package org.apache.hadoop.hdds.utils.db;
 import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 
 /**
- *
+ * In memory test table for String keys.
+ * @param <V> Value type.
  */
 public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
   @Override
