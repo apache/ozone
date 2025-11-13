@@ -829,7 +829,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       internalGetSSTDiffList(src, dest, fwdDAGSameFiles, fwdDAGDifferentFiles);
     } else {
       Set<SstFileInfo> srcSstFileInfos = new HashSet<>(src.getSstFileMap().values());
-      Set<SstFileInfo> destSstFileInfos = new HashSet<>(src.getSstFileMap().values());
+      Set<SstFileInfo> destSstFileInfos = new HashSet<>(dest.getSstFileMap().values());
       for (SstFileInfo srcSstFileInfo : srcSstFileInfos) {
         if (destSstFileInfos.contains(srcSstFileInfo)) {
           fwdDAGSameFiles.put(srcSstFileInfo.getFileName(), srcSstFileInfo);
