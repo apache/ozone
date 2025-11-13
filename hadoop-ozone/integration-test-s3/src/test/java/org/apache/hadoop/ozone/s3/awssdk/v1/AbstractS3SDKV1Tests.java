@@ -1200,7 +1200,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
       Map<String, List<String>> headers = new HashMap<>();
       List<String> sha256Value = new ArrayList<>();
-      sha256Value.add("wrong-sha245-value");
+      sha256Value.add("wrong-sha256-value");
       headers.put("x-amz-content-sha256", sha256Value);
 
       HttpURLConnection connection = null;
