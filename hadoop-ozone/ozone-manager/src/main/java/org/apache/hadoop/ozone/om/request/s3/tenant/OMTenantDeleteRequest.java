@@ -96,19 +96,24 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     // Get tenant object by tenant name
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
 
+    final OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final OmDBTenantState dbTenantState =
+        omMetadataManager.getTenantStateTable().get(tenantId);
+    if (dbTenantState == null) {
+      LOG.debug("tenant: '{}' does not exist", tenantId);
+      throw new OMException("Tenant '" + tenantId + "' does not exist",
+          TENANT_NOT_FOUND);
+    }
+    final String volumeName = dbTenantState.getBucketNamespaceName();
+    Preconditions.checkNotNull(volumeName);
+
     // Perform ACL check during preExecute (WRITE_ACL on volume if applicable)
     if (ozoneManager.getAclsEnabled()) {
       try {
-        final OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-        final OmDBTenantState dbTenantState =
-            omMetadataManager.getTenantStateTable().get(tenantId);
-        if (dbTenantState != null) {
-          final String volumeName = dbTenantState.getBucketNamespaceName();
-          if (volumeName != null && !volumeName.isEmpty()) {
-            checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-                OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-                volumeName, null, null);
-          }
+        if (!volumeName.isEmpty()) {
+          checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+              OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+              volumeName, null, null);
         }
       } catch (IOException ex) {
         // Ensure audit log captures preExecute failures
