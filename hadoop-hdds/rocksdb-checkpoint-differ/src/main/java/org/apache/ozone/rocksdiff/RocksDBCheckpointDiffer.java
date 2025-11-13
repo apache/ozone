@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
@@ -1104,7 +1105,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           sstFileNodesRemoved);
     }
 
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock()) {
       removeSstFiles(sstFileNodesRemoved);
       removeKeyFromCompactionLogTable(keysToRemove);
     } catch (InterruptedException e) {
@@ -1266,7 +1267,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           nonLeafSstFiles);
     }
 
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock()) {
       removeSstFiles(nonLeafSstFiles);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -1325,7 +1326,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                 prunedSSTFilePath.toFile().getAbsolutePath());
 
             // Move pruned.sst.tmp => file.sst and replace existing file atomically.
-            try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+            try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock()) {
               Files.move(prunedSSTFilePath, sstFilePath,
                   StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             }

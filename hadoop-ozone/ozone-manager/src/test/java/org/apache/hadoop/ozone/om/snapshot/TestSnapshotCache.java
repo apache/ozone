@@ -81,45 +81,42 @@ class TestSnapshotCache {
   @BeforeAll
   static void beforeAll() throws Exception {
     cacheLoader = mock(CacheLoader.class);
-    // Create a difference mock OmSnapshot instance each time load() is called
-    when(cacheLoader.load(any())).thenAnswer(
-        (Answer<OmSnapshot>) invocation -> {
-          final OmSnapshot omSnapshot = mock(OmSnapshot.class);
-          // Mock the snapshotTable return value for the lookup inside release()
-          final UUID snapshotID = (UUID) invocation.getArguments()[0];
-          when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
-          when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
-
-          OMMetadataManager metadataManager = mock(OMMetadataManager.class);
-          org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
-          when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
-          when(metadataManager.getStore()).thenReturn(store);
-
-          Table<?, ?> table1 = mock(Table.class);
-          Table<?, ?> table2 = mock(Table.class);
-          Table<?, ?> keyTable = mock(Table.class);
-          when(table1.getName()).thenReturn("table1");
-          when(table2.getName()).thenReturn("table2");
-          when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
-          final List<Table<?, ?>> tables = new ArrayList<>();
-          tables.add(table1);
-          tables.add(table2);
-          tables.add(keyTable);
-          when(store.listTables()).thenReturn(tables);
-
-          return omSnapshot;
-        }
-    );
-
     // Set SnapshotCache log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(SnapshotCache.class, Level.DEBUG);
     lock = spy(new OmReadOnlyLock());
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     // Reset cache for each test case
     omMetrics = OMMetrics.create();
+    // Create a difference mock OmSnapshot instance each time load() is called
+    doAnswer((Answer<OmSnapshot>) invocation -> {
+      final OmSnapshot omSnapshot = mock(OmSnapshot.class);
+      // Mock the snapshotTable return value for the lookup inside release()
+      final UUID snapshotID = (UUID) invocation.getArguments()[0];
+      when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
+      when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
+
+      OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+      org.apache.hadoop.hdds.utils.db.DBStore store = mock(org.apache.hadoop.hdds.utils.db.DBStore.class);
+      when(omSnapshot.getMetadataManager()).thenReturn(metadataManager);
+      when(metadataManager.getStore()).thenReturn(store);
+
+      Table<?, ?> table1 = mock(Table.class);
+      Table<?, ?> table2 = mock(Table.class);
+      Table<?, ?> keyTable = mock(Table.class);
+      when(table1.getName()).thenReturn("table1");
+      when(table2.getName()).thenReturn("table2");
+      when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
+      final List<Table<?, ?>> tables = new ArrayList<>();
+      tables.add(table1);
+      tables.add(table2);
+      tables.add(keyTable);
+      when(store.listTables()).thenReturn(tables);
+
+      return omSnapshot;
+    }).when(cacheLoader).load(any(UUID.class));
     snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true, lock);
   }
 
@@ -152,6 +149,17 @@ class TestSnapshotCache {
     assertThrows(OMException.class, () -> snapshotCache.get(dbKey1));
     snapshotCache.get(dbKey2);
     assertEquals(1, snapshotCache.size());
+  }
+
+  @Test
+  @DisplayName("Tests get() releases readLock when load() fails")
+  public void testGetReleasesReadLockOnLoadFailure() throws Exception {
+    clearInvocations(lock);
+    final UUID dbKey = UUID.randomUUID();
+    when(cacheLoader.load(eq(dbKey))).thenThrow(new Exception("Dummy exception thrown"));
+    assertThrows(IllegalStateException.class, () -> snapshotCache.get(dbKey));
+    verify(lock, times(1)).acquireReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
+    verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
   }
 
   @ParameterizedTest

@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,7 +186,7 @@ public class SstFilteringService extends BackgroundService
                 ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName());
 
-            try (
+            try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock();
                 UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
                     snapshotManager.get().getActiveSnapshot(
                         snapshotInfo.getVolumeName(),
@@ -195,10 +196,8 @@ public class SstFilteringService extends BackgroundService
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();
-              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
-                  .lock()) {
-                db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
-              }
+              db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
+
               markSSTFilteredFlagForSnapshot(snapshotInfo);
               snapshotLimit--;
               snapshotFilteredCount.getAndIncrement();

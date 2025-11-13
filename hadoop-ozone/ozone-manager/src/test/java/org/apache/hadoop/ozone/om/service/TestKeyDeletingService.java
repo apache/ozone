@@ -71,7 +71,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -658,7 +657,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       KeyDeletingService kds = Mockito.spy(new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
           100000, conf, 10, true));
       when(kds.getTasks()).thenAnswer(i -> {
-        BackgroundTaskQueue queue = new BackgroundTaskQueue();
+        AbstractKeyDeletingService.DeletingServiceTaskQueue queue = kds.new DeletingServiceTaskQueue();
         for (UUID id : snapshotIds) {
           queue.add(kds.new KeyDeletingTask(id));
         }

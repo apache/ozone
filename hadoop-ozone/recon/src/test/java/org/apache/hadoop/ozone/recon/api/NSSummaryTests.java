@@ -15,24 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.common;
+package org.apache.hadoop.ozone.recon.api;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.KeyObjectDBInfo;
@@ -40,12 +38,11 @@ import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 
 /**
- * This is a utility class for common code for test cases.
+ * Shared NSSummary test cases.
  */
-public class CommonUtils {
+public abstract class NSSummaryTests {
   private static final String ROOT_PATH = "/";
   private static final String VOL_PATH = "/vol";
   private static final String BUCKET_ONE_PATH = "/vol/bucket1";
@@ -54,32 +51,17 @@ public class CommonUtils {
   private static final String INVALID_PATH = "/vol/path/not/found";
   private static final String KEY_PATH = "/vol/bucket2/file4";
 
-  private OmPrefixInfo getOmPrefixInfoForTest(
-      String path,
-      IAccessAuthorizer.ACLIdentityType identityType,
-      String identityString,
-      IAccessAuthorizer.ACLType aclType,
-      OzoneAcl.AclScope scope) {
-    return OmPrefixInfo.newBuilder()
-        .setName(path)
-        .setAcls(new ArrayList<>(Collections.singletonList(OzoneAcl.of(
-            identityType, identityString,
-            scope, aclType))))
-        .setObjectID(10)
-        .setUpdateID(100)
-        .build();
-  }
-
-  public void testNSSummaryBasicInfoRoot(
+  public static void testNSSummaryBasicInfoRoot(
       NSSummaryEndpoint nsSummaryEndpoint,
       ReconOMMetadataManager reconOMMetadataManager) throws Exception {
     String username = "myuser";
-    OmPrefixInfo omPrefixInfo = getOmPrefixInfoForTest(ROOT_PATH,
-        IAccessAuthorizer.ACLIdentityType.USER,
-        username,
-        IAccessAuthorizer.ACLType.WRITE,
-        ACCESS);
-    omPrefixInfo.getMetadata().put("key", "value");
+    OmPrefixInfo omPrefixInfo = OmPrefixInfo.newBuilder()
+        .setName(ROOT_PATH)
+        .setObjectID(10)
+        .setUpdateID(100)
+        .setAcls(singletonList(OzoneAcl.of(USER, username, ACCESS, WRITE)))
+        .addMetadata("key", "value")
+        .build();
     reconOMMetadataManager.getPrefixTable()
         .put(OzoneConsts.OM_KEY_PREFIX, omPrefixInfo);
     // Test root basics
@@ -208,13 +190,5 @@ public class CommonUtils {
     assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).
             getReplicationConfig().getReplicationType());
-  }
-
-  public SCMNodeDetails getReconNodeDetails() {
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setSCMNodeId("Recon");
-    builder.setDatanodeProtocolServerAddress(
-        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
-    return builder.build();
   }
 }
