@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -67,6 +66,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -243,8 +243,7 @@ public class TestSstFilteringService {
 
     String snapshotName2 = "snapshot2";
     final long count;
-    try (BootstrapStateHandler.Lock lock =
-             filteringService.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = filteringService.getBootstrapStateLock().acquireWriteLock()) {
       count = filteringService.getSnapshotFilteredCount().get();
       createSnapshot(volumeName, bucketName2, snapshotName2);
 
