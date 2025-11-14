@@ -277,7 +277,7 @@ public class TestOMTenantCreateRequest {
     OMTenantCreateRequest omTenantCreateRequest =
         spy(new OMTenantCreateRequest(originalRequest) {
           @Override
-          public void checkAcls(OzoneManager ozoneManager,
+          public void checkAcls(OzoneManager om,
               OzoneObj.ResourceType resType, OzoneObj.StoreType storeType,
               IAccessAuthorizer.ACLType aclType, String volume, String bucket,
               String key) throws IOException {

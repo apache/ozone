@@ -125,7 +125,7 @@ public class TestOMTenantDeleteRequest {
     OMTenantDeleteRequest omTenantDeleteRequest =
         new OMTenantDeleteRequest(deleteRequest) {
           @Override
-          public void checkAcls(OzoneManager ozoneManager,
+          public void checkAcls(OzoneManager om,
               OzoneObj.ResourceType resType, OzoneObj.StoreType storeType,
               IAccessAuthorizer.ACLType aclType, String volume, String bucket,
               String key) throws IOException {
