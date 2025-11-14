@@ -18,7 +18,9 @@
 package org.apache.ozone.rocksdb.util;
 
 import static org.apache.commons.io.FilenameUtils.getBaseName;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 
+import java.nio.file.Path;
 import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -87,6 +89,10 @@ public class SstFileInfo implements CopyObject<SstFileInfo> {
   @Override
   public int hashCode() {
     return Objects.hash(fileName, startKey, endKey, columnFamily);
+  }
+
+  public Path getFilePath(Path directoryPath) {
+    return directoryPath.resolve(getFileName() + SST_FILE_EXTENSION);
   }
 
   @Override
