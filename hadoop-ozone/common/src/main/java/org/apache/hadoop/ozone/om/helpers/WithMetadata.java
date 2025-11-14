@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.jcip.annotations.Immutable;
 
+import com.google.common.collect.ImmutableMap;
+
 /**
  * Mixin class to handle custom metadata.
  */
@@ -31,23 +33,17 @@ public abstract class WithMetadata {
   private final Map<String, String> metadata;
 
   protected WithMetadata() {
-    metadata = Collections.emptyMap();
+    metadata = ImmutableMap.of();
   }
 
   protected WithMetadata(Builder b) {
-    metadata = toUnmodifiableMap(b.metadata);
+    metadata = b.metadata == null ? ImmutableMap.of()
+        : ImmutableMap.copyOf(b.metadata);
   }
 
   protected WithMetadata(WithMetadata other) {
-    metadata = toUnmodifiableMap(other.getMetadata());
-  }
-
-  private static Map<String, String> toUnmodifiableMap(
-      Map<String, String> source) {
-    if (source == null || source.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    return Collections.unmodifiableMap(new ConcurrentHashMap<>(source));
+    metadata = other.getMetadata() == null ? ImmutableMap.of()
+        : ImmutableMap.copyOf(other.getMetadata());
   }
 
   /**
