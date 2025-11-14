@@ -689,7 +689,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         throw new IOException("Recursive volume delete using " +
             "ofs is not supported. " +
             "Instead use 'ozone sh volume delete -r -skipTrash " +
-            "-id <OM_SERVICE_ID> <Volume_URI>' command");
+            "o3://<OM_SERVICE_ID>/<Volume_URI>' command");
       }
       return deleteVolume(f, ofsPath);
     }

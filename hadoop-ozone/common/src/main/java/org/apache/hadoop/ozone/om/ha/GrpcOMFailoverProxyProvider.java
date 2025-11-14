@@ -18,12 +18,9 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import io.grpc.Status;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -41,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import io.grpc.StatusRuntimeException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,9 +58,10 @@ public class GrpcOMFailoverProxyProvider<T> extends
       LoggerFactory.getLogger(GrpcOMFailoverProxyProvider.class);
 
   public GrpcOMFailoverProxyProvider(ConfigurationSource configuration,
+                                     UserGroupInformation ugi,
                                      String omServiceId,
                                      Class<T> protocol) throws IOException {
-    super(configuration, omServiceId, protocol);
+    super(configuration, ugi, omServiceId, protocol);
   }
 
   @Override
@@ -116,9 +115,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   private T createOMProxy() throws IOException {
     InetSocketAddress addr = new InetSocketAddress(0);
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
-    return (T) RPC.getProxy(getInterface(), 0, addr, hadoopConf);
+    return createOMProxy(addr);
   }
 
   /**

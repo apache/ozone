@@ -152,11 +152,16 @@ public class FindSourceGreedy implements FindSourceStrategy {
     if (sizeLeavingNode.containsKey(source)) {
       long sizeLeavingAfterMove = sizeLeavingNode.get(source) + size;
       //size can be moved out of source datanode only when the following
-      //two condition are met.
-      //1 sizeLeavingAfterMove does not succeed the configured
+      //three conditions are met.
+      //1 size should be greater than zero bytes
+      //2 sizeLeavingAfterMove does not succeed the configured
       // MaxSizeLeavingTarget
-      //2 after subtracting sizeLeavingAfterMove, the usage is bigger
+      //3 after subtracting sizeLeavingAfterMove, the usage is bigger
       // than or equal to lowerLimit
+      if (size <= 0) {
+        LOG.debug("{} bytes container cannot leave datanode {}", size, source.getUuidString());
+        return false;
+      }
       if (sizeLeavingAfterMove > config.getMaxSizeLeavingSource()) {
         LOG.debug("{} bytes cannot leave datanode {} because 'size.leaving" +
                 ".source.max' limit is {} and {} bytes have already left.",

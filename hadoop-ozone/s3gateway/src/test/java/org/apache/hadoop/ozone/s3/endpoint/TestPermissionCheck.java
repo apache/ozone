@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -86,6 +88,8 @@ public class TestPermissionCheck {
     Mockito.when(client.getObjectStore()).thenReturn(objectStore);
     Mockito.when(client.getConfiguration()).thenReturn(conf);
     headers = Mockito.mock(HttpHeaders.class);
+    Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     clientProtocol = Mockito.mock(ClientProtocol.class);
     Mockito.when(client.getProxy()).thenReturn(clientProtocol);
   }
@@ -257,6 +261,9 @@ public class TestPermissionCheck {
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    objectEndpoint.setSignatureInfo(signatureInfo);
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         "bucketName", "keyPath", 1024, 0, null,

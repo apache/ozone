@@ -135,7 +135,7 @@ class TestSecureOzoneContainer {
       conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      container = new OzoneContainer(dn, conf, ContainerTestUtils
+      container = new OzoneContainer(null, dn, conf, ContainerTestUtils
           .getMockContext(dn, conf), caClient, secretKeyClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());

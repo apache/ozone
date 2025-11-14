@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -71,10 +73,15 @@ public class TestMultipartUploadComplete {
 
     when(HEADERS.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(HEADERS.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     REST.setHeaders(HEADERS);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    REST.setSignatureInfo(signatureInfo);
   }
 
   private String initiateMultipartUpload(String key) throws IOException,

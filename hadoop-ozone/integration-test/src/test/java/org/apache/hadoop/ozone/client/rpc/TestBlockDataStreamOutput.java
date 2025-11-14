@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
@@ -46,12 +45,13 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
@@ -76,13 +76,6 @@ public class TestBlockDataStreamOutput {
   private static String bucketName;
   private static String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeClass
   public static void init() throws Exception {
     chunkSize = 100;
@@ -115,7 +108,7 @@ public class TestBlockDataStreamOutput {
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
-    volumeName = "testblockoutputstream";
+    volumeName = "testblockdatastreamoutput";
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
@@ -161,6 +154,11 @@ public class TestBlockDataStreamOutput {
   }
 
   static void testWrite(int dataLength) throws Exception {
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
@@ -169,9 +167,19 @@ public class TestBlockDataStreamOutput {
     // now close the stream, It will update the key length.
     key.close();
     validateData(keyName, data);
+
+    Assert.assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    Assert.assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
   }
 
   private void testWriteWithFailure(int dataLength) throws Exception {
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
@@ -190,17 +198,24 @@ public class TestBlockDataStreamOutput {
     key.close();
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+
+    Assert.assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    Assert.assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
   }
 
   @Test
   public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 500;
+    int dataLength = maxFlushSize + 100;
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
-    long putBlockCount = metrics.getContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
-    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
+    long writeChunkCount = metrics.getContainerOpCountMetrics(WriteChunk);
+    long putBlockCount = metrics.getContainerOpCountMetrics(PutBlock);
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+    long totalOpCount = metrics.getTotalOpCount();
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, 0);
@@ -208,15 +223,24 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    Assert.assertTrue(
-        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            <= pendingPutBlockCount + 1);
+    Assert.assertTrue(metrics.getPendingContainerOpCountMetrics(PutBlock) <=
+        pendingPutBlockCount + 1);
+    Assert.assertTrue(metrics.getPendingContainerOpCountMetrics(WriteChunk) <= pendingWriteChunkCount + 5);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
-    Assert.assertTrue(
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            == putBlockCount + 2);
+    Assert.assertEquals(putBlockCount + 2,
+        metrics.getContainerOpCountMetrics(PutBlock));
+    // Each chunk is 100 so there will be 500 / 100 = 5 chunks.
+    Assert.assertEquals(writeChunkCount + 5,
+        metrics.getContainerOpCountMetrics(WriteChunk));
+    Assert.assertEquals(totalOpCount + 7,
+        metrics.getTotalOpCount());
+    Assert.assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    Assert.assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
+
     validateData(keyName, data);
   }
 
@@ -238,20 +262,22 @@ public class TestBlockDataStreamOutput {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
     OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
-    long writeChunkCount =
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
+    long writeChunkCount = metrics.getContainerOpCountMetrics(WriteChunk);
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 2)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
     // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
     Assert.assertEquals(writeChunkCount,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+        metrics.getContainerOpCountMetrics(WriteChunk));
     key.write(ByteBuffer.wrap(data));
     Assert.assertEquals(writeChunkCount + 1,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+        metrics.getContainerOpCountMetrics(WriteChunk));
     // now close the stream, It will update the key length.
     key.close();
+    Assert.assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }

@@ -30,6 +30,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
@@ -63,6 +66,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,6 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -124,8 +129,12 @@ class TestObjectPut {
     objectEndpoint = spy(new ObjectEndpoint());
     objectEndpoint.setClient(clientStub);
     objectEndpoint.setOzoneConfiguration(config);
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    objectEndpoint.setSignatureInfo(signatureInfo);
 
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     objectEndpoint.setHeaders(headers);
 
     String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
@@ -236,7 +245,8 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
 
@@ -415,7 +425,8 @@ class TestObjectPut {
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
 
       // Add copy header, and then call put
@@ -499,5 +510,19 @@ class TestObjectPut {
     // THEN
     assertEquals(S3ErrorTable.NO_OVERWRITE.getCode(), exception.getCode());
     assertEquals(S3ErrorTable.NO_OVERWRITE.getHttpCode(), exception.getHttpCode());
+  }
+
+  @Test
+  public void testPutEmptyObject() throws IOException, OS3Exception {
+    HttpHeaders headersWithTags = mock(HttpHeaders.class);
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    String emptyString = "";
+    ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headersWithTags);
+
+    Response putResponse = objectEndpoint.put(BUCKET_NAME, KEY_NAME, emptyString.length(), 1, null, body);
+    assertEquals(200, putResponse.getStatus());
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
+    assertEquals(0, keyDetails.getDataSize());
   }
 }

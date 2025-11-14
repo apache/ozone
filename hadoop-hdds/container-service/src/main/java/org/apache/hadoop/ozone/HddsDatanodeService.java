@@ -293,7 +293,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers);
 
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
+      datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
           reconfigurationHandler);
       try {
@@ -634,6 +634,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       LOG.error(msg, ex);
       terminateDatanode();
     }
+  }
+
+  public boolean isStopped() {
+    return isStopped.get();
   }
 
   /**

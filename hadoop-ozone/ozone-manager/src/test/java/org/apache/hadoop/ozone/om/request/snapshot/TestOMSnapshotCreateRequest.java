@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -28,11 +29,13 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
@@ -94,6 +97,9 @@ public class TestOMSnapshotCreateRequest {
         anotherTempDir.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
+    when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0),
+            i.getArgument(0), "dummyBucketOwner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
@@ -141,6 +147,29 @@ public class TestOMSnapshotCreateRequest {
     OMRequest omRequest = createSnapshotRequest(volumeName,
         bucketName, snapshotName);
     doPreExecute(omRequest);
+  }
+
+  @ValueSource(strings = {
+      // '-' is allowed.
+      "9cdf0e8a-6946-41ad-a2d1-9eb724fab126",
+      // 3 chars name is allowed.
+      "sn1",
+      // less than or equal to 63 chars are allowed.
+      "snap75795657617173401188448010125899089001363595171500499231286"
+  })
+  @ParameterizedTest
+  public void testPreExecuteWithLinkedBucket(String snapshotName) throws Exception {
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    String resolvedBucketName = volumeName + "1";
+    String resolvedVolumeName = volumeName + "1";
+    when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    OMRequest omRequest = createSnapshotRequest(volumeName,
+        bucketName, snapshotName);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+    assertEquals(resolvedVolumeName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getVolumeName());
+    assertEquals(resolvedBucketName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getBucketName());
   }
 
   @ValueSource(strings = {

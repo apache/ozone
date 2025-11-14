@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -73,8 +75,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       LoggerFactory.getLogger(OMSnapshotCreateRequest.class);
 
   private final String snapshotPath;
-  private final String volumeName;
-  private final String bucketName;
+  private String volumeName;
+  private String bucketName;
   private final String snapshotName;
   private final SnapshotInfo snapshotInfo;
 
@@ -104,7 +106,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
-
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+    this.volumeName = bucket.realVolume();
+    this.bucketName = bucket.realBucket();
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
@@ -114,12 +120,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-
-    return omRequest.toBuilder().setCreateSnapshotRequest(
-        omRequest.getCreateSnapshotRequest().toBuilder()
-            .setSnapshotId(toProtobuf(UUID.randomUUID()))
-            .setCreationTime(Time.now())
-            .build()).build();
+    CreateSnapshotRequest.Builder createSnapshotRequest = omRequest.getCreateSnapshotRequest().toBuilder()
+        .setSnapshotId(toProtobuf(UUID.randomUUID()))
+        .setVolumeName(volumeName)
+        .setBucketName(this.bucketName)
+        .setCreationTime(Time.now());
+    return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
   
   @Override

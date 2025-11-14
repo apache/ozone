@@ -34,7 +34,9 @@ import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read PutBucketAclRequest wo namespace.
@@ -79,7 +81,7 @@ public class PutBucketAclRequestUnmarshaller
       filter.parse(new InputSource(inputStream));
       return (S3BucketAcl)(unmarshallerHandler.getResult());
     } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
+      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
     }
   }
 }

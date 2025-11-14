@@ -45,6 +45,9 @@ import org.apache.hadoop.util.StringUtils;
 import com.google.common.annotations.VisibleForTesting;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +57,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class StringToSignProducer {
 
-  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
   public static final String X_AMAZ_DATE = "x-amz-date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
-  private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -201,30 +202,45 @@ public final class StringToSignProducer {
     validateCanonicalHeaders(canonicalHeaders.toString(), headers,
         unsignedPayload);
 
-    String payloadHash;
-    if (UNSIGNED_PAYLOAD.equals(
-        headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
-      payloadHash = UNSIGNED_PAYLOAD;
-    } else {
-      // According to AWS Sig V4 documentation
-      // https://docs.aws.amazon.com/AmazonS3/latest/API/
-      // sig-v4-header-based-auth.html
-      // Note: The x-amz-content-sha256 header is required
-      // for all AWS Signature Version 4 requests.(using Authorization header)
-      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
-        LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
-            + " header for signed payload");
-        throw S3_AUTHINFO_CREATION_ERROR;
-      }
-      payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
-    }
-    String canonicalRequest = method + NEWLINE
+    String payloadHash = getPayloadHash(headers, unsignedPayload);
+
+    return method + NEWLINE
         + canonicalUri + NEWLINE
         + canonicalQueryStr + NEWLINE
         + canonicalHeaders + NEWLINE
         + signedHeaders + NEWLINE
         + payloadHash;
-    return canonicalRequest;
+  }
+
+  private static String getPayloadHash(Map<String, String> headers, boolean isUsingQueryParameter)
+      throws OS3Exception {
+    if (isUsingQueryParameter) {
+      // According to AWS Signature V4 documentation using Query Parameters
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+      return UNSIGNED_PAYLOAD;
+    }
+    String contentSignatureHeaderValue = headers.get(X_AMZ_CONTENT_SHA256);
+    // According to AWS Signature V4 documentation using Authorization Header
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+    // The x-amz-content-sha256 header is required
+    // for all AWS Signature Version 4 requests using Authorization header.
+    if (contentSignatureHeaderValue == null) {
+      LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
+          + " header for signed payload");
+      throw S3_AUTHINFO_CREATION_ERROR;
+    }
+    // Simply return the header value of x-amz-content-sha256 as the payload hash
+    // These are the possible cases:
+    // 1. Actual payload checksum for single chunk upload
+    // 2. Unsigned payloads for multiple chunks upload
+    //    - UNSIGNED-PAYLOAD
+    //    - STREAMING-UNSIGNED-PAYLOAD-TRAILER
+    // 3. Signed payloads for multiple chunks upload
+    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
+    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
+    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
+    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
+    return contentSignatureHeaderValue;
   }
 
   /**
@@ -354,6 +370,12 @@ public final class StringToSignProducer {
         .filter(s -> s.startsWith("x-amz-"))
         .collect(Collectors.toSet())) {
       if (!(canonicalHeaders.contains(header + ":"))) {
+        // According to AWS Signature V4 documentation using Authorization Header
+        // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // The x-amz-content-sha256 header is not required for CanonicalHeaders
+        if (X_AMZ_CONTENT_SHA256.equals(header)) {
+          continue;
+        }
         LOG.error("The SignedHeaders list must include all "
             + "x-amz-* headers in the request");
         throw S3_AUTHINFO_CREATION_ERROR;

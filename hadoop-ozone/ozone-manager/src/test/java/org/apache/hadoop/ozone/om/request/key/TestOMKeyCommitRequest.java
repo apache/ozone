@@ -27,6 +27,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -56,6 +59,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 /**
  * Class tests OMKeyCommitRequest class.
@@ -551,16 +556,17 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheOnOverwrite() throws Exception {
+    when(ozoneManager.getObjectIdFromTxId(anyLong())).thenAnswer(tx ->
+        OmUtils.getObjectIdFromTxId(2, tx.getArgument(0)));
     testValidateAndUpdateCache();
 
     // Become a new client and set next version number
     clientID = Time.now();
     version += 1;
 
-    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(getKeyLocation(10).subList(4, 10), false));
 
-    OMKeyCommitRequest omKeyCommitRequest =
-            getOmKeyCommitRequest(modifiedOmRequest);
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
 
     KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
 
@@ -577,9 +583,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Append new blocks
     List<OmKeyLocationInfo> allocatedLocationList =
-            keyArgs.getKeyLocationsList().stream()
-                    .map(OmKeyLocationInfo::getFromProtobuf)
-                    .collect(Collectors.toList());
+        keyArgs.getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
     addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
@@ -589,9 +595,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             omClientResponse.getOMResponse().getStatus());
 
     // New entry should be created in key Table.
-    omKeyInfo =
-        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
-            .get(ozoneKey);
+    omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
 
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(version,
@@ -606,15 +610,28 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Check block location.
     List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
-        commitKeyRequest.getKeyArgs()
-        .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
-        .collect(Collectors.toList());
+        commitKeyRequest.getKeyArgs().getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
 
     Assertions.assertEquals(locationInfoListFromCommitKeyRequest,
             omKeyInfo.getLatestVersionLocations().getLocationList());
     Assertions.assertEquals(allocatedLocationList,
             omKeyInfo.getLatestVersionLocations().getLocationList());
     Assertions.assertEquals(1, omKeyInfo.getKeyLocationVersions().size());
+
+    // flush response content to db
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMKeyCommitResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // verify deleted key is unique generated
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, omKeyInfo.getBucketName(), keyName);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
+    Assertions.assertFalse(rangeKVs.isEmpty());
+    Assertions.assertEquals(1, rangeKVs.get(0).getValue().getOmKeyInfoList().size());
+    Assertions.assertFalse(rangeKVs.get(0).getKey().endsWith(rangeKVs.get(0).getValue()
+        .getOmKeyInfoList().get(0).getObjectID() + ""));
   }
 
   /**
