@@ -273,4 +273,61 @@ public class TestStringToSignProducer {
 
     assertEquals(expectedResult, actualResult);
   }
+
+  private static Stream<Arguments> testPayloadHashMismatchInput() {
+    String validHash = EMPTY_CONTENT_SHA_256;
+    String invalidHash = "0000000000000000000000000000000000000000000000000000000000000000";
+
+    return Stream.of(
+        arguments(validHash, "", "success"),
+        arguments(invalidHash, "", "XAmzContentSHA256Mismatch"),
+        arguments(EMPTY_CONTENT_SHA_256, "test content", "XAmzContentSHA256Mismatch"),
+        // ignore payload hash check for these special values
+        arguments("UNSIGNED-PAYLOAD", "test content", "success"),
+        // ignore payload hash check for these special values
+        arguments("STREAMING-AWS4-HMAC-SHA256-PAYLOAD", "test content", "success")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testPayloadHashMismatchInput")
+  public void testPayloadHashMismatch(
+      String contentSha256,
+      String payload,
+      String expectedResult) throws Exception {
+    String actualResult = "success";
+
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    headerMap.putSingle("Content-Type", "application/octet-stream");
+    headerMap.putSingle("Host", "0.0.0.0:9878");
+    headerMap.putSingle("X-Amz-Date", DATETIME);
+    headerMap.putSingle("X-Amz-Content-Sha256", contentSha256);
+
+    LowerCaseKeyStringMap queryParams = new LowerCaseKeyStringMap();
+    queryParams.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    queryParams.put("X-Amz-Credential", "ozone/"
+        + DATE_FORMATTER.format(LocalDate.now())
+        + "/us-east-1/s3/aws4_request");
+    queryParams.put("X-Amz-Date", DATETIME);
+    queryParams.put("X-Amz-Expires", "86400");
+    queryParams.put("X-Amz-SignedHeaders", "host;x-amz-date");
+    queryParams.put("X-Amz-Signature", "db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2");
+
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
+    UriInfo uriInfo = mock(UriInfo.class);
+    when(uriInfo.getRequestUri()).thenReturn(new URI("https://0.0.0.0:9878/bucket/key"));
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(context.getMethod()).thenReturn("PUT");
+    when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getEntityStream()).thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
+
+    try {
+      StringToSignProducer.createSignatureBase(new AuthorizationV4QueryParser(queryParams).parseSignature(), context);
+    } catch (OS3Exception e) {
+      actualResult = e.getCode();
+    }
+
+    assertEquals(expectedResult, actualResult);
+  }
 }
