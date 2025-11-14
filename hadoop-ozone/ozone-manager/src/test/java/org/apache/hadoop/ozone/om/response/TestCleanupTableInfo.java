@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.s3.security.S3AssumeRoleResponse;
 import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
@@ -139,6 +140,7 @@ public class TestCleanupTableInfo {
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
     subTypes.remove(DummyOMClientResponse.class);
+    subTypes.remove(S3AssumeRoleResponse.class);
     subTypes.forEach(aClass -> {
       if (Modifier.isAbstract(aClass.getModifiers())) {
         assertFalse(aClass.isAnnotationPresent(CleanupTableInfo.class),
