@@ -142,6 +142,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -808,9 +809,10 @@ public class KeyManagerImpl implements KeyManager {
     int notReclaimableKeyCount = 0;
 
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
-    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedTable);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
-             delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
+             delKeyIter = deletedTable.iterator(bucketPrefix.orElse(""))) {
 
       /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
@@ -832,12 +834,15 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
+              List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
+                      .map(b -> new DeletedBlock(new BlockID(b.getContainerID(),
+                          b.getLocalID()), info.getDataSize(), info.getReplicatedSize()))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
+
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
-                  .addAllBlockIDs(blockIDS).build();
+                  .addAllDeletedBlocks(deletedBlocks)
+                  .build();
               reclaimableKeys.put(blockGroupName,
                   new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
                   keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
@@ -887,7 +892,7 @@ public class KeyManagerImpl implements KeyManager {
     return entries;
   }
 
-  private Optional<String> getBucketPrefix(String volumeName, String bucketName, boolean isFSO) throws IOException {
+  private Optional<String> getBucketPrefix(String volumeName, String bucketName, Table table) throws IOException {
     // Bucket prefix would be empty if both volume & bucket is empty i.e. either null or "".
     if (StringUtils.isEmpty(volumeName) && StringUtils.isEmpty(bucketName)) {
       return Optional.empty();
@@ -895,17 +900,17 @@ public class KeyManagerImpl implements KeyManager {
       throw new IOException("One of volume : " + volumeName + ", bucket: " + bucketName + " is empty." +
           " Either both should be empty or none of the arguments should be empty");
     }
-    return isFSO ? Optional.of(metadataManager.getBucketKeyPrefixFSO(volumeName, bucketName)) :
-        Optional.of(metadataManager.getBucketKeyPrefix(volumeName, bucketName));
+    return Optional.of(metadataManager.getTableBucketPrefix(table.getName(), volumeName, bucketName));
   }
 
   @Override
   public List<KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
-    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
+    Table<String, String> snapshotRenamedTable = metadataManager.getSnapshotRenamedTable();
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, snapshotRenamedTable);
     try (TableIterator<String, ? extends KeyValue<String, String>>
-             renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
+             renamedKeyIter = snapshotRenamedTable.iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
     }
   }
@@ -953,9 +958,10 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
       int size) throws IOException {
-    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedTable);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
-             delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
+             delKeyIter = deletedTable.iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
     }
   }
@@ -2259,8 +2265,9 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException {
-    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, true);
-    return metadataManager.getDeletedDirTable().iterator(bucketPrefix.orElse(""));
+    Table<String, OmKeyInfo> deletedDirTable = metadataManager.getDeletedDirTable();
+    Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, deletedDirTable);
+    return deletedDirTable.iterator(bucketPrefix.orElse(""));
   }
 
   @Override

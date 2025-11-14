@@ -70,11 +70,6 @@ public class TestOmAcls {
     AuditLogTestUtils.enableAuditLog();
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -192,6 +187,21 @@ public class TestOmAcls {
     assertThat(logCapturer.getOutput()).contains("doesn't have READ " +
             "permission to access key");
     verifyAuditLog(OMAction.READ_KEY, AuditEventStatus.FAILURE);
+  }
+
+  @Test
+  public void testGetFileStatusPermissionDenied() throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    TestDataUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8));
+
+    authorizer.keyAclAllow = false;
+    OMException exception = assertThrows(OMException.class,
+            () -> bucket.getFileStatus("testKey"));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
+    assertThat(logCapturer.getOutput()).contains("doesn't have READ " +
+            "permission to access key");
+    verifyAuditLog(OMAction.GET_FILE_STATUS, AuditEventStatus.FAILURE);
   }
 
   @Test

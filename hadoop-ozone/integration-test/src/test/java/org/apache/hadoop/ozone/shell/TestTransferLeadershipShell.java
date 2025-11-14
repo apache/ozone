@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -55,11 +54,6 @@ public class TestTransferLeadershipShell {
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException Exception
-   */
   @BeforeAll
   public void init() throws Exception {
     ozoneAdmin = new OzoneAdmin();
@@ -77,9 +71,6 @@ public class TestTransferLeadershipShell {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {

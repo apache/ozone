@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,10 +179,6 @@ public class SnapshotDefragService extends BackgroundService
     public BackgroundTaskResult call() throws Exception {
       // Check OM leader and readiness
       if (shouldRun()) {
-        final long count = runCount.incrementAndGet();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Initiating Snapshot Defragmentation Task: run # {}", count);
-        }
         triggerSnapshotDefragOnce();
       }
 
@@ -190,6 +187,12 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   public synchronized boolean triggerSnapshotDefragOnce() throws IOException {
+
+    final long count = runCount.incrementAndGet();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initiating Snapshot Defragmentation Task: run # {}", count);
+    }
+
     // Check if rocks-tools native lib is available
     if (!isRocksToolsNativeLibAvailable()) {
       LOG.warn("Rocks-tools native library is not available. " +
@@ -345,7 +348,8 @@ public class SnapshotDefragService extends BackgroundService
       return false;
     }
     // The service only runs if current OM node is ready
-    return running.get() && ozoneManager.isRunning();
+    return running.get() && ozoneManager.isRunning() &&
+        ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.SNAPSHOT_DEFRAG);
   }
 
   public AtomicLong getSnapshotsDefraggedCount() {

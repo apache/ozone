@@ -71,10 +71,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -150,6 +151,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private OMMetadataManager metadataManager;
   private KeyDeletingService keyDeletingService;
   private DirectoryDeletingService directoryDeletingService;
+  private SstFilteringService sstFilteringService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
   private DeletingServiceMetrics metrics;
 
@@ -183,7 +185,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private void createSubject() throws Exception {
     OmTestManagers omTestManagers = new OmTestManagers(conf, scmBlockTestingClient, null);
     keyManager = omTestManagers.getKeyManager();
-
+    sstFilteringService = keyManager.getSnapshotSstFilteringService();
     keyDeletingService = keyManager.getDeletingService();
     directoryDeletingService = keyManager.getDirDeletingService();
     writeClient = omTestManagers.getWriteClient();
@@ -548,6 +550,7 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
+    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -557,6 +560,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           om.getMetadataManager().getKeyTable(BucketLayout.DEFAULT);
 
       // Suspend KeyDeletingService
+      sstFilteringService.pause();
       keyDeletingService.suspend();
       directoryDeletingService.suspend();
 
@@ -625,6 +629,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
         checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+      sstFilteringService.resume();
     }
 
     @Test
@@ -652,7 +657,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       KeyDeletingService kds = Mockito.spy(new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
           100000, conf, 10, true));
       when(kds.getTasks()).thenAnswer(i -> {
-        BackgroundTaskQueue queue = new BackgroundTaskQueue();
+        AbstractKeyDeletingService.DeletingServiceTaskQueue queue = kds.new DeletingServiceTaskQueue();
         for (UUID id : snapshotIds) {
           queue.add(kds.new KeyDeletingTask(id));
         }
@@ -802,7 +807,9 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @AfterEach
     void resume() {
+      directoryDeletingService.resume();
       keyDeletingService.resume();
+      sstFilteringService.resume();
     }
 
     @AfterAll
@@ -826,7 +833,8 @@ class TestKeyDeletingService extends OzoneTestBase {
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
+            .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
+                new BlockID(1, 1), 1, 3))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
             "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
@@ -1393,7 +1401,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           .getPurgedKeys().values()
           .stream()
           .map(PurgedKey::getBlockGroup)
-          .map(BlockGroup::getBlockIDList)
+          .map(BlockGroup::getDeletedBlocks)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {
