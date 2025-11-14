@@ -118,14 +118,6 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void pauseAutoFlush() {
-  }
-
-  @Override
-  public void resumeAutoFlush() {
-  }
-
-  @Override
   public boolean shouldFlush(long snapshotWaitTime) {
     return true;
   }

@@ -42,10 +42,6 @@ public interface SCMHADBTransactionBuffer
   AtomicReference<SnapshotInfo> getLatestSnapshotRef();
 
   void flush() throws IOException;
-
-  void pauseAutoFlush();
-
-  void resumeAutoFlush();
   
   boolean shouldFlush(long snapshotWaitTime);
 

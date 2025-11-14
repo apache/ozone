@@ -147,18 +147,13 @@ public class DeletedBlockLogStateManagerImpl
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
     Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
-    transactionBuffer.pauseAutoFlush();
-    try {
-      for (DeletedBlocksTransaction tx : txs) {
-        long tid = tx.getTxID();
-        containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
-            (k, v) -> v != null && v > tid ? v : tid);
-        transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
-      }
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    } finally {
-      transactionBuffer.resumeAutoFlush();
+    for (DeletedBlocksTransaction tx : txs) {
+      long tid = tx.getTxID();
+      containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
+          (k, v) -> v != null && v > tid ? v : tid);
+      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
+    transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
     containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
 
@@ -180,15 +175,10 @@ public class DeletedBlockLogStateManagerImpl
     if (deletingTxIDs != null) {
       deletingTxIDs.addAll(txIDs);
     }
-    transactionBuffer.pauseAutoFlush();
-    try {
-      for (Long txID : txIDs) {
-        transactionBuffer.removeFromBuffer(deletedTable, txID);
-      }
-      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    } finally {
-      transactionBuffer.resumeAutoFlush();
+    for (Long txID : txIDs) {
+      transactionBuffer.removeFromBuffer(deletedTable, txID);
     }
+    transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
   }
 
   @Override
