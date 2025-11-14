@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
@@ -106,15 +107,17 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     }
     final String volumeName = dbTenantState.getBucketNamespaceName();
     Preconditions.checkNotNull(volumeName);
+    if (volumeName.isEmpty()) {
+      throw new OMException("Tenant '" + tenantId + "' has empty volume name",
+          INVALID_REQUEST);
+    }
 
     // Perform ACL check during preExecute (WRITE_ACL on volume if applicable)
     if (ozoneManager.getAclsEnabled()) {
       try {
-        if (!volumeName.isEmpty()) {
-          checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-              OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-              volumeName, null, null);
-        }
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volumeName, null, null);
       } catch (IOException ex) {
         // Ensure audit log captures preExecute failures
         Map<String, String> auditMap = new HashMap<>();
