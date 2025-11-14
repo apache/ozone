@@ -21,9 +21,15 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.mapPolicyActionsToS3Actions;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -257,6 +263,145 @@ public class TestIamSessionPolicyResolver {
         json, "Unsupported Effect - aLLOw", NOT_SUPPORTED_OPERATION);
   }
 
+  @Test
+  public void testBuildS3ActionMapMatchesConstant() {
+    assertThat(IamSessionPolicyResolver.buildS3ActionMap()).isEqualTo(IamSessionPolicyResolver.S3_ACTION_MAP);
+  }
+
+  @Test
+  public void testBuildS3ActionMap() {
+    final Map<String, Set<S3Action>> actionMap = IamSessionPolicyResolver.buildS3ActionMap();
+    
+    // Verify that individual S3 actions are present
+    assertThat(actionMap).containsKeys("s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+        "s3:CreateBucket", "s3:ListAllMyBuckets");
+
+    // Verify that wildcard actions are present
+    assertThat(actionMap).containsKeys("s3:*", "s3:Get*", "s3:Put*", "s3:List*", "s3:Delete*", "s3:Create*");
+
+    // Verify s3:Get* contains Get actions
+    final Set<S3Action> getActions = actionMap.get("s3:Get*");
+    assertThat(getActions).containsOnly(
+        S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION, S3Action.GET_OBJECT_VERSION,
+        S3Action.GET_OBJECT_TAGGING);
+
+    // Verify s3:Put* contains Put actions
+    final Set<S3Action> putActions = actionMap.get("s3:Put*");
+    assertThat(putActions).containsOnly(
+        S3Action.PUT_OBJECT, S3Action.PUT_OBJECT_VERSION_TAGGING, S3Action.PUT_OBJECT_TAGGING,
+        S3Action.PUT_BUCKET_ACL);
+
+    // Verify s3:List* contains List actions
+    final Set<S3Action> listActions = actionMap.get("s3:List*");
+    assertThat(listActions).containsOnly(
+        S3Action.LIST_BUCKET, S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET_MULTIPART_UPLOADS,
+        S3Action.LIST_MULTIPART_UPLOAD_PARTS);
+
+    // Verify s3:Delete* contains Delete actions
+    final Set<S3Action> deleteActions = actionMap.get("s3:Delete*");
+    assertThat(deleteActions).containsOnly(
+        S3Action.DELETE_OBJECT, S3Action.DELETE_OBJECT_VERSION, S3Action.DELETE_BUCKET,
+        S3Action.DELETE_OBJECT_TAGGING);
+
+    // Verify s3:Create* contains Create actions
+    final Set<S3Action> createActions = actionMap.get("s3:Create*");
+    assertThat(createActions).containsOnly(S3Action.CREATE_BUCKET);
+  }
+
+  @Test
+  public void testBuildS3ActionMapIndividualActionsContainSingleEntry() {
+    final Map<String, Set<S3Action>> actionMap = IamSessionPolicyResolver.buildS3ActionMap();
+    
+    // Individual actions should map to a set with exactly one entry
+    final Set<S3Action> listBucketAction = actionMap.get("s3:ListBucket");
+    assertThat(listBucketAction).hasSize(1);
+    
+    final Set<S3Action> getObjectAction = actionMap.get("s3:GetObject");
+    assertThat(getObjectAction).hasSize(1);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithNullReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(null);
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithEmptyListReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.emptySet());
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithSingleActionMapsCorrectly() {
+    final Set<S3Action> listBucket = mapPolicyActionsToS3Actions(Collections.singleton("s3:ListBucket"));
+    assertThat(listBucket).containsOnly(S3Action.LIST_BUCKET);
+
+    final Set<S3Action> getObject = mapPolicyActionsToS3Actions(Collections.singleton("s3:DeleteObject"));
+    assertThat(getObject).containsOnly(S3Action.DELETE_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithMultipleActionsMapAllCorrectly() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:ListBucket", "s3:GetObject", "s3:PutObject"));
+    assertThat(result).containsOnly(S3Action.LIST_BUCKET, S3Action.GET_OBJECT, S3Action.PUT_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithWildcardExpansion() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:Get*"));
+    assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
+        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithS3StarReturnsAll() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:*"));
+    assertThat(result).containsOnly(S3Action.ALL_S3);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsIgnoresUnsupportedActions() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:GetAccelerateConfiguration", "s3:GetObject"));
+    // Unsupported action should be silently ignored
+    assertThat(result).containsOnly(S3Action.GET_OBJECT);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithOnlyUnsupportedActionsReturnsEmpty() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(
+        strSet("s3:GetAccelerateConfiguration", "s3:PutBucketVersioning"));
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsDeduplicatesResults() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:GetObject", "s3:GetBucketAcl"));
+    assertThat(result).contains(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
+        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsHandlesMultipleWildcards() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:Put*"));
+    assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
+        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING, S3Action.PUT_OBJECT,
+        S3Action.PUT_OBJECT_VERSION_TAGGING, S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
+  }
+
+  @Test
+  public void testMapPolicyActionsToS3ActionsWithS3StarIgnoresOtherActions() {
+    final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:*", "s3:GetObject", "s3:PutObject"));
+    // When s3:* is present, it should return only the ALL_S3 action
+    assertThat(result).containsOnly(S3Action.ALL_S3);
+  }
+
+  private static Set<String> strSet(String... strs) {
+    final Set<String> s = new LinkedHashSet<>();
+    Collections.addAll(s, strs);
+    return s;
+  }
+
   private static void expectResolveThrows(String json,
       IamSessionPolicyResolver.AuthorizerType authorizerType, String expectedMessage,
       OMException.ResultCodes expectedCode) {
@@ -268,9 +413,9 @@ public class TestIamSessionPolicyResolver {
       assertThat(ex.getResult()).isEqualTo(expectedCode);
     }
   }
-  
-  private static void expectResolveThrowsForBothAuthorizers(String json,
-      String expectedMessage, OMException.ResultCodes expectedCode) {
+
+  private static void expectResolveThrowsForBothAuthorizers(String json, String expectedMessage,
+      OMException.ResultCodes expectedCode) {
     expectResolveThrows(json, NATIVE, expectedMessage, expectedCode);
     expectResolveThrows(json, RANGER, expectedMessage, expectedCode);
   }
