@@ -99,8 +99,9 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
     TablePrefixInfo tablePrefixInfo = activeMetadataManager.getTableBucketPrefix(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
     return computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup,
-        tablePrefixInfo).map(Map::values).orElseThrow(() -> new IOException("Failed to compute delta files for " +
-        "snapshots " + fromSnapshot + " and " + toSnapshot));
+        tablePrefixInfo).map(Map::values).orElseThrow(() -> new IOException(String.format(
+            "Failed to compute delta files for snapshots %s and %s tablesToLookup : %s", fromSnapshot, toSnapshot,
+        tablesToLookup)));
   }
 
   void updateActivity(SubStatus status) {
