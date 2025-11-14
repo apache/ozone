@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMToken
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
-
   public static final Text KIND_NAME = new Text("STSToken");
 
   // STS-specific fields
@@ -130,9 +129,9 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * Initialize this identifier from protobuf.
    */
   public void fromProtoBuf(OMTokenProto token) throws IOException {
-    Preconditions.checkArgument(token.getType() == OMTokenProto.Type.S3_STS_TOKEN,
-        "Invalid token type for STSTokenIdentifier"
-    );
+    Preconditions.checkArgument(
+        token.getType() == OMTokenProto.Type.S3_STS_TOKEN,
+        "Invalid token type for STSTokenIdentifier: " + token.getType());
 
     setOwnerId(token.getOwner());
     setExpiry(Instant.ofEpochMilli(token.getMaxDate()));

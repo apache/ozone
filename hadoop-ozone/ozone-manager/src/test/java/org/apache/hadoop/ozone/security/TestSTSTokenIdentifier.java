@@ -93,7 +93,7 @@ public class TestSTSTokenIdentifier {
         "secretAccessKey", "sessionPolicy");
 
     final IOException ex = assertThrows(IOException.class, () -> stsTokenIdentifier.fromProtoBuf(invalid));
-    assertThat(ex.getMessage()).contains("Invalid secretKeyId format in STS token");
+    assertThat(ex.getMessage()).isEqualTo("Invalid secretKeyId format in STS token: not-a-uuid");
   }
 
   @Test
@@ -146,7 +146,7 @@ public class TestSTSTokenIdentifier {
 
     final IllegalArgumentException ex = assertThrows(
         IllegalArgumentException.class, () -> stsTokenIdentifier.fromProtoBuf(invalidType));
-    assertThat(ex.getMessage()).isEqualTo("Invalid token type for STSTokenIdentifier");
+    assertThat(ex.getMessage()).isEqualTo("Invalid token type for STSTokenIdentifier: DELEGATION_TOKEN");
   }
 
   @Test
@@ -173,7 +173,10 @@ public class TestSTSTokenIdentifier {
   @Test
   public void testWriteToAndReadFromByteArrayWithDifferentSecretKeyIds() throws Exception {
     final UUID uuid1 = UUID.randomUUID();
-    final UUID uuid2 = UUID.randomUUID();
+    UUID uuid2 = UUID.randomUUID();
+    if (uuid2.equals(uuid1)) {
+      uuid2 = UUID.randomUUID();
+    }
 
     final Instant expiry = Instant.now().plusSeconds(1500);
     final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
