@@ -123,28 +123,6 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void pauseAutoFlush() {
-    rwLock.writeLock().lock();
-    try {
-      autoFlushEnabled = false;
-      LOG.debug("Auto flush is paused for SCM HA DB transaction buffer.");
-    } finally {
-      rwLock.writeLock().unlock();
-    }
-  }
-
-  @Override
-  public void resumeAutoFlush() {
-    rwLock.writeLock().lock();
-    try {
-      autoFlushEnabled = true;
-      LOG.debug("Auto flush is resumed for SCM HA DB transaction buffer.");
-    } finally {
-      rwLock.writeLock().unlock();
-    }
-  }
-
-  @Override
   public void flush() throws IOException {
     rwLock.writeLock().lock();
     try {
