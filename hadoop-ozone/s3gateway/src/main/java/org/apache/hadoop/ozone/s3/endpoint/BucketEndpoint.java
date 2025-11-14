@@ -388,9 +388,10 @@ public class BucketEndpoint extends EndpointBase {
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);
-      result.setKeyMarker(keyMarker);
+      result.setKeyMarker(EncodingTypeObject.createNullable(keyMarker, encodingType));
       result.setUploadIdMarker(uploadIdMarker);
-      result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
+      result.setNextKeyMarker(EncodingTypeObject.createNullable(
+          ozoneMultipartUploadList.getNextKeyMarker(), encodingType));
       result.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
       result.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
       result.setEncodingType(encodingType);
@@ -408,6 +409,7 @@ public class BucketEndpoint extends EndpointBase {
         }
         String relativeKeyName = keyName.substring(prefix.length());
 
+        boolean addedAsPrefix = false;
         if (!StringUtils.isEmpty(delimiter)) {
           int depth = StringUtils.countMatches(relativeKeyName, delimiter);
           if (depth > 0) {
@@ -416,19 +418,16 @@ public class BucketEndpoint extends EndpointBase {
               result.addPrefix(EncodingTypeObject.createNullable(
                   prefix + dirName + delimiter, encodingType));
               prevDir = dirName;
+              addedAsPrefix = true;
             }
           } else if (relativeKeyName.endsWith(delimiter)) {
             result.addPrefix(EncodingTypeObject.createNullable(
                 prefix + relativeKeyName, encodingType));
-          } else {
-            result.addUpload(new ListMultipartUploadsResult.Upload(
-                upload.getKeyName(),
-                upload.getUploadId(),
-                upload.getCreationTime(),
-                S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
-            ));
+            addedAsPrefix = true;
           }
-        } else {
+        }
+        
+        if (!addedAsPrefix) {
           result.addUpload(new ListMultipartUploadsResult.Upload(
               upload.getKeyName(),
               upload.getUploadId(),

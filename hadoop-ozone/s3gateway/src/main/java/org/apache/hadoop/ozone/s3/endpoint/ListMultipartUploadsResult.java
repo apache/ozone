@@ -43,14 +43,16 @@ public class ListMultipartUploadsResult {
   @XmlElement(name = "Bucket")
   private String bucket;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "KeyMarker")
-  private String keyMarker;
+  private EncodingTypeObject keyMarker;
 
   @XmlElement(name = "UploadIdMarker")
   private String uploadIdMarker;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "NextKeyMarker")
-  private String nextKeyMarker;
+  private EncodingTypeObject nextKeyMarker;
 
   @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Prefix")
@@ -86,11 +88,11 @@ public class ListMultipartUploadsResult {
     this.bucket = bucket;
   }
 
-  public String getKeyMarker() {
+  public EncodingTypeObject getKeyMarker() {
     return keyMarker;
   }
 
-  public void setKeyMarker(String keyMarker) {
+  public void setKeyMarker(EncodingTypeObject keyMarker) {
     this.keyMarker = keyMarker;
   }
 
@@ -102,11 +104,11 @@ public class ListMultipartUploadsResult {
     this.uploadIdMarker = uploadIdMarker;
   }
 
-  public String getNextKeyMarker() {
+  public EncodingTypeObject getNextKeyMarker() {
     return nextKeyMarker;
   }
 
-  public void setNextKeyMarker(String nextKeyMarker) {
+  public void setNextKeyMarker(EncodingTypeObject nextKeyMarker) {
     this.nextKeyMarker = nextKeyMarker;
   }
 
