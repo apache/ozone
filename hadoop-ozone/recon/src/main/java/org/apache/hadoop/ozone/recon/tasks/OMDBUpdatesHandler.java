@@ -23,9 +23,13 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -42,6 +46,11 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
+
+  // Track resources for proper cleanup
+  private final Set<Table<?, ?>> openTables = Collections.synchronizedSet(new HashSet<>());
+
+  private final AtomicBoolean closed = new AtomicBoolean(false);
 
   private Map<Integer, String> tablesNames;
   private OMMetadataManager omMetadataManager;
@@ -96,6 +105,11 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private void processEvent(int cfIndex, byte[] keyBytes, byte[]
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
+
+    if (closed.get()) {
+      throw new IllegalStateException("OMDBUpdatesHandler has been closed");
+    }
+
     String tableName = tablesNames.get(cfIndex);
     // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
     // and assuming to typecast as String while de-serializing will throw error.
@@ -127,6 +141,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - DELETE with a non-existing key: No action, log a warning if
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
+      openTables.add(table);  // Track for cleanup
 
       OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
@@ -333,6 +348,48 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
      * implemented as and when need arises.
      */
 
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    if (closed.compareAndSet(false, true)) {
+      LOG.debug("Closing OMDBUpdatesHandler and cleaning up {} tracked tables", openTables.size());
+
+      IOException closeException = null;
+
+      // Clean up tracked tables
+      for (Table<?, ?> table : openTables) {
+        try {
+          // Force cleanup of any cached iterators or resources
+          if (table instanceof AutoCloseable) {
+            ((AutoCloseable) table).close();
+          }
+        } catch (Exception e) {
+          LOG.warn("Error closing table during OMDBUpdatesHandler cleanup", e);
+          if (closeException == null) {
+            closeException = new IOException("Failed to close table resources", e);
+          }
+        }
+      }
+      openTables.clear();
+
+      // Clear collections to help GC
+      if (omdbUpdateEvents != null) {
+        omdbUpdateEvents.clear();
+        omdbUpdateEvents = null;
+      }
+      if (omdbLatestUpdateEvents != null) {
+        omdbLatestUpdateEvents.clear();
+        omdbLatestUpdateEvents = null;
+      }
+
+      LOG.debug("OMDBUpdatesHandler cleanup completed");
+
+      if (closeException != null) {
+        throw new RuntimeException(closeException);
+      }
+    }
   }
 
   /**
