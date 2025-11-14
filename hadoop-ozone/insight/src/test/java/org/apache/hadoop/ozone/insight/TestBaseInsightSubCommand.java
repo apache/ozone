@@ -76,4 +76,27 @@ public class TestBaseInsightSubCommand {
     String scmHost = command.getHost(conf, new Component(Type.SCM, null));
     assertTrue(scmHost.startsWith("https://"));
   }
+
+  @Test
+  public void testFallbackToRpcAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, "HTTP_ONLY");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "scm-host:9860");
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "om-host:9862");
+
+    BaseInsightSubCommand command = new BaseInsightSubCommand();
+
+    // Should fallback to hostname from RPC address with default HTTP port
+    assertEquals("http://scm-host:" + ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.SCM, null)));
+    assertEquals("http://om-host:" + OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.OM, null)));
+
+    // Should fallback to hostname from RPC address with default HTTPS port
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, "HTTPS_ONLY");
+    assertEquals("https://scm-host:" + ScmConfigKeys.OZONE_SCM_HTTPS_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.SCM, null)));
+    assertEquals("https://om-host:" + OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT,
+        command.getHost(conf, new Component(Type.OM, null)));
+  }
 }
