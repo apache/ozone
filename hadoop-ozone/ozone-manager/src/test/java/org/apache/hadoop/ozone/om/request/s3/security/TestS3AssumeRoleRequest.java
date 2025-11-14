@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +25,6 @@ import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.regex.Pattern;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
@@ -45,7 +43,6 @@ import org.junit.jupiter.api.Test;
 public class TestS3AssumeRoleRequest {
 
   private static final String ROLE_ARN_1 = "arn:aws:iam::123456789012:role/MyRole1";
-  private static final String ROLE_ARN_2 = "arn:aws:iam::123456789012:role/path/anotherLevel/Role2";
   private static final String SESSION_NAME = "testSessionName";
   private static final String ORIGINAL_ACCESS_KEY_ID = "origAccessKeyId";
 
@@ -75,7 +72,7 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("Duration: 899 is not valid");
+    assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
   }
 
@@ -94,7 +91,7 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("Duration: 43201 is not valid");
+    assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
   }
 
@@ -198,100 +195,6 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
-  public void testValidateAndExtractRoleNameFromArnSuccessCases() throws OMException {
-    assertThat(S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(ROLE_ARN_1)).isEqualTo("MyRole1");
-
-    assertThat(S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(ROLE_ARN_2)).isEqualTo("Role2");
-
-    // Path name right at 511-char max boundary
-    final String arnPrefixLen511 = repeat('p', 510) + "/"; // 510 chars + '/' = 511
-    final String arnMaxPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen511 + "RoleB";
-    assertThat(S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arnMaxPath)).isEqualTo("RoleB");
-
-    // Role name right at 64-char max boundary
-    final String roleName64 = repeat('A', 64);
-    final String arn64 = "arn:aws:iam::123456789012:role/" + roleName64;
-    assertThat(S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arn64)).isEqualTo(roleName64);
-  }
-
-  @Test
-  public void testValidateAndExtractRoleNameFromArnFailureCases() {
-    // Improper structure
-    final OMException e1 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("roleNoSlashNorColons"));
-    assertThat(e1.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e1.getMessage()).isEqualTo("Invalid role ARN: roleNoSlashNorColons");
-
-    // Null
-    final OMException e2 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(null));
-    assertThat(e2.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e2.getMessage()).isEqualTo("Role ARN is required");
-
-    // String without role name
-    final OMException e3 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/"));
-    assertThat(e3.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e3.getMessage()).isEqualTo("Invalid role ARN: missing role name");
-
-    // No role resource and no role name
-    final OMException e4 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012"));
-    assertThat(e4.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e4.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012");
-
-    // No role resource but contains role name
-    final OMException e5 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:WebRole"));
-    assertThat(e5.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e5.getMessage()).isEqualTo("Invalid role ARN: arn:aws:iam::123456789012:WebRole");
-
-    // Empty string
-    final OMException e6 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(""));
-    assertThat(e6.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e6.getMessage()).isEqualTo("Role ARN is required");
-
-    // String with only slash
-    final OMException e7 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("/"));
-    assertThat(e7.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e7.getMessage()).isEqualTo("Role ARN length: 1 is not valid");
-
-    // String with only whitespace
-    final OMException e8 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("     "));
-    assertThat(e8.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e8.getMessage()).isEqualTo("Role ARN is required");
-
-    // Path name too long (> 511 characters)
-    final String arnPrefixLen512 = repeat('q', 511) + "/"; // 511 chars + '/' = 512
-    final String arnTooLongPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen512 + "RoleA";
-    final OMException e9 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(arnTooLongPath));
-    assertThat(e9.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e9.getMessage()).isEqualTo("Role path length must be between 1 and 512 characters");
-
-    // Otherwise valid role ending in /
-    final OMException e10 = assertThrows(
-        OMException.class,
-        () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn("arn:aws:iam::123456789012:role/MyRole/"));
-    assertThat(e10.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e10.getMessage()).isEqualTo("Invalid role ARN: missing role name");  // MyRole/ is considered a path
-
-    // 65-char role name
-    final String roleName65 = repeat('B', 65);
-    final String roleArn65 = "arn:aws:iam::123456789012:role/" + roleName65;
-    final OMException e11 = assertThrows(
-        OMException.class, () -> S3AssumeRoleRequest.validateAndExtractRoleNameFromArn(roleArn65));
-    assertThat(e11.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e11.getMessage()).isEqualTo("Invalid role name: " + roleName65);
-  }
-
-  @Test
   public void testGenerateSecureRandomStringUsingChars() {
     final String chars = "ABC";
     final int length = 32;
@@ -355,7 +258,79 @@ public class TestS3AssumeRoleRequest {
     final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
         .validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(response.getOMResponse().getMessage()).isEqualTo("RoleSessionName:  is not valid");
+    assertThat(response.getOMResponse().getMessage()).isEqualTo("RoleSessionName is required");
+  }
+
+  @Test
+  public void testInvalidAssumeRoleSessionNameTooShort() {
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName("T")   // Less than 2 characters
+        ).build();
+
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
+    final OMResponse omResponse = response.getOMResponse();
+
+    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
+    assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
+    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+  }
+
+  @Test
+  public void testInvalidRoleSessionNameTooLong() {
+    final String tooLongRoleSessionName = S3SecurityTestUtils.repeat('h', 70);
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(tooLongRoleSessionName)
+        ).build();
+
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
+    final OMResponse omResponse = response.getOMResponse();
+
+    assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
+    assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
+    assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+  }
+
+  @Test
+  public void testValidRoleSessionNameMaxLengthBoundary() {
+    final String roleSessionName = S3SecurityTestUtils.repeat('g', 64);
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(roleSessionName)  // exactly max length
+        ).build();
+
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
+    final OMResponse omResponse = response.getOMResponse();
+
+    assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
+    assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+  }
+
+  @Test
+  public void testValidRoleSessionNameMinLengthBoundary() {
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName("TT")   // exactly min length
+        ).build();
+
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+        .validateAndUpdateCache(ozoneManager, context);
+    final OMResponse omResponse = response.getOMResponse();
+
+    assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
+    assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
   }
 
   @Test
@@ -383,17 +358,6 @@ public class TestS3AssumeRoleRequest {
             S3Authentication.newBuilder()
                 .setAccessId(ORIGINAL_ACCESS_KEY_ID)
         );
-  }
-
-  /**
-   * Generates a string of length count containing the char c repeated.
-   */
-  private static String repeat(char c, int count) {
-    final StringBuilder sb = new StringBuilder(count);
-    for (int i = 0; i < count; i++) {
-      sb.append(c);
-    }
-    return sb.toString();
   }
 }
 

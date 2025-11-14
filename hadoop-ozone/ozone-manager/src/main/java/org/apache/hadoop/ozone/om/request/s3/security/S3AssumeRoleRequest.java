@@ -51,9 +51,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   private static final int STS_SECRET_ACCESS_KEY_LENGTH = 40;
   private static final int STS_ROLE_ID_LENGTH = 16;
   private static final String ASSUME_ROLE_ID_PREFIX = "AROA";
-  private static final int ASSUME_ROLE_NAME_MAX_LENGTH = 64;
-  private static final int ASSUME_ROLE_ARN_MIN_LENGTH = 20;
-  private static final int ASSUME_ROLE_ARN_MAX_LENGTH = 2048;
+  private static final int ASSUME_ROLE_SESSION_NAME_MIN_LENGTH = 2;
+  private static final int ASSUME_ROLE_SESSION_NAME_MAX_LENGTH = 64;
   private static final String CHARS_FOR_ACCESS_KEY_IDS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   private static final int CHARS_FOR_ACCESS_KEY_IDS_LENGTH = CHARS_FOR_ACCESS_KEY_IDS.length();
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
@@ -71,27 +70,25 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final int durationSeconds = assumeRoleRequest.getDurationSeconds();
 
     // Validate duration
-    if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS ||
-        durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
+    if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS || durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
       final OMException omException = new OMException(
-          "Duration: " + durationSeconds + " is not valid", OMException.ResultCodes.INVALID_REQUEST);
+          "Duration must be between " + MIN_TOKEN_EXPIRATION_SECONDS + " and " + MAX_TOKEN_EXPIRATION_SECONDS,
+          OMException.ResultCodes.INVALID_REQUEST);
       return new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
 
     // Validate role session name
     final String roleSessionName = assumeRoleRequest.getRoleSessionName();
-    if (StringUtils.isBlank(roleSessionName)) {
-      final OMException omException = new OMException(
-          "RoleSessionName: " + roleSessionName + " is not valid", OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+    final S3AssumeRoleResponse roleSessionNameErrorResponse = validateRoleSessionName(roleSessionName, omRequest);
+    if (roleSessionNameErrorResponse != null) {
+      return roleSessionNameErrorResponse;
     }
 
     final String roleArn = assumeRoleRequest.getRoleArn();
     try {
       // Validate role ARN and extract role
-      final String targetRoleName = validateAndExtractRoleNameFromArn(roleArn);
+      final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
 
       if (!omRequest.hasS3Authentication()) {
         final String msg = "S3AssumeRoleRequest does not have S3 authentication";
@@ -128,14 +125,34 @@ public class S3AssumeRoleRequest extends OMClientRequest {
               .setAssumeRoleResponse(responseBuilder.build())
               .build());
     } catch (OMException e) {
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
+      return new S3AssumeRoleResponse(createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
     } catch (IOException e) {
       final OMException omException = new OMException(
           "Failed to generate STS token for role: " + roleArn, e, OMException.ResultCodes.INTERNAL_ERROR);
       return new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
+  }
+
+  /**
+   * Ensures RoleSessionName is valid.
+   */
+  private S3AssumeRoleResponse validateRoleSessionName(String roleSessionName, OMRequest omRequest) {
+    if (StringUtils.isBlank(roleSessionName)) {
+      final OMException omException = new OMException(
+          "RoleSessionName is required", OMException.ResultCodes.INVALID_REQUEST);
+      return new S3AssumeRoleResponse(
+          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+    }
+    if (roleSessionName.length() < ASSUME_ROLE_SESSION_NAME_MIN_LENGTH ||
+        roleSessionName.length() > ASSUME_ROLE_SESSION_NAME_MAX_LENGTH) {
+      final OMException omException = new OMException(
+          "RoleSessionName length must be between " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + " and " +
+          ASSUME_ROLE_SESSION_NAME_MAX_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
+      return new S3AssumeRoleResponse(
+          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+    }
+    return null;
   }
 
   /**
@@ -163,12 +180,21 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     final String roleArn = assumeRoleRequest.getRoleArn();
     final String sessionPolicy = getSessionPolicy(
-        ozoneManager, originalAccessKeyId, assumeRoleRequest.getAwsIamSessionPolicy(), hostName,
-        remoteIp, ugi, targetRoleName);
+        ozoneManager, originalAccessKeyId, assumeRoleRequest.getAwsIamSessionPolicy(), hostName, remoteIp, ugi,
+        targetRoleName);
 
     // TODO sts - generate a real STS token in a future PR that incorporates the components above
-    return originalAccessKeyId + ":" + roleArn + ":" + assumeRoleRequest.getDurationSeconds() +
-        ":" + secretAccessKey + ":" + sessionPolicy;
+    final StringBuilder builder = new StringBuilder();
+    builder.append(originalAccessKeyId);
+    builder.append(':');
+    builder.append(roleArn);
+    builder.append(':');
+    builder.append(assumeRoleRequest.getDurationSeconds());
+    builder.append(':');
+    builder.append(secretAccessKey);
+    builder.append(':');
+    builder.append(sessionPolicy);
+    return builder.toString();
   }
 
   /**
@@ -192,106 +218,5 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       sb.append(chars.charAt(SECURE_RANDOM.nextInt(charsLength)));
     }
     return sb.toString();
-  }
-
-  /**
-   * Extract the role name from an AWS-style role ARN, falling back to the
-   * full ARN if parsing is not possible. Examples:
-   * arn:aws:iam::123456789012:role/RoleA -> RoleA
-   * arn:aws:iam::123456789012:role/path/RoleB -> RoleB
-   */
-  @VisibleForTesting
-  static String validateAndExtractRoleNameFromArn(String roleArn) throws OMException {
-    if (StringUtils.isBlank(roleArn)) {
-      throw new OMException("Role ARN is required", OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    final int roleArnLength = roleArn.length();
-    if (roleArnLength < ASSUME_ROLE_ARN_MIN_LENGTH || roleArnLength > ASSUME_ROLE_ARN_MAX_LENGTH) {
-      throw new OMException(
-          "Role ARN length: " + roleArnLength + " is not valid", OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    // Expected format: arn:aws:iam::123456789012:role/[optional path segments/]RoleName
-    if (!roleArn.startsWith("arn:aws:iam::")) {
-      throw new OMException("Invalid role ARN: " + roleArn, OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    // Split ARN into parts: arn:aws:iam::accountId:role/path/name
-    final String[] parts = roleArn.split(":", 6);
-    if (parts.length < 6 || !parts[5].startsWith("role/")) {
-      throw new OMException("Invalid role ARN: " + roleArn, OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    // Validate account ID (12 digits)
-    final String accountId = parts[4];
-    if (accountId.length() != 12 || !isAllDigits(accountId)) {
-      throw new OMException("Invalid AWS account ID in ARN", OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    // Extract role name (last segment after last slash)
-    final String rolePath = parts[5].substring(5); // Skip "role/"
-    if (rolePath.isEmpty() || rolePath.endsWith("/")) {
-      throw new OMException("Invalid role ARN: missing role name", OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    final String[] pathSegments = rolePath.split("/");
-    final String roleName = pathSegments[pathSegments.length - 1];
-
-    // Validate role name
-    if (roleName.isEmpty() || roleName.length() > ASSUME_ROLE_NAME_MAX_LENGTH ||
-        hasCharNotAllowedInIamRoleArn(roleName)) {
-      throw new OMException("Invalid role name: " + roleName, OMException.ResultCodes.INVALID_REQUEST);
-    }
-
-    // Validate path segments if present
-    if (pathSegments.length > 1) {
-      final String pathPrefix = rolePath.substring(0, rolePath.lastIndexOf('/') + 1);
-      if (pathPrefix.length() > 511) {
-        throw new OMException(
-            "Role path length must be between 1 and 512 characters", OMException.ResultCodes.INVALID_REQUEST);
-      }
-      for (String segment : pathSegments) {
-        if (segment.isEmpty() || hasCharNotAllowedInIamRoleArn(segment)) {
-          throw new OMException("Invalid role path segment: " + segment, OMException.ResultCodes.INVALID_REQUEST);
-        }
-      }
-    }
-
-    return roleName;
-  }
-
-  /**
-   * Checks if all the characters in a String are numbers.
-   */
-  private static boolean isAllDigits(String s) {
-    for (int i = 0; i < s.length(); i++) {
-      if (!Character.isDigit(s.charAt(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Checks if supplied string contains a char that is not allowed in IAM Role ARN.
-   */
-  private static boolean hasCharNotAllowedInIamRoleArn(String s) {
-    for (int i = 0; i < s.length(); i++) {
-      if (!isCharAllowedInIamRoleArn(s.charAt(i))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Checks if the supplied chars is allowed in IAM Role ARN.
-   */
-  private static boolean isCharAllowedInIamRoleArn(char c) {
-    return (c >= 'A' && c <= 'Z')
-        || (c >= 'a' && c <= 'z')
-        || (c >= '0' && c <= '9')
-        || c == '+' || c == '=' || c == ',' || c == '.' || c == '@' || c == '_' || c == '-';
   }
 }
