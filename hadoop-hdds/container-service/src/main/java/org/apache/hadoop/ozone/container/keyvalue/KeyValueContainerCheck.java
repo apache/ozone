@@ -383,7 +383,7 @@ public class KeyValueContainerCheck {
         } else if (chunk.getChecksumData().getType() != ContainerProtos.ChecksumType.NONE) {
           // Before adding chunks, add a block entry to the tree to represent cases where the block exists but has no
           // chunks.
-          currentTree.addBlock(block.getBlockID().getLocalID());
+          currentTree.addBlock(block.getBlockID().getLocalID(), block.getBlockCommitSequenceId());
           int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
           ByteBuffer buffer = BUFFER_POOL.getBuffer(bytesPerChecksum);
           // Keep scanning the block even if there are errors with individual chunks.
