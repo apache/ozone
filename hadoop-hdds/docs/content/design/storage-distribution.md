@@ -314,7 +314,6 @@ To enable this, components should expose metrics that can be scraped by Promethe
   - Recon has already methods that are available to calculate the following information.
     - open key used space
     - committed key used space 
-    - containerPreAllocated space
     - pending deletion 
   - In every OM db syncing, we can update these metrics values.
 
