@@ -21,7 +21,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -46,6 +45,6 @@ public interface DeltaFileComputer extends Closeable {
    *         an empty {@code Optional} if no changes are found
    * @throws IOException if an I/O error occurs while retrieving delta files
    */
-  Optional<Collection<Pair<Path, SstFileInfo>>> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
+  Collection<Pair<Path, SstFileInfo>> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
       Set<String> tablesToLookup) throws IOException;
 }

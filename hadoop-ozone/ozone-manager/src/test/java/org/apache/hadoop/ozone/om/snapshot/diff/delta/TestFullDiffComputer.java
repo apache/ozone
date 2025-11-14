@@ -249,8 +249,7 @@ public class TestFullDiffComputer {
         Collectors.toMap(entry -> snapDirectory.resolve(entry.getKey()), Map.Entry::getValue)),
         result);
 
-    Set<Object> iNodes = fullDiffComputer.getDeltaFiles(fromSnapshot, toSnapshot,
-            tablesToLookup).orElse(Collections.emptyList()).stream()
+    Set<Object> iNodes = fullDiffComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup).stream()
         .map(Pair::getKey).map(path -> {
           try {
             return getINode(path);

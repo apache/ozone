@@ -87,18 +87,20 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
    * @param tablePrefixInfo information about table prefixes to apply during computation
    * @return an Optional containing a map where the key is the delta file path, and the value
    *         is a pair consisting of a resolved path and the corresponding SST file information.
-   *         If there are no delta files, returns an empty Optional.
+   *         Return empty if the delta files could not be computed.
    * @throws IOException if an I/O error occurs during the computation process
    */
   abstract Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshot,
       SnapshotInfo toSnapshot, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException;
 
   @Override
-  public Optional<Collection<Pair<Path, SstFileInfo>>> getDeltaFiles(SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
-      Set<String> tablesToLookup) throws IOException {
+  public final Collection<Pair<Path, SstFileInfo>> getDeltaFiles(SnapshotInfo fromSnapshot,
+      SnapshotInfo toSnapshot, Set<String> tablesToLookup) throws IOException {
     TablePrefixInfo tablePrefixInfo = activeMetadataManager.getTableBucketPrefix(fromSnapshot.getVolumeName(),
         fromSnapshot.getBucketName());
-    return computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo).map(Map::values);
+    return computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup,
+        tablePrefixInfo).map(Map::values).orElseThrow(() -> new IOException("Failed to compute delta files for " +
+        "snapshots " + fromSnapshot + " and " + toSnapshot));
   }
 
   void updateActivity(SubStatus status) {

@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -195,6 +197,7 @@ public class TestFileLinkDeltaFileComputer {
     Path expectedNextLink = deltaDirPath.resolve("2.sst");
     Files.createFile(expectedNextLink);
 
+    expectedNextLink = deltaDirPath.resolve("3.sst");
     // Try to create another link - it should handle the FileAlreadyExistsException
     Path secondLink = deltaFileComputer.createLink(sourceFile);
     assertEquals(expectedNextLink, secondLink);
@@ -363,11 +366,10 @@ public class TestFileLinkDeltaFileComputer {
 
     deltaFileComputer.setComputeDeltaFilesResult(Optional.of(deltaMap));
 
-    Optional<java.util.Collection<Pair<Path, SstFileInfo>>> result =
+    Collection<Pair<Path, SstFileInfo>> result =
         deltaFileComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup);
 
-    assertTrue(result.isPresent(), "Result should be present");
-    assertEquals(1, result.get().size(), "Should have one delta file");
+    assertEquals(1, result.size(), "Should have one delta file");
     verify(activeMetadataManager, times(1)).getTableBucketPrefix("vol1", "bucket1");
   }
 
@@ -388,10 +390,7 @@ public class TestFileLinkDeltaFileComputer {
 
     deltaFileComputer.setComputeDeltaFilesResult(Optional.empty());
 
-    Optional<java.util.Collection<Pair<Path, SstFileInfo>>> result =
-        deltaFileComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup);
-
-    assertFalse(result.isPresent(), "Result should be empty");
+    assertThrows(IOException.class, () -> deltaFileComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup));
   }
 
   /**
