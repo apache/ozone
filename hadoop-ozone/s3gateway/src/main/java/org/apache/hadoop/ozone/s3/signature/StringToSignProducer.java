@@ -108,6 +108,7 @@ public final class StringToSignProducer {
         fromMultiValueToSingleValueMap(
             context.getUriInfo().getQueryParameters()));
 
+    // validate x-amz-content-sha256
     String payloadHash = getPayloadHash(lowerCaseKeyStringMap, !signatureInfo.isSignPayload());
     if (!VALID_UNSIGNED_PAYLOADS.contains(payloadHash)) {
       byte[] payload = IOUtils.toByteArray(context.getEntityStream());
@@ -375,7 +376,7 @@ public final class StringToSignProducer {
       }
       break;
     case X_AMZ_CONTENT_SHA256:
-      // TODO: Construct request payload and match HEX(SHA256(requestPayload))
+      // validate x-amz-content-sha256 after creating the signatureBase
       break;
     default:
       break;
