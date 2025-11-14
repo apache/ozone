@@ -4,7 +4,7 @@ summary: STS Support in Ozone
 date: 2025-10-30
 jira: HDDS-13323
 status: implementing
-author: Ren Koike, Fabian Morgan
+author: Madhan Neethiraj, Ren Koike, Fabian Morgan, Stephen O'Donnell, Istvan Fajth, Uma Maheswara Rao Gangumalla
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
