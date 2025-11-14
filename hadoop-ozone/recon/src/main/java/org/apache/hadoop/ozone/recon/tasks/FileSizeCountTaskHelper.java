@@ -48,11 +48,16 @@ public abstract class FileSizeCountTaskHelper {
   private static final Object TRUNCATE_LOCK = new Object();
 
   /**
-   * Static write lock for cross-task synchronization during DB writes.
-   * Ensures read-modify-write operations are atomic when FSO and OBS tasks
-   * flush concurrently to the same FileSizeCountKey bins.
+   * GLOBAL lock for cross-task synchronization during DB writes.
+   * 
+   * Scope: Shared across ALL tasks (FSO, OBS, Legacy)
+   * Protects: RocksDB read-modify-write operations
+   * Purpose: Ensures atomic updates when multiple tasks flush concurrently to the same bins
+   * 
+   * IMPORTANT: Callers MUST acquire this lock before calling writeCountsToDB().
+   * This lock should NOT be acquired inside writeCountsToDB() to avoid nested locking.
    */
-  private static final ReentrantReadWriteLock FILE_COUNT_WRITE_LOCK = 
+  public static final ReentrantReadWriteLock FILE_COUNT_WRITE_LOCK = 
       new ReentrantReadWriteLock();
 
   /**
@@ -137,7 +142,13 @@ public abstract class FileSizeCountTaskHelper {
     long iterationEndTime = Time.monotonicNow();
     
     long writeStartTime = Time.monotonicNow();
-    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    // Acquire GLOBAL lock (cross-task) before writing to DB
+    FILE_COUNT_WRITE_LOCK.writeLock().lock();
+    try {
+      writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    } finally {
+      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
+    }
     long writeEndTime = Time.monotonicNow();
     
     long overallEndTime = Time.monotonicNow();
@@ -168,7 +179,8 @@ public abstract class FileSizeCountTaskHelper {
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
     
-    // Use fair lock to prevent write lock starvation when flushing
+    // LOCAL lock (task-specific) - coordinates worker threads within this task only
+    // Protects: in-memory fileSizeCountMap from concurrent access by workers in THIS task
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
     AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
@@ -187,21 +199,27 @@ public abstract class FileSizeCountTaskHelper {
       if (fileSizeCountMap.size() >= FLUSH_THRESHOLD &&
           isFlushingInProgress.compareAndSet(false, true)) {
         try {
+          // Step 1: Acquire LOCAL lock (task-specific) to stop worker threads in THIS task
           lock.writeLock().lock();
           try {
             // Double-check after acquiring write lock
             if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
               LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-              writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-              fileSizeCountMap.clear();
+              // Step 2: Acquire GLOBAL lock (cross-task) to protect DB from concurrent FSO/OBS/Legacy writes
+              FILE_COUNT_WRITE_LOCK.writeLock().lock();
+              try {
+                writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+                fileSizeCountMap.clear();
+              } finally {
+                FILE_COUNT_WRITE_LOCK.writeLock().unlock();  // Release GLOBAL lock
+              }
             }
           } finally {
             isFlushingInProgress.set(false);  // Reset flag after flush completes
+            lock.writeLock().unlock();  // Release LOCAL lock
           }
         } catch (Exception e) {
           throw new RuntimeException("Failed to flush file size counts", e);
-        } finally {
-          lock.writeLock().unlock();
         }
       }
       return null;
@@ -283,7 +301,13 @@ public abstract class FileSizeCountTaskHelper {
       }
     }
     
-    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    // Acquire GLOBAL lock (cross-task) before writing to DB
+    FILE_COUNT_WRITE_LOCK.writeLock().lock();
+    try {
+      writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    } finally {
+      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
+    }
     
     LOG.debug("{} successfully processed using RocksDB in {} milliseconds", taskName,
         (Time.monotonicNow() - startTime));
@@ -292,6 +316,9 @@ public abstract class FileSizeCountTaskHelper {
 
   /**
    * Writes the accumulated file size counts to RocksDB using ReconFileMetadataManager.
+   * 
+   * IMPORTANT: Caller MUST hold FILE_COUNT_WRITE_LOCK.writeLock() before calling this method.
+   * This ensures atomic read-modify-write operations across concurrent FSO/OBS task flushes.
    */
   public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
                                      ReconFileMetadataManager reconFileMetadataManager) {
@@ -299,8 +326,7 @@ public abstract class FileSizeCountTaskHelper {
       return;
     }
 
-    // Global write lock ensures atomic read-modify-write across concurrent FSO/OBS flushes
-    FILE_COUNT_WRITE_LOCK.writeLock().lock();
+    // Note: Caller must already hold FILE_COUNT_WRITE_LOCK.writeLock()
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
         FileSizeCountKey key = entry.getKey();
@@ -322,8 +348,6 @@ public abstract class FileSizeCountTaskHelper {
     } catch (Exception e) {
       LOG.error("Error writing file size counts to RocksDB", e);
       throw new RuntimeException("Failed to write to RocksDB", e);
-    } finally {
-      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
     }
   }
 
