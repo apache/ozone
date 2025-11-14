@@ -68,12 +68,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * @param sessionPolicy       an optional opaque identifier that further limits the scope of
    *                            the permissions granted by the role
    */
-  public STSTokenIdentifier(String tempAccessKeyId,
-                            String originalAccessKeyId,
-                            String roleArn,
-                            Instant expiry,
-                            String secretAccessKey,
-                            String sessionPolicy) {
+  public STSTokenIdentifier(String tempAccessKeyId, String originalAccessKeyId, String roleArn, Instant expiry,
+      String secretAccessKey, String sessionPolicy) {
     super(tempAccessKeyId, expiry);
     this.originalAccessKeyId = originalAccessKeyId;
     this.roleArn = roleArn;
@@ -157,10 +153,8 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         setSecretKeyId(UUID.fromString(token.getSecretKeyId()));
       } catch (IllegalArgumentException e) {
         // Handle invalid UUID format gracefully
-        throw new IOException("Invalid secretKeyId format in STS token: " +
-            token.getSecretKeyId(),
-            e
-        );
+        throw new IOException(
+            "Invalid secretKeyId format in STS token: " + token.getSecretKeyId(), e);
       }
     }
 
@@ -210,32 +204,23 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     }
 
     final STSTokenIdentifier that = (STSTokenIdentifier) o;
-    return Objects.equals(roleArn, that.roleArn) &&
-        Objects.equals(secretAccessKey, that.secretAccessKey) &&
+    return Objects.equals(roleArn, that.roleArn) && Objects.equals(secretAccessKey, that.secretAccessKey) &&
         Objects.equals(originalAccessKeyId, that.originalAccessKeyId) &&
         Objects.equals(sessionPolicy, that.sessionPolicy);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(),
-        roleArn,
-        secretAccessKey,
-        originalAccessKeyId,
-        sessionPolicy
-    );
+    return Objects.hash(
+        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy);
   }
 
   @Override
   public String toString() {
     // Intentionally left off secretAccessKey
-    return "STSTokenIdentifier{" +
-        "tempAccessKeyId='" + getOwnerId() + "'" +
-        ", originalAccessKeyId='" + originalAccessKeyId + "'" +
-        ", roleArn='" + roleArn + "'" +
-        ", expiry='" + getExpiry() + "'" +
-        ", secretKeyId='" + getSecretKeyId() + "'" +
-        ", sessionPolicy='" + sessionPolicy + "'" +
-        '}';
+    return "STSTokenIdentifier{" + "tempAccessKeyId='" + getOwnerId() + "'" +
+        ", originalAccessKeyId='" + originalAccessKeyId + "', roleArn='" + roleArn + "'" +
+        ", expiry='" + getExpiry() + "', secretKeyId='" + getSecretKeyId() + "'" +
+        ", sessionPolicy='" + sessionPolicy + "'}";
   }
 }
