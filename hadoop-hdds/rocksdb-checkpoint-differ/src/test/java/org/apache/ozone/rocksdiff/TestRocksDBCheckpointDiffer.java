@@ -934,7 +934,6 @@ public class TestRocksDBCheckpointDiffer {
               .map(i -> i.stream().map(SstFileInfo::getFileName).sorted().collect(Collectors.toList())).orElse(null));
     } catch (RuntimeException rtEx) {
       if (!expectingException) {
-        rtEx.printStackTrace();
         fail("Unexpected exception thrown in test.");
       } else {
         exceptionThrown = true;
