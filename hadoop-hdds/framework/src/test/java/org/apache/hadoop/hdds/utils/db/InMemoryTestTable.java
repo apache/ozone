@@ -21,21 +21,22 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.NavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 
 /**
  * InMemory Table implementation for tests.
  */
-public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
-  private final Map<KEY, VALUE> map;
+public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
+  private final NavigableMap<KEY, VALUE> map;
 
   public InMemoryTestTable() {
     this(Collections.emptyMap());
   }
 
   public InMemoryTestTable(Map<KEY, VALUE> map) {
-    this.map = new ConcurrentHashMap<>();
+    this.map = new ConcurrentSkipListMap<>(map);
     this.map.putAll(map);
   }
 
@@ -123,5 +124,9 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void loadFromFile(File externalFile) {
     throw new UnsupportedOperationException();
+  }
+
+  NavigableMap<KEY, VALUE> getMap() {
+    return map;
   }
 }

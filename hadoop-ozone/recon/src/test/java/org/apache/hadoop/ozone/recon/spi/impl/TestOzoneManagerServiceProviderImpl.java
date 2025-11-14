@@ -66,7 +66,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
@@ -91,7 +91,6 @@ public class TestOzoneManagerServiceProviderImpl {
 
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
-  private CommonUtils commonUtils;
   private ReconContext reconContext;
 
   @BeforeEach
@@ -104,7 +103,6 @@ public class TestOzoneManagerServiceProviderImpl {
         dirReconDB.getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
-    commonUtils = new CommonUtils();
     reconContext = new ReconContext(configuration, new ReconUtils());
   }
 
@@ -141,7 +139,7 @@ public class TestOzoneManagerServiceProviderImpl {
           .thenReturn(httpURLConnectionMock);
       when(reconUtilsMock.getReconNodeDetails(
           any(OzoneConfiguration.class))).thenReturn(
-          commonUtils.getReconNodeDetails());
+          ReconTestUtils.getReconNodeDetails());
       ReconTaskController reconTaskController = getMockTaskController();
 
       OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -187,7 +185,7 @@ public class TestOzoneManagerServiceProviderImpl {
         .thenThrow(new IOException("Mocked IOException"));
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
+        ReconTestUtils.getReconNodeDetails());
     ReconTaskController reconTaskController = getMockTaskController();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -229,7 +227,7 @@ public class TestOzoneManagerServiceProviderImpl {
       when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
           .thenReturn(httpURLConnectionMock);
       when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
-          .thenReturn(commonUtils.getReconNodeDetails());
+          .thenReturn(ReconTestUtils.getReconNodeDetails());
       ReconTaskController reconTaskController = getMockTaskController();
 
       reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -278,7 +276,7 @@ public class TestOzoneManagerServiceProviderImpl {
           .thenReturn(httpURLConnectionMock1);
       when(reconUtilsMock.getReconNodeDetails(
           any(OzoneConfiguration.class))).thenReturn(
-          commonUtils.getReconNodeDetails());
+          ReconTestUtils.getReconNodeDetails());
 
       OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
           new OzoneManagerServiceProviderImpl(configuration,
@@ -331,7 +329,7 @@ public class TestOzoneManagerServiceProviderImpl {
           .thenReturn(httpURLConnectionMock);
       when(reconUtilsMock.getReconNodeDetails(
           any(OzoneConfiguration.class))).thenReturn(
-          commonUtils.getReconNodeDetails());
+          ReconTestUtils.getReconNodeDetails());
       ReconOMMetadataManager reconOMMetadataManager =
           mock(ReconOMMetadataManager.class);
       ReconTaskController reconTaskController = getMockTaskController();
