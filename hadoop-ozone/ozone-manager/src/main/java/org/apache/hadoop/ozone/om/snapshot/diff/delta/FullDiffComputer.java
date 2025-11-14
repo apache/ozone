@@ -88,8 +88,8 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
         LOG.error("Exception occurred while populating delta files for snapDiff", e);
         LOG.warn("Falling back to full file list comparison, inode-based optimization skipped.");
         paths.clear();
-        Set<SstFileInfo> fromSnapshotFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookup, tablePrefixInfo);
-        Set<SstFileInfo> toSnapshotFiles = getSSTFileListForSnapshot(toSnapshot, tablesToLookup, tablePrefixInfo);
+        Set<SstFileInfo> fromSnapshotFiles = getSSTFileSetForSnapshot(fromSnapshot, tablesToLookup, tablePrefixInfo);
+        Set<SstFileInfo> toSnapshotFiles = getSSTFileSetForSnapshot(toSnapshot, tablesToLookup, tablePrefixInfo);
         for (SstFileInfo sstFileInfo : fromSnapshotFiles) {
           Path source = sstFileInfo.getFilePath(fromSnapshotPath);
           paths.put(source, Pair.of(createLink(source), sstFileInfo));
@@ -109,7 +109,7 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
         .getStore()).getDb().getManagedRocksDb(), tablesToLookUp), tablesToLookUp, tablePrefixInfo);
   }
 
-  static Set<SstFileInfo> getSSTFileListForSnapshot(OmSnapshot snapshot, Set<String> tablesToLookUp,
+  static Set<SstFileInfo> getSSTFileSetForSnapshot(OmSnapshot snapshot, Set<String> tablesToLookUp,
       TablePrefixInfo tablePrefixInfo) {
     return filterRelevantSstFiles(RdbUtil.getSSTFilesForComparison(((RDBStore)snapshot.getMetadataManager().getStore())
             .getDb().getManagedRocksDb(), tablesToLookUp), tablesToLookUp, tablePrefixInfo);
