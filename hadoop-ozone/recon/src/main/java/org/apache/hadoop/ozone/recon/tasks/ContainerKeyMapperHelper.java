@@ -222,7 +222,7 @@ public abstract class ContainerKeyMapperHelper {
     return true;
   }
 
-  private static synchronized boolean checkAndCallFlushToDB(Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
+  private static boolean checkAndCallFlushToDB(Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
                                                long containerKeyFlushToDBMaxThreshold,
                                                ReconContainerMetadataManager reconContainerMetadataManager) {
     if (localContainerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {

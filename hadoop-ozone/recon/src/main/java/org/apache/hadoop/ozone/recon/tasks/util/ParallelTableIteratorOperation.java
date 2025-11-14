@@ -213,8 +213,17 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
               break;
             }
           }
-        } catch (IOException | ExecutionException | InterruptedException e) {
-          throw new RuntimeException(e);
+        } catch (IOException e) {
+          LOG.error("IO error during parallel iteration on table {}", taskName, e);
+          throw new RuntimeException("IO error during iteration", e);
+        } catch (InterruptedException e) {
+          LOG.warn("Parallel iteration interrupted for task {}", taskName, e);
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Iteration interrupted", e);
+        } catch (ExecutionException e) {
+          Throwable cause = e.getCause();
+          LOG.error("Task execution failed for {}: {}", taskName, cause.getMessage(), cause);
+          throw new RuntimeException("Task execution failed", cause);
         }
       }));
     }
