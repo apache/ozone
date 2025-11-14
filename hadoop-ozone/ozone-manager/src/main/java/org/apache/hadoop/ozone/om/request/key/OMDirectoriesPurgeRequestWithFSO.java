@@ -255,7 +255,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
-      mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys));
+      if (lockAcquired) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys));
+      }  
     }
 
     return new OMDirectoriesPurgeResponseWithFSO(
