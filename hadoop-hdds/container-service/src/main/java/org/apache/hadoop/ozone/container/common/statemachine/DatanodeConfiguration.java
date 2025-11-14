@@ -83,7 +83,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
-  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 1;
+  static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
@@ -601,15 +601,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
       containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
     }
-
-//    if (periodicDiskCheckIntervalMinutes < 1) {
-//      LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
-//              " must be greater than zero and was set to {}. Defaulting to {}",
-//          periodicDiskCheckIntervalMinutes,
-//          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
-//      periodicDiskCheckIntervalMinutes =
-//          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
-//    }
 
     if (periodicDiskCheckIntervalMinutes == 0) {
       LOG.warn("{} must not be zero. Defaulting to {}",

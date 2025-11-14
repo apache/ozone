@@ -108,7 +108,7 @@ public class TestDatanodeConfiguration {
   public void overridesInvalidValues() {
     // GIVEN
     int invalidDeleteThreads = 0;
-    long invalidDiskCheckIntervalMinutes = -1;
+    long invalidDiskCheckIntervalMinutes = 0;
     int invalidFailedVolumesTolerated = -2;
     long invalidDiskCheckMinGap = -1;
     long invalidDiskCheckTimeout = -1;
