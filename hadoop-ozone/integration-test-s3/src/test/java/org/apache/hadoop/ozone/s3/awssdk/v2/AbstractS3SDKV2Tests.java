@@ -320,7 +320,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     }
     assertThat(s3Objects).hasSize(2);
     assertEquals(s3Objects.stream()
-            .map(S3Object::key).collect(Collectors.toList()),
+        .map(S3Object::key).collect(Collectors.toList()),
         keyNames.subList(0, 2));
     for (S3Object s3Object : s3Objects) {
       assertEquals(keyToEtag.get(s3Object.key()), s3Object.eTag());
