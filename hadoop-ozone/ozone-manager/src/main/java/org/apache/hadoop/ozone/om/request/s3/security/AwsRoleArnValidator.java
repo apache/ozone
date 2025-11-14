@@ -34,9 +34,12 @@ public final class AwsRoleArnValidator {
 
   /**
    * Extract the role name from an AWS-style role ARN, falling back to the
-   * full ARN if parsing is not possible. Examples:
+   * full ARN if parsing is not possible.
+   * Examples:
+   * <pre>{@code
    * arn:aws:iam::123456789012:role/RoleA -> RoleA
    * arn:aws:iam::123456789012:role/path/RoleB -> RoleB
+   * }</pre>
    *
    * @param roleArn the AWS role ARN to validate and extract from
    * @return the extracted role name
