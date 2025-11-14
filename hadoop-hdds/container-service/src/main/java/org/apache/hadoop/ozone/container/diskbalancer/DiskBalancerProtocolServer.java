@@ -115,9 +115,17 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
       info.setOperationalState(DiskBalancerRunningStatus.PAUSED);
     }
 
+    DiskBalancerConfiguration finalConfig;
     if (configProto != null) {
-      info.updateFromConf(DiskBalancerConfiguration.fromProtobuf(configProto));
+      // only update fields present in configProto
+      DiskBalancerConfiguration existingConfig = info.toConfiguration();
+      finalConfig = DiskBalancerConfiguration.fromProtobuf(configProto, existingConfig);
+      info.updateFromConf(finalConfig);
+    } else {
+      finalConfig = info.toConfiguration();
     }
+
+    LOG.info("DiskBalancer opType : START \n{}", finalConfig);
     refreshService(info);
   }
 
@@ -125,6 +133,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
   public void stopDiskBalancer() throws IOException {
     adminChecker.check("stopDiskBalancer");
     DiskBalancerInfo info = getDiskBalancerInfo();
+    LOG.info("DiskBalancer opType : STOP");
     info.setOperationalState(DiskBalancerRunningStatus.STOPPED);
     refreshService(info);
   }
@@ -134,7 +143,12 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
       throws IOException {
     adminChecker.check("updateDiskBalancerConfiguration");
     DiskBalancerInfo info = getDiskBalancerInfo();
-    info.updateFromConf(DiskBalancerConfiguration.fromProtobuf(configProto));
+
+    // only update fields present in configProto
+    DiskBalancerConfiguration currentConfig = info.toConfiguration();
+    DiskBalancerConfiguration updateConfig = DiskBalancerConfiguration.fromProtobuf(configProto, currentConfig);
+    info.updateFromConf(updateConfig);
+    LOG.info("DiskBalancer opType : UPDATE :\n{}", updateConfig);
     refreshService(info);
   }
 

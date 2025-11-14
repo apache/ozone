@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 /**
@@ -50,10 +51,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
-    // Validate that either -d or --in-service-datanodes is specified
+    // Validate that either datanode addresses or --in-service-datanodes is specified
     if ((options.getDatanodes() == null || options.getDatanodes().isEmpty()) 
         && !options.isInServiceDatanodes()) {
-      System.err.println("Error: Either -d/--datanodes or --in-service-datanodes must be specified.");
+      System.err.println("Error: Either datanode address(es) or --in-service-datanodes must be specified.");
       return null;
     }
 
@@ -77,17 +78,50 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     // Execute on all target datanodes and collect results
     List<String> successNodes = new ArrayList<>();
     List<String> failedNodes = new ArrayList<>();
+    List<Object> jsonResults = new ArrayList<>();
+    StringBuilder errorBuilder = new StringBuilder();
     
+    // Execute commands and collect results
     for (String dn : targetDatanodes) {
-      if (executeCommand(dn)) {
-        successNodes.add(dn);
-      } else {
+      try {
+        Object result = executeCommand(dn);
+        if (result != null) {
+          successNodes.add(dn);
+          if (options.isJson()) {
+            jsonResults.add(result);
+          }
+        } else {
+          failedNodes.add(dn);
+          if (options.isJson()) {
+            errorBuilder.append("Error on node [").append(dn)
+                .append("]: Command execution failed\n");
+          }
+        }
+      } catch (Exception e) {
         failedNodes.add(dn);
+        if (options.isJson()) {
+          String errorMsg = e.getMessage();
+          if (errorMsg != null && errorMsg.contains("\n")) {
+            errorMsg = errorMsg.split("\n", 2)[0];
+          }
+          errorBuilder.append("Error on node [").append(dn)
+              .append("]: ").append(errorMsg != null ? errorMsg : e.getClass().getSimpleName())
+              .append('\n');
+        }
       }
     }
     
-    // Display consolidated results
-    displayResults(successNodes, failedNodes);
+    // Output results
+    if (options.isJson()) {
+      if (!jsonResults.isEmpty()) {
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(jsonResults));
+      }
+      if (errorBuilder.length() > 0) {
+        System.err.print(errorBuilder);
+      }
+    } else {
+      displayResults(successNodes, failedNodes);
+    }
     return null;
   }
 
@@ -100,8 +134,16 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
   }
 
   /**
+   * Get the common options for this command.
+   * @return the DiskBalancerCommonOptions instance
+   */
+  protected DiskBalancerCommonOptions getOptions() {
+    return options;
+  }
+
+  /**
    * Get the list of target datanodes to execute the command on.
-   * Either from -d option or by querying SCM for in-service datanodes.
+   * Either from positional arguments or by querying SCM for in-service datanodes.
    */
   private List<String> getTargetDatanodes() {
     if (options.isInServiceDatanodes()) {
@@ -135,14 +177,18 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
   /**
    * Execute the DiskBalancer command on a single hostName.
+   * Return a JSON-serializable object if successful, null if failed.
+   * The base class handles whether to use it for JSON output or not.
    *
    * @param hostName the hostName in "host:port" format
-   * @return true if successful, false if failed
+   * @return result object for JSON serialization if successful, null if failed
+   * @throws Exception if execution fails
    */
-  protected abstract boolean executeCommand(String hostName);
+  protected abstract Object executeCommand(String hostName) throws Exception;
 
   /**
    * Display consolidated results after executing on all datanodes.
+   * For JSON mode, this may be called for summary purposes only.
    * 
    * @param successNodes list of nodes where command succeeded
    * @param failedNodes list of nodes where command failed

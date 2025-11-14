@@ -276,22 +276,30 @@ public final class DiskBalancerConfiguration {
     return builder;
   }
 
+  /**
+   * Merges proto configuration into an existing configuration object.
+   * Only fields present in the proto will be updated.
+   *
+   * @param newConfigProto the proto containing fields to update
+   * @param existingConfig the existing configuration to merge into
+   * @return the updated configuration object
+   */
   public static DiskBalancerConfiguration fromProtobuf(
-      @Nonnull HddsProtos.DiskBalancerConfigurationProto proto) {
-    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
-    if (proto.hasThreshold()) {
-      config.setThreshold(proto.getThreshold());
+      @Nonnull HddsProtos.DiskBalancerConfigurationProto newConfigProto,
+      @Nonnull DiskBalancerConfiguration existingConfig) {
+    if (newConfigProto.hasThreshold()) {
+      existingConfig.setThreshold(newConfigProto.getThreshold());
     }
-    if (proto.hasDiskBandwidthInMB()) {
-      config.setDiskBandwidthInMB(proto.getDiskBandwidthInMB());
+    if (newConfigProto.hasDiskBandwidthInMB()) {
+      existingConfig.setDiskBandwidthInMB(newConfigProto.getDiskBandwidthInMB());
     }
-    if (proto.hasParallelThread()) {
-      config.setParallelThread(proto.getParallelThread());
+    if (newConfigProto.hasParallelThread()) {
+      existingConfig.setParallelThread(newConfigProto.getParallelThread());
     }
-    if (proto.hasStopAfterDiskEven()) {
-      config.setStopAfterDiskEven(proto.getStopAfterDiskEven());
+    if (newConfigProto.hasStopAfterDiskEven()) {
+      existingConfig.setStopAfterDiskEven(newConfigProto.getStopAfterDiskEven());
     }
-    return config;
+    return existingConfig;
   }
 }
 

@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import picocli.CommandLine.Command;
@@ -34,19 +36,28 @@ import picocli.CommandLine.Command;
 public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
 
   @Override
-  protected boolean executeCommand(String hostName) {
-    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
-        .getSingleNodeDiskBalancerProxy(hostName)) {
+  protected Object executeCommand(String hostName) throws IOException {
+    DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName);
+    try {
       diskBalancerProxy.stopDiskBalancer();
-      return true;
-    } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
-      return false;
+      Map<String, Object> result = new java.util.LinkedHashMap<>();
+      result.put("datanode", hostName);
+      result.put("action", "stop");
+      result.put("status", "success");
+      return result;
+    } finally {
+      diskBalancerProxy.close();
     }
   }
 
   @Override
   protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+    // In JSON mode, results are already written, only show summary if needed
+    if (getOptions().isJson()) {
+      return;
+    }
+
     if (isBatchMode()) {
       // Simpler message for batch mode
       if (!failedNodes.isEmpty()) {

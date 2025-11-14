@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,23 +42,28 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private final List<HddsProtos.DatanodeDiskBalancerInfoProto> reports = new ArrayList<>();
 
   @Override
-  protected boolean executeCommand(String hostName) {
-    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
-        .getSingleNodeDiskBalancerProxy(hostName)) {
+  protected Object executeCommand(String hostName) throws IOException {
+    DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName);
+    try {
       HddsProtos.DatanodeDiskBalancerInfoProto report = 
           diskBalancerProxy.getDiskBalancerInfo(
               DatanodeDiskBalancerInfoType.REPORT,
               ClientVersion.CURRENT_VERSION);
       reports.add(report);
-      return true;
-    } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
-      return false;
+      return new ReportResult(report);
+    } finally {
+      diskBalancerProxy.close();
     }
   }
 
   @Override
   protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+    // In JSON mode, results are already written, only show summary if needed
+    if (getOptions().isJson()) {
+      return;
+    }
+
     if (!failedNodes.isEmpty()) {
       System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n", 
           String.join(", ", failedNodes));
@@ -90,5 +96,26 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));
+  }
+
+  /**
+   * Wrapper class for JSON serialization of DiskBalancer report.
+   */
+  private static class ReportResult {
+    private final DatanodeDiskBalancerInfoProto report;
+
+    ReportResult(DatanodeDiskBalancerInfoProto report) {
+      this.report = report;
+    }
+
+    @JsonProperty
+    public String getDatanode() {
+      return report.getNode().getHostName();
+    }
+
+    @JsonProperty
+    public double getVolumeDensity() {
+      return report.getCurrentVolumeDensitySum();
+    }
   }
 }

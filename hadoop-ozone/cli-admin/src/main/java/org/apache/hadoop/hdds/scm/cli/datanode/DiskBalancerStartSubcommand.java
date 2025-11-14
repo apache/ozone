@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
@@ -50,46 +52,71 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
   private Integer parallelThread;
 
   @Option(names = {"-s", "--stop-after-disk-even"},
-      description = "Stop DiskBalancer automatically after disk utilization is even.")
+      description = "Stop DiskBalancer automatically after disk utilization is even.",
+      arity = "1")
   private Boolean stopAfterDiskEven;
 
   @Override
-  protected boolean executeCommand(String hostName) {
-    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
-        .getSingleNodeDiskBalancerProxy(hostName)) {
+  protected Object executeCommand(String hostName) throws IOException {
+    DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName);
+    try {
+      DiskBalancerConfigurationProto config = buildConfigProto();
+      diskBalancerProxy.startDiskBalancer(config);
       
-      // Build configuration if any parameters are specified
-      DiskBalancerConfigurationProto config = null;
+      Map<String, Object> result = new java.util.LinkedHashMap<>();
+      result.put("datanode", hostName);
+      result.put("action", "start");
+      result.put("status", "success");
       if (threshold != null || bandwidthInMB != null || 
           parallelThread != null || stopAfterDiskEven != null) {
-        DiskBalancerConfigurationProto.Builder builder =
-            DiskBalancerConfigurationProto.newBuilder();
+        Map<String, Object> configMap = new java.util.LinkedHashMap<>();
         if (threshold != null) {
-          builder.setThreshold(threshold);
+          configMap.put("threshold", threshold);
         }
         if (bandwidthInMB != null) {
-          builder.setDiskBandwidthInMB(bandwidthInMB);
+          configMap.put("bandwidthInMB", bandwidthInMB);
         }
         if (parallelThread != null) {
-          builder.setParallelThread(parallelThread);
+          configMap.put("parallelThread", parallelThread);
         }
         if (stopAfterDiskEven != null) {
-          builder.setStopAfterDiskEven(stopAfterDiskEven);
+          configMap.put("stopAfterDiskEven", stopAfterDiskEven);
         }
-        config = builder.build();
+        result.put("configuration", configMap);
       }
-      
-      diskBalancerProxy.startDiskBalancer(config);
-      return true;
-    } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
-      return false;
+      return result;
+    } finally {
+      diskBalancerProxy.close();
     }
+  }
+
+  private DiskBalancerConfigurationProto buildConfigProto() {
+    DiskBalancerConfigurationProto.Builder builder =
+        DiskBalancerConfigurationProto.newBuilder();
+    if (threshold != null) {
+      builder.setThreshold(threshold);
+    }
+    if (bandwidthInMB != null) {
+      builder.setDiskBandwidthInMB(bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      builder.setParallelThread(parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      builder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    return builder.build();
   }
 
   @Override
   protected void displayResults(List<String> successNodes,
       List<String> failedNodes) {
+    // In JSON mode, results are already written, only show summary if needed
+    if (getOptions().isJson()) {
+      return;
+    }
+
     if (isBatchMode()) {
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",

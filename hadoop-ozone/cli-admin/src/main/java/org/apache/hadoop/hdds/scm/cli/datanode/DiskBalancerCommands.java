@@ -29,76 +29,76 @@ import picocli.CommandLine.Command;
  * <h2>SYNOPSIS</h2>
  * <pre>
  * To start:
- *      ozone admin datanode diskbalancer start -d {@literal <host[:port]>}
+ *      ozone admin datanode diskbalancer start {@literal <host[:port]>} [{@literal <host[:port]>} ...]
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
  *
  *      Examples:
- *      ozone admin datanode diskbalancer start -d DN-1
+ *      ozone admin datanode diskbalancer start DN-1
  *        Start balancer on DN-1 using default port (9858)
  *
- *      ozone admin datanode diskbalancer start -d 192.168.1.10:9858
+ *      ozone admin datanode diskbalancer start 192.168.1.10:9858
  *        Start balancer with explicit port specification
  *
- *      ozone admin datanode diskbalancer start -d DN-1,DN-2,DN-3
+ *      ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
  *        Start balancer on multiple datanodes (using default port)
  *
- *      ozone admin datanode diskbalancer start --datanodes DN-1:9858,DN-2:9999
+ *      ozone admin datanode diskbalancer start DN-1:9858 DN-2:9999
  *        Start balancer on multiple datanodes with explicit ports
  *
- *      ozone admin datanode diskbalancer start -d DN-1 -t 5
+ *      ozone admin datanode diskbalancer start DN-1 -t 5
  *        Start balancer with a threshold of 5%
  *
- *      ozone admin datanode diskbalancer start -d 192.168.1.10 -b 20
+ *      ozone admin datanode diskbalancer start 192.168.1.10 -b 20
  *        Start balancer with maximum 20MB/s disk bandwidth
  *
- *      ozone admin datanode diskbalancer start -d DN-1 -p 5
+ *      ozone admin datanode diskbalancer start DN-1 -p 5
  *        Start balancer with 5 parallel threads
  *
- *      ozone admin datanode diskbalancer start -d DN-1 -s false
+ *      ozone admin datanode diskbalancer start DN-1 -s false
  *        Start balancer and keep running even after disks are balanced
  *
  * To stop:
- *      ozone admin datanode diskbalancer stop -d {@literal <host[:port]>}
+ *      ozone admin datanode diskbalancer stop {@literal <host[:port]>} [{@literal <host[:port]>} ...]
  *
  *      Examples:
- *      ozone admin datanode diskbalancer stop -d DN-1
+ *      ozone admin datanode diskbalancer stop DN-1
  *        Stop diskbalancer on DN-1 (using default port)
  *
- *      ozone admin datanode diskbalancer stop --datanodes DN-1,DN-2,DN-3
+ *      ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
  *        Stop diskbalancer on multiple datanodes
  *
  * To update:
- *      ozone admin datanode diskbalancer update -d {@literal <host[:port]>}
+ *      ozone admin datanode diskbalancer update {@literal <host[:port]>} [{@literal <host[:port]>} ...]
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
  *
  *      Examples:
- *      ozone admin datanode diskbalancer update -d DN-1 -t 10
+ *      ozone admin datanode diskbalancer update DN-1 -t 10
  *        Update diskbalancer threshold to 10% on DN-1
  *
  * To get report:
- *      ozone admin datanode diskbalancer report -d {@literal <host[:port]>}
+ *      ozone admin datanode diskbalancer report {@literal <host[:port]>} [{@literal <host[:port]>} ...]
  *
  *      Examples:
- *      ozone admin datanode diskbalancer report -d DN-1
+ *      ozone admin datanode diskbalancer report DN-1
  *        Retrieve volume density report from DN-1
  *
- *      ozone admin datanode diskbalancer report --datanodes DN-1,DN-2,DN-3
+ *      ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
  *        Retrieve volume density report from multiple datanodes
  *
  * To get status:
- *      ozone admin datanode diskbalancer status -d {@literal <host[:port]>}
+ *      ozone admin datanode diskbalancer status {@literal <host[:port]>} [{@literal <host[:port]>} ...]
  *
  *      Examples:
- *      ozone admin datanode diskbalancer status -d DN-1
+ *      ozone admin datanode diskbalancer status DN-1
  *        Return the diskbalancer status on DN-1
  *
- *      ozone admin datanode diskbalancer status --datanodes DN-1,DN-2,DN-3
+ *      ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
  *        Return the diskbalancer status on multiple datanodes
  *
  * </pre>

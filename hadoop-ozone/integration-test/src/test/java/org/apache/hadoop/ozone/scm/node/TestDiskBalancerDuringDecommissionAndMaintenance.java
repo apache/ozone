@@ -54,7 +54,6 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   public static void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
-    conf.setStrings(HddsConfigKeys.HDDS_DISK_BALANCER_REPORT_INTERVAL, "2s");
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);

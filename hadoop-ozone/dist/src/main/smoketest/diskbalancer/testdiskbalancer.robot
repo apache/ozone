@@ -37,7 +37,7 @@ Resource            ../commonlib.robot
 #    - Test --in-service-datanodes option for read-only operations
 #
 # 4. Check diskbalancer with specific datanodes
-#    - Test -d/--datanodes option with specific datanode addresses
+#    - Test with space-separated datanode addresses as positional parameters
 #    - Verify hostname extraction from datanode list
 #    - Test commands with multiple specific datanodes
 #    - Validate output format for specific datanode operations
