@@ -770,6 +770,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param versionMap version map containing the connection between source snapshot version and dest snapshot version.
    * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
@@ -812,6 +813,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param prefixInfo TablePrefixInfo to filter irrelevant SST files; can be null.
    * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
    *                       must be non-null.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
@@ -829,7 +831,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       internalGetSSTDiffList(src, dest, fwdDAGSameFiles, fwdDAGDifferentFiles);
     } else {
       Set<SstFileInfo> srcSstFileInfos = new HashSet<>(src.getSstFileMap().values());
-      Set<SstFileInfo> destSstFileInfos = new HashSet<>(src.getSstFileMap().values());
+      Set<SstFileInfo> destSstFileInfos = new HashSet<>(dest.getSstFileMap().values());
       for (SstFileInfo srcSstFileInfo : srcSstFileInfos) {
         if (destSstFileInfos.contains(srcSstFileInfo)) {
           fwdDAGSameFiles.put(srcSstFileInfo.getFileName(), srcSstFileInfo);

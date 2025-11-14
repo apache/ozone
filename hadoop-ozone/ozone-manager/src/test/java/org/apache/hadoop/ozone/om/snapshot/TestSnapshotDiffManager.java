@@ -1614,7 +1614,7 @@ public class TestSnapshotDiffManager {
         anyString());
 
     doReturn(testDeltaFiles).when(spy)
-        .getSSTFileListForSnapshot(any(OmSnapshot.class), anySet());
+        .getSSTFileSetForSnapshot(any(OmSnapshot.class), anySet());
 
     doNothing().when(spy).addToObjectIdMap(eq(keyInfoTable), eq(keyInfoTable),
         any(), anyBoolean(), any(), any(), any(), any(), any(), any(), anyString());

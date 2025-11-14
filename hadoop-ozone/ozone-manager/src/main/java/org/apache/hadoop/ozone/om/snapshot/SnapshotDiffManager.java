@@ -379,7 +379,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @VisibleForTesting
-  protected Set<SstFileInfo> getSSTFileListForSnapshot(OmSnapshot snapshot, Set<String> tablesToLookUp) {
+  protected Set<SstFileInfo> getSSTFileSetForSnapshot(OmSnapshot snapshot, Set<String> tablesToLookUp) {
     return RdbUtil.getSSTFilesForComparison(
         ((RDBStore)snapshot.getMetadataManager().getStore()).getDb().getManagedRocksDb(), tablesToLookUp);
   }
@@ -1069,7 +1069,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
     if (skipNativeDiff || !isNativeLibsLoaded) {
-      Set<SstFileInfo> inputFiles = filterRelevantSstFiles(getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp),
+      Set<SstFileInfo> inputFiles = filterRelevantSstFiles(getSSTFileSetForSnapshot(fromSnapshot, tablesToLookUp),
           tablesToLookUp, tablePrefixes);
       Path fromSnapshotPath = fromSnapshot.getMetadataManager().getStore().getDbLocation().getAbsoluteFile().toPath();
       for (SstFileInfo sstFileInfo : inputFiles) {
@@ -1246,9 +1246,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       // In case of exception during inode read use all files
       LOG.error("Exception occurred while populating delta files for snapDiff", e);
       LOG.warn("Falling back to full file list comparison, inode-based optimization skipped.");
-      Set<SstFileInfo> fromSnapshotFiles = filterRelevantSstFiles(getSSTFileListForSnapshot(fromSnapshot,
+      Set<SstFileInfo> fromSnapshotFiles = filterRelevantSstFiles(getSSTFileSetForSnapshot(fromSnapshot,
           tablesToLookUp), tablesToLookUp, tablePrefixInfo);
-      Set<SstFileInfo> toSnapshotFiles = filterRelevantSstFiles(getSSTFileListForSnapshot(toSnapshot,
+      Set<SstFileInfo> toSnapshotFiles = filterRelevantSstFiles(getSSTFileSetForSnapshot(toSnapshot,
           tablesToLookUp), tablesToLookUp, tablePrefixInfo);
       diffFiles = new HashSet<>();
       for (SstFileInfo sstFileInfo : fromSnapshotFiles) {

@@ -48,6 +48,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.MutableGraph;
@@ -441,6 +442,115 @@ public class TestRocksDBCheckpointDiffer {
     return differSnapshotInfo;
   }
 
+  private static Stream<Arguments> getSSTDiffListWithoutCompactionDAGCase() {
+    return Stream.of(
+        Arguments.of("Delta File with same source and target",
+        ImmutableList.of(
+            new SstFileInfo("1", "ac", "ae", "cf1"),
+            new SstFileInfo("2", "ad", "ag", "cf1")),
+        ImmutableList.of(
+            new SstFileInfo("1", "ac", "ae", "cf1"),
+            new SstFileInfo("2", "ad", "ag", "cf1")),
+        ImmutableMap.of("cf1", "a", "cf2", "z"), ImmutableSet.of("cf1"), Collections.emptyList()),
+        Arguments.of("Delta File with source having more files",
+            ImmutableList.of(
+                new SstFileInfo("2", "ad", "ag", "cf1"),
+                new SstFileInfo("3", "af", "ah", "cf1")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ad", "ag", "cf1"),
+                new SstFileInfo("3", "af", "ah", "cf1")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1"),
+            ImmutableList.of(new SstFileInfo("1", "ac", "ae", "cf1"))),
+        Arguments.of("Delta File with target having more files",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ad", "ag", "cf1"),
+                new SstFileInfo("3", "af", "ah", "cf1")),
+            ImmutableList.of(
+                new SstFileInfo("2", "ad", "ag", "cf1"),
+                new SstFileInfo("3", "af", "ah", "cf1")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1"),
+            ImmutableList.of(new SstFileInfo("1", "ac", "ae", "cf1"))),
+        Arguments.of("Delta File computation with source files with invalid prefix",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "bh", "bi", "cf1")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("4", "af", "ai", "cf1")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1"),
+            ImmutableList.of(new SstFileInfo("4", "af", "ai", "cf1"))),
+        Arguments.of("Delta File computation with target files with invalid prefix",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("4", "bf", "bi", "cf1")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1"),
+            ImmutableList.of(new SstFileInfo("2", "ah", "ai", "cf1"))),
+        Arguments.of("Delta File computation with target files with multiple tables",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("3", "ah", "ai", "cf3")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("5", "af", "ai", "cf4")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"), ImmutableSet.of("cf1"), Collections.emptyList()),
+        Arguments.of("Delta File computation with target files with multiple tables to lookup on source",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("3", "ah", "ai", "cf3")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("5", "af", "ai", "cf4")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1", "cf3"),
+            ImmutableList.of(new SstFileInfo("3", "ah", "ai", "cf3"))),
+        Arguments.of("Delta File computation with target files with multiple tables to lookup on target",
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("3", "ah", "ai", "cf3")),
+            ImmutableList.of(
+                new SstFileInfo("1", "ac", "ae", "cf1"),
+                new SstFileInfo("2", "ah", "ai", "cf1"),
+                new SstFileInfo("5", "af", "ai", "cf4")),
+            ImmutableMap.of("cf1", "a", "cf2", "z"),
+            ImmutableSet.of("cf1", "cf4"),
+            ImmutableList.of(new SstFileInfo("5", "af", "ai", "cf4")))
+        );
+  }
+
+  private DifferSnapshotInfo getDifferSnapshotInfoForVersion(List<SstFileInfo> sstFiles, int version) {
+    TreeMap<Integer, List<SstFileInfo>> sourceSstFileMap = new TreeMap<>();
+    sourceSstFileMap.put(version, sstFiles);
+    return new DifferSnapshotInfo(v -> Paths.get("src"), UUID.randomUUID(), 0, sourceSstFileMap);
+  }
+
+  @ParameterizedTest
+  @MethodSource("getSSTDiffListWithoutCompactionDAGCase")
+  public void testGetSSTDiffListWithoutCompactionDag(String description, List<SstFileInfo> sourceSstFiles,
+      List<SstFileInfo> destSstFiles, Map<String, String> prefixMap, Set<String> tablesToLookup,
+      List<SstFileInfo> expectedDiffList) {
+    DifferSnapshotInfo sourceDSI = getDifferSnapshotInfoForVersion(sourceSstFiles, 0);
+    DifferSnapshotVersion sourceVersion = new DifferSnapshotVersion(sourceDSI, 0, tablesToLookup);
+    DifferSnapshotInfo destDSI = getDifferSnapshotInfoForVersion(destSstFiles, 1);
+    DifferSnapshotVersion destVersion = new DifferSnapshotVersion(destDSI, 1, tablesToLookup);
+    List<SstFileInfo> diffList = rocksDBCheckpointDiffer.getSSTDiffList(sourceVersion, destVersion,
+        new TablePrefixInfo(prefixMap), tablesToLookup, false).orElse(null);
+    assertEquals(expectedDiffList, diffList);
+  }
+
   /**
    * Test cases for testGetSSTDiffListWithoutDB.
    */
@@ -824,7 +934,6 @@ public class TestRocksDBCheckpointDiffer {
               .map(i -> i.stream().map(SstFileInfo::getFileName).sorted().collect(Collectors.toList())).orElse(null));
     } catch (RuntimeException rtEx) {
       if (!expectingException) {
-        rtEx.printStackTrace();
         fail("Unexpected exception thrown in test.");
       } else {
         exceptionThrown = true;
