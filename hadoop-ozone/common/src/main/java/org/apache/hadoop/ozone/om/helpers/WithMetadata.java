@@ -17,12 +17,10 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.jcip.annotations.Immutable;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Mixin class to handle custom metadata.
