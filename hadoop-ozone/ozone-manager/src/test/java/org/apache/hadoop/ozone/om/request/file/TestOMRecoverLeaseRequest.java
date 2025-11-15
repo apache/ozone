@@ -560,16 +560,15 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   String addToOpenFileTable(List<OmKeyLocationInfo> locationList, boolean hsyncFlag)
       throws Exception {
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
-    omKeyInfo.appendNewBlocks(locationList, false);
+        .setParentObjectID(parentId);
     if (hsyncFlag) {
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.put(OzoneConsts.HSYNC_CLIENT_ID,
-              String.valueOf(clientID)));
+      keyInfoBuilder.addMetadata(OzoneConsts.HSYNC_CLIENT_ID,
+          String.valueOf(clientID));
     }
+    OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+    omKeyInfo.appendNewBlocks(locationList, false);
 
     OMRequestTestUtils.addFileToKeyTable(
         true, false, omKeyInfo.getFileName(),
@@ -586,16 +585,15 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   String addToFileTable(List<OmKeyLocationInfo> locationList, boolean hsyncFlag)
       throws Exception {
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
-    omKeyInfo.appendNewBlocks(locationList, false);
+        .setParentObjectID(parentId);
     if (hsyncFlag) {
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.put(OzoneConsts.HSYNC_CLIENT_ID,
-              String.valueOf(clientID)));
+      keyInfoBuilder.addMetadata(OzoneConsts.HSYNC_CLIENT_ID,
+          String.valueOf(clientID));
     }
+    OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+    omKeyInfo.appendNewBlocks(locationList, false);
 
     OMRequestTestUtils.addFileToKeyTable(
         false, false, omKeyInfo.getFileName(),

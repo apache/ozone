@@ -980,12 +980,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setUpdateID(transactionLogIndex);
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
-      // Construct a new metadata map from KeyArgs.
-      dbKeyInfo = dbKeyInfo.withMetadataMutations(metadata -> {
-        metadata.clear();
-        metadata.putAll(KeyValueUtil.getFromProtobuf(
-            keyArgs.getMetadataList()));
-      });
+      // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
+      dbKeyInfo = dbKeyInfo.toBuilder()
+          .setMetadata(KeyValueUtil.getFromProtobuf(
+              keyArgs.getMetadataList()))
+          .build();
 
       // Construct a new tags from KeyArgs
       // Clear the old one when the key is overwritten

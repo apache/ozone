@@ -519,12 +519,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
-      if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfo = omKeyInfo.withMetadata(dbOpenKeyInfo.getMetadata());
-      }
       final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
-      omKeyInfo = omKeyInfo.withMetadataMutations(
-          metadata -> metadata.put(OzoneConsts.ETAG, multipartHash));
+      OmKeyInfo.Builder omKeyInfoBuilder = omKeyInfo.toBuilder();
+      if (dbOpenKeyInfo.getMetadata() != null) {
+        omKeyInfoBuilder.setMetadata(dbOpenKeyInfo.getMetadata());
+      }
+      omKeyInfo = omKeyInfoBuilder
+          .addMetadata(OzoneConsts.ETAG, multipartHash)
+          .build();
       if (dbOpenKeyInfo.getTags() != null) {
         omKeyInfo.setTags(dbOpenKeyInfo.getTags());
       }

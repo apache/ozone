@@ -202,8 +202,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
-        openKeyToDelete = openKeyToDelete.withMetadataMutations(
-            metadata -> metadata.put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true"));
+        openKeyToDelete = openKeyToDelete.toBuilder()
+            .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .build();
         openKeyToDelete.setModificationTime(Time.now());
         openKeyToDelete.setUpdateID(trxnLogIndex);
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,

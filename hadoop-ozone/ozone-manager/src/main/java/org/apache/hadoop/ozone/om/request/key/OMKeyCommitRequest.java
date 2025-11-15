@@ -274,8 +274,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         dbOpenKeyToDeleteKey = omMetadataManager.getOpenKey(volumeName, bucketName,
             keyName, Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
-        openKeyToDelete = openKeyToDelete.withMetadataMutations(
-            metadata -> metadata.put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true"));
+        openKeyToDelete = openKeyToDelete.toBuilder()
+            .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .build();
         openKeyToDelete.setModificationTime(Time.now());
         openKeyToDelete.setUpdateID(trxnLogIndex);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -385,12 +386,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             dbOpenKey, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
-        omKeyInfo = omKeyInfo.withMetadataMutations(
-            metadata -> metadata.remove(OzoneConsts.HSYNC_CLIENT_ID));
-        if (isRecovery) {
-          omKeyInfo = omKeyInfo.withMetadataMutations(
-              metadata -> metadata.remove(OzoneConsts.LEASE_RECOVERY));
-        }
+        omKeyInfo = omKeyInfo.withMetadataMutations(metadata -> {
+          metadata.remove(OzoneConsts.HSYNC_CLIENT_ID);
+          if (isRecovery) {
+            metadata.remove(OzoneConsts.LEASE_RECOVERY);
+          }
+        });
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
