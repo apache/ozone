@@ -257,6 +257,17 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     if (considerUnhealthy) {
       result += " +considerUnhealthy";
     }
+
+    if (!isSufficientlyReplicated()) {
+      result += " " + ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED + ": need "
+          + additionalReplicaNeeded() + " more";
+    } else if (isOverReplicated()) {
+      result += " " + ContainerHealthResult.ReplicationStatus.OVER_REPLICATED + ": excess "
+          + getExcessRedundancy(true) + " replica(s)";
+    } else {
+      result += " " + ContainerHealthResult.ReplicationStatus.HEALTHY_REPLICATION;
+    }
+    
     return result;
   }
 
@@ -539,12 +550,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     return delta <= 0;
   }
 
-  /**
-   * @return true if the container is under replicated, false otherwise
-   */
-  public boolean isUnderReplicated() {
-    return !isSufficientlyReplicated();
-  }
 
   /**
    * Return true if the container is over replicated. Decommission and
