@@ -185,4 +185,16 @@ public enum TestContainerCorruptions {
     assertTrue(blockFile.exists());
     return blockFile;
   }
+
+  /**
+   * Set of {@link ContainerScanError.FailureType} values that are excluded from testing.
+   * When adding a FailureType to this set, add a comment explaining why it's excluded.
+   */
+  public static Set<ContainerScanError.FailureType> getExcludedFailureTypes() {
+    return EnumSet.of(
+        ContainerScanError.FailureType.WRITE_FAILURE,
+        ContainerScanError.FailureType.INACCESSIBLE_DB,
+        ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH
+    );
+  }
 }
