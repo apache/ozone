@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -31,7 +33,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>();
+  // Most containers will have 3 replicas, and some may have 14, for example, in the case of EC 10-4
+  // so an initial capacity of 8 should be sufficient to avoid resize for most cases
+  private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>(8);
+  private Set<ContainerReplica> replicaSet;
 
   ContainerEntry(ContainerInfo info) {
     this.info = info;
@@ -42,14 +47,29 @@ public class ContainerEntry {
   }
 
   public Set<ContainerReplica> getReplicas() {
-    return new HashSet<>(replicas.values());
+    if (replicaSet == null) {
+      replicaSet = Collections.unmodifiableSet(new HashSet<>(replicas.values()));
+    }
+    return replicaSet;
   }
 
   public ContainerReplica put(ContainerReplica r) {
-    return replicas.put(r.getDatanodeDetails().getID(), r);
+    final ContainerReplica previous =
+        replicas.put(r.getDatanodeDetails().getID(), r);
+    // Invalidate the cached replica set if it has changed.
+    // A null previous value means a new replica was added.
+    if (!Objects.equals(previous, r)) {
+      replicaSet = null;
+    }
+    return previous;
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    return replicas.remove(datanodeID);
+    final ContainerReplica removed = replicas.remove(datanodeID);
+    if (removed != null) {
+      // Invalidate the cached replica set as it has changed.
+      replicaSet = null;
+    }
+    return removed;
   }
 }
