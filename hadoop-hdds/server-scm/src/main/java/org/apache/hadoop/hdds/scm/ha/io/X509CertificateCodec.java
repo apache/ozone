@@ -21,7 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.security.cert.X509Certificate;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 
@@ -36,7 +36,7 @@ public class X509CertificateCodec implements Codec {
       String certString =
           CertificateCodec.getPEMEncodedString((X509Certificate) object);
       // getBytes returns a new array
-      return Proto2Utils.unsafeByteString(certString.getBytes(UTF_8));
+      return ProtoUtils.unsafeByteString(certString.getBytes(UTF_8));
     } catch (Exception ex) {
       throw new InvalidProtocolBufferException(
           "X509Certificate cannot be decoded: " + ex.getMessage());
