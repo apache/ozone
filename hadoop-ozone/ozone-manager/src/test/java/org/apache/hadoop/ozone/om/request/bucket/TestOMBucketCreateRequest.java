@@ -332,7 +332,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         String bucketName) {
     Throwable e = assertThrows(OMException.class, () ->
         doPreExecute(volumeName, bucketName));
-    // 比 message（不需要再加 e.getResult()）
     assertEquals(
         "INVALID_BUCKET_NAME bucket name has an unsupported character : _",
         OMException.ResultCodes.INVALID_BUCKET_NAME + " " + e.getMessage()
