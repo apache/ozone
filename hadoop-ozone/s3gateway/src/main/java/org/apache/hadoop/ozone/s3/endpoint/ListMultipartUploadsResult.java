@@ -25,7 +25,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.apache.hadoop.ozone.s3.commontypes.CommonPrefix;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
+import org.apache.hadoop.ozone.s3.commontypes.ObjectKeyNameAdapter;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
@@ -40,17 +43,27 @@ public class ListMultipartUploadsResult {
   @XmlElement(name = "Bucket")
   private String bucket;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "KeyMarker")
-  private String keyMarker;
+  private EncodingTypeObject keyMarker;
 
   @XmlElement(name = "UploadIdMarker")
   private String uploadIdMarker;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "NextKeyMarker")
-  private String nextKeyMarker;
+  private EncodingTypeObject nextKeyMarker;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Prefix")
-  private String prefix;
+  private EncodingTypeObject prefix;
+
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
+  @XmlElement(name = "Delimiter")
+  private EncodingTypeObject delimiter;
+
+  @XmlElement(name = "EncodingType")
+  private String encodingType;
 
   @XmlElement(name = "NextUploadIdMarker")
   private String nextUploadIdMarker;
@@ -64,6 +77,9 @@ public class ListMultipartUploadsResult {
   @XmlElement(name = "Upload")
   private List<Upload> uploads = new ArrayList<>();
 
+  @XmlElement(name = "CommonPrefixes")
+  private List<CommonPrefix> commonPrefixes = new ArrayList<>();
+
   public String getBucket() {
     return bucket;
   }
@@ -72,11 +88,11 @@ public class ListMultipartUploadsResult {
     this.bucket = bucket;
   }
 
-  public String getKeyMarker() {
+  public EncodingTypeObject getKeyMarker() {
     return keyMarker;
   }
 
-  public void setKeyMarker(String keyMarker) {
+  public void setKeyMarker(EncodingTypeObject keyMarker) {
     this.keyMarker = keyMarker;
   }
 
@@ -88,20 +104,36 @@ public class ListMultipartUploadsResult {
     this.uploadIdMarker = uploadIdMarker;
   }
 
-  public String getNextKeyMarker() {
+  public EncodingTypeObject getNextKeyMarker() {
     return nextKeyMarker;
   }
 
-  public void setNextKeyMarker(String nextKeyMarker) {
+  public void setNextKeyMarker(EncodingTypeObject nextKeyMarker) {
     this.nextKeyMarker = nextKeyMarker;
   }
 
-  public String getPrefix() {
+  public EncodingTypeObject getPrefix() {
     return prefix;
   }
 
-  public void setPrefix(String prefix) {
+  public void setPrefix(EncodingTypeObject prefix) {
     this.prefix = prefix;
+  }
+
+  public EncodingTypeObject getDelimiter() {
+    return delimiter;
+  }
+
+  public void setDelimiter(EncodingTypeObject delimiter) {
+    this.delimiter = delimiter;
+  }
+
+  public String getEncodingType() {
+    return encodingType;
+  }
+
+  public void setEncodingType(String encodingType) {
+    this.encodingType = encodingType;
   }
 
   public String getNextUploadIdMarker() {
@@ -139,6 +171,18 @@ public class ListMultipartUploadsResult {
 
   public void addUpload(Upload upload) {
     this.uploads.add(upload);
+  }
+
+  public List<CommonPrefix> getCommonPrefixes() {
+    return commonPrefixes;
+  }
+
+  public void setCommonPrefixes(List<CommonPrefix> commonPrefixes) {
+    this.commonPrefixes = commonPrefixes;
+  }
+
+  public void addPrefix(EncodingTypeObject relativeKeyName) {
+    commonPrefixes.add(new CommonPrefix(relativeKeyName));
   }
 
   /**
