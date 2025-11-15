@@ -583,6 +583,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetReplicationManagerReportResponse(getReplicationManagerReport(
                 request.getReplicationManagerReportRequest()))
             .build();
+      case CheckContainerStatus:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setCheckContainerStatusResponse(checkContainerStatus(
+                request.getCheckContainerStatusRequest()))
+            .build();
       case StartContainerBalancer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1113,6 +1120,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       ReplicationManagerReportRequestProto request) throws IOException {
     return ReplicationManagerReportResponseProto.newBuilder()
         .setReport(impl.getReplicationManagerReport().toProtobuf())
+        .build();
+  }
+
+  public StorageContainerLocationProtocolProtos.CheckContainerStatusResponseProto checkContainerStatus(
+      StorageContainerLocationProtocolProtos.CheckContainerStatusRequestProto request) throws IOException {
+    ContainerInfo containerInfo = ContainerInfo.fromProtobuf(request.getContainerInfo());
+    return StorageContainerLocationProtocolProtos.CheckContainerStatusResponseProto.newBuilder()
+        .setReport(impl.checkContainerStatus(containerInfo).toProtobuf())
         .build();
   }
 

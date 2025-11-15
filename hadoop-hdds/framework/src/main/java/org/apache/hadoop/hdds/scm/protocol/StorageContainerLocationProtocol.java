@@ -406,6 +406,18 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ReplicationManagerReport getReplicationManagerReport() throws IOException;
 
   /**
+   * Checks the health status of a specific container using SCM's
+   * ReplicationManager. This allows Recon to query SCM for the
+   * authoritative health state of individual containers.
+   *
+   * @param containerInfo the container to check
+   * @return ReplicationManagerReport containing health state for this container
+   * @throws IOException if the check fails or container is not found
+   */
+  ReplicationManagerReport checkContainerStatus(ContainerInfo containerInfo)
+      throws IOException;
+
+  /**
    * Start ContainerBalancer.
    * @return {@link StartContainerBalancerResponseProto} that contains the
    * start status and an optional message.

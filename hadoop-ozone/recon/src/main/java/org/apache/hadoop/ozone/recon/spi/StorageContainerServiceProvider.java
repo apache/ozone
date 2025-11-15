@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -98,4 +99,15 @@ public interface StorageContainerServiceProvider {
    * @return Total number of containers in SCM.
    */
   long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Checks the health status of a specific container using SCM's
+   * ReplicationManager. This allows Recon to query SCM for the
+   * authoritative health state of individual containers.
+   *
+   * @param containerInfo the container to check
+   * @return ReplicationManagerReport containing health state for this container
+   * @throws IOException if the check fails or container is not found
+   */
+  ReplicationManagerReport checkContainerStatus(ContainerInfo containerInfo) throws IOException;
 }

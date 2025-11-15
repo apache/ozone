@@ -1082,6 +1082,16 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public ReplicationManagerReport checkContainerStatus(
+      ContainerInfo containerInfo) throws IOException {
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.CHECK_CONTAINER_STATUS, null));
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    scm.getReplicationManager().checkContainerStatus(containerInfo, report);
+    return report;
+  }
+
+  @Override
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
