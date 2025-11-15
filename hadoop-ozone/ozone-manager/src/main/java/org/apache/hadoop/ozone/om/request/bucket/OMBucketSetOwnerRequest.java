@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -63,15 +64,40 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
+    super.preExecute(ozoneManager);
+
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
         setBucketPropertyRequestBuilder = getOmRequest()
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
+    SetBucketPropertyRequest setBucketPropertyRequest =
+        getOmRequest().getSetBucketPropertyRequest();
+    BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
+    String volumeName = bucketArgs.getVolumeName();
+    String bucketName = bucketArgs.getBucketName();
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volumeName, bucketName, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+        Map<String, String> auditMap = omBucketArgs.toAuditMap();
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.SET_OWNER, auditMap, ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
+
     return getOmRequest().toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
-        .setUserInfo(getUserInfo())
+        .setUserInfo(getUserIfNotExists(ozoneManager))
         .build();
   }
 
@@ -109,13 +135,6 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volumeName, bucketName, null);
-      }
-
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           BUCKET_LOCK, volumeName, bucketName));
