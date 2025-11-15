@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
@@ -116,6 +117,12 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
 
     // Populate a custom complex tree structure
     populateComplexTree();
+  }
+
+  @BeforeEach
+  void clearCacheBetweenTests() {
+    // Clear LRU cache to ensure clean state between tests
+    nSSummaryTaskWithFso.clearCache();
   }
 
   /**
