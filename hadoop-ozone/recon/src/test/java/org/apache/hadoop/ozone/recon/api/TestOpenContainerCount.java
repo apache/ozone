@@ -227,7 +227,7 @@ public class TestOpenContainerCount {
       initializeInjector();
       isSetupDone = true;
     }
-    datanodeId = datanodeDetails.getUuid().toString();
+    datanodeId = datanodeDetails.getID().toString();
 
     // initialize container report
     builder = ContainerReportsProto.newBuilder();
