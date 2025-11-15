@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.admin.om.snapshot;
 
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import picocli.CommandLine;
 
 /**
@@ -31,11 +30,4 @@ import picocli.CommandLine;
     }
 )
 public class SnapshotSubCommand {
-
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  public OMAdmin getParent() {
-    return parent;
-  }
 }
