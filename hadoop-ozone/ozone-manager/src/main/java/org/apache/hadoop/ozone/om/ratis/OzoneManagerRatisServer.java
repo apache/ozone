@@ -92,6 +92,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -124,6 +125,7 @@ public final class OzoneManagerRatisServer {
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private final Read.Option readOption;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -170,6 +172,8 @@ public final class OzoneManagerRatisServer {
           raftGroupIdStr, raftPeersStr.substring(2));
     }
     this.omStateMachine = getStateMachine(conf);
+
+    this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
@@ -239,11 +243,11 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response returned to the client.
    * @throws ServiceException
    */
-  public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+  public OMResponse submitRequest(OMRequest omRequest, boolean isWrite) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = createRaftRequest(omRequest);
+      RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
       return createOmResponse(omRequest, raftClientReply);
     } else {
@@ -277,10 +281,10 @@ public final class OzoneManagerRatisServer {
         () -> submitRequestToRatisImpl(raftClientRequest));
   }
 
-  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequest(OMRequest omRequest, boolean isWrite) {
     return captureLatencyNs(
         perfMetrics.getCreateRatisRequestLatencyNs(),
-        () -> createRaftRequestImpl(omRequest));
+        () -> createRaftRequestImpl(omRequest, isWrite));
   }
 
   /**
@@ -500,7 +504,7 @@ public final class OzoneManagerRatisServer {
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest, boolean isWrite) {
     return RaftClientRequest.newBuilder()
         .setClientId(getClientId())
         .setServerId(server.getId())
@@ -509,7 +513,7 @@ public final class OzoneManagerRatisServer {
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
+        .setType(isWrite ? RaftClientRequest.writeRequestType() : RaftClientRequest.readRequestType())
         .build();
   }
 
@@ -645,6 +649,10 @@ public final class OzoneManagerRatisServer {
   @VisibleForTesting
   public RaftServer.Division getServerDivision() {
     return serverDivision.get();
+  }
+
+  public boolean isLinearizableRead() {
+    return readOption == Read.Option.LINEARIZABLE;
   }
 
   /**
