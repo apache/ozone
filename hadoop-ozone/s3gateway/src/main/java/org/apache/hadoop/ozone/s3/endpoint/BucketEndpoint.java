@@ -145,6 +145,10 @@ public class BucketEndpoint extends EndpointBase {
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
+      if (prefix == null) {
+        prefix = "";
+      }
+
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
         return listMultipartUploads(bucketName, prefix, delimiter, encodingType,
@@ -152,10 +156,6 @@ public class BucketEndpoint extends EndpointBase {
       }
 
       maxKeys = validateMaxKeys(maxKeys);
-
-      if (prefix == null) {
-        prefix = "";
-      }
 
       // Assign marker to startAfter. for the compatibility of aws api v1
       if (startAfter == null && marker != null) {
@@ -370,10 +370,6 @@ public class BucketEndpoint extends EndpointBase {
     // The valid encodingType Values is "url"
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
-    }
-
-    if (prefix == null) {
-      prefix = "";
     }
 
     long startNanos = Time.monotonicNowNanos();
