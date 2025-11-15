@@ -115,9 +115,9 @@ public class ContainerChecksumTreeManager {
     return report;
   }
 
-  private void compareContainerMerkleTree(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
-                                          ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
-                                          ContainerDiffReport report) {
+  public static void compareContainerMerkleTree(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
+                                                ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
+                                                ContainerDiffReport report) {
     ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
     ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
 
@@ -180,7 +180,7 @@ public class ContainerChecksumTreeManager {
    * This should be commutative, associative, and idempotent, so that all replicas converge after a single round of
    * reconciliation when all peers have communicated.
    */
-  private void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
+  public static void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree, ContainerDiffReport report) {
 
     boolean thisBlockDeleted = thisBlockMerkleTree.getDeleted();
@@ -212,7 +212,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private void compareChunkMerkleTrees(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
+  public static void compareChunkMerkleTrees(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
                                       ContainerProtos.BlockMerkleTree peerBlockMerkleTree,
                                       ContainerDiffReport report) {
 
@@ -260,7 +260,7 @@ public class ContainerChecksumTreeManager {
     // chunks from us when they reconcile.
   }
 
-  private void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
+  public static void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
       BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
     if (peerTree.getChecksumMatches()) {
       addToReport.accept(blockID, peerTree);
