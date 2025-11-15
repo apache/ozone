@@ -76,7 +76,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * modification time of bucket.
    */
-  private long modificationTime;
+  private final long modificationTime;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -108,7 +108,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final BucketLayout bucketLayout;
 
-  private String owner;
+  private final String owner;
 
   private OmBucketInfo(Builder b) {
     super(b);
@@ -333,14 +333,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   public String getOwner() {
     return owner;
-  }
-
-  public void setModificationTime(long modificationTime) {
-    this.modificationTime = modificationTime;
-  }
-
-  public void setOwner(String ownerName) {
-    this.owner = ownerName;
   }
 
   /**
