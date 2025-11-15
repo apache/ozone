@@ -92,9 +92,9 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -123,7 +123,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
+   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc_.RPC.Server}.
    * @param conf configuration
    * @param protocol Protocol interface
    * @param service service that implements the protocol

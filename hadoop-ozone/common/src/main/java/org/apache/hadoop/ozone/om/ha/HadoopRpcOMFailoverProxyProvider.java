@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
