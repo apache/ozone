@@ -75,4 +75,39 @@ public class TestOmSnapshotUtils {
 
     assertEquals(tree1Files, tree2Files);
   }
+
+  /**
+   * Test createHardLinks() with om.db prefix stripping.
+   */
+  @Test
+  public void testCreateHardLinksWithOmDbPrefix(@TempDir File tempDir) throws Exception {
+    // Create source file
+    File sourceFile = new File(tempDir, "source.sst");
+    Files.write(sourceFile.toPath(), "test content".getBytes(UTF_8));
+
+    // Create hardlink file with "om.db/" prefixed paths
+    File hardlinkFile = new File(tempDir, "hardLinkFile"); // OmSnapshotManager.OM_HARDLINK_FILE
+    String hardlinkContent =
+        "om.db/target1.sst\tsource.sst\n" +  // Should strip om.db/ prefix
+            "target2.sst\tsource.sst\n";         // Should remain unchanged
+    Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
+
+    // Execute createHardLinks
+    OmSnapshotUtils.createHardLinks(tempDir.toPath(), false);
+
+    // Verify hard links created correctly
+    File target1 = new File(tempDir, "target1.sst");
+    File target2 = new File(tempDir, "target2.sst");
+
+    assertTrue(target1.exists(),
+        "Hard link should be created without om.db/ prefix");
+    assertTrue(target2.exists(),
+        "Hard link should be created normally");
+
+    // Verify content is same using inode comparison
+    assertEquals(getINode(sourceFile.toPath()), getINode(target1.toPath()),
+        "Hard links should have same inode as source");
+    assertEquals(getINode(sourceFile.toPath()), getINode(target2.toPath()),
+        "Hard links should have same inode as source");
+  }
 }
