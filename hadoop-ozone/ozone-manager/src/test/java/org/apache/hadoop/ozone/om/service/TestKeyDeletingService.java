@@ -55,7 +55,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -468,6 +467,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       service.runPeriodicalTaskNow();
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
       snapshotDeletingService.resume();
+      snapshotDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount, metadataManager);
       keyDeletingService.resume();
     }
@@ -475,7 +476,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testRenamedKeyReclaimation(boolean testForSnapshot)
-        throws IOException, InterruptedException, TimeoutException, ExecutionException {
+        throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -1129,7 +1130,22 @@ class TestKeyDeletingService extends OzoneTestBase {
       // Create and delete keys using the test-specific managers
       createAndDeleteKeys(numKeysToCreate, 1, testOmTestManagers);
 
+      // Ensure all keys are in DeletedTable before processing
+      // This addresses potential timing issues with RocksDB iterator consistency
+      // by ensuring the DeletedTable has all keys before the service processes them
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              return testOm.getMetadataManager().countRowsInTable(
+                  testOm.getMetadataManager().getDeletedTable()) == numKeysToCreate;
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          },
+          100, 5000); // Poll every 100ms, timeout after 5s
+
       testKds.resume();
+      testKds.setKeyLimitPerTask(numKeysToCreate);
 
       // Manually trigger the KeyDeletingService to run its task immediately.
       // This will initiate the purge requests to Ratis.
@@ -1144,14 +1160,11 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Get all captured requests that were sent
       List<OzoneManagerProtocolProtos.OMRequest> capturedRequests = requestCaptor.getAllValues();
-      int totalPurgedKeysAcrossBatches = 0;
 
       // Iterate through each captured Ratis request (batch)
       for (OzoneManagerProtocolProtos.OMRequest omRequest : capturedRequests) {
         assertNotNull(omRequest);
         assertEquals(OzoneManagerProtocolProtos.Type.PurgeKeys, omRequest.getCmdType());
-
-        OzoneManagerProtocolProtos.PurgeKeysRequest purgeRequest = omRequest.getPurgeKeysRequest();
 
         // At runtime we enforce ~90% of the Ratis limit as a safety margin,
         // but in tests we assert against the actual limit to avoid false negatives.
@@ -1159,17 +1172,14 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertThat(omRequest.getSerializedSize())
             .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + actualRatisLimitBytes)
             .isLessThanOrEqualTo(actualRatisLimitBytes);
-
-        // Sum up all the keys purged in this batch (may be spread across multiple DeletedKeys entries)
-        totalPurgedKeysAcrossBatches += purgeRequest.getDeletedKeysList()
-            .stream()
-            .mapToInt(OzoneManagerProtocolProtos.DeletedKeys::getKeysCount)
-            .sum();
       }
 
-      // Assert that the sum of keys across all batches equals the total number of keys initially deleted.
-      assertEquals(numKeysToCreate, totalPurgedKeysAcrossBatches,
-          "Total keys purged across all batches should match initial keys deleted.");
+      // Verify that all keys were purged by checking the service's internal count.
+      // This is more reliable than counting from captured requests, as the service
+      // tracks the actual number of keys processed (including those in KeysToUpdate).
+      long actualPurgedKeys = testKds.getDeletedKeyCount().get();
+      assertEquals(numKeysToCreate, actualPurgedKeys,
+          "Total keys purged should match initial keys deleted.");
 
     } finally {
       // Clean up the temporary OzoneManager and its resources
