@@ -37,7 +37,7 @@ import org.apache.ratis.statemachine.SnapshotInfo;
  * <p>
  * This class is immutable.
  */
-public final class TransactionInfo implements Comparable<TransactionInfo> {
+public class TransactionInfo implements Comparable<TransactionInfo> {
   private static final Codec<TransactionInfo> CODEC = new DelegatedCodec<>(
       StringCodec.get(),
       TransactionInfo::valueOf,
@@ -99,7 +99,7 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
     return TermIndex.valueOf(NON_RATIS_TERM, transactionIndex);
   }
 
-  private TransactionInfo(TermIndex termIndex) {
+  TransactionInfo(TermIndex termIndex) {
     this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex();
     this.snapshotInfo = new SnapshotInfo() {
       @Override
