@@ -131,7 +131,9 @@ public class TestOmPrefixInfo {
         IAccessAuthorizer.ACLIdentityType.USER,
         username, IAccessAuthorizer.ACLType.WRITE,
         ACCESS);
-    omPrefixInfo.getMetadata().put("key", "value");
+    omPrefixInfo = new OmPrefixInfo.Builder(omPrefixInfo)
+        .addMetadata("key", "value")
+        .build();
     OzoneManagerStorageProtos.PersistedPrefixInfo pi =
         omPrefixInfo.getProtobuf();
     assertEquals(testPath, pi.getName());

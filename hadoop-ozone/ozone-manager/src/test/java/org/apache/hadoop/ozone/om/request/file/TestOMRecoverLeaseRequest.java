@@ -566,8 +566,9 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
         .build();
     omKeyInfo.appendNewBlocks(locationList, false);
     if (hsyncFlag) {
-      omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
-          String.valueOf(clientID));
+      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
+          metadata.put(OzoneConsts.HSYNC_CLIENT_ID,
+              String.valueOf(clientID)));
     }
 
     OMRequestTestUtils.addFileToKeyTable(
@@ -591,8 +592,9 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
         .build();
     omKeyInfo.appendNewBlocks(locationList, false);
     if (hsyncFlag) {
-      omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
-          String.valueOf(clientID));
+      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
+          metadata.put(OzoneConsts.HSYNC_CLIENT_ID,
+              String.valueOf(clientID)));
     }
 
     OMRequestTestUtils.addFileToKeyTable(

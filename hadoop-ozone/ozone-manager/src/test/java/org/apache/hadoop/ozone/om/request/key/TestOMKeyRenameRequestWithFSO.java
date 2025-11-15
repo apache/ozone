@@ -80,8 +80,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   @Test
   public void testRenameOpenFile() throws Exception {
-    fromKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
-        String.valueOf(1234));
+    fromKeyInfo = fromKeyInfo.withMetadataMutations(metadata ->
+        metadata.put(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(1234)));
     addKeyToTable(fromKeyInfo);
     OMRequest modifiedOmRequest =
         doPreExecute(createRenameKeyRequest(
