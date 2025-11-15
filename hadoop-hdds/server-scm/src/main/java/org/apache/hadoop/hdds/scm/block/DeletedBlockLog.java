@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import com.google.protobuf.ByteString;
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -24,8 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
@@ -100,7 +104,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param containerBlocksMap a map of containerBlocks.
    * @throws IOException
    */
-  void addTransactions(Map<Long, List<Long>> containerBlocksMap)
+  void addTransactions(Map<Long, List<DeletedBlock>> containerBlocksMap)
       throws IOException;
 
   /**
@@ -115,8 +119,13 @@ public interface DeletedBlockLog extends Closeable {
   /**
    * Reinitialize the delete log from the db.
    * @param deletedBlocksTXTable delete transaction table
+   * @param statefulConfigTable stateful service config table
    */
-  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable);
+  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
+      Table<String, ByteString> statefulConfigTable) throws IOException;
 
   int getTransactionToDNsCommitMapSize();
+
+  @Nullable
+  DeletedBlocksTransactionSummary getTransactionSummary();
 }

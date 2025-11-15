@@ -54,6 +54,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+  private boolean autoFlushEnabled = true;
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
@@ -179,7 +180,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     rwLock.readLock().lock();
     try {
       long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
-      return txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
+      return autoFlushEnabled && txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
     } finally {
       rwLock.readLock().unlock();
     }
