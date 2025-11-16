@@ -197,7 +197,6 @@ public class TestStreamingServer {
     }
   }
 
-
   private void streamDir(String subdir) {
     try (StreamingServer server = new StreamingServer(
         new DirectoryServerSource(sourceDir), 0)) {
