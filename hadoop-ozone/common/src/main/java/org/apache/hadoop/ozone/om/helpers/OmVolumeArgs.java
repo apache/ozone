@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 /**
  * A class that encapsulates the OmVolumeArgs Args.
  */
+// not yet @Immutable, needs HDDS-13937 and HDDS-13941
 public final class OmVolumeArgs extends WithObjectID
     implements CopyObject<OmVolumeArgs>, Auditable {
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
@@ -47,13 +48,13 @@ public final class OmVolumeArgs extends WithObjectID
       OmVolumeArgs.class);
 
   private final String adminName;
-  private String ownerName;
+  private final String ownerName;
   private final String volume;
-  private long creationTime;
-  private long modificationTime;
-  private long quotaInBytes;
-  private long quotaInNamespace;
-  private long usedNamespace;
+  private final long creationTime;
+  private final long modificationTime;
+  private final long quotaInBytes;
+  private final long quotaInNamespace;
+  private final long usedNamespace;
   private final CopyOnWriteArrayList<OzoneAcl> acls;
   /**
    * Reference count on this Ozone volume.
@@ -67,7 +68,7 @@ public final class OmVolumeArgs extends WithObjectID
    * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
    * will have reference count set to zero by default.
    */
-  private long refCount;
+  private final long refCount;
 
   private OmVolumeArgs(Builder b) {
     super(b);
@@ -90,42 +91,6 @@ public final class OmVolumeArgs extends WithObjectID
   public long getRefCount() {
     Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
-  }
-
-  /**
-   * Increase refCount by 1.
-   */
-  public void incRefCount() {
-    this.refCount++;
-  }
-
-  /**
-   * Decrease refCount by 1.
-   */
-  public void decRefCount() {
-    Preconditions.checkState(this.refCount > 0L,
-        "refCount should not become negative");
-    this.refCount--;
-  }
-
-  public void setOwnerName(String newOwner) {
-    this.ownerName = newOwner;
-  }
-
-  public void setQuotaInBytes(long quotaInBytes) {
-    this.quotaInBytes = quotaInBytes;
-  }
-
-  public void setQuotaInNamespace(long quotaInNamespace) {
-    this.quotaInNamespace = quotaInNamespace;
-  }
-
-  public void setCreationTime(long time) {
-    this.creationTime = time;
-  }
-
-  public void setModificationTime(long time) {
-    this.modificationTime = time;
   }
 
   public boolean addAcl(OzoneAcl ozoneAcl) {
@@ -208,13 +173,6 @@ public final class OmVolumeArgs extends WithObjectID
       }
     }
     return defaultAcls;
-  }
-
-  /**
-   * increase used bucket namespace by n.
-   */
-  public void incrUsedNamespace(long n) {
-    usedNamespace += n;
   }
 
   /**
@@ -350,6 +308,14 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    /**
+     * increase used bucket namespace by n.
+     */
+    public Builder incrUsedNamespace(long n) {
+      this.usedNamespace += n;
+      return this;
+    }
+
     @Override
     public Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
@@ -374,10 +340,28 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    /**
+     * Increase refCount by 1.
+     */
+    public Builder incRefCount() {
+      refCount++;
+      return this;
+    }
+
+    /**
+     * Decrease refCount by 1.
+     */
+    public Builder decRefCount() {
+      refCount--;
+      return this;
+    }
+
     public OmVolumeArgs build() {
       Preconditions.checkNotNull(adminName);
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
+      Preconditions.checkState(this.refCount >= 0L,
+          "refCount should not become negative");
       return new OmVolumeArgs(this);
     }
 
@@ -438,6 +422,10 @@ public final class OmVolumeArgs extends WithObjectID
 
   @Override
   public OmVolumeArgs copyObject() {
+    return toBuilder().build();
+  }
+
+  public Builder toBuilder() {
     return new Builder(acls)
         .setAdminName(adminName)
         .setOwnerName(ownerName)
@@ -450,7 +438,6 @@ public final class OmVolumeArgs extends WithObjectID
         .setModificationTime(modificationTime)
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
-        .setRefCount(refCount)
-        .build();
+        .setRefCount(refCount);
   }
 }
