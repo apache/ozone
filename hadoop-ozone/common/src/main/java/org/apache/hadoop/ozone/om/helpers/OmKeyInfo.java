@@ -805,7 +805,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static Builder builderFromProtobuf(KeyInfo keyInfo) {
     if (keyInfo == null) {
       return null;
     }
@@ -858,7 +858,12 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
-    return builder.build();
+    return builder;
+  }
+
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+    Builder builder = builderFromProtobuf(keyInfo);
+    return builder == null ? null : builder.build();
   }
 
   @Override
