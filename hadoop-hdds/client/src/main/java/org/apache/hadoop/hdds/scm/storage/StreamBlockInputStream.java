@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -44,11 +47,13 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
 
 /**
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
@@ -58,18 +63,18 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
-  private static final Throwable CANCELLED_EXCEPTION = new Throwable("Cancelled by client");
 
   private final BlockID blockID;
   private final long blockLength;
+  private final int packetSize;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
-  private XceiverClientSpi xceiverClient;
+  private XceiverClientGrpc xceiverClient;
 
   private ByteBuffer buffer;
   private long position = 0;
-  private boolean initialized = false;
+  private long requestedLength = 0;
   private StreamingReader streamingReader;
 
   private final boolean verifyChecksum;
@@ -78,13 +83,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private int retries = 0;
 
   public StreamBlockInputStream(
-      BlockID blockID, long length, Pipeline pipeline,
+      BlockID blockID, long blockLength, int packetSize, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
-    this.blockLength = length;
+    this.blockLength = blockLength;
+    this.packetSize = packetSize;
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -111,7 +117,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   @Override
   public synchronized int read() throws IOException {
     checkOpen();
-    if (!dataAvailableToRead()) {
+    if (!dataAvailableToRead(1)) {
       return EOF;
     }
     position++;
@@ -129,7 +135,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     checkOpen();
     int read = 0;
     while (targetBuf.hasRemaining()) {
-      if (!dataAvailableToRead()) {
+      if (!dataAvailableToRead(targetBuf.remaining())) {
         break;
       }
       int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
@@ -143,16 +149,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     return read > 0 ? read : EOF;
   }
 
-  private boolean dataAvailableToRead() throws IOException {
+  private boolean dataAvailableToRead(int length) throws IOException {
     if (position >= blockLength) {
       return false;
     }
     initialize();
-    if (buffer == null || buffer.remaining() == 0) {
-      int loaded = fillBuffer();
-      return loaded != EOF;
-    }
-    return true;
+    return fillBuffer(length);
   }
 
   @Override
@@ -188,12 +190,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     releaseClient();
   }
 
-  private void closeStream() {
+  private synchronized void closeStream() {
     if (streamingReader != null) {
-      streamingReader.cancel();
+      streamingReader.onCompleted();
       streamingReader = null;
     }
-    initialized = false;
     buffer = null;
   }
 
@@ -207,34 +208,48 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     checkOpen();
     if (xceiverClient == null) {
       final Pipeline pipeline = pipelineRef.get();
+      final XceiverClientSpi client;
       try {
-        xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+        client = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
         LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
       }
+
+      if (client == null) {
+        throw new IOException("Failed to acquire client for " + pipeline);
+      }
+      if (!(client instanceof XceiverClientGrpc)) {
+        throw new IOException("Unexpected client class: " + client.getClass().getName() + ", " + pipeline.toString());
+      }
+
+      xceiverClient =  (XceiverClientGrpc) client;
     }
   }
 
-  private void initialize() throws IOException {
-    if (initialized) {
-      return;
-    }
-    while (true) {
+  private synchronized void initialize() throws IOException {
+    while (streamingReader == null) {
       try {
         acquireClient();
-        streamingReader = new StreamingReader();
-        ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
-            pipelineRef.get().getReplicaIndexes(), streamingReader);
-        initialized = true;
-        return;
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        handleExceptions(new IOException("Interrupted", ie));
       } catch (IOException ioe) {
         handleExceptions(ioe);
       }
+
+      streamingReader = new StreamingReader();
+      xceiverClient.initStreamRead(blockID, streamingReader);
     }
+  }
+
+  synchronized void readBlock(long length) throws IOException {
+    if (streamingReader == null) {
+      throw new IOException("Uninitialized StreamingReader: " + blockID);
+    }
+    final StreamingReadResponse r = streamingReader.getResponse();
+    if (r == null) {
+      throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
+    }
+    xceiverClient.streamRead(ContainerProtocolCalls.getReadBlockCommand(
+        blockID, position, length, tokenRef.get(), pipelineRef.get()), r);
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -251,12 +266,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  private int fillBuffer() throws IOException {
-    if (!streamingReader.hasNext()) {
-      return EOF;
+  private boolean hasRemaining () {
+    return buffer != null && buffer.hasRemaining();
+  }
+
+  private boolean fillBuffer(int length) throws IOException {
+    if (hasRemaining()) {
+      return true;
     }
-    buffer = streamingReader.readNext();
-    return buffer == null ? EOF : buffer.limit();
+    buffer = streamingReader.read(length);
+    return hasRemaining();
   }
 
   protected synchronized void releaseClient() {
@@ -277,9 +296,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
-  private synchronized void releaseStreamResources(StreamingReadResponse response) {
+  private synchronized void releaseStreamResources() {
     if (xceiverClient != null) {
-      xceiverClient.completeStreamRead(response);
+      xceiverClient.completeStreamRead();
     }
   }
 
@@ -288,44 +307,59 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
    */
   public class StreamingReader implements StreamingReaderSpi {
 
-    private final BlockingQueue<ContainerProtos.ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>(1);
-    private final AtomicBoolean completed = new AtomicBoolean(false);
-    private final AtomicBoolean failed = new AtomicBoolean(false);
-    private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
-    private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private volatile StreamingReadResponse response;
+    /** Response queue: poll is blocking while offer is non-blocking. */
+    private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
 
-    public boolean hasNext() {
-      return !responseQueue.isEmpty() || !completed.get();
+    private final CompletableFuture<Void> future = new CompletableFuture<>();
+    private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
+    private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
+
+    void checkError() throws IOException {
+      if (future.isCompletedExceptionally()) {
+        try {
+          future.get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new IOException("Streaming read failed", e);
+        }
+      }
     }
 
-    public ByteBuffer readNext() throws IOException {
-      if (failed.get()) {
-        Throwable cause = error.get();
-        throw new IOException("Streaming read failed", cause);
-      }
+    ReadBlockResponseProto poll() throws IOException {
+      for (; ; ) {
+        checkError();
+        if (future.isDone()) {
+          return null; // Stream ended
+        }
 
-      if (completed.get() && responseQueue.isEmpty()) {
+        final ReadBlockResponseProto proto;
+        try {
+          proto = responseQueue.poll(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted while waiting for response", e);
+        }
+        if (proto != null) {
+          return proto;
+        }
+      }
+    }
+
+    private ByteBuffer read(int length) throws IOException {
+      checkError();
+      if (future.isDone()) {
         return null; // Stream ended
       }
 
-      ReadBlockResponseProto readBlock;
-      try {
-        readBlock = responseQueue.poll(30, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Interrupted while waiting for response", e);
+      final long diff = position + length - requestedLength;
+      if (diff > 0) {
+        final long rounded = roundUp(diff, packetSize);
+        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}",
+            position, length, requestedLength, diff, rounded);
+        readBlock(rounded);
+        requestedLength += rounded;
       }
-      if (readBlock == null) {
-        if (failed.get()) {
-          Throwable cause = error.get();
-          throw new IOException("Streaming read failed", cause);
-        } else if (completed.get()) {
-          return null; // Stream ended
-        } else {
-          throw new IOException("Timed out waiting for response");
-        }
-      }
+
+      final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind
@@ -339,15 +373,17 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       }
       if (pos > readBlock.getOffset()) {
         int offset = (int)(pos - readBlock.getOffset());
+        if (offset > buf.limit()) {
+          offset = buf.limit();
+        }
         buf.position(offset);
       }
       return buf;
     }
 
     private void releaseResources() {
-      boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
-      if (wasNotYetComplete) {
-        releaseStreamResources(response);
+      if (semaphoreReleased.compareAndSet(false, true)) {
+        releaseStreamResources();
       }
     }
 
@@ -361,17 +397,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
           Checksum.verifyChecksum(data, checksumData, 0);
         }
         offerToQueue(readBlock);
-      } catch (OzoneChecksumException e) {
-        LOG.warn("Checksum verification failed for block {} from datanode {}",
-            getBlockID(), response.getDatanodeDetails(), e);
-        cancelDueToError(e);
+      } catch (Exception e) {
+        final StreamingReadResponse r = getResponse();
+        LOG.warn("Failed to process block {} response from {}", getBlockID(), r, e);
+        setFailed(e);
+        r.getRequestObserver().onError(e);
+        releaseResources();
       }
     }
 
     @Override
     public void onError(Throwable throwable) {
       if (throwable instanceof StatusRuntimeException) {
-        if (((StatusRuntimeException) throwable).getStatus().getCode().name().equals("CANCELLED")) {
+        if (((StatusRuntimeException) throwable).getStatus().getCode() == CANCELLED) {
           // This is expected when the client cancels the stream.
           setCompleted();
         }
@@ -387,57 +425,47 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       releaseResources();
     }
 
-    /**
-     * By calling cancel, the client will send a cancel signal to the server, which will stop sending more data and
-     * cause the onError() to be called in this observer with a CANCELLED exception.
-     */
-    public void cancel() {
-      if (response != null && response.getRequestObserver() != null) {
-        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
-        setCompleted();
-        releaseResources();
-      }
-    }
-
-    public void cancelDueToError(Throwable exception) {
-      if (response != null && response.getRequestObserver() != null) {
-        response.getRequestObserver().onError(exception);
-        setFailed(exception);
-        releaseResources();
-      }
+    StreamingReadResponse getResponse() {
+      return response.get();
     }
 
     private void setFailed(Throwable throwable) {
-      if (completed.get()) {
-        throw new IllegalArgumentException("Cannot mark a completed stream as failed");
+      final boolean completed = future.completeExceptionally(throwable);
+      if (!completed) {
+        LOG.warn("Already failed: suppressed ", throwable);
       }
-      failed.set(true);
-      error.set(throwable);
     }
 
     private void setCompleted() {
-      if (!failed.get()) {
-        completed.set(true);
+      final boolean changed = future.complete(null);
+      if (!changed) {
+        try {
+          future.get();
+        } catch (InterruptedException | ExecutionException e) {
+          LOG.warn("Failed to setCompleted", e);
+        }
       }
+
+      releaseResources();
     }
 
     private void offerToQueue(ReadBlockResponseProto item) {
-      while (!completed.get() && !failed.get()) {
-        try {
-          if (responseQueue.offer(item, 100, TimeUnit.MILLISECONDS)) {
-            return;
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          return;
-        }
-      }
+      final boolean offered = responseQueue.offer(item);
+      Preconditions.assertTrue(offered, () -> "Failed to offer " + item);
     }
 
     @Override
     public void setStreamingReadResponse(StreamingReadResponse streamingReadResponse) {
-      response = streamingReadResponse;
+      final boolean set = response.compareAndSet(null, streamingReadResponse);
+      Preconditions.assertTrue(set, () -> "Failed to set streamingReadResponse");
     }
   }
 
+  static long roundUp(long required, int packet) {
+    final long n = (required - 1) / packet;
+    final long rounded = (n + 1) * packet;
+    Preconditions.assertTrue(rounded >= required);
+    Preconditions.assertTrue(rounded - packet < required);
+    return rounded;
+  }
 }

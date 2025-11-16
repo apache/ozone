@@ -79,6 +79,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -371,6 +372,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
+      GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org"), Level.ERROR);
       CodecTestUtil.gc();
       IOUtils.closeQuietly(clients);
       final File baseDir = new File(getBaseDir());

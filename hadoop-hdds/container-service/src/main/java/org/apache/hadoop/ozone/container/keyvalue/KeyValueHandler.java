@@ -92,6 +92,7 @@ import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -169,6 +170,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2075,6 +2077,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       ReadBlockRequestProto readBlock = request.getReadBlock();
+      LOG.info("XXX server readBlock {}", TextFormat.shortDebugString(readBlock));
 
       BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
       // This is a new api the block should always be checked.
@@ -2108,7 +2111,9 @@ public class KeyValueHandler extends Handler {
            FileChannel channel = file.getChannel()) {
         ByteBuffer buffer = ByteBuffer.allocate(bytesPerChecksum);
         channel.position(adjustedOffset);
-        while (channel.read(buffer) != -1) {
+        int totalDataLength = 0;
+        int numResponse = 0;
+        while (totalDataLength < readBlock.getLength() && channel.read(buffer) != -1) {
           buffer.flip();
           if (checksumType != ContainerProtos.ChecksumType.NONE) {
             // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
@@ -2119,11 +2124,19 @@ public class KeyValueHandler extends Handler {
             ByteString checksum = blockData.getChunks().get(chunkIndex).getChecksumData().getChecksums(checksumIndex);
             checksumData = new ChecksumData(checksumType, bytesPerChecksum, Collections.singletonList(checksum));
           }
-          streamObserver.onNext(getReadBlockResponse(request, checksumData, buffer, adjustedOffset));
+          final ContainerCommandResponseProto response = getReadBlockResponse(request, checksumData, buffer, adjustedOffset);
+          final int dataLength = response.getReadBlock().getData().size();
+          final int responseLength = response.getSerializedSize();
+          LOG.info("XXX server onNext response {}: dataLength={}", numResponse, dataLength);
+          streamObserver.onNext(response);
           buffer.clear();
 
           adjustedOffset += bytesPerChecksum;
+          totalDataLength += dataLength;
+          numResponse++;
         }
+        LOG.info("XXX server response ended: totalDataLength={}, numResponse={}",
+            totalDataLength, numResponse);
       }
       // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {

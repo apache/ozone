@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
@@ -105,6 +106,7 @@ public class GrpcXceiverService extends
 
         try {
           if (request.getCmdType() == Type.ReadBlock) {
+            LOG.info("XXX server received onNext request {}", TextFormat.shortDebugString(request.getReadBlock()));
             dispatcher.streamDataReadOnly(request, responseObserver, null);
           } else {
             final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);

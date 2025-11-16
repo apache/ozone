@@ -79,7 +79,7 @@ abstract class TestInputStreamBase {
         .applyTo(conf);
 
     return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(3)
         .build();
   }
 

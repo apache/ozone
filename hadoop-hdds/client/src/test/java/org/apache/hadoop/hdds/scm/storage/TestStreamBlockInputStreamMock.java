@@ -72,11 +72,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
- * Tests for {@link TestStreamBlockInputStream}'s functionality.
+ * Tests for {@link TestStreamBlockInputStreamMock}'s functionality.
  */
-public class TestStreamBlockInputStream {
+public class TestStreamBlockInputStreamMock {
   private static final int BYTES_PER_CHECKSUM = 1024;
   private static final int BLOCK_SIZE = 1024;
+  private static final int PACKET_SIZE = 128;
   private StreamBlockInputStream blockStream;
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private XceiverClientFactory xceiverClientFactory;
@@ -119,7 +120,7 @@ public class TestStreamBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
     createDataAndChecksum();
-    blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, pipeline,
+    blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, PACKET_SIZE, pipeline,
         token, xceiverClientFactory, refreshFunction, clientConfig);
   }
 
@@ -143,7 +144,7 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
   }
 
   @Test
@@ -156,7 +157,7 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
     // The next read should "rebuffer" and continue from the last position
     assertEquals(data[1], blockStream.read());
     assertEquals(2, blockStream.getPos());
@@ -170,7 +171,7 @@ public class TestStreamBlockInputStream {
     assertEquals(100, blockStream.getPos());
     // Verify that cancel() was called on the requestObserver mock
     verify(requestObserver).cancel(any(), any());
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
     // The xceiverClient should not be released
     verify(xceiverClientFactory, never())
         .releaseClientForReadData(xceiverClient, false);
@@ -193,7 +194,7 @@ public class TestStreamBlockInputStream {
       return null;
     }).when(xceiverClient).streamRead(any(), any());
     assertThrows(IOException.class, () -> blockStream.read());
-    verify(xceiverClient, times(0)).completeStreamRead(any());
+    verify(xceiverClient, times(0)).completeStreamRead();
   }
 
   @Test

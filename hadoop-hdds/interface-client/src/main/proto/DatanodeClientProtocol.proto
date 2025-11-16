@@ -401,6 +401,7 @@ message ListBlockResponseProto {
 message ReadBlockRequestProto {
   required DatanodeBlockID blockID = 1;
   required uint64 offset = 2;
+  required uint64 length = 3;
 }
 
 message ReadBlockResponseProto {
