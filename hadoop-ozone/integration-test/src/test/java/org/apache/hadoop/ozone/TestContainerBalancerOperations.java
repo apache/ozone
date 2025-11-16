@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -97,12 +98,17 @@ public class TestContainerBalancerOperations {
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
-    // waiting for balance completed.
-    // TODO: this is a temporary implementation for now
-    // modify this after balancer is fully completed
-    try {
-      Thread.sleep(20000);
-    } catch (InterruptedException e) { }
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            return !containerBalancerClient.getContainerBalancerStatus();
+          } catch (IOException e) {
+            return false;
+          }
+        },
+        100,
+        30000
+    );
 
     running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
