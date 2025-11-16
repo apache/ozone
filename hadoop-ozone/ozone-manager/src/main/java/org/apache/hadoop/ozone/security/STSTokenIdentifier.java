@@ -52,7 +52,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   /**
    * Create an empty STS token identifier.
    */
-  private STSTokenIdentifier() {
+  public STSTokenIdentifier() {
     super();
   }
 

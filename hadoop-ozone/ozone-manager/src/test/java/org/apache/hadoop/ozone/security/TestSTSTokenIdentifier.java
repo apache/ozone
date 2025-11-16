@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,10 @@ public class TestSTSTokenIdentifier {
 
   @Test
   public void testProtoBufRoundTrip() throws IOException {
-    final Instant expiry = Instant.now().plusSeconds(7200);
+    // STSTokenIdentifier persists expiry with millisecond precision (via toEpochMilli),
+    // so use a millisecond-precision Instant to avoid nanos-only differences across
+    // platforms/JDKs during round-trips.
+    final Instant expiry = Instant.now().plusSeconds(7200).truncatedTo(ChronoUnit.MILLIS);
     final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
         "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleY",
         expiry, "secretKey", "sessionPolicy");
@@ -63,9 +67,7 @@ public class TestSTSTokenIdentifier {
     assertThat(proto.getSessionPolicy()).isEqualTo("sessionPolicy");
     assertThat(proto.getSecretKeyId()).isEqualTo(secretKeyId.toString());
 
-    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier(
-        "other", "other", "other", Instant.now(), "other",
-        "other");
+    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getOwnerId()).isEqualTo("tempAccess");
@@ -106,9 +108,7 @@ public class TestSTSTokenIdentifier {
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
-    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier(
-        "other", "other", "other", Instant.now(), "other",
-        "other");
+    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -124,9 +124,7 @@ public class TestSTSTokenIdentifier {
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
-    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier(
-        "other", "other", "other", Instant.now(), "other",
-        "other");
+    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -151,9 +149,14 @@ public class TestSTSTokenIdentifier {
 
   @Test
   public void testWriteToAndReadFromByteArray() throws Exception {
+    // Use millisecond-precision Instant so that the value survives the
+    // toEpochMilli() / Instant.ofEpochMilli() round-trip without losing precision
+    // compared to the original object, which is compared using equals().
+    final Instant expiry =
+        Instant.now().plusSeconds(1000).truncatedTo(ChronoUnit.MILLIS);
     final STSTokenIdentifier originalTokenIdentifier = new STSTokenIdentifier(
-        "tempAccessKeyId", "originalAccessKeyId", "roleArn",
-        Instant.now().plusSeconds(1000), "secretAccessKey", "sessionPolicy");
+        "tempAccessKeyId", "originalAccessKeyId", "roleArn", expiry,
+        "secretAccessKey", "sessionPolicy");
     originalTokenIdentifier.setSecretKeyId(UUID.randomUUID());
 
     final ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -162,9 +165,7 @@ public class TestSTSTokenIdentifier {
     }
 
     final byte[] bytes = baos.toByteArray();
-    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier(
-        "other", "other", "other", Instant.now(), "other",
-        "other");
+    final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
     parsedTokenIdentifier.readFromByteArray(bytes);
 
     assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
