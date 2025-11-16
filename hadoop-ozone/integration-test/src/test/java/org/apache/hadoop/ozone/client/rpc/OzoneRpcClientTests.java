@@ -4454,7 +4454,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
+    omKeyInfo = omKeyInfo.withMetadataMutations(
+        metadata -> metadata.remove(OzoneConsts.GDPR_FLAG));
 
     omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
