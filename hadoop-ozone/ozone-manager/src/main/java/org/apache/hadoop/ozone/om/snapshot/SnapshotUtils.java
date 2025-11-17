@@ -18,18 +18,13 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -217,26 +212,6 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Return a map column family to prefix for the keys in the table for
-   * the given volume and bucket.
-   * Column families, map is returned for, are keyTable, dirTable and fileTable.
-   */
-  public static Map<String, String> getColumnFamilyToKeyPrefixMap(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
-      String bucketName
-  ) throws IOException {
-    String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-    String keyPrefixFso = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-
-    Map<String, String> columnFamilyToPrefixMap = new HashMap<>();
-    columnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
-    columnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
-    columnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
-    return columnFamilyToPrefixMap;
-  }
-
-  /**
    * Returns merged repeatedKeyInfo entry with the existing deleted entry in the table.
    * @param snapshotMoveKeyInfos keyInfos to be added.
    * @param metadataManager metadataManager for a store.
@@ -244,7 +219,8 @@ public final class SnapshotUtils {
    * @throws IOException
    */
   public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
-      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws
+      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, long bucketId,
+      OMMetadataManager metadataManager) throws
       IOException {
     String dbKey = snapshotMoveKeyInfos.getKey();
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
@@ -260,7 +236,7 @@ public final class SnapshotUtils {
     // can happen on om transaction replay on snapshotted rocksdb.
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
     if (result == null) {
-      result = new RepeatedOmKeyInfo(keyInfoList);
+      result = new RepeatedOmKeyInfo(keyInfoList, bucketId);
     } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
       keyInfoList.forEach(result::addOmKeyInfo);
     }
@@ -291,17 +267,19 @@ public final class SnapshotUtils {
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
 
-  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+  // Validates the previous path snapshotId for given a snapshotInfo. In case snapshotInfo is
+  // null, the snapshotInfo would be considered as AOS and previous snapshot becomes the latest snapshot in the global
+  // snapshot chain. Would throw OMException if validation fails otherwise function would pass.
+  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
     UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
         SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
     if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
-      LOG.warn("Snapshot validation failed. Expected previous snapshotId : " +
-          expectedPreviousSnapshotId + " but was " + previousSnapshotId);
-      return false;
+      throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
+          expectedPreviousSnapshotId + " but was " + previousSnapshotId,
+          OMException.ResultCodes.INVALID_REQUEST);
     }
-    return true;
   }
 
   /**

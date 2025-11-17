@@ -30,9 +30,8 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -77,8 +76,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -664,8 +661,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
-
+    try (Scope ignored = span.makeCurrent()) {
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
@@ -681,7 +677,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       processReply(reply);
     } finally {
-      span.finish();
+      span.end();
     }
   }
 
@@ -743,9 +739,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, b.toString(), ClosePipelineInfo.Reason.PIPELINE_FAILED);
   }
 
-  private void triggerPipelineClose(RaftGroupId groupId, String detail,
+  @VisibleForTesting
+  public void triggerPipelineClose(RaftGroupId groupId, String detail,
       ClosePipelineInfo.Reason reasonCode) {
     PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
+
+    if (context != null) {
+      if (context.isPipelineCloseInProgress(pipelineID.getId())) {
+        LOG.debug("Skipped triggering pipeline close for {} as it is already in progress. Reason: {}",
+            pipelineID.getId(), detail);
+        return;
+      }
+    }
+
     ClosePipelineInfo.Builder closePipelineInfo =
         ClosePipelineInfo.newBuilder()
             .setPipelineID(pipelineID.getProtobuf())
@@ -778,18 +784,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
   }
 
-  private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
-    long bytesWritten = 0;
-    for (Container<?> container : containerController.getContainers()) {
-      ContainerData containerData = container.getContainerData();
-      if (containerData.getOriginPipelineId()
-          .compareTo(pipelineID.getId()) == 0) {
-        bytesWritten += containerData.getStatistics().getWriteBytes();
-      }
-    }
-    return bytesWritten;
-  }
-
   @Override
   public List<PipelineReport> getPipelineReport() {
     try {
@@ -803,7 +797,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(pipelineID)
             .setIsLeader(isLeader)
-            .setBytesWritten(calculatePipelineBytesWritten(pipelineID))
             .build());
       }
       return reports;

@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,9 +40,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -69,7 +74,13 @@ public class TestOMSnapshotCreateResponse {
     String fsPath = folder.getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotLocalDataManager snapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(snapshotLocalDataManager);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -120,7 +131,7 @@ public class TestOMSnapshotCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Confirm snapshot directory was created
-    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
+    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo, 0);
     assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry

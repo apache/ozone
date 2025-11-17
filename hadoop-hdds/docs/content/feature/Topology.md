@@ -157,6 +157,24 @@ This is configured using the `ozone.scm.container.placement.impl` property in `o
 
 Note: When configuring these values, include the full class name prefix: for example, org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity
 
+## Container Placement for Erasure Coded (EC) Containers
+
+For Erasure Coded (EC) containers, SCM employs a specialized placement policy to ensure data resilience and availability by distributing data and parity blocks across multiple racks. This is configured using the `ozone.scm.container.placement.ec.impl.key` property in `ozone-site.xml`.
+
+### 1. `SCMContainerPlacementRackScatter` (Default)
+
+*   **Function:** This is the default policy for EC containers. It attempts to place each block (both data and parity) of an EC container on a different rack. For example, for an RS-6-3-1024k container (6 data blocks + 3 parity blocks), this policy will try to place the 9 blocks on 9 different racks. This "scatter" approach maximizes the fault tolerance, as the loss of a single rack will not impact more than one block of the container. [5]
+*   **Use Cases:** This policy is highly recommended for production clusters using Erasure Coding to protect against rack-level failures.
+*   **Configuration:**
+    ```xml
+    <property>
+      <name>ozone.scm.container.placement.ec.impl.key</name>
+      <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter</value>
+    </property>
+    ```
+*   **Behavior:** If the number of available racks is less than the number of blocks in the EC group, the policy will start placing more than one block on the same rack, while trying to keep the distribution as even as possible.
+*   **Limitations:** Similar to `SCMContainerPlacementRackAware`, this policy is designed for single-layer rack topologies (e.g., `/rack/node`) and is not recommended for multi-layer hierarchies.
+
 ## Optimizing Read Paths
 
 Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.xml`. [1]
@@ -173,6 +191,8 @@ This directs clients (replicated data) to read from topologically closest DataNo
 *   **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
 *   **Pipeline Creation:** For production environments, use the default `PipelinePlacementPolicy` for `ozone.scm.pipeline.placement.impl` to ensure both rack fault tolerance and pipeline load balancing.
 *   **Pipeline Selection:** The default `RandomPipelineChoosePolicy` for `hdds.scm.pipeline.choose.policy.impl` is suitable for general load balancing.
+*   **Replicated (RATIS) Containers:** For production, use `SCMContainerPlacementRackAware` (mindful of its single-layer topology limitation) or `SCMContainerPlacementCapacity` (balanced disk usage) over `SCMContainerPlacementRandom`.
+*   **Erasure Coded (EC) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackScatter`.
 *   **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
 *   **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
 
@@ -182,3 +202,4 @@ This directs clients (replicated data) to read from topologically closest DataNo
 2.  [Ozone Source Code: container placement policies](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). (For implementations of pluggable placement policies).
 3.  [Ozone Source Code: SCMContainerPlacementRandom.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementRandom.java).
 4.  [Ozone Source Code: SCMContainerPlacementCapacity.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementCapacity.java).
+5.  [Ozone Source Code: SCMContainerPlacementRackScatter.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementRackScatter.java).

@@ -19,12 +19,17 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -34,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
@@ -65,6 +71,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.suspended = new AtomicBoolean(false);
   }
 
+  @Override
+  public abstract DeletingServiceTaskQueue getTasks();
+
   protected OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
   }
@@ -75,6 +84,49 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       return true;
     }
     return !suspended.get() && getOzoneManager().isLeaderReady();
+  }
+
+  boolean isPreviousPurgeTransactionFlushed() throws IOException {
+    TransactionInfo lastAOSTransactionId = metrics.getLastAOSTransactionInfo();
+    TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
+        getOzoneManager().getMetadataManager());
+    if (flushedTransactionId != null && lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
+      LOG.info("Skipping AOS processing since changes to deleted space of AOS have not been flushed to disk " +
+              "last Purge Transaction: {}, Flushed Disk Transaction: {}", lastAOSTransactionId,
+          flushedTransactionId);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * A specialized implementation of {@link BackgroundTaskQueue} that modifies
+   * the behavior of added tasks to utilize a read lock during execution.
+   *
+   * This class ensures that every {@link BackgroundTask} added to the queue
+   * is wrapped such that its execution acquires a read lock via
+   * {@code getBootstrapStateLock().acquireReadLock()} before performing any
+   * operations. The lock is automatically released upon task completion or
+   * exception, ensuring safe concurrent execution of tasks within the service when running along with bootstrap flow.
+   */
+  public class DeletingServiceTaskQueue extends BackgroundTaskQueue {
+    @Override
+    public synchronized void add(BackgroundTask task) {
+      super.add(new BackgroundTask() {
+
+        @Override
+        public BackgroundTaskResult call() throws Exception {
+          try (UncheckedAutoCloseable readLock = getBootstrapStateLock().acquireReadLock()) {
+            return task.call();
+          }
+        }
+
+        @Override
+        public int getPriority() {
+          return task.getPriority();
+        }
+      });
+    }
   }
 
   /**

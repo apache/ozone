@@ -24,11 +24,14 @@ import EChart from '@/v2/components/eChart/eChart';
 import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
+import ErrorMessage from '@/v2/components/errors/errorCard';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
   loading?: boolean;
   storageReport: StorageReport;
+  error?: string | null;
 }
 
 const size = filesize.partial({ round: 1 });
@@ -73,8 +76,13 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
     used: 0,
     remaining: 0,
     committed: 0
-  }
+  },
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title='Cluster Capacity' />
+  }
 
   const {
     ozoneUsedPercentage,

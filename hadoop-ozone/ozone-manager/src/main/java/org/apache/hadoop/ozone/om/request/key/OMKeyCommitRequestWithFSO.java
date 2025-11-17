@@ -28,6 +28,7 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -95,7 +97,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
     Exception exception = null;
     OmKeyInfo omKeyInfo = null;
-    OmBucketInfo omBucketInfo = null;
+    OmBucketInfo omBucketInfo;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
@@ -200,7 +202,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
-        openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
+        openKeyToDelete = openKeyToDelete.toBuilder()
+            .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .build();
         openKeyToDelete.setModificationTime(Time.now());
         openKeyToDelete.setUpdateID(trxnLogIndex);
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
@@ -214,13 +218,15 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       if (isHSync) {
         if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenFileKey)) {
           // Update open key as well if it is the first hsync of this key
-          omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+          omKeyInfo = omKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString));
           newOpenKeyInfo = omKeyInfo.copyObject();
         }
       }
 
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getMetadataList()));
+      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
+          metadata.putAll(KeyValueUtil.getFromProtobuf(
+              commitKeyArgs.getMetadataList())));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       List<OmKeyLocationInfo> uncommitted =
@@ -247,12 +253,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
       } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
-        // Subtract the size of blocks to be overwritten.
-        correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, trxnLogIndex);
-        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
-            correctedSpace);
+            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
         // using pseudoObjId as objectId can be same in case of overwrite key
@@ -267,17 +269,39 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // and local ID with omKeyInfo blocks'.
         // Otherwise, it causes data loss once those shared blocks are added
         // to deletedTable and processed by KeyDeletingService for deletion.
-        filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
-
+        Pair<Map<OmKeyInfo, List<OmKeyLocationInfo>>, Integer> filteredUsedBlockCnt =
+            filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
+        Map<OmKeyInfo, List<OmKeyLocationInfo>> blocks = filteredUsedBlockCnt.getLeft();
+        correctedSpace -= blocks.entrySet().stream().mapToLong(filteredKeyBlocks ->
+            filteredKeyBlocks.getValue().stream().mapToLong(block -> QuotaUtil.getReplicatedSize(
+                block.getLength(), filteredKeyBlocks.getKey().getReplicationConfig())).sum()).sum();
+        long totalSize = 0;
+        long totalNamespace = 0;
         if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
           oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+          List<OmKeyInfo> oldKeys = oldVerKeyInfo.getOmKeyInfoList();
+          for (int i = 0; i < oldKeys.size(); i++) {
+            OmKeyInfo updatedOlderKeyVersions =
+                oldKeys.get(i).withCommittedKeyDeletedFlag(true);
+            oldKeys.set(i, updatedOlderKeyVersions);
+            totalSize += sumBlockLengths(updatedOlderKeyVersions);
+            totalNamespace += 1;
+          }
         }
+        // Subtract the size of blocks to be overwritten.
+        checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
+        // Subtract the size of blocks to be overwritten.
+        omBucketInfo.decrUsedNamespace(totalNamespace, true);
+        omBucketInfo.decrUsedNamespace(filteredUsedBlockCnt.getRight(), false);
+        omBucketInfo.decrUsedBytes(totalSize, true);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-        omBucketInfo.incrUsedNamespace(1L);
       }
+      omBucketInfo.incrUsedNamespace(1L);
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
@@ -293,7 +317,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
         oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
+            key -> new RepeatedOmKeyInfo(omBucketInfo.getObjectID())).addOmKeyInfo(pseudoKeyInfo);
       }
 
       // Add to cache of open key table and key table.
@@ -305,9 +329,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             dbOpenFileKey, null, fileName, keyName, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
-        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        omKeyInfo = omKeyInfo.withMetadataMutations(
+            metadata -> metadata.remove(OzoneConsts.HSYNC_CLIENT_ID));
         if (isRecovery) {
-          omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
+          omKeyInfo = omKeyInfo.withMetadataMutations(
+              metadata -> metadata.remove(OzoneConsts.LEASE_RECOVERY));
         }
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable

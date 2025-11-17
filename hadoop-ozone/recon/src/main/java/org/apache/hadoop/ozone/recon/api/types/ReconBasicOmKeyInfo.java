@@ -247,6 +247,38 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
     return builder.build();
   }
 
+  /**
+   * Converts a KeyInfo protobuf object into a ReconBasicOmKeyInfo instance.
+   * This method extracts only the essential fields required for Recon event handling, avoiding the overhead of
+   * deserializing unused metadata such as KeyLocationList or ACLs.
+   *
+   * @param keyInfoProto required for deserialization.
+   * @return the deserialized lightweight ReconBasicOmKeyInfo object.
+   */
+  public static ReconBasicOmKeyInfo getFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfoProto) {
+    if (keyInfoProto == null) {
+      return null;
+    }
+
+    String keyName = keyInfoProto.getKeyName();
+
+    Builder builder = new Builder()
+        .setVolumeName(keyInfoProto.getVolumeName())
+        .setBucketName(keyInfoProto.getBucketName())
+        .setKeyName(keyName)
+        .setDataSize(keyInfoProto.getDataSize())
+        .setCreationTime(keyInfoProto.getCreationTime())
+        .setModificationTime(keyInfoProto.getModificationTime())
+        .setReplicationConfig(ReplicationConfig.fromProto(
+            keyInfoProto.getType(),
+            keyInfoProto.getFactor(),
+            keyInfoProto.getEcReplicationConfig()))
+        .setIsFile(!keyName.endsWith("/"))
+        .setParentId(keyInfoProto.getParentID());
+
+    return builder.build();
+  }
+
   public OzoneManagerProtocolProtos.KeyInfoProtoLight toProtobuf() {
     throw new UnsupportedOperationException("This method is not supported.");
   }

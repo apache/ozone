@@ -56,7 +56,6 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG = RatisReplicationConfig.getInstance(THREE);
   private ContainerInfo container;
   private ReplicationManager replicationManager;
-  private ReplicationManagerMetrics metrics;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
   private final DatanodeID origin1 = DatanodeID.randomID();
@@ -74,7 +73,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
     when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
-    metrics = ReplicationManagerMetrics.create(replicationManager);
+    ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
@@ -119,8 +118,13 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        0,
+        null,
+        Long.MAX_VALUE,
+        0));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);

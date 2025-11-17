@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import { AxiosError } from 'axios';
+import React, { useState, useEffect } from 'react';
 import {
   Dropdown,
   Menu,
@@ -38,8 +37,8 @@ import { ValueType } from 'react-select';
 import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
@@ -47,7 +46,6 @@ import {
   MismatchContainersResponse,
   Pipelines
 } from '@/v2/types/insights.types';
-
 
 //-----Types-----
 type ContainerMismatchTableProps = {
@@ -58,6 +56,10 @@ type ContainerMismatchTableProps = {
   onRowExpand: (arg0: boolean, arg1: any) => void;
 }
 
+const DEFAULT_MISMATCH_RESPONSE: MismatchContainersResponse = {
+  containerDiscrepancyInfo: []
+};
+
 //-----Components------
 const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
   paginationConfig,
@@ -66,19 +68,40 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
   expandedRowRender,
   handleLimitChange
 }) => {
+  const [data, setData] = useState<Container[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [missingIn, setMissingIn] = useState<string>('OM');
 
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [data, setData] = React.useState<Container[]>();
-  const [searchTerm, setSearchTerm] = React.useState<string>('');
-
-  const cancelSignal = React.useRef<AbortController>();
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Use the modern hooks pattern
+  const mismatchData = useApiData<MismatchContainersResponse>(
+    `/api/v1/containers/mismatch?limit=${limit.value}&missingIn=${missingIn}`,
+    DEFAULT_MISMATCH_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  // Process data when it changes
+  useEffect(() => {
+    if (mismatchData.data && mismatchData.data.containerDiscrepancyInfo) {
+      setData(mismatchData.data.containerDiscrepancyInfo);
+    }
+  }, [mismatchData.data]);
+
+  // Refetch when limit or missingIn changes
+  useEffect(() => {
+    mismatchData.refetch();
+  }, [limit.value, missingIn]);
 
   const handleExistAtChange: FilterMenuProps['onClick'] = ({ key }) => {
     if (key === 'OM') {
-      fetchMismatchContainers('SCM');
+      setMissingIn('SCM');
     } else {
-      fetchMismatchContainers('OM');
+      setMissingIn('OM');
     }
   }
 
@@ -94,7 +117,6 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
       dataIndex: 'containerId',
       key: 'containerId',
       width: '20%'
-
     },
     {
       title: 'Count Of Keys',
@@ -150,33 +172,6 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
     }
   ];
 
-  function fetchMismatchContainers(missingIn: string) {
-    setLoading(true);
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/containers/mismatch?limit=${limit.value}&missingIn=${missingIn}`,
-      cancelSignal.current
-    );
-
-    cancelSignal.current = controller;
-    request.then(response => {
-      const mismatchedContainers: MismatchContainersResponse = response?.data;
-      setData(mismatchedContainers?.containerDiscrepancyInfo ?? []);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    })
-  }
-
-  React.useEffect(() => {
-    //Fetch containers missing in OM by default
-    fetchMismatchContainers('OM');
-
-    return (() => {
-      cancelSignal.current && cancelSignal.current.abort();
-    })
-  }, [limit.value]);
-
   return (
     <>
       <div className='table-header-section'>
@@ -203,7 +198,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
         }}
         dataSource={filterData(data)}
         columns={COLUMNS}
-        loading={loading}
+        loading={mismatchData.loading}
         pagination={paginationConfig}
         rowKey='containerId'
         locale={{ filterTitle: '' }}

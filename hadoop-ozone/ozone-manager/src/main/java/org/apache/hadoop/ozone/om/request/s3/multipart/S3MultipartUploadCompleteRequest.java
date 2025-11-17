@@ -318,7 +318,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
-              keyToDelete, trxnLogIndex);
+              keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
@@ -398,7 +398,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo);
+        getBucketLayout(), omBucketInfo, bucketId);
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
@@ -519,11 +519,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      OmKeyInfo.Builder omKeyInfoBuilder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfo.setMetadata(dbOpenKeyInfo.getMetadata());
+        omKeyInfoBuilder.setMetadata(dbOpenKeyInfo.getMetadata());
       }
-      omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
-          multipartUploadedKeyHash(partKeyInfoMap));
+      omKeyInfo = omKeyInfoBuilder
+          .addMetadata(OzoneConsts.ETAG, multipartHash)
+          .build();
       if (dbOpenKeyInfo.getTags() != null) {
         omKeyInfo.setTags(dbOpenKeyInfo.getTags());
       }
