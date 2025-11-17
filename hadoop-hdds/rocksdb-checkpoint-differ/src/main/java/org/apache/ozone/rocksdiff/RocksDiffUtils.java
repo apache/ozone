@@ -65,7 +65,7 @@ public final class RocksDiffUtils {
   /**
    * Filter sst files based on prefixes.
    */
-  public static <T> Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> inputFiles,
+  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> inputFiles,
       Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
     for (Iterator<SstFileInfo> fileIterator = inputFiles.iterator(); fileIterator.hasNext();) {
       SstFileInfo sstFileInfo = fileIterator.next();
