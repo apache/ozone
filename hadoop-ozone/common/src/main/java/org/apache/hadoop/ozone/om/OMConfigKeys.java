@@ -258,16 +258,6 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
-  public static final String OZONE_OM_HA_RAFT_SERVER_READ_OPTION =
-      "ozone.om.ha.raft.server.read.option";
-  public static final String
-      OZONE_OM_HA_RAFT_SERVER_READ_OPTION_DEFAULT = "DEFAULT";
-
-  public static final String OZONE_OM_HA_RAFT_SERVER_READ_LEADER_LEASE_ENABLED =
-      "ozone.om.ha.raft.server.read.leader.lease.enabled";
-  public static final boolean
-      OZONE_OM_HA_RAFT_SERVER_READ_LEADER_LEASE_ENABLED_DEFAULT = false;
-
   public static final String OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_KEY =
       "ozone.om.ratis.server.close.threshold";
   public static final TimeDuration OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT =

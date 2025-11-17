@@ -52,6 +52,23 @@ public class OzoneManagerRatisServerConfig {
   )
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
 
+  @Config(key = "raft.server.read.option",
+      defaultValue = "DEFAUTL",
+      type = ConfigType.STRING,
+      tags = {OZONE, OM, RATIS, PERFORMANCE},
+      description = "Option for processing read-only requests on Follower OMs," +
+          " options include : `DEFAULT`, `LINEARIZABLE`"
+  )
+  private String raftServerReadOption;
+
+  @Config(key = "raft.server.read.leader.lease.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, OM, RATIS, PERFORMANCE},
+      description = "whether to enable lease in linearizable read-only requests."
+  )
+  private boolean raftServerReadLeaderLeaseEnabled;
+
   public long getLogAppenderWaitTimeMin() {
     return logAppenderWaitTimeMin;
   }
@@ -66,5 +83,21 @@ public class OzoneManagerRatisServerConfig {
 
   public void setRetryCacheTimeout(Duration duration) {
     this.retryCacheTimeout = duration.toMillis();
+  }
+
+  public String getRaftServerReadOption() {
+    return raftServerReadOption;
+  }
+
+  public void setRaftServerReadOption(String option) {
+    this.raftServerReadOption = option;
+  }
+
+  public boolean isRaftServerReadLeaderLeaseEnabled() {
+    return raftServerReadLeaderLeaseEnabled;
+  }
+
+  public void setRaftServerReadLeaderLeaseEnabled(boolean raftServerReadLeaderLeaseEnabled) {
+    this.raftServerReadLeaderLeaseEnabled = raftServerReadLeaderLeaseEnabled;
   }
 }
