@@ -22,10 +22,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -98,17 +97,17 @@ public final class IamSessionPolicyResolver {
 
     final Set<AssumeRoleRequest.OzoneGrant> result = new LinkedHashSet<>();
 
-    // Parse JSON into list of statements
-    final List<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
+    // Parse JSON into set of statements
+    final Set<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
 
     for (JsonNode stmt : statements) {
       validateEffectInJsonStatement(stmt);
 
-      final List<String> actions = readStringOrArray(stmt.get("Action"));
-      final List<String> resources = readStringOrArray(stmt.get("Resource"));
+      final Set<String> actions = readStringOrArray(stmt.get("Action"));
+      final Set<String> resources = readStringOrArray(stmt.get("Resource"));
 
       // Parse prefixes from conditions, if any
-      final List<String> prefixes = parsePrefixesFromConditions(stmt);
+      final Set<String> prefixes = parsePrefixesFromConditions(stmt);
 
       // Map actions to S3Action enum if possible
       final Set<S3Action> mappedS3Actions = mapPolicyActionsToS3Actions(actions);
@@ -118,7 +117,7 @@ public final class IamSessionPolicyResolver {
       }
 
       // Categorize resources according to bucket resource, object resource, etc
-      final List<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
+      final Set<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
 
       // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
       final Set<AssumeRoleRequest.OzoneGrant> stmtResults = createPathsAndPermissions(
@@ -154,7 +153,7 @@ public final class IamSessionPolicyResolver {
   /**
    * Parses IAM session policy and retrieve the statement(s).
    */
-  private static List<JsonNode> parseJsonAndRetrieveStatements(String policyJson) throws OMException {
+  private static Set<JsonNode> parseJsonAndRetrieveStatements(String policyJson) throws OMException {
     final JsonNode root;
     try {
       root = MAPPER.readTree(policyJson);
@@ -167,7 +166,7 @@ public final class IamSessionPolicyResolver {
       throw new OMException("Invalid policy JSON - missing Statement", INVALID_REQUEST);
     }
 
-    final List<JsonNode> statements = new ArrayList<>();
+    final Set<JsonNode> statements = new HashSet<>();
 
     if (statementsNode.isArray()) {
       statementsNode.forEach(statements::add);
@@ -199,28 +198,28 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
-   * Reads a JsonNode and converts to a List of String, if the node represents
+   * Reads a JsonNode and converts to a Set of String, if the node represents
    * a textual value or an array of textual values.  Otherwise, returns
    * an empty List.
    */
-  private static List<String> readStringOrArray(JsonNode node) {
+  private static Set<String> readStringOrArray(JsonNode node) {
     if (node == null || node.isMissingNode() || node.isNull()) {
-      return Collections.emptyList();
+      return Collections.emptySet();
     }
     if (node.isTextual()) {
-      return Collections.singletonList(node.asText());
+      return Collections.singleton(node.asText());
     }
     if (node.isArray()) {
-      final List<String> list = new ArrayList<>();
+      final Set<String> set = new HashSet<>();
       node.forEach(n -> {
         if (n.isTextual()) {
-          list.add(n.asText());
+          set.add(n.asText());
         }
       });
-      return list;
+      return set;
     }
 
-    return Collections.emptyList();
+    return Collections.emptySet();
   }
 
   /**
@@ -230,8 +229,8 @@ public final class IamSessionPolicyResolver {
    * <p>
    * Only the StringEquals operator and s3:prefix attribute are supported.
    */
-  private static List<String> parsePrefixesFromConditions(JsonNode stmt) throws OMException {
-    List<String> prefixes = Collections.emptyList();
+  private static Set<String> parsePrefixesFromConditions(JsonNode stmt) throws OMException {
+    Set<String> prefixes = Collections.emptySet();
     final JsonNode cond = stmt.get("Condition");
     if (cond != null && !cond.isMissingNode() && !cond.isNull()) {
       if (cond.size() != 1) {
@@ -273,7 +272,7 @@ public final class IamSessionPolicyResolver {
    * Maps actions from JSON IAM policy to S3Action enum in order to determine what the
    * permissions should be.
    */
-  private static Set<S3Action> mapPolicyActionsToS3Actions(List<String> actions) {
+  private static Set<S3Action> mapPolicyActionsToS3Actions(Set<String> actions) {
     // TODO implement in future PR
     return Collections.emptySet();
   }
@@ -287,10 +286,10 @@ public final class IamSessionPolicyResolver {
    * <p>
    * It also validates that the Resource Arn(s) are valid and supported.
    */
-  private static List<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
-      List<String> resources) throws OMException {
+  private static Set<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
+      Set<String> resources) throws OMException {
     // TODO implement in future PR
-    return Collections.emptyList();
+    return Collections.emptySet();
   }
 
   /**
@@ -298,8 +297,8 @@ public final class IamSessionPolicyResolver {
    * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
    */
   private static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName,
-      AuthorizerType authorizerType, Set<S3Action> mappedS3Actions, List<ResourceSpec> resourceSpecs,
-      List<String> prefixes) {
+      AuthorizerType authorizerType, Set<S3Action> mappedS3Actions, Set<ResourceSpec> resourceSpecs,
+      Set<String> prefixes) {
     // TODO implement in future PR
     return Collections.emptySet();
   }
