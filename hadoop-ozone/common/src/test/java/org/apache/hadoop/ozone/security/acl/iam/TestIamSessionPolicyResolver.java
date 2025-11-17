@@ -19,17 +19,30 @@ package org.apache.hadoop.ozone.security.acl.iam;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3ResourceType;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.buildCaseInsensitiveS3ActionMap;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.createPathsAndPermissions;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.mapPolicyActionsToS3Actions;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.validateAndCategorizeResources;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.S3Action;
 import org.junit.jupiter.api.Test;
 
@@ -218,8 +231,7 @@ public class TestIamSessionPolicyResolver {
     final String json = createJsonStringLargerThan2048Characters();
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid policy JSON - exceeds maximum length of 2048 characters",
-        INVALID_REQUEST);
+        json, "Invalid policy JSON - exceeds maximum length of 2048 characters", INVALID_REQUEST);
   }
 
   @Test
@@ -410,15 +422,447 @@ public class TestIamSessionPolicyResolver {
     assertThat(result).containsOnly(S3Action.ALL_S3);
   }
 
+  @Test
+  public void testValidateAndCategorizeResourcesWithWildcard() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("*")),
+        "Wildcard bucket patterns are not supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("*"));
+    assertThat(resultRanger).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.ANY, "*", null, null));
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithSingleBucket() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.BUCKET, "my-bucket", null, null);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::my-bucket"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::my-bucket"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcard() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.BUCKET_WILDCARD, "my-bucket*", null, null);
+
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::my-bucket*")),
+        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::my-bucket*"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcardAndExactObjectKey() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "*", null, "myKey.txt");
+
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/myKey.txt")),
+        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::*/myKey.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketWildcardAndObjectWildcard() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/*")),
+        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "*", "*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::*/*"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndExactObjectKey() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket1/key.txt"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket1/key.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndExactObjectKeyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_EXACT, "bucket2", null, "path/folder/nested/key.txt");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket2/path/folder/nested/key.txt"));
+    assertThat(resultNative).containsOnly(expectedResourceSpec);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket2/path/folder/nested/key.txt"));
+    assertThat(resultRanger).containsOnly(expectedResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndEmpty() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndEmptyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "path/b/", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/path/b/*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "path/b/*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/path/b/*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndNonEmpty() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket3", "test", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket3/test*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "test*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/test*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixAndNonEmptyWithPath() throws OMException {
+    final IamSessionPolicyResolver.ResourceSpec expectedNativeResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX, "bucket", "a/b/test", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, Collections.singleton("arn:aws:s3:::bucket/a/b/test*"));
+    assertThat(resultNative).containsOnly(expectedNativeResourceSpec);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket", "a/b/test*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket/a/b/test*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEnd() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*.log")),
+        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
+        "at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*.log", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*.log"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEndWithPath() throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket/a/q/*.ps")),
+        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
+        "at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket", "a/q/*.ps", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket/a/q/*.ps"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithMultipleResources() throws OMException {
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
+        NATIVE, strSet("arn:aws:s3:::bucket1", "arn:aws:s3:::bucket2/*", "arn:aws:s3:::bucket3/key.txt"));
+    assertThat(resultNative).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket2", "", null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket3", null, "key.txt"));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, strSet("arn:aws:s3:::bucket1", "arn:aws:s3:::bucket2/*", "arn:aws:s3:::bucket3/key.txt"));
+    assertThat(resultRanger).containsOnly(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket2", "*", null),
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket3", null, "key.txt"));
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithInvalidArnThrows() {
+    final String invalidArn = "arn:aws:ec2:::bucket";
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton(invalidArn)),
+        "Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, Collections.singleton(invalidArn)),
+        "Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithArnWithNoBucketThrows() {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::")),
+        "Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, Collections.singleton("arn:aws:s3:::")),
+        "Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithNoResourcesThrows() {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.emptySet()),
+        "No Resource(s) found in policy", INVALID_REQUEST);
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(RANGER, Collections.emptySet()),
+        "No Resource(s) found in policy", INVALID_REQUEST);
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithResourceAny() {
+    // This also tests that acls are deduplicated across different resource types
+    final Set<S3Action> actions = Stream.of(S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET, S3Action.GET_OBJECT)
+        .collect(Collectors.toSet()); // actions at volume, bucket and key levels
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.ANY, "*", null, null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
+        "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    final Set<IOzoneObj> readAndListObjects = objSet(volume(), bucket("*")); // volume, bucket level have READ, LIST
+    final Set<IOzoneObj> readObject = objSet(key("*", "*")); // key level has READ
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readAndListObjects, acls(READ, LIST)),
+        new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketResource() {
+    final Set<S3Action> actions = Collections.singleton(IamSessionPolicyResolver.S3Action.LIST_BUCKET);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> readAndListObject = objSet(bucket("bucket1"));
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)));
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketWildcardResource() {
+    final Set<S3Action> actions = Collections.singleton(IamSessionPolicyResolver.S3Action.PUT_BUCKET_ACL);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "bucket1*", null, null));
+    final Set<IOzoneObj> writeAclObject = objSet(bucket("bucket1*"));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
+        "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(writeAclObject, acls(WRITE_ACL)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectExactResource() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
+    final Set<IOzoneObj> readObject = objSet(key("bucket1", "key.txt"));
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectPrefixResource() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "prefix/", null));
+    final Set<IOzoneObj> nativeReadObject = objSet(prefix("bucket1", "prefix/"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObject, acls(READ)));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet()),
+        "ResourceSpec type OBJECT_PREFIX not supported for RangerOzoneAuthorizer");
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithObjectPrefixWildcardResource() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "prefix/*", null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
+        "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Set<IOzoneObj> rangerReadObject = objSet(key("bucket1", "prefix/*"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObject, acls(READ)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixes() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", null, null));
+    final Set<IOzoneObj> nativeReadObject = objSet(
+        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, prefixes);
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObject, acls(READ)));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", null, null));
+    final Set<IOzoneObj> rangerReadObject = objSet(
+        key("bucket1", "folder1/"), key("bucket1", "folder2/"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, prefixes);
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObject, acls(READ)));
+  }
+
+  // TODO sts - add more createPathsAndPermissions tests in the next PR
+
+  private static void expectIllegalArgumentException(Runnable runnable, String expectedMessage) {
+    try {
+      runnable.run();
+      throw new AssertionError("Expected exception not thrown");
+    } catch (IllegalArgumentException ex) {
+      assertThat(ex.getMessage()).isEqualTo(expectedMessage);
+    }
+  }
+
+  private static void expectOMExceptionWithCode(RunnableThrowingOMException runnable, String expectedMessage,
+      OMException.ResultCodes expectedCode) {
+    try {
+      runnable.run();
+      throw new AssertionError("Expected exception not thrown");
+    } catch (OMException ex) {
+      assertThat(ex.getMessage()).isEqualTo(expectedMessage);
+      assertThat(ex.getResult()).isEqualTo(expectedCode);
+    }
+  }
+
+  @FunctionalInterface
+  private interface RunnableThrowingOMException {
+    void run() throws OMException;
+  }
+
+  private static IOzoneObj key(String bucket, String key) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .setKeyName(key)
+        .build();
+  }
+
+  private static IOzoneObj volume() {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .build();
+  }
+
+  private static IOzoneObj bucket(String bucket) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .build();
+  }
+
+  private static IOzoneObj prefix(String bucket, String prefix) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(VOLUME)
+        .setBucketName(bucket)
+        .setPrefixName(prefix)
+        .build();
+  }
+
+  private static Set<IOzoneObj> objSet(IOzoneObj... objs) {
+    final Set<IOzoneObj> s = new LinkedHashSet<>();
+    Collections.addAll(s, objs);
+    return s;
+  }
+
+  private static Set<ACLType> acls(ACLType... types) {
+    final Set<ACLType> s = new LinkedHashSet<>();
+    Collections.addAll(s, types);
+    return s;
+  }
+
   private static Set<String> strSet(String... strs) {
     final Set<String> s = new LinkedHashSet<>();
     Collections.addAll(s, strs);
     return s;
   }
 
-  private static void expectResolveThrows(String json,
-      IamSessionPolicyResolver.AuthorizerType authorizerType, String expectedMessage,
-      OMException.ResultCodes expectedCode) {
+  private static void expectResolveThrows(String json, IamSessionPolicyResolver.AuthorizerType authorizerType,
+      String expectedMessage, OMException.ResultCodes expectedCode) {
     try {
       IamSessionPolicyResolver.resolve(json, VOLUME, authorizerType);
       throw new AssertionError("Expected exception not thrown");
@@ -448,7 +892,6 @@ public class TestIamSessionPolicyResolver {
     jsonBuilder.append("\"\n");
     jsonBuilder.append("  }]\n");
     jsonBuilder.append('}');
-
     return jsonBuilder.toString();
   }
 
@@ -465,7 +908,6 @@ public class TestIamSessionPolicyResolver {
       jsonBuilder.append('a');
     }
     jsonBuilder.append("\"\n  }]\n}");
-
     return jsonBuilder.toString();
   }
 }
