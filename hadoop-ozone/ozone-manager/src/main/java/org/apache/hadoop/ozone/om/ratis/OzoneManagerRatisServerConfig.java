@@ -52,22 +52,26 @@ public class OzoneManagerRatisServerConfig {
   )
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "raft.server.read.option",
+  @Config(key = "read.option",
       defaultValue = "DEFAUTL",
       type = ConfigType.STRING,
       tags = {OZONE, OM, RATIS, PERFORMANCE},
-      description = "Option for processing read-only requests on Follower OMs," +
-          " options include : `DEFAULT`, `LINEARIZABLE`"
+      description = "Select the Ratis server read option." +
+          " Possible values are: " +
+          "   DEFAULT      - Directly query statemachine (non-linearizable). " +
+          "     Only the leader can serve read requests. " +
+          "   LINEARIZABLE - Use ReadIndex (see Raft Paper section 6.4) to maintain linearizability. " +
+          " Both the leader and the followers can serve read requests."
   )
-  private String raftServerReadOption;
+  private String readOption;
 
-  @Config(key = "raft.server.read.leader.lease.enabled",
+  @Config(key = "read.leader.lease.enabled",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, OM, RATIS, PERFORMANCE},
-      description = "whether to enable lease in linearizable read-only requests."
+      description = "If we enabled the leader lease on Ratis Leader."
   )
-  private boolean raftServerReadLeaderLeaseEnabled;
+  private boolean readLeaderLeaseEnabled;
 
   public long getLogAppenderWaitTimeMin() {
     return logAppenderWaitTimeMin;
@@ -85,19 +89,19 @@ public class OzoneManagerRatisServerConfig {
     this.retryCacheTimeout = duration.toMillis();
   }
 
-  public String getRaftServerReadOption() {
-    return raftServerReadOption;
+  public String getReadOption() {
+    return readOption;
   }
 
-  public void setRaftServerReadOption(String option) {
-    this.raftServerReadOption = option;
+  public void setReadOption(String option) {
+    this.readOption = option;
   }
 
-  public boolean isRaftServerReadLeaderLeaseEnabled() {
-    return raftServerReadLeaderLeaseEnabled;
+  public boolean isReadLeaderLeaseEnabled() {
+    return readLeaderLeaseEnabled;
   }
 
-  public void setRaftServerReadLeaderLeaseEnabled(boolean raftServerReadLeaderLeaseEnabled) {
-    this.raftServerReadLeaderLeaseEnabled = raftServerReadLeaderLeaseEnabled;
+  public void setReadLeaderLeaseEnabled(boolean readLeaderLeaseEnabled) {
+    this.readLeaderLeaseEnabled = readLeaderLeaseEnabled;
   }
 }
