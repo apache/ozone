@@ -530,8 +530,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public void streamRead(ContainerCommandRequestProto request, StreamingReadResponse streamObserver) {
-    LOG.info("XXX {} -> {}, send onNext request {}",
-        name, streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
+//    LOG.info("XXX {} -> {}, send onNext request {}",
+//        name, streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
     streamObserver.getRequestObserver().onNext(request);
   }
 
@@ -547,7 +547,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         if (stub == null) {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
-        LOG.info("XXX initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
+//        LOG.info("XXX initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
         StreamObserver<ContainerCommandRequestProto> requestObserver = stub
             .withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(streamObserver);

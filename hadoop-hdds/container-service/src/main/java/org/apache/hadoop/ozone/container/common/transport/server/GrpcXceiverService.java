@@ -32,6 +32,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,6 +129,12 @@ public class GrpcXceiverService extends
 
       @Override
       public void onError(Throwable t) {
+        if (t instanceof StatusRuntimeException) {
+          if (((StatusRuntimeException) t).getStatus().getCode() == Status.Code.CANCELLED) {
+            return;
+          };
+        }
+
         // for now we just log a msg
         LOG.error("ContainerCommand send on error. Exception: ", t);
       }

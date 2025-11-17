@@ -2077,7 +2077,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       ReadBlockRequestProto readBlock = request.getReadBlock();
-      LOG.info("XXX server readBlock {}", TextFormat.shortDebugString(readBlock));
+//      LOG.info("XXX server readBlock {}", TextFormat.shortDebugString(readBlock));
 
       BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
       // This is a new api the block should always be checked.
@@ -2127,7 +2127,7 @@ public class KeyValueHandler extends Handler {
           final ContainerCommandResponseProto response = getReadBlockResponse(request, checksumData, buffer, adjustedOffset);
           final int dataLength = response.getReadBlock().getData().size();
           final int responseLength = response.getSerializedSize();
-          LOG.info("XXX server onNext response {}: dataLength={}", numResponse, dataLength);
+//          LOG.info("XXX server onNext response {}: dataLength={}", numResponse, dataLength);
           streamObserver.onNext(response);
           buffer.clear();
 
@@ -2135,8 +2135,7 @@ public class KeyValueHandler extends Handler {
           totalDataLength += dataLength;
           numResponse++;
         }
-        LOG.info("XXX server response ended: totalDataLength={}, numResponse={}",
-            totalDataLength, numResponse);
+//        LOG.info("XXX server response ended: totalDataLength={}, numResponse={}", totalDataLength, numResponse);
       }
       // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
