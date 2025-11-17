@@ -96,17 +96,6 @@ public class TestDiskBalancer {
   }
 
   /**
-   * Helper method to get the CLIENT_RPC address for a datanode.
-   */
-  private String getDatanodeClientRpcAddress(DatanodeDetails dn) {
-    Port port = dn.getPort(Port.Name.CLIENT_RPC);
-    if (port != null) {
-      return dn.getIpAddress() + ":" + port.getValue();
-    }
-    throw new IllegalArgumentException("CLIENT_RPC port not found for datanode: " + dn);
-  }
-
-  /**
    * Helper method to create a DiskBalancerProtocol proxy for a datanode.
    */
   private DiskBalancerProtocol getDiskBalancerProxy(DatanodeDetails dn) throws IOException {

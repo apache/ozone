@@ -20,7 +20,5 @@ x-disk-balancer-config:
     - OZONE-SITE.XML_hdds.datanode.disk.balancer.enabled=true
 
 services:
-  scm:
-    <<: *disk-balancer-config
   datanode:
     <<: *disk-balancer-config
