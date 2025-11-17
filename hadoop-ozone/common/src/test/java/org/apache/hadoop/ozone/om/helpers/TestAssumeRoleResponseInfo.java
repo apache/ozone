@@ -46,12 +46,7 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testConstructor() {
     final AssumeRoleResponseInfo response = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertEquals(ACCESS_KEY_ID, response.getAccessKeyId());
     assertEquals(SECRET_ACCESS_KEY, response.getSecretAccessKey());
@@ -63,12 +58,7 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testProtobufConversion() {
     final AssumeRoleResponseInfo response = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponse proto = response.getProtobuf();
 
@@ -102,12 +92,7 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testProtobufRoundTrip() {
     final AssumeRoleResponseInfo originalResponse = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponse proto = originalResponse.getProtobuf();
     final AssumeRoleResponseInfo recoveredResponse = AssumeRoleResponseInfo.fromProtobuf(proto);
@@ -118,20 +103,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testEqualsAndHashCodeWithIdenticalObjects() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertEquals(response1, response2);
     assertEquals(response1.hashCode(), response2.hashCode());
@@ -140,20 +115,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsAndHashCodeWithDifferentAccessKeyId() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        "DIFFERENT_KEY_ID",
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        "DIFFERENT_KEY_ID", SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertNotEquals(response1, response2);
     assertNotEquals(response1.hashCode(), response2.hashCode());
@@ -162,20 +127,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsAndHashCodeWithDifferentSecretAccessKey() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        "DIFFERENT_SECRET_KEY",
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, "DIFFERENT_SECRET_KEY", SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertNotEquals(response1, response2);
     assertNotEquals(response1.hashCode(), response2.hashCode());
@@ -184,20 +139,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsAndHashCodeWithDifferentSessionToken() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        "DIFFERENT_TOKEN",
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, "DIFFERENT_TOKEN", EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertNotEquals(response1, response2);
     assertNotEquals(response1.hashCode(), response2.hashCode());
@@ -206,20 +151,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsAndHashCodeWithDifferentExpirationEpochSeconds() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        9999999999L,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, 9999999999L, ASSUMED_ROLE_ID);
 
     assertNotEquals(response1, response2);
     assertNotEquals(response1.hashCode(), response2.hashCode());
@@ -228,20 +163,10 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsAndHashCodeWithDifferentAssumedRoleId() {
     final AssumeRoleResponseInfo response1 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final AssumeRoleResponseInfo response2 = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        "DIFFERENT_ROLE_ID"
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, "DIFFERENT_ROLE_ID");
 
     assertNotEquals(response1, response2);
     assertNotEquals(response1.hashCode(), response2.hashCode());
@@ -250,12 +175,7 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testNotEqualsWithNull() {
     final AssumeRoleResponseInfo response = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     assertNotEquals(null, response);
   }
@@ -263,21 +183,12 @@ public class TestAssumeRoleResponseInfo {
   @Test
   public void testToString() {
     final AssumeRoleResponseInfo response = new AssumeRoleResponseInfo(
-        ACCESS_KEY_ID,
-        SECRET_ACCESS_KEY,
-        SESSION_TOKEN,
-        EXPIRATION_EPOCH_SECONDS,
-        ASSUMED_ROLE_ID
-    );
+        ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final String toString = response.toString();
-    final String expectedString = "AssumeRoleResponseInfo{" +
-        "accessKeyId='" + ACCESS_KEY_ID + '\'' +
-        ", secretAccessKey='" + SECRET_ACCESS_KEY + '\'' +
-        ", sessionToken='" + SESSION_TOKEN + '\'' +
-        ", expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS +
-        ", assumedRoleId='" + ASSUMED_ROLE_ID + '\'' +
-        '}';
+    final String expectedString = "AssumeRoleResponseInfo{" + "accessKeyId='" + ACCESS_KEY_ID  +
+        "', secretAccessKey='" + SECRET_ACCESS_KEY + "', sessionToken='" + SESSION_TOKEN +
+        "', expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS + ", assumedRoleId='" + ASSUMED_ROLE_ID + "'}";
 
     assertNotNull(toString);
     assertEquals(expectedString, toString);

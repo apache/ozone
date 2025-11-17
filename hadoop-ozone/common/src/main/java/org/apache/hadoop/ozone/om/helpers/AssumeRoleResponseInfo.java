@@ -53,13 +53,8 @@ public class AssumeRoleResponseInfo {
     return assumedRoleId;
   }
 
-  public AssumeRoleResponseInfo(
-      String accessKeyId,
-      String secretAccessKey,
-      String sessionToken,
-      long expirationEpochSeconds,
-      String assumedRoleId
-  ) {
+  public AssumeRoleResponseInfo(String accessKeyId, String secretAccessKey, String sessionToken,
+      long expirationEpochSeconds, String assumedRoleId) {
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
@@ -67,16 +62,10 @@ public class AssumeRoleResponseInfo {
     this.assumedRoleId = assumedRoleId;
   }
 
-  public static AssumeRoleResponseInfo fromProtobuf(
-      AssumeRoleResponse response
-  ) {
+  public static AssumeRoleResponseInfo fromProtobuf(AssumeRoleResponse response) {
     return new AssumeRoleResponseInfo(
-        response.getAccessKeyId(),
-        response.getSecretAccessKey(),
-        response.getSessionToken(),
-        response.getExpirationEpochSeconds(),
-        response.getAssumedRoleId()
-    );
+        response.getAccessKeyId(), response.getSecretAccessKey(), response.getSessionToken(),
+        response.getExpirationEpochSeconds(), response.getAssumedRoleId());
   }
 
   public AssumeRoleResponse getProtobuf() {
@@ -91,19 +80,13 @@ public class AssumeRoleResponseInfo {
 
   @Override
   public String toString() {
-    return "AssumeRoleResponseInfo{" +
-        "accessKeyId='" + accessKeyId + '\'' +
-        ", secretAccessKey='" + secretAccessKey + '\'' +
-        ", sessionToken='" + sessionToken + '\'' +
-        ", expirationEpochSeconds=" + expirationEpochSeconds +
-        ", assumedRoleId='" + assumedRoleId + '\'' +
-        '}';
+    return "AssumeRoleResponseInfo{" + "accessKeyId='" + accessKeyId + "', secretAccessKey='" + secretAccessKey +
+        "', sessionToken='" + sessionToken + "', expirationEpochSeconds=" + expirationEpochSeconds +
+        ", assumedRoleId='" + assumedRoleId + "'}";
   }
 
   @Override
-  public boolean equals(
-      Object o
-  ) {
+  public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
@@ -113,21 +96,13 @@ public class AssumeRoleResponseInfo {
     }
 
     final AssumeRoleResponseInfo that = (AssumeRoleResponseInfo) o;
-    return expirationEpochSeconds == that.expirationEpochSeconds &&
-        Objects.equals(accessKeyId, that.accessKeyId) &&
-        Objects.equals(secretAccessKey, that.secretAccessKey) &&
-        Objects.equals(sessionToken, that.sessionToken) &&
+    return expirationEpochSeconds == that.expirationEpochSeconds && Objects.equals(accessKeyId, that.accessKeyId) &&
+        Objects.equals(secretAccessKey, that.secretAccessKey) && Objects.equals(sessionToken, that.sessionToken) &&
         Objects.equals(assumedRoleId, that.assumedRoleId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        accessKeyId,
-        secretAccessKey,
-        sessionToken,
-        expirationEpochSeconds,
-        assumedRoleId
-    );
+    return Objects.hash(accessKeyId, secretAccessKey, sessionToken, expirationEpochSeconds, assumedRoleId);
   }
 }
