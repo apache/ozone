@@ -58,22 +58,20 @@ utilised disk to the least utilised disk. DiskBalancer can be triggered manually
 
 ## High-Level DiskBalancer Implementation
 
-The general view of this design consists of 3 parts as follows:
+The general view of this design consists of 2 parts as follows:
 
-**Client & SCM -:**
+**Client & DN - Direct Communication:**
 
 Administrators use the `ozone admin datanode diskbalancer` CLI to manage and monitor the feature.
-* Clients can control the DiskBalancer job by sending requests to SCM, like start,
-stop, update configuration and can query for diskBalancer status.
-* Clients get storageReport from SCM to decide which datanode to balance.
+* Clients communicate **directly** with datanodes via RPC using the `DiskBalancerProtocol` interface, bypassing SCM.
+* Clients can control the DiskBalancer job by sending requests directly to datanodes, including:
+  - Start/stop DiskBalancer operations
+  - Update configuration parameters
+  - Query DiskBalancer status and volume density reports
+* Each datanode performs its own **authentication** (via RPC) and **authorization** checks (using `OzoneAdmins` based on `ozone.administrators` configuration).
+* For batch operations, clients can use the `--in-service-datanodes` flag to automatically query SCM for all IN_SERVICE datanodes and execute commands on all of them.
 
-**SCM & DN -:**
-
-SCM acts as a **control plane** and information hub but remains **stateless** 
-regarding the balancing process.
-* SCM retrieves storageReport and balance status via heartbeat from DN.
-
-**DN -:**
+**DN - DiskBalancer Service:**
 
 All balance operations are done in dataNodes. 
 
@@ -82,6 +80,9 @@ A daemon thread, the **Scheduler**, runs periodically on each Datanode.
 2.  If an imbalance is detected (i.e., density > threshold), it moves a set of closed containers
 from the most over-utilized disk (source) to the least utilized disk (destination).
 3.  The scheduler dispatches these move tasks to a pool of **Worker** threads for parallel execution.
+
+**Note:** SCM is used **only** for datanode discovery when using the `--in-service-datanodes` flag. SCM provides a list of IN_SERVICE datanodes for batch operations but
+does **not** participate in DiskBalancer control operations (start/stop/update/status/report). All DiskBalancer operations are performed directly between client and datanode.
 
 ## Container Move Process
 
@@ -117,6 +118,91 @@ volume. It iterates through the containers on the source disk and picks the firs
 and is not already being moved by another balancing operation. To optimize performance and avoid re-scanning the same 
 containers repeatedly, it caches the list of containers for each volume which auto expires after one hour of its last 
 used time or if the container iterator for that is invalidated on full utilisation.
+
+## CLI Interface
+
+The DiskBalancer CLI provides the following commands:
+
+### Command Syntax
+
+**Start DiskBalancer:**
+```bash
+ozone admin datanode diskbalancer start [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+```
+
+**Stop DiskBalancer:**
+```bash
+ozone admin datanode diskbalancer stop [<datanode-address> ...] [--in-service-datanodes]
+```
+
+**Update Configuration:**
+```bash
+ozone admin datanode diskbalancer update [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
+```
+
+**Get Status:**
+```bash
+ozone admin datanode diskbalancer status [<datanode-address> ...] [--in-service-datanodes] [--json]
+```
+
+**Get Report:**
+```bash
+ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-datanodes] [--json]
+```
+
+### Command Options
+
+| Option                              | Description                                                                                                                                                                                                                                                                                                                                                         | Example                                        |
+|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| `<datanode-address>`                | One or more datanode addresses as positional arguments. Addresses can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (9858)<br>- Hostname with port (e.g., `DN-1:9858`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:9858`)<br>- Stdin (`-`) - reads datanode addresses from standard input, one per line | `DN-1`<br>`DN-1:9858`<br>`192.168.1.10`<br>`-` |
+| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                                | `--in-service-datanodes`                       |
+| `--json`                            | Format output as JSON.                                                                                                                                                                                                                                                                                                                                              | `--json`                                       |
+| `-t/--threshold`                    | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                       | `-t 5`<br>`--threshold 5.0`                    |
+| `-b/--bandwidth-in-mb`              | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                              | `-b 20`<br>`--bandwidth-in-mb 50`              |
+| `-p/--parallel-thread`              | Number of parallel threads (default: 1). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                   | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even`         | Stop automatically after disks are balanced (default: false). Used with `start` and `update` commands.                                                                                                                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+
+### Examples
+
+```bash
+# Start DiskBalancer on a specific datanode
+ozone admin datanode diskbalancer start DN-1
+
+# Start DiskBalancer on multiple datanodes
+ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
+
+# Start DiskBalancer on all IN_SERVICE datanodes
+ozone admin datanode diskbalancer start --in-service-datanodes
+
+# Start DiskBalancer with configuration parameters
+ozone admin datanode diskbalancer start DN-1 -t 5 -b 20 -p 5
+
+# Read datanode addresses from stdin
+echo -e "DN-1\nDN-2" | ozone admin datanode diskbalancer start -
+
+# Get status as JSON
+ozone admin datanode diskbalancer status --in-service-datanodes --json
+
+# Update configuration on specific datanode (partial update - only specified parameters are updated)
+ozone admin datanode diskbalancer update DN-1 -b 50
+```
+
+### Authentication and Authorization
+
+* **Authentication**: RPC authentication is required (e.g., via `kinit` in secure clusters). The client's identity is verified by the datanode's RPC layer.
+
+* **Authorization**: Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
+  - **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators`
+  - **Read-only operations** (status, report): Do not require admin privileges
+
+### Operational State Awareness
+
+DiskBalancer automatically responds to datanode operational state changes:
+* When a datanode enters **DECOMMISSIONING** or **MAINTENANCE** state, DiskBalancer automatically **pauses** (transitions to `PAUSED` state).
+* When a datanode returns to **IN_SERVICE** state, DiskBalancer automatically **resumes** (if it was previously `RUNNING`).
+* If DiskBalancer was explicitly **stopped** (via CLI), it remains `STOPPED` even after the datanode returns to `IN_SERVICE` state.
+
+This ensures DiskBalancer respects datanode lifecycle management and does not interfere with maintenance or decommissioning operations.
 
 ## Feature Flag
 

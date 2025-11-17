@@ -26,7 +26,7 @@ ${STDIN_FILE}   /tmp/datanode.stdin
 *** Keywords ***
 Get Datanode Address
     [arguments]    ${index}=1
-    ${hostname} =    Execute    grep '^Datanode:' ${LIST_FILE} | sed -n '${index}p' | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }'
+    ${hostname} =    Execute    grep '^Datanode:' ${LIST_FILE} | sed -n '${index}p' | awk '{ print \$3 }' | awk -F '[/]' '{ print \$4 }' | awk -F '[.]' '{ print \$1 }'
     [return]    ${hostname}
 
 Setup Datanode List

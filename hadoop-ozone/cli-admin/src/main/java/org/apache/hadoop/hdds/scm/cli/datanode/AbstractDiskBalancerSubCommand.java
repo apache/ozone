@@ -99,14 +99,19 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
         }
       } catch (Exception e) {
         failedNodes.add(dn);
+        String errorMsg = e.getMessage();
+        if (errorMsg != null && errorMsg.contains("\n")) {
+          errorMsg = errorMsg.split("\n", 2)[0];
+        }
+        if (errorMsg == null || errorMsg.isEmpty()) {
+          errorMsg = e.getClass().getSimpleName();
+        }
         if (options.isJson()) {
-          String errorMsg = e.getMessage();
-          if (errorMsg != null && errorMsg.contains("\n")) {
-            errorMsg = errorMsg.split("\n", 2)[0];
-          }
           errorBuilder.append("Error on node [").append(dn)
-              .append("]: ").append(errorMsg != null ? errorMsg : e.getClass().getSimpleName())
-              .append('\n');
+              .append("]: ").append(errorMsg).append('\n');
+        } else {
+          // Print error messages in non-JSON mode as well
+          System.err.printf("Error on node [%s]: %s%n", dn, errorMsg);
         }
       }
     }
