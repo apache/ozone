@@ -84,7 +84,7 @@ public final class IamSessionPolicyResolver {
   private static final String[] S3_ACTION_PREFIXES = {"s3:Get", "s3:Put", "s3:List", "s3:Delete", "s3:Create"};
 
   @VisibleForTesting
-  static final Map<String, Set<S3Action>> S3_ACTION_MAP = buildS3ActionMap();
+  static final Map<String, Set<S3Action>> S3_ACTION_MAP_CI = buildCaseInsensitiveS3ActionMap();
 
   private IamSessionPolicyResolver() {
   }
@@ -288,24 +288,26 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
-   * Builds the S3Action map used for mapping policy actions to S3Action enum values.
-   * This map is built once and cached statically.
+   * Builds a case-insensitive S3Action map by lowercasing keys.  This map is used for mapping policy actions to
+   * S3Action enum values.  This map is built once and cached statically.
    */
   @VisibleForTesting
-  static Map<String, Set<S3Action>> buildS3ActionMap() {
-    final Map<String, Set<S3Action>> s3ActionMap = new LinkedHashMap<>();
+  static Map<String, Set<S3Action>> buildCaseInsensitiveS3ActionMap() {
+    final Map<String, Set<S3Action>> ciMap = new LinkedHashMap<>();
     for (S3Action sa : S3Action.values()) {
-      s3ActionMap.put(sa.name, singleton(sa));
+      // Exact action mapping
+      ciMap.put(sa.name.toLowerCase(), singleton(sa));
 
       // Group into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create* based on action name prefix
       for (String prefix : S3_ACTION_PREFIXES) {
         if (sa.name.startsWith(prefix)) {
-          s3ActionMap.computeIfAbsent(prefix + "*", k -> new LinkedHashSet<>()).add(sa);
+          final String wildcardKey = (prefix + "*").toLowerCase();
+          ciMap.computeIfAbsent(wildcardKey, k -> new LinkedHashSet<>()).add(sa);
           break;
         }
       }
     }
-    return Collections.unmodifiableMap(s3ActionMap);
+    return Collections.unmodifiableMap(ciMap);
   }
 
   /**
@@ -326,8 +328,9 @@ public final class IamSessionPolicyResolver {
       }
 
       // Unsupported actions are silently ignored
-      if (S3_ACTION_MAP.containsKey(action)) {
-        mappedActions.addAll(S3_ACTION_MAP.get(action));
+      final Set<S3Action> s3Actions = S3_ACTION_MAP_CI.get(action.toLowerCase());
+      if (s3Actions != null) {
+        mappedActions.addAll(s3Actions);
       }
     }
 
