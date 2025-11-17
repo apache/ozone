@@ -90,12 +90,6 @@ public class OMAdmin implements AdminSubcommand {
   }
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      String omServiceID
-  ) throws Exception {
-    return createOmClient(omServiceID, null, true);
-  }
-
-  public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
       String omHost,
       boolean forceHA
