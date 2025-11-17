@@ -2652,12 +2652,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public AssumeRoleResponseInfo assumeRole(
-      String roleArn,
-      String roleSessionName,
-      int durationSeconds,
-      String awsIamSessionPolicy
-  ) throws IOException {
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy) throws IOException {
     final OzoneManagerProtocolProtos.AssumeRoleRequest.Builder request =
         OzoneManagerProtocolProtos.AssumeRoleRequest.newBuilder()
             .setRoleArn(roleArn)
@@ -2670,8 +2666,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     return AssumeRoleResponseInfo.fromProtobuf(
-        handleError(submitRequest(omRequest)).getAssumeRoleResponse()
-    );
+        handleError(submitRequest(omRequest)).getAssumeRoleResponse());
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {

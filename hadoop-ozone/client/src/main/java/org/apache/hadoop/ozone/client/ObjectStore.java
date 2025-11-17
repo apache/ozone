@@ -761,12 +761,8 @@ public class ObjectStore {
    * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
    * @throws IOException            if an error occurs during the AssumeRole operation
    */
-  public AssumeRoleResponseInfo assumeRole(
-      String roleArn,
-      String roleSessionName,
-      int durationSeconds,
-      String awsIamSessionPolicy
-  ) throws IOException {
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy) throws IOException {
     return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy);
   }
 
