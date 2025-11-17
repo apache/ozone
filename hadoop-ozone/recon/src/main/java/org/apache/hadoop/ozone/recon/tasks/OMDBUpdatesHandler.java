@@ -23,12 +23,9 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -46,9 +43,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
-
-  // Track resources for proper cleanup
-  private final Set<Table<?, ?>> openTables = Collections.synchronizedSet(new HashSet<>());
 
   private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -141,7 +135,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - DELETE with a non-existing key: No action, log a warning if
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
-      openTables.add(table);  // Track for cleanup
 
       OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
@@ -354,41 +347,19 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   public void close() {
     super.close();
     if (closed.compareAndSet(false, true)) {
-      LOG.debug("Closing OMDBUpdatesHandler and cleaning up {} tracked tables", openTables.size());
+      LOG.debug("Closing OMDBUpdatesHandler");
 
-      IOException closeException = null;
-
-      // Clean up tracked tables
-      for (Table<?, ?> table : openTables) {
-        try {
-          // Force cleanup of any cached iterators or resources
-          if (table instanceof AutoCloseable) {
-            ((AutoCloseable) table).close();
-          }
-        } catch (Exception e) {
-          LOG.warn("Error closing table during OMDBUpdatesHandler cleanup", e);
-          if (closeException == null) {
-            closeException = new IOException("Failed to close table resources", e);
-          }
-        }
-      }
-      openTables.clear();
-
-      // Clear collections to help GC
-      if (omdbUpdateEvents != null) {
-        omdbUpdateEvents.clear();
-        omdbUpdateEvents = null;
-      }
+      // Clear internal tracking map to help GC
+      // Note: We do NOT close tables obtained from omMetadataManager as they
+      // are owned and managed by the OMMetadataManager, not by this handler.
+      // Note: omdbUpdateEvents is intentionally NOT cleared here because
+      // getEvents() may be called after close() to retrieve the events
+      // for processing by ReconOmTasks
       if (omdbLatestUpdateEvents != null) {
         omdbLatestUpdateEvents.clear();
-        omdbLatestUpdateEvents = null;
       }
 
       LOG.debug("OMDBUpdatesHandler cleanup completed");
-
-      if (closeException != null) {
-        throw new RuntimeException(closeException);
-      }
     }
   }
 
