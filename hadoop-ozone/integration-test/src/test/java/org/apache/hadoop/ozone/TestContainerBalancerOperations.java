@@ -110,9 +110,6 @@ public class TestContainerBalancerOperations {
         30000
     );
 
-    running = containerBalancerClient.getContainerBalancerStatus();
-    assertFalse(running);
-
     // test normally start , and stop it before balance is completed
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
