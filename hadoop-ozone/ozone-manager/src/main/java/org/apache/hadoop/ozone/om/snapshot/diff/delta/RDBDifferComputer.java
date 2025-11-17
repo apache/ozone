@@ -101,7 +101,7 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
   private static DifferSnapshotInfo getDSIFromSI(OMMetadataManager activeOmMetadataManager,
       SnapshotInfo snapshotInfo, OmSnapshotLocalData snapshotLocalData) throws IOException {
     final UUID snapshotId = snapshotInfo.getSnapshotId();
-    final long dbTxSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
+    final long dbTxSequenceNumber = snapshotLocalData.getDbTxSequenceNumber();
     NavigableMap<Integer, List<SstFileInfo>> versionSstFiles = snapshotLocalData.getVersionSstFileInfos().entrySet()
         .stream().collect(toMap(Map.Entry::getKey,
             entry -> entry.getValue().getSstFiles(), (u, v) -> {
