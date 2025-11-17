@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.netty.buffer.ByteBuf;
@@ -111,6 +112,39 @@ public class TestDirstreamClientHandler {
 
     assertEquals("xxxx", getContent("asd.txt"));
     assertEquals("yyy", getContent("bsd.txt"));
+  }
+
+  @Test
+  public void testInvalidFormatMissingSpace() {
+    final DirstreamClientHandler handler = new DirstreamClientHandler(
+        new DirectoryServerDestination(tmpDir));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+      handler.doRead(null, wrap("123\n"));
+    });
+    assertTrue(exception.getMessage().contains("Invalid file name format"));
+  }
+
+  @Test
+  public void testInvalidFormatEmptyFileName() {
+    final DirstreamClientHandler handler = new DirstreamClientHandler(
+        new DirectoryServerDestination(tmpDir));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+      handler.doRead(null, wrap("123 \n"));
+    });
+    assertTrue(exception.getMessage().contains("Invalid file name format"));
+  }
+
+  @Test
+  public void testInvalidFormatOnlySize() {
+    final DirstreamClientHandler handler = new DirstreamClientHandler(
+        new DirectoryServerDestination(tmpDir));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+      handler.doRead(null, wrap("12345\n"));
+    });
+    assertTrue(exception.getMessage().contains("Invalid file name format"));
   }
 
   @Nonnull

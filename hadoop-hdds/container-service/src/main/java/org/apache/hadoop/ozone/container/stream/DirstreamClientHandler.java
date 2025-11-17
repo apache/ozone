@@ -80,6 +80,10 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         name.release();
         buffer.skipBytes(1);
         String[] parts = currentFileName.split(" ", 2);
+        if (parts.length < 2 || parts[1].trim().isEmpty()) {
+          throw new IllegalArgumentException("Invalid file name format: " + currentFileName
+              + ". Expected format: SIZE FILENAME");
+        }
         remaining = Long.parseLong(parts[0]);
         Path destFilePath = destination.mapToDestination(parts[1]);
         final Path destfileParent = destFilePath.getParent();
