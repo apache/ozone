@@ -110,7 +110,6 @@ public class TestDiskBalancer {
    * Helper method to create a DiskBalancerProtocol proxy for a datanode.
    */
   private DiskBalancerProtocol getDiskBalancerProxy(DatanodeDetails dn) throws IOException {
-    String address = getDatanodeClientRpcAddress(dn);
     InetSocketAddress nodeAddr = new java.net.InetSocketAddress(
         dn.getIpAddress(), dn.getPort(Port.Name.CLIENT_RPC).getValue());
     UserGroupInformation user = UserGroupInformation.getCurrentUser();

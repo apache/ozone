@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.scm.node;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -417,11 +416,12 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Check both log message and actual status
     GenericTestUtils.waitFor(() -> {
       String logs = serviceLog.getOutput();
-      boolean logFound = logs.contains("Cannot start DiskBalancer as node is in DECOMMISSIONING state. Pausing instead.");
+      boolean logFound = logs.contains("Cannot start DiskBalancer as node is in" +
+          " DECOMMISSIONING state. Pausing instead.");
       if (logFound) {
         return true;
       }
-      // Also check if status is PAUSED (in case log message timing is off)
+      // Also check if status is PAUSED
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
         DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
             DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);

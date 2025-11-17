@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
