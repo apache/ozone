@@ -181,7 +181,6 @@ public class TestDeletedBlocksTxnShell {
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
     assertEquals(30, currentValidTxnNum);
     DeletedBlocksTransactionSummary summary = deletedBlockLog.getTransactionSummary();
-    assertEquals(1, summary.getFirstTxID());
     assertEquals(30, summary.getTotalTransactionCount());
     assertEquals(30 * BLOCKS_PER_TX, summary.getTotalBlockCount());
     assertEquals(30 * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
@@ -193,7 +192,6 @@ public class TestDeletedBlocksTxnShell {
     ContainerOperationClient scmClient = new ContainerOperationClient(conf);
     getDeletedBlockSummarySubcommand.execute(scmClient);
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Start from tx ID: 1"));
     assertTrue(output.contains("Total number of transactions: 30"));
     assertTrue(output.contains("Total number of blocks: 150"));
     assertTrue(output.contains("Total size of blocks: 15000"));

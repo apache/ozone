@@ -224,15 +224,12 @@ public class TestScmDataDistributionFinalization {
     assertEquals(EMPTY_SUMMARY, summary);
     statusManager.removeTransactions(txIdList);
 
-    // generate new deletion tx, summary should be updated, total DB tx 4
-    lastTxId = findLastTx();
     activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, true));
     flushDBTransactionBuffer(activeSCM);
     ArrayList<Long> txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount, txWithSizeList.size());
 
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX, summary.getTotalBlockCount());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
@@ -246,7 +243,6 @@ public class TestScmDataDistributionFinalization {
     txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount / 2, txWithSizeList.size());
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
@@ -261,7 +257,6 @@ public class TestScmDataDistributionFinalization {
     ArrayList<Long> txWithoutSizeList = txIdList;
 
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
@@ -271,7 +266,6 @@ public class TestScmDataDistributionFinalization {
     statusManager.removeTransactions(txWithoutSizeList);
     flushDBTransactionBuffer(activeSCM);
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
@@ -281,7 +275,6 @@ public class TestScmDataDistributionFinalization {
     statusManager.removeTransactions(txWithSizeList);
     flushDBTransactionBuffer(activeSCM);
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(0, summary.getTotalTransactionCount());
     assertEquals(0, summary.getTotalBlockCount());
     assertEquals(0, summary.getTotalBlockSize());
@@ -291,7 +284,6 @@ public class TestScmDataDistributionFinalization {
     statusManager.removeTransactions(txWithSizeList);
     flushDBTransactionBuffer(activeSCM);
     summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(0, summary.getTotalTransactionCount());
     assertEquals(0, summary.getTotalBlockCount());
     assertEquals(0, summary.getTotalBlockSize());
@@ -364,7 +356,6 @@ public class TestScmDataDistributionFinalization {
     GenericTestUtils.waitFor(
         () -> !EMPTY_SUMMARY.equals(statusManager.getTransactionSummary()), 100, 5000);
     HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
-    assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(1, summary.getTotalTransactionCount());
     assertEquals(1, summary.getTotalBlockCount());
     assertEquals(value.getBytes(UTF_8).length, summary.getTotalBlockSize());

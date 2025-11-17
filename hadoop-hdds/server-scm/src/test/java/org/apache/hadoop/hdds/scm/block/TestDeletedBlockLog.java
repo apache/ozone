@@ -844,24 +844,20 @@ public class TestDeletedBlockLog {
 
   public static Stream<Arguments> values() {
     return Stream.of(
-        arguments(100, false, false),
-        arguments(100, true, false),
-        arguments(100, true, true),
-        arguments(1000, false, false),
-        arguments(1000, true, false),
-        arguments(1000, true, true),
-        arguments(1000, false, false),
-        arguments(1000, true, false),
-        arguments(1000, true, true),
-        arguments(100000, false, false),
-        arguments(100000, true, false),
-        arguments(100000, true, true)
+        arguments(100, false),
+        arguments(100, true),
+        arguments(1000, false),
+        arguments(1000, true),
+        arguments(10000, false),
+        arguments(10000, true),
+        arguments(100000, false),
+        arguments(100000, true)
     );
   }
 
   @ParameterizedTest
   @MethodSource("values")
-  public void testAddRemoveTransactionPerformance(int txCount, boolean dataDistributionFinalized, boolean cacheEnabled)
+  public void testAddRemoveTransactionPerformance(int txCount, boolean dataDistributionFinalized)
       throws Exception {
     Map<Long, List<DeletedBlock>> data = generateData(txCount);
     SCMDeletedBlockTransactionStatusManager statusManager =
@@ -896,9 +892,8 @@ public class TestDeletedBlockLog {
 
     ArrayList txIdList = data.keySet().stream().collect(Collectors.toCollection(ArrayList::new));
     long initialHitFromCacheCount = metrics.getNumBlockDeletionTransactionSizeFromCache();
-    long initialHitFromDBCount = metrics.getNumBlockDeletionTransactionSizeFromDB();
 
-    if (dataDistributionFinalized && cacheEnabled) {
+    if (dataDistributionFinalized) {
       Map<Long, TxBlockInfo> txSizeMap = statusManager.getTxSizeMap();
       for (Map.Entry<Long, List<DeletedBlock>> entry : data.entrySet()) {
         List<DeletedBlock> deletedBlockList = entry.getValue();
@@ -929,17 +924,10 @@ public class TestDeletedBlockLog {
      *  - 3499 ms to remove 100000 txs from DB
      */
     System.out.println((System.nanoTime() - startTime) / 100000 + " ms to remove " + txCount + " txs from DB, " +
-        "dataDistributionFinalized " + dataDistributionFinalized + ", cacheEnabled " + cacheEnabled);
+        "dataDistributionFinalized " + dataDistributionFinalized);
     if (dataDistributionFinalized) {
-      if (cacheEnabled) {
-        GenericTestUtils.waitFor(() ->
-            metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount == txCount, 100, 5000);
-        assertEquals(0, metrics.getNumBlockDeletionTransactionSizeFromDB() - initialHitFromDBCount);
-      } else {
-        GenericTestUtils.waitFor(() ->
-            metrics.getNumBlockDeletionTransactionSizeFromDB() - initialHitFromDBCount == txCount, 100, 5000);
-        assertEquals(0, metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount);
-      }
+      GenericTestUtils.waitFor(() ->
+          metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount == txCount, 100, 5000);
     }
   }
 

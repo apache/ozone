@@ -41,8 +41,6 @@ public class GetDeletedBlockSummarySubcommand extends ScmSubcommand {
       System.out.println("DeletedBlocksTransaction summary is not available");
     } else {
       System.out.println("DeletedBlocksTransaction summary:");
-      System.out.println("  Start from tx ID: " +
-          summary.getFirstTxID());
       System.out.println("  Total number of transactions: " +
           summary.getTotalTransactionCount());
       System.out.println("  Total number of blocks: " +

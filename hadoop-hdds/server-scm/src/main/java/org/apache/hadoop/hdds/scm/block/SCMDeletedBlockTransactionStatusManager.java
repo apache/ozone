@@ -84,7 +84,6 @@ public class SCMDeletedBlockTransactionStatusManager {
   private Table<String, ByteString> statefulConfigTable;
   public static final HddsProtos.DeletedBlocksTransactionSummary EMPTY_SUMMARY =
       HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
-          .setFirstTxID(Long.MAX_VALUE)
           .setTotalTransactionCount(0)
           .setTotalBlockCount(0)
           .setTotalBlockSize(0)
@@ -94,8 +93,6 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final AtomicLong totalBlockCount = new AtomicLong(0);
   private final AtomicLong totalBlocksSize = new AtomicLong(0);
   private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
-  private long firstTxIdForDataDistribution = Long.MAX_VALUE;
-  private boolean isFirstTxIdForDataDistributionSet = false;
   private static boolean disableDataDistributionForTest;
 
   /**
@@ -459,11 +456,6 @@ public class SCMDeletedBlockTransactionStatusManager {
         !disableDataDistributionForTest) {
       for (DeletedBlocksTransaction tx: txList) {
         if (tx.hasTotalBlockSize()) {
-          if (!isFirstTxIdForDataDistributionSet) {
-            // set the first transaction ID for data distribution
-            isFirstTxIdForDataDistributionSet = true;
-            firstTxIdForDataDistribution = tx.getTxID();
-          }
           incrDeletedBlocksSummary(tx);
         }
       }
@@ -487,31 +479,12 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      ArrayList<Long> txToQueryList = new ArrayList<>();
       for (Long txID: txIDs) {
-        if (txID >= firstTxIdForDataDistribution) {
-          TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
-          if (txBlockInfo != null) {
-            // txBlockInfosToBeDeleted.add(txBlockInfo);
-            descDeletedBlocksSummary(txBlockInfo);
-            metrics.incrBlockDeletionTransactionSizeFromCache();
-          } else {
-            // Fetch the transaction from DB to get the size. This happens during
-            // 1. SCM leader transfer, deletion command send by one SCM,
-            //    while the deletion ack received by a different SCM
-            // 2. SCM restarts, txBlockInfoMap is empty, while receiving the deletion ack from DN
-            txToQueryList.add(txID);
-            metrics.incrBlockDeletionTransactionSizeFromDB();
-          }
+        TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
+        if (txBlockInfo != null) {
+          descDeletedBlocksSummary(txBlockInfo);
+          metrics.incrBlockDeletionTransactionSizeFromCache();
         }
-      }
-      if (!txToQueryList.isEmpty()) {
-        ArrayList<DeletedBlocksTransaction> txList =
-            deletedBlockLogStateManager.getTransactionsFromDB(txToQueryList);
-        if (txList.size() != txToQueryList.size()) {
-          LOG.info("Failed to get all transactions from DB: " + txToQueryList.size() + ", got: " + txList.size());
-        }
-        txList.stream().filter(t -> t.hasTotalBlockSize()).forEach(t -> descDeletedBlocksSummary(t));
       }
       deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
       return;
@@ -598,7 +571,6 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   public DeletedBlocksTransactionSummary getSummary() {
     return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
         .setTotalTransactionCount(totalTxCount.get())
         .setTotalBlockCount(totalBlockCount.get())
         .setTotalBlockSize(totalBlocksSize.get())
@@ -611,13 +583,6 @@ public class SCMDeletedBlockTransactionStatusManager {
     totalBlockCount.addAndGet(-txBlockInfo.getTotalBlockCount());
     totalBlocksSize.addAndGet(-txBlockInfo.getTotalBlockSize());
     totalReplicatedBlocksSize.addAndGet(-txBlockInfo.getTotalReplicatedBlockSize());
-  }
-
-  private void descDeletedBlocksSummary(DeletedBlocksTransaction tx) {
-    totalTxCount.addAndGet(-1);
-    totalBlockCount.addAndGet(-tx.getLocalIDCount());
-    totalBlocksSize.addAndGet(-tx.getTotalBlockSize());
-    totalReplicatedBlocksSize.addAndGet(-tx.getTotalBlockReplicatedSize());
   }
 
   @VisibleForTesting
@@ -697,7 +662,6 @@ public class SCMDeletedBlockTransactionStatusManager {
       return null;
     }
     return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
         .setTotalTransactionCount(totalTxCount.get())
         .setTotalBlockCount(totalBlockCount.get())
         .setTotalBlockSize(totalBlocksSize.get())
@@ -709,14 +673,12 @@ public class SCMDeletedBlockTransactionStatusManager {
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
       DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
       if (summary != null) {
-        isFirstTxIdForDataDistributionSet = true;
-        firstTxIdForDataDistribution = summary.getFirstTxID();
         totalTxCount.set(summary.getTotalTransactionCount());
         totalBlockCount.set(summary.getTotalBlockCount());
         totalBlocksSize.set(summary.getTotalBlockSize());
         totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-        LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {} lastTxIdBeforeUpgrade {}",
-            totalBlockCount.get(), totalBlocksSize.get(), firstTxIdForDataDistribution);
+        LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {}",
+            totalBlockCount.get(), totalBlocksSize.get());
       }
     } else {
       LOG.info(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION + " is not finalized");

@@ -387,8 +387,7 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
-              txn.hasTotalBlockReplicatedSize()) {
+          if (txn.hasTotalBlockReplicatedSize()) {
             transactionStatusManager.getTxSizeMap().put(txn.getTxID(),
                 new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(txn.getLocalIDCount(),
                     txn.getTotalBlockSize(), txn.getTotalBlockReplicatedSize()));
