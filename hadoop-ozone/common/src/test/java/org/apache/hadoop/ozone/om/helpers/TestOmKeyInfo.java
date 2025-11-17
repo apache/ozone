@@ -64,7 +64,8 @@ public class TestOmKeyInfo {
     assertEquals(key, keyAfterSerialization);
 
     assertFalse(key.isHsync());
-    key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+    key = key.withMetadataMutations(
+        metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, "clientid"));
     assertTrue(key.isHsync());
     assertEquals(5678L, key.getExpectedDataGeneration());
   }

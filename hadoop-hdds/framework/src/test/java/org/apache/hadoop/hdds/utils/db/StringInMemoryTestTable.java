@@ -15,21 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
-import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is enabled.
+ * In memory test table for String keys.
+ * @param <V> Value type.
  */
-@EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-@Unhealthy("HDDS-13466")
-class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
-  TestOmSnapshotFsoWithNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false);
+public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
+  @Override
+  public KeyValueIterator<String, V> iterator(String prefix, KeyValueIterator.Type type) {
+    return new MapBackedTableIterator<>(getMap(), prefix);
   }
 }

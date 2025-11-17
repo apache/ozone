@@ -39,7 +39,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.38.2</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.38.7</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.82</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -203,11 +203,11 @@
     <protobuf3.version>3.25.8</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.71.0</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.119.Final</ratis-thirdparty.netty.version>
-    <ratis-thirdparty.protobuf.version>3.25.5</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.0.9</ratis.thirdparty.version>
-    <ratis.version>3.2.0</ratis.version>
+    <ratis-thirdparty.grpc.version>1.75.0</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.127.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.protobuf.version>3.25.8</ratis-thirdparty.protobuf.version>
+    <ratis.thirdparty.version>1.0.10</ratis.thirdparty.version>
+    <ratis.version>3.2.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
@@ -2632,80 +2632,6 @@
                   <goal>sign</goal>
                 </goals>
                 <phase>verify</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>clover</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property>
-          <name>clover</name>
-        </property>
-      </activation>
-      <properties>
-        <!-- NB: This additional parametrization is made in order
-             to be able to re-define these properties with "-Dk=v" maven options.
-             By some reason the expressions declared in clover
-             docs like "${maven.clover.generateHtml}" do not work in that way.
-             However, the below properties are confirmed to work: e.g.
-             -DcloverGenHtml=false switches off the Html generation.
-             The default values provided here exactly correspond to Clover defaults, so
-             the behavior is 100% backwards compatible. -->
-        <cloverAlwaysReport>true</cloverAlwaysReport>
-        <cloverDatabase>${project.build.directory}/clover/hadoop-coverage.db</cloverDatabase>
-        <cloverGenHistorical>false</cloverGenHistorical>
-        <cloverGenHtml>true</cloverGenHtml>
-        <cloverGenXml>true</cloverGenXml>
-        <cloverLicenseLocation>${user.home}/.clover.license</cloverLicenseLocation>
-      </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.atlassian.maven.plugins</groupId>
-            <artifactId>maven-clover2-plugin</artifactId>
-            <configuration>
-              <includesAllSourceRoots>false</includesAllSourceRoots>
-              <includesTestSourceRoots>true</includesTestSourceRoots>
-              <licenseLocation>${cloverLicenseLocation}</licenseLocation>
-              <cloverDatabase>${cloverDatabase}</cloverDatabase>
-              <targetPercentage>50%</targetPercentage>
-              <outputDirectory>${project.build.directory}/clover</outputDirectory>
-              <alwaysReport>${cloverAlwaysReport}</alwaysReport>
-              <generateHtml>${cloverGenHtml}</generateHtml>
-              <generateXml>${cloverGenXml}</generateXml>
-              <generateHistorical>${cloverGenHistorical}</generateHistorical>
-              <excludes>
-                <exclude>**/examples/**/*.java</exclude>
-                <exclude>**/hamlet/*.java</exclude>
-                <exclude>**/ha/proto/*.java</exclude>
-                <exclude>**/protocol/proto/*.java</exclude>
-                <exclude>**/compiler/generated/*.java</exclude>
-                <exclude>**/protobuf/*.java</exclude>
-                <exclude>**/v2/proto/*.java</exclude>
-                <exclude>**/yarn/proto/*.java</exclude>
-                <exclude>**/security/proto/*.java</exclude>
-                <exclude>**/tools/proto/*.java</exclude>
-                <exclude>**/hs/proto/*.java</exclude>
-              </excludes>
-            </configuration>
-            <executions>
-              <execution>
-                <id>clover-setup</id>
-                <goals>
-                  <goal>setup</goal>
-                </goals>
-                <phase>process-sources</phase>
-              </execution>
-              <execution>
-                <id>clover</id>
-                <goals>
-                  <goal>clover</goal>
-                </goals>
-                <phase>test</phase>
               </execution>
             </executions>
           </plugin>
