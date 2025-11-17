@@ -216,6 +216,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     });
 
     AtomicBoolean isRunSuccessful = new AtomicBoolean(true);
+    LOG.info("Submitting {} tasks for parallel reprocessing", tasks.size());
     try {
       CompletableFuture.allOf(tasks.stream()
           .map(task -> {
@@ -223,8 +224,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             long reprocessStartTime = Time.monotonicNow();
 
             return CompletableFuture.supplyAsync(() -> {
+              LOG.info("Task {} started execution on thread {}", 
+                  task.getTaskName(), Thread.currentThread().getName());
               try {
                 ReconOmTask.TaskResult result = task.call();
+                LOG.info("Task {} completed execution", task.getTaskName());
                 return result;
               } catch (Exception e) {
                 // Track reprocess failure per task
@@ -347,7 +351,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Clean up any pre-existing checkpoint directories from previous runs
     cleanupPreExistingCheckpoints();
     
-    executorService = Executors.newFixedThreadPool(threadCount,
+    executorService = Executors.newFixedThreadPool(8,
         new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
             .build());
     

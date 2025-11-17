@@ -136,9 +136,7 @@ public abstract class ContainerKeyMapperHelper {
                                                 int maxWorkers,
                                                 int maxKeysInMemory) {
     AtomicLong omKeyCount = new AtomicLong(0);
-    // Local map: per-task ContainerKeyPrefix mappings (cleared on flush)
     Map<ContainerKeyPrefix, Integer> localContainerKeyMap = new ConcurrentHashMap<>();
-    // Shared map: cross-task container counts (FSO + OBS accumulate here)
 
     try {
       LOG.info("{}: Starting parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
@@ -199,10 +197,18 @@ public abstract class ContainerKeyMapperHelper {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
       }
 
-      // Final flush and commit: local map cleared, shared map kept for other tasks
+      // Capture total container count BEFORE final flush clears the map
+      long totalContainers = SHARED_CONTAINER_KEY_COUNT_MAP.size();
+
+      // Final flush and commit
       if (!flushAndCommitContainerKeyInfoToDB(localContainerKeyMap, SHARED_CONTAINER_KEY_COUNT_MAP, reconContainerMetadataManager)) {
         LOG.error("Failed to flush Container Key data to DB for {}", taskName);
         return false;
+      }
+
+      // Write total container count once at the end (after all processing)
+      if (totalContainers > 0) {
+        reconContainerMetadataManager.incrementContainerCountBy(totalContainers);
       }
 
       Instant end = Instant.now();
@@ -212,9 +218,9 @@ public abstract class ContainerKeyMapperHelper {
       double throughput = keysProcessed / Math.max(durationSeconds, 0.001);
       
       LOG.info("{}: Parallel reprocess completed. Processed {} keys in {} ms ({} sec) - " +
-          "Throughput: {} keys/sec - Containers (shared): {}, Container-Key mappings (local): {}",
+          "Throughput: {} keys/sec - Containers: {}, Container-Key mappings: {}",
           taskName, keysProcessed, durationMillis, String.format("%.2f", durationSeconds),
-          String.format("%.2f", throughput), SHARED_CONTAINER_KEY_COUNT_MAP.size(), localContainerKeyMap.size());
+          String.format("%.2f", throughput), totalContainers, localContainerKeyMap.size());
     } catch (Exception ex) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;
@@ -495,36 +501,24 @@ public abstract class ContainerKeyMapperHelper {
                                         ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
 
-    AtomicLong containerCountToIncrement = new AtomicLong(0);
-
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo.getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
       for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup.getLocationList()) {
         long containerId = omKeyLocationInfo.getContainerID();
         ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(containerId, key, keyVersion);
 
-        if (reconContainerMetadataManager.getCountForContainerKeyPrefix(containerKeyPrefix) == 0
-            && !localContainerKeyMap.containsKey(containerKeyPrefix)) {
+        // During reprocess, tables are empty so skip DB lookup - just check in-memory map
+        if (!localContainerKeyMap.containsKey(containerKeyPrefix)) {
           // Save on writes. No need to save same container-key prefix mapping again.
           localContainerKeyMap.put(containerKeyPrefix, 1);
 
-          // Thread-safe increment using shared AtomicLong map (cross-task safe: FSO + OBS)
-          AtomicLong count = sharedContainerKeyCountMap.computeIfAbsent(containerId, 
-              k -> new AtomicLong(0));
-          
-          long newCount = count.incrementAndGet();
-          
-          // Check if this is the first key for this container (across all tasks)
-          if (newCount == 1) {
-            containerCountToIncrement.incrementAndGet();
-          }
+          // Thread-safe increment using computeIfAbsent (cross-task safe: FSO + OBS)
+          sharedContainerKeyCountMap.computeIfAbsent(containerId, k -> new AtomicLong(0))
+              .incrementAndGet();
         }
       }
     }
-
-    if (containerCountToIncrement.get() > 0) {
-      reconContainerMetadataManager.incrementContainerCountBy(containerCountToIncrement.get());
-    }
+    // Container count will be written once at the end of reprocess, not here (Derby optimization)
   }
 
   public static boolean flushAndCommitContainerKeyInfoToDB(

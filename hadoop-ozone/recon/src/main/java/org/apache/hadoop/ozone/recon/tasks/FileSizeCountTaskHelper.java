@@ -184,7 +184,7 @@ public abstract class FileSizeCountTaskHelper {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
     AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
-    final int FLUSH_THRESHOLD = 100000;
+    final int FLUSH_THRESHOLD = 200000;
     
     // Use parallel table iteration
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
