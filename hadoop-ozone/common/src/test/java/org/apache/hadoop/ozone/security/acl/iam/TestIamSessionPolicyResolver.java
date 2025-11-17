@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.security.acl.iam;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
+import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -58,7 +60,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Condition attribute - aws:SourceArn", NOT_SUPPORTED_OPERATION);
+        json, "Unsupported Condition key name - aws:SourceArn", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -160,7 +162,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Condition (must have operator StringEquals and attribute " +
+        json, "Invalid Condition (must have operator StringEquals and key name " +
         "s3:prefix) - [\"RandomCondition\"]", INVALID_REQUEST);
   }
 
@@ -176,7 +178,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Missing Condition attribute - StringEquals", INVALID_REQUEST);
+        json, "Missing Condition operator - StringEquals", INVALID_REQUEST);
   }
 
   @Test
@@ -191,7 +193,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Condition attribute structure - [{\"s3:prefix\":\"folder/\"}]",
+        json, "Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
         INVALID_REQUEST);
   }
 
@@ -220,8 +222,39 @@ public class TestIamSessionPolicyResolver {
     assertThat(json.length()).isEqualTo(2048);
 
     // Must not throw an exception
-    IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.NATIVE);
-    IamSessionPolicyResolver.resolve(json, VOLUME, IamSessionPolicyResolver.AuthorizerType.RANGER);
+    IamSessionPolicyResolver.resolve(json, VOLUME, NATIVE);
+    IamSessionPolicyResolver.resolve(json, VOLUME, RANGER);
+  }
+
+  @Test
+  public void testConditionKeyMustBeCaseInsensitive() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"S3:PRefiX\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    // Must not throw exception
+    IamSessionPolicyResolver.resolve(json, VOLUME, NATIVE);
+    IamSessionPolicyResolver.resolve(json, VOLUME, RANGER);
+  }
+
+  @Test
+  public void testEffectMustBeCaseSensitive() {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"aLLOw\",\n" +
+        "    \"Action\": \"s3:ListBucket\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::b\",\n" +
+        "    \"Condition\": { \"StringEquals\": { \"s3:prefix\": \"x/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    expectResolveThrowsForBothAuthorizers(
+        json, "Unsupported Effect - aLLOw", NOT_SUPPORTED_OPERATION);
   }
 
   private static void expectResolveThrows(String json,
@@ -238,8 +271,8 @@ public class TestIamSessionPolicyResolver {
   
   private static void expectResolveThrowsForBothAuthorizers(String json,
       String expectedMessage, OMException.ResultCodes expectedCode) {
-    expectResolveThrows(json, IamSessionPolicyResolver.AuthorizerType.NATIVE, expectedMessage, expectedCode);
-    expectResolveThrows(json, IamSessionPolicyResolver.AuthorizerType.RANGER, expectedMessage, expectedCode);
+    expectResolveThrows(json, NATIVE, expectedMessage, expectedCode);
+    expectResolveThrows(json, RANGER, expectedMessage, expectedCode);
   }
 
   private static String createJsonStringLargerThan2048Characters() {

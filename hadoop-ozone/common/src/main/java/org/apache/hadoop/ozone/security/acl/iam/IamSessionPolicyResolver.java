@@ -48,12 +48,17 @@ import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest;
  * <p>
  * The only supported Condition operator is StringEquals - all others will throw
  * OMException with NOT_SUPPORTED_OPERATION.  Furthermore, only one Condition is supported in a
- * statement.
+ * statement.  The value StringEquals is case-sensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html">
+ * AWS spec</a>.
  * <p>
- * The only supported Condition attribute is s3:prefix - all others will throw
- * OMException with NOT_SUPPORTED_OPERATION.
+ * The only supported Condition key name is s3:prefix - all others will throw
+ * OMException with NOT_SUPPORTED_OPERATION.  s3:prefix is case-insensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition.html">AWS spec</a>.
  * <p>
- * The only supported Effect is Allow - all others will throw OMException with NOT_SUPPORTED_OPERATION.
+ * The only supported Effect is Allow - all others will throw OMException with NOT_SUPPORTED_OPERATION.  This
+ * value is case-sensitive per the
+ * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_effect.html">AWS spec</a>.
  * <p>
  * If a (currently) unsupported S3 action is requested, such as s3:GetAccelerateConfiguration,
  * it will be silently ignored.
@@ -65,6 +70,8 @@ public final class IamSessionPolicyResolver {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  // JSON length is limited per AWS policy.  See https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+  // under Policy section.
   private static final int MAX_JSON_LENGTH = 2048;
 
   private IamSessionPolicyResolver() {
@@ -184,7 +191,7 @@ public final class IamSessionPolicyResolver {
     if (effectNode != null) {
       if (effectNode.isTextual()) {
         final String effect = effectNode.asText();
-        if (!"Allow".equalsIgnoreCase(effect)) {
+        if (!"Allow".equals(effect)) {
           throw new OMException("Unsupported Effect - " + effect, NOT_SUPPORTED_OPERATION);
         }
         return;
@@ -225,9 +232,9 @@ public final class IamSessionPolicyResolver {
   /**
    * Parses and returns prefixes from Conditions (if any).  Also validates
    * that if there is a Condition, there is only one and that the Condition
-   * operator and attribute are supported.
+   * operator and key name are supported.
    * <p>
-   * Only the StringEquals operator and s3:prefix attribute are supported.
+   * Only the StringEquals operator and s3:prefix key name are supported.
    */
   private static Set<String> parsePrefixesFromConditions(JsonNode stmt) throws OMException {
     Set<String> prefixes = Collections.emptySet();
@@ -239,7 +246,7 @@ public final class IamSessionPolicyResolver {
 
       if (!cond.isObject()) {
         throw new OMException(
-            "Invalid Condition (must have operator StringEquals " + "and attribute s3:prefix) - " +
+            "Invalid Condition (must have operator StringEquals " + "and key name s3:prefix) - " +
             cond, INVALID_REQUEST);
       }
 
@@ -248,21 +255,21 @@ public final class IamSessionPolicyResolver {
         throw new OMException("Unsupported Condition operator - " + operator, NOT_SUPPORTED_OPERATION);
       }
 
-      final JsonNode attribute = cond.get("StringEquals");
-      if ("null".equals(attribute.asText())) {
-        throw new OMException("Missing Condition attribute - StringEquals", INVALID_REQUEST);
+      final JsonNode operatorValue = cond.get("StringEquals");
+      if ("null".equals(operatorValue.asText())) {
+        throw new OMException("Missing Condition operator - StringEquals", INVALID_REQUEST);
       }
 
-      if (!attribute.isObject()) {
-        throw new OMException("Invalid Condition attribute structure - " + attribute, INVALID_REQUEST);
+      if (!operatorValue.isObject()) {
+        throw new OMException("Invalid Condition operator value structure - " + operatorValue, INVALID_REQUEST);
       }
 
-      final String attributeFieldName = attribute.fieldNames().hasNext() ? attribute.fieldNames().next() : null;
-      if (!"s3:prefix".equals(attributeFieldName)) {
-        throw new OMException("Unsupported Condition attribute - " + attributeFieldName, NOT_SUPPORTED_OPERATION);
+      final String keyName = operatorValue.fieldNames().hasNext() ? operatorValue.fieldNames().next() : null;
+      if (!"s3:prefix".equalsIgnoreCase(keyName)) {
+        throw new OMException("Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
       }
 
-      prefixes = readStringOrArray(attribute.get("s3:prefix"));
+      prefixes = readStringOrArray(operatorValue.get(keyName));
     }
 
     return prefixes;
