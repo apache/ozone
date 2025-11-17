@@ -152,7 +152,6 @@ public class SnapshotDiffManager implements AutoCloseable {
   private static final String MODIFY_DIFF_TABLE_SUFFIX = "-modify-diff";
 
   private final ManagedRocksDB db;
-  private final RocksDBCheckpointDiffer differ;
   private final OzoneManager ozoneManager;
   private final OMMetadataManager activeOmMetadataManager;
   private final CodecRegistry codecRegistry;
@@ -196,22 +195,17 @@ public class SnapshotDiffManager implements AutoCloseable {
           (SnapshotInfo fromSnapshotInfo, SnapshotInfo toSnapshotInfo) ->
               fromSnapshotInfo.getSnapshotId() + DELIMITER +
                   toSnapshotInfo.getSnapshotId();
-  private final OmSnapshotLocalDataManager snapshotLocalDataManager;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffManager(ManagedRocksDB db,
-                             RocksDBCheckpointDiffer differ,
                              OzoneManager ozoneManager,
-                             OmSnapshotLocalDataManager snapshotLocalDataManager,
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions,
                              CodecRegistry codecRegistry) {
     this.db = db;
-    this.differ = differ;
     this.ozoneManager = ozoneManager;
     this.activeOmMetadataManager = ozoneManager.getMetadataManager();
-    this.snapshotLocalDataManager = snapshotLocalDataManager;
     this.familyOptions = familyOptions;
     this.codecRegistry = codecRegistry;
     this.defaultWaitTime = ozoneManager.getConfiguration().getTimeDuration(
@@ -337,19 +331,6 @@ public class SnapshotDiffManager implements AutoCloseable {
             " unless you know what you are doing.\n");
       } catch (IOException ignored) {
       }
-    }
-  }
-
-  private void deleteDir(Path path) {
-    if (path == null || Files.notExists(path)) {
-      return;
-    }
-
-    try {
-      PathUtils.deleteDirectory(path);
-    } catch (IOException e) {
-      // TODO: [SNAPSHOT] Fail gracefully
-      throw new IllegalStateException(e);
     }
   }
 

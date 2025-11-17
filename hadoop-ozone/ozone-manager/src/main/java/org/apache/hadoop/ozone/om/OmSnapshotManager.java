@@ -312,8 +312,8 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
         cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
-    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
-        ozoneManager, snapshotLocalDataManager, snapDiffJobCf, snapDiffReportCf,
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb,
+        ozoneManager, snapDiffJobCf, snapDiffReportCf,
         columnFamilyOptions, codecRegistry);
 
     diffCleanupServiceInterval = ozoneManager.getConfiguration()

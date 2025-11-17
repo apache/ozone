@@ -140,7 +140,6 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
@@ -162,7 +161,6 @@ import org.mockito.quality.Strictness;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 /**
  * Tests for SnapshotDiffManager.
@@ -189,10 +187,6 @@ public class TestSnapshotDiffManager {
   private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
-  @TempDir
-  private File snapDiffDir;
-  @Mock
-  private RocksDBCheckpointDiffer differ;
   @Mock
   private OMMetadataManager omMetadataManager;
   @Mock
@@ -209,15 +203,6 @@ public class TestSnapshotDiffManager {
   private OmBucketInfo omBucketInfo;
   @Mock
   private RDBStore dbStore;
-
-  @Mock
-  private RocksIterator jobTableIterator;
-
-  @Mock
-  private OmSnapshotLocalDataManager localDataManager;
-
-  @Mock
-  private OmSnapshotManager omSnapshotManager;
 
   private static CodecRegistry codecRegistry;
 
@@ -268,7 +253,6 @@ public class TestSnapshotDiffManager {
 
     String snapshotNamePrefix = "snap-";
     String snapshotPath = "snapshotPath";
-    String snapshotCheckpointDir = "snapshotCheckpointDir";
     UUID baseSnapshotId = UUID.randomUUID();
     String baseSnapshotName = snapshotNamePrefix + baseSnapshotId;
     snapshotInfo = new SnapshotInfo.Builder()
@@ -354,7 +338,7 @@ public class TestSnapshotDiffManager {
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
-    omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0, true,
         new OmReadOnlyLock());
@@ -366,7 +350,7 @@ public class TestSnapshotDiffManager {
           return snapshotCache.get(snapInfo.getSnapshotId());
         });
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager, localDataManager,
+    snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
         snapDiffJobTable, snapDiffReportTable, columnFamilyOptions, codecRegistry);
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
@@ -395,12 +379,6 @@ public class TestSnapshotDiffManager {
     when(omMetadataManager.getStore()).thenReturn(dbStore);
     when(omSnapshot.getSnapshotID()).thenReturn(snapshotId);
     return omSnapshot;
-  }
-
-  private SnapshotInfo getMockedSnapshotInfo(UUID snapshotId) {
-    SnapshotInfo snapInfo = mock(SnapshotInfo.class);
-    when(snapInfo.getSnapshotId()).thenReturn(snapshotId);
-    return snapInfo;
   }
 
   private Table<String, ? extends WithParentObjectId> getMockedTable(
