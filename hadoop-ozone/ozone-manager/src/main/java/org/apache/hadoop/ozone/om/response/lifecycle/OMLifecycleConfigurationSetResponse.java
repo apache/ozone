@@ -61,4 +61,8 @@ public class OMLifecycleConfigurationSetResponse extends OMClientResponse  {
     omMetadataManager.getLifecycleConfigurationTable().putWithBatch(
         batchOperation, dbLifecycleKey, omLifecycleConfiguration);
   }
+
+  public OmLifecycleConfiguration getOmLifecycleConfiguration() {
+    return omLifecycleConfiguration;
+  }
 }
