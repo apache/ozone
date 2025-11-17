@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,8 +13,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.recon.persistence;
 
 import java.io.Serializable;
@@ -30,23 +29,30 @@ public class ContainerHistory implements Serializable {
   private String datanodeHost;
   private long firstSeenTime;
   private long lastSeenTime;
-  private long bcsId;
+  private long lastBcsId;
   private String state;
+  private long dataChecksum;
 
+  @SuppressWarnings("parameternumber")
   public ContainerHistory(long containerId, String datanodeUuid,
                           String datanodeHost, long firstSeenTime,
-                          long lastSeenTime, long lastBcsId, String state) {
+                          long lastSeenTime, long lastBcsId, String state, long dataChecksum) {
     this.containerId = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
-    this.bcsId = lastBcsId;
+    this.lastBcsId = lastBcsId;
     this.state = state;
+    this.dataChecksum = dataChecksum;
+  }
+
+  // Default constructor, used by jackson lib for object deserialization.
+  public ContainerHistory() {
   }
 
   public long getLastBcsId() {
-    return bcsId;
+    return lastBcsId;
   }
 
   public long getContainerId() {
@@ -95,5 +101,13 @@ public class ContainerHistory implements Serializable {
 
   public void setState(String state) {
     this.state = state;
+  }
+
+  public long getDataChecksum() {
+    return dataChecksum;
+  }
+
+  public void setDataChecksum(long dataChecksum) {
+    this.dataChecksum = dataChecksum;
   }
 }

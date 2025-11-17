@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.signature;
 
 import javax.enterprise.context.RequestScoped;
@@ -53,63 +53,40 @@ public class SignatureInfo {
 
   private String unfilteredURI = null;
 
-
   private String stringToSign = null;
 
   public SignatureInfo() { }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public SignatureInfo(
-      Version version,
-      String date,
-      String dateTime,
-      String awsAccessId,
-      String signature,
-      String signedHeaders,
-      String credentialScope,
-      String algorithm,
-      boolean signPayload
-  ) {
-    initialize(version, date, dateTime, awsAccessId, signature, signedHeaders,
-        credentialScope, algorithm, signPayload, null, null);
+  private SignatureInfo(Builder b) {
+    initialize(b);
   }
 
-  public void initialize(
-      SignatureInfo signatureInfo
-  ) {
-    initialize(signatureInfo.getVersion(), signatureInfo.getDate(),
-        signatureInfo.getDateTime(), signatureInfo.getAwsAccessId(),
-        signatureInfo.getSignature(), signatureInfo.getSignedHeaders(),
-        signatureInfo.getCredentialScope(), signatureInfo.getAlgorithm(),
-        signatureInfo.isSignPayload(), signatureInfo.getUnfilteredURI(),
-        signatureInfo.getStringToSign());
+  public void initialize(SignatureInfo signatureInfo) {
+    initialize(new Builder(signatureInfo.getVersion())
+        .setDate(signatureInfo.getDate())
+        .setDateTime(signatureInfo.getDateTime())
+        .setAwsAccessId(signatureInfo.getAwsAccessId())
+        .setSignature(signatureInfo.getSignature())
+        .setSignedHeaders(signatureInfo.getSignedHeaders())
+        .setCredentialScope(signatureInfo.getCredentialScope())
+        .setAlgorithm(signatureInfo.getAlgorithm())
+        .setSignPayload(signatureInfo.isSignPayload())
+        .setUnfilteredURI(signatureInfo.getUnfilteredURI())
+        .setStringToSign(signatureInfo.getStringToSign()));
   }
 
-  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:HiddenField"})
-  public void initialize(
-      Version version,
-      String date,
-      String dateTime,
-      String awsAccessId,
-      String signature,
-      String signedHeaders,
-      String credentialScope,
-      String algorithm,
-      boolean signPayload,
-      String uri,
-      String stringToSign
-  ) {
-    this.version = version;
-    this.date = date;
-    this.dateTime = dateTime;
-    this.awsAccessId = awsAccessId;
-    this.signature = signature;
-    this.signedHeaders = signedHeaders;
-    this.credentialScope = credentialScope;
-    this.algorithm = algorithm;
-    this.signPayload = signPayload;
-    this.unfilteredURI = uri;
-    this.stringToSign = stringToSign;
+  private void initialize(Builder b) {
+    this.version = b.version;
+    this.date = b.date;
+    this.dateTime = b.dateTime;
+    this.awsAccessId = b.awsAccessId;
+    this.signature = b.signature;
+    this.signedHeaders = b.signedHeaders;
+    this.credentialScope = b.credentialScope;
+    this.algorithm = b.algorithm;
+    this.signPayload = b.signPayload;
+    this.unfilteredURI = b.unfilteredURI;
+    this.stringToSign = b.stringToSign;
   }
 
   public String getAwsAccessId() {
@@ -169,5 +146,80 @@ public class SignatureInfo {
    */
   public enum Version {
     NONE, V4, V2;
+  }
+
+  /**
+   * Builder class for SignatureInfo.
+   */
+  public static class Builder {
+    private Version version;
+    private String date = "";
+    private String dateTime = "";
+    private String awsAccessId = "";
+    private String signature = "";
+    private String signedHeaders = "";
+    private String credentialScope = "";
+    private String algorithm = "";
+    private boolean signPayload = true;
+    private String unfilteredURI = null;
+    private String stringToSign = null;
+
+    public Builder(Version version) {
+      this.version = version;
+    }
+
+    public Builder setDate(String date) {
+      this.date = date;
+      return this;
+    }
+
+    public Builder setDateTime(String dateTime) {
+      this.dateTime = dateTime;
+      return this;
+    }
+
+    public Builder setAwsAccessId(String awsAccessId) {
+      this.awsAccessId = awsAccessId;
+      return this;
+    }
+
+    public Builder setSignature(String signature) {
+      this.signature = signature;
+      return this;
+    }
+
+    public Builder setSignedHeaders(String signedHeaders) {
+      this.signedHeaders = signedHeaders;
+      return this;
+    }
+
+    public Builder setCredentialScope(String credentialScope) {
+      this.credentialScope = credentialScope;
+      return this;
+    }
+
+    public Builder setAlgorithm(String algorithm) {
+      this.algorithm = algorithm;
+      return this;
+    }
+
+    public Builder setSignPayload(boolean signPayload) {
+      this.signPayload = signPayload;
+      return this;
+    }
+
+    public Builder setUnfilteredURI(String uri) {
+      this.unfilteredURI = uri;
+      return this;
+    }
+
+    public Builder setStringToSign(String stringToSign) {
+      this.stringToSign = stringToSign;
+      return this;
+    }
+
+    public SignatureInfo build() {
+      return new SignatureInfo(this);
+    }
   }
 }

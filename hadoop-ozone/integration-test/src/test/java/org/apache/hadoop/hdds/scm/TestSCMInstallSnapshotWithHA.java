@@ -1,20 +1,28 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,10 +30,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -36,83 +43,59 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 /**
  * Tests the Ratis snapshot feature in SCM.
  */
-@Timeout(500)
 @Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_OMS = 1;
+  private static final int NUM_OF_SCMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omServiceId;
-  private String scmServiceId;
-  private int numOfOMs = 1;
-  private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
   private static final int LOG_PURGE_GAP = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
 
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
             SNAPSHOT_THRESHOLD);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .setNumOfStorageContainerManagers(numOfSCMs)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setSCMServiceId(SCM_SERVICE_ID)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS)
         .setNumOfActiveSCMs(2)
         .build();
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {
@@ -149,7 +132,7 @@ public class TestSCMInstallSnapshotWithHA {
     }, 100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= 200);
+    assertThat(followerLastAppliedIndex).isGreaterThanOrEqualTo(200);
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower 's DB contains the transactions which were
@@ -187,9 +170,8 @@ public class TestSCMInstallSnapshotWithHA {
     followerSM.notifyTermIndexUpdated(lastTermIndex.getTerm(),
         lastTermIndex.getIndex() + 100);
 
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.INFO);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.INFO);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
 
     // Install the old checkpoint on the follower . This should fail as the
     // follower is already ahead of that transactionLogIndex and the
@@ -206,7 +188,7 @@ public class TestSCMInstallSnapshotWithHA {
     }
 
     String errorMsg = "Reloading old state of SCM";
-    assertTrue(logCapture.getOutput().contains(errorMsg));
+    assertThat(logCapture.getOutput()).contains(errorMsg);
     assertNull(newTermIndex, " installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex");
     assertEquals(followerTermIndex, followerSM.getLastAppliedTermIndex());
@@ -230,9 +212,8 @@ public class TestSCMInstallSnapshotWithHA {
     DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    TransactionInfo leaderCheckpointTrxnInfo = HAUtils
-        .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation,
-            new SCMDBDefinition());
+    final TransactionInfo leaderCheckpointTrxnInfo = HAUtils.getTrxnInfoFromCheckpoint(
+        conf, leaderCheckpointLocation, SCMDBDefinition.get());
 
     assertNotNull(leaderCheckpointLocation);
     // Take a backup of the current DB
@@ -248,11 +229,12 @@ public class TestSCMInstallSnapshotWithHA {
     // Corrupt the leader checkpoint and install that on the follower. The
     // operation should fail and  should shutdown.
     boolean delete = true;
-    for (File file : leaderCheckpointLocation.toFile()
-        .listFiles()) {
+    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    assertNotNull(files);
+    for (File file : files) {
       if (file.getName().contains(".sst")) {
         if (delete) {
-          file.delete();
+          FileUtils.deleteQuietly(file);
           delete = false;
         } else {
           delete = true;
@@ -262,17 +244,16 @@ public class TestSCMInstallSnapshotWithHA {
 
     SCMHAManagerImpl scmhaManager =
         (SCMHAManagerImpl) (followerSCM.getScmHAManager());
-    GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.ERROR);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    GenericTestUtils.setLogLevel(SCMHAManagerImpl.class, Level.ERROR);
+    LogCapturer logCapture = LogCapturer.captureLogs(SCMHAManagerImpl.class);
     scmhaManager.setExitManagerForTesting(new DummyExitManager());
 
     followerSM.pause();
     scmhaManager.installCheckpoint(leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
-    assertTrue(logCapture.getOutput()
-        .contains("Failed to reload SCM state and instantiate services."));
+    assertThat(logCapture.getOutput())
+        .contains("Failed to reload SCM state and instantiate services.");
     final LifeCycle.State s = followerSM.getLifeCycleState();
     assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(), "Unexpected lifeCycle state: " + s);
 
@@ -310,7 +291,6 @@ public class TestSCMInstallSnapshotWithHA {
       log.error("System Exit: " + message, throwable);
     }
   }
-
 
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {
     for (StorageContainerManager scm : impl.getStorageContainerManagers()) {

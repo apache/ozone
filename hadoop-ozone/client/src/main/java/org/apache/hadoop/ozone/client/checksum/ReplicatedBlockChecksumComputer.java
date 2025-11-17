@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.checksum;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.io.MD5Hash;
@@ -25,10 +29,6 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.List;
 
 /**
  * The implementation of AbstractBlockChecksumComputer for replicated blocks.
@@ -39,7 +39,13 @@ public class ReplicatedBlockChecksumComputer extends
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
-  private List<ContainerProtos.ChunkInfo> chunkInfoList;
+  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
+
+  static MD5Hash digest(ByteBuffer data) {
+    final MessageDigest digester = MD5Hash.getDigester();
+    digester.update(data);
+    return new MD5Hash(digester.digest());
+  }
 
   public ReplicatedBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList) {
@@ -62,20 +68,20 @@ public class ReplicatedBlockChecksumComputer extends
   }
 
   // compute the block checksum, which is the md5 of chunk checksums
-  private void computeMd5Crc() throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
+  private void computeMd5Crc() {
+    ByteString bytes = ByteString.EMPTY;
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
       ContainerProtos.ChecksumData checksumData =
           chunkInfo.getChecksumData();
       List<ByteString> checksums = checksumData.getChecksumsList();
 
       for (ByteString checksum : checksums) {
-        baos.write(checksum.toByteArray());
+        bytes = bytes.concat(checksum);
       }
     }
 
-    MD5Hash fileMD5 = MD5Hash.digest(baos.toByteArray());
+    final MD5Hash fileMD5 = digest(bytes.asReadOnlyByteBuffer());
+
     setOutBytes(fileMD5.getDigest());
 
     LOG.debug("number of chunks={}, md5out={}",
@@ -88,7 +94,7 @@ public class ReplicatedBlockChecksumComputer extends
     DataChecksum.Type dataChecksumType;
     long bytesPerCrc;
     long chunkSize;
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
+    Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
     switch (firstChunkInfo.getChecksumData().getType()) {
@@ -121,7 +127,7 @@ public class ReplicatedBlockChecksumComputer extends
       Preconditions.checkArgument(remainingChunkSize <=
           checksums.size() * chunkSize);
       for (ByteString checksum : checksums) {
-        int checksumDataCrc = CrcUtil.readInt(checksum.toByteArray(), 0);
+        final int checksumDataCrc = checksum.asReadOnlyByteBuffer().getInt();
         chunkCrcComposer.update(checksumDataCrc,
             Math.min(bytesPerCrc, remainingChunkSize));
         remainingChunkSize -= bytesPerCrc;

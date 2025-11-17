@@ -1,37 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.fs.contract;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IOUtils;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.EOFException;
-import java.io.IOException;
-import java.util.Random;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
@@ -39,6 +23,22 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.verifyRead;
 import static org.assertj.core.api.Assertions.fail;
+
+import java.io.EOFException;
+import java.io.IOException;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test Seek operations.
@@ -53,6 +53,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
   private Path zeroByteFile;
   private FSDataInputStream instream;
 
+  @BeforeEach
   @Override
   public void setup() throws Exception {
     super.setup();
@@ -74,6 +75,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     return conf;
   }
 
+  @AfterEach
   @Override
   public void teardown() throws Exception {
     IOUtils.closeStream(instream);
@@ -341,15 +343,14 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     byte[] buf = dataset(filesize, 0, 255);
     Path randomSeekFile = path("testrandomseeks.bin");
     createFile(getFileSystem(), randomSeekFile, true, buf);
-    Random r = new Random();
 
     // Record the sequence of seeks and reads which trigger a failure.
     int[] seeks = new int[10];
     int[] reads = new int[10];
     try (FSDataInputStream stm = getFileSystem().open(randomSeekFile)) {
       for (int i = 0; i < limit; i++) {
-        int seekOff = r.nextInt(buf.length);
-        int toRead = r.nextInt(Math.min(buf.length - seekOff, 32000));
+        int seekOff = RandomUtils.secure().randomInt(0, buf.length);
+        int toRead = RandomUtils.secure().randomInt(0, Math.min(buf.length - seekOff, 32000));
 
         seeks[i % seeks.length] = seekOff;
         reads[i % reads.length] = toRead;
@@ -360,7 +361,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
       sb.append("Sequence of actions:\n");
       for (int j = 0; j < seeks.length; j++) {
         sb.append("seek @ ").append(seeks[j]).append("  ")
-            .append("read ").append(reads[j]).append("\n");
+            .append("read ").append(reads[j]).append('\n');
       }
       LOG.error(sb.toString());
       throw afe;

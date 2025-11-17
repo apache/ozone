@@ -1,25 +1,38 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -49,22 +62,6 @@ import org.apache.ratis.protocol.DataStreamReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
-
 /**
  * An {@link ByteBufferStreamOutput} used by the REST service in combination
  * with the SCMClient to write the value of a key to a sequence
@@ -82,7 +79,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
  * through to the container.
  */
 public class BlockDataStreamOutput implements ByteBufferStreamOutput {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutput.class);
 
   public static final int PUT_BLOCK_REQUEST_LENGTH_MAX = 1 << 20;  // 1MB
@@ -128,20 +125,19 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
 
-  //number of buffers used before doing a flush/putBlock.
-  private int flushPeriod;
   private final Token<? extends TokenIdentifier> token;
   private final String tokenString;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private final long syncSize = 0; // TODO: disk sync is disabled for now
+  private static final long SYNC_SIZE = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
   private boolean isDatastreamPipelineMode;
+
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -174,8 +170,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.bufferList = bufferList;
-    flushPeriod = (int) (config.getStreamBufferFlushSize() / config
-        .getStreamBufferSize());
+
+    //number of buffers used before doing a flush/putBlock.
+    int flushPeriod = (int) (config.getStreamBufferFlushSize() / config.getStreamBufferSize());
 
     Preconditions
         .checkArgument(
@@ -239,11 +236,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     return failedServers;
   }
 
-  @VisibleForTesting
-  public XceiverClientRatis getXceiverClient() {
-    return xceiverClient;
-  }
-
   public IOException getIoException() {
     return ioException.get();
   }
@@ -259,7 +251,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     while (len > 0) {
       allocateNewBufferIfNeeded();
-      int writeLen = Math.min(len, currentBuffer.length());
+      int writeLen = Math.min(len, currentBuffer.remaining());
       final StreamBuffer buf = new StreamBuffer(b, off, writeLen);
       currentBuffer.put(buf);
       writeChunkIfNeeded();
@@ -271,7 +263,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private void writeChunkIfNeeded() throws IOException {
-    if (currentBuffer.length() == 0) {
+    if (currentBuffer.remaining() == 0) {
       writeChunk(currentBuffer);
       currentBuffer = null;
     }
@@ -331,10 +323,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     totalDataFlushedLength = writtenDataLength;
   }
 
-  @VisibleForTesting
-  public long getTotalDataFlushedLength() {
-    return totalDataFlushedLength;
-  }
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -374,7 +362,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * it is a no op.
    * @param bufferFull flag indicating whether bufferFull condition is hit or
    *              its called as part flush/close
-   * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
   public void watchForCommit(boolean bufferFull) throws IOException {
@@ -421,6 +408,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     waitFuturesComplete();
     final BlockData blockData = containerBlockData.build();
     if (close) {
+      // HDDS-12007 changed datanodes to ignore the following PutBlock request.
+      // However, clients still have to send it for maintaining compatibility.
+      // Otherwise, new clients won't send a PutBlock.
+      // Then, old datanodes will fail since they expect a PutBlock.
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
               xceiverClient.getPipeline(), blockData, true, tokenString);
@@ -518,6 +509,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    try {
+      if (!isClosed()) {
+        handleFlush(false);
+      }
+    } catch (Exception e) {
+
+    }
+  }
+
   public void waitFuturesComplete() throws IOException {
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
@@ -597,7 +604,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-
   private void setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
@@ -640,9 +646,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private boolean needSync(long position) {
-    if (syncSize > 0) {
+    if (SYNC_SIZE > 0) {
       // TODO: or position >= fileLength
-      if (position - syncPosition >= syncSize) {
+      if (position - syncPosition >= SYNC_SIZE) {
         syncPosition = position;
         return true;
       }
@@ -683,6 +689,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             out.writeAsync(buf, StandardWriteOption.SYNC) :
             out.writeAsync(buf))
             .whenCompleteAsync((r, e) -> {
+              metrics.decrPendingContainerOpsMetrics(ContainerProtos.Type.WriteChunk);
               if (e != null || !r.isSuccess()) {
                 if (e == null) {
                   e = new IOException("result is not success");
@@ -701,11 +708,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
-  }
-
-  @VisibleForTesting
-  public void setXceiverClient(XceiverClientRatis xceiverClient) {
-    this.xceiverClient = xceiverClient;
   }
 
   /**

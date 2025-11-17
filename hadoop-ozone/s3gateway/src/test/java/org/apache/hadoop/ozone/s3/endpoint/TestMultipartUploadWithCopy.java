@@ -1,27 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +39,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
-
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -41,24 +51,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Class to test Multipart upload where parts are created with copy header.
@@ -73,13 +73,13 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final long DELAY_MS = 2000;
-  private static long sourceKeyLastModificationTime;
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
   private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
   private static final String ERROR_CODE =
       S3ErrorTable.PRECOND_FAILED.getCode();
+
   @BeforeAll
   public static void setUp() throws Exception {
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -91,14 +91,18 @@ public class TestMultipartUploadWithCopy {
     try (OutputStream stream = bucket
         .createKey(EXISTING_KEY, keyContent.length,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.THREE), new HashMap<>())) {
+            ReplicationFactor.THREE),
+            new HashMap<String, String>() {{
+              put(OzoneConsts.ETAG, DigestUtils.md5Hex(EXISTING_KEY_CONTENT));
+            }}
+        )) {
       stream.write(keyContent);
     }
 
-    sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
+    long sourceKeyLastModificationTime = CLIENT.getObjectStore()
+                                             .getS3Bucket(OzoneConsts.S3_BUCKET)
+                                             .getKey(EXISTING_KEY)
+                                             .getModificationTime().toEpochMilli();
     beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =
@@ -118,10 +122,16 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    REST.setRequestIdentifier(new RequestIdentifier());
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    REST.setSignatureInfo(signatureInfo);
   }
 
   @Test
@@ -287,6 +297,7 @@ public class TestMultipartUploadWithCopy {
           + " ErrorCode:" + this.errorCode;
     }
   }
+
   @Test
   public void testMultipartTSHeaders() throws Exception {
     for (CopyIfTimestampTestCase t : CopyIfTimestampTestCase.values()) {
@@ -325,11 +336,11 @@ public class TestMultipartUploadWithCopy {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
-        partNumber, uploadID, body);
+        partNumber, uploadID, null, null, body);
     assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
     part.setPartNumber(partNumber);
 
     return part;
@@ -370,14 +381,14 @@ public class TestMultipartUploadWithCopy {
 
     ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
-        uploadID, body);
+        uploadID, null, null, body);
     assertEquals(200, response.getStatus());
 
     CopyPartResult result = (CopyPartResult) response.getEntity();
     assertNotNull(result.getETag());
     assertNotNull(result.getLastModified());
     Part part = new Part();
-    part.seteTag(result.getETag());
+    part.setETag(result.getETag());
     part.setPartNumber(partNumber);
 
     return part;
@@ -397,7 +408,7 @@ public class TestMultipartUploadWithCopy {
         OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
     additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, "bytes=0-3");
     setHeaders(additionalHeaders);
-    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, body);
+    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, null, null, body);
     OzoneMultipartUploadPartListParts parts =
         CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
         .listParts(KEY, uploadID, 0, 100);
@@ -429,6 +440,8 @@ public class TestMultipartUploadWithCopy {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));

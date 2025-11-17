@@ -23,7 +23,6 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
-: "${OZONE_VOLUME_OWNER:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
 # export for docker-compose
@@ -31,32 +30,18 @@ export OZONE_REPLICATION_FACTOR
 
 source "${_upgrade_dir}/../testlib.sh"
 
-## @description Create the directory tree required for persisting data between
-##   compose cluster restarts
-create_data_dirs() {
-  local dirs_to_create="$@"
-
-  if [[ -z "${OZONE_VOLUME}" ]]; then
-    return 1
-  fi
-
-  rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p $dirs_to_create
-  fix_data_dir_permissions
-}
-
 ## @description Prepares to run an image with `start_docker_env`.
 ## @param the version of Ozone to be run.
 ##   If this is equal to the string 'current', then the ozone runner image will
 #    be used.
 ##   Else, a binary image will be used.
 prepare_for_image() {
-  local image_version="$1"
+  local image_version="${1}"
 
   if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
       prepare_for_runner_image
   else
-      prepare_for_binary_image "$image_version"
+      prepare_for_binary_image "${image_version}"
   fi
 }
 
@@ -106,7 +91,7 @@ run_test() {
 
   local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
   local callback_dir="$test_dir"/callbacks
-  local execution_dir="$test_dir"/execution/"${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
+  local execution_dir="$test_dir"/execution/"$compose_cluster-$upgrade_type-${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
   local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
   # Export variables needed by test, since it is run in a subshell.
   export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh

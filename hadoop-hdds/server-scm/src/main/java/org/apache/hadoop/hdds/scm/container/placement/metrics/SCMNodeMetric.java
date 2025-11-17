@@ -1,18 +1,18 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
@@ -23,7 +23,8 @@ import com.google.common.base.Preconditions;
 /**
  * SCM Node Metric that is used in the placement classes.
  */
-public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
+public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
+    Comparable<SCMNodeMetric> {
   private SCMNodeStat stat;
 
   /**
@@ -41,8 +42,7 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    * @param capacity  in bytes
    * @param used      in bytes
    * @param remaining in bytes
-   * @param committed
-   * @paaram committed in bytes
+   * @param committed in bytes
    */
   @VisibleForTesting
   public SCMNodeMetric(long capacity, long used, long remaining,
@@ -195,12 +195,12 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    * @throws ClassCastException   if the specified object's type prevents it
    *                              from being compared to this object.
    */
-  //@Override
-  public int compareTo(SCMNodeStat o) {
-    if (isEqual(o)) {
+  @Override
+  public int compareTo(SCMNodeMetric o) {
+    if (isEqual(o.get())) {
       return 0;
     }
-    if (isGreater(o)) {
+    if (isGreater(o.get())) {
       return 1;
     } else {
       return -1;
@@ -224,5 +224,10 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public int hashCode() {
     return stat != null ? stat.hashCode() : 0;
+  }
+
+  @Override
+  public String toString() {
+    return "SCMNodeMetric{" + stat.toString() + '}';
   }
 }

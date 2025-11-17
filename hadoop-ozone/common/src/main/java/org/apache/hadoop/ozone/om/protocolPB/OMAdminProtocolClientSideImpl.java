@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import com.google.protobuf.RpcController;
@@ -34,17 +34,21 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
-import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
+import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,9 +216,53 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
     }
   }
 
+  @Override
+  public void compactOMDB(String columnFamily) throws IOException {
+    CompactRequest compactRequest = CompactRequest.newBuilder()
+        .setColumnFamily(columnFamily)
+        .build();
+    CompactResponse response;
+    try {
+      response = rpcProxy.compactDB(NULL_RPC_CONTROLLER, compactRequest);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    if (!response.getSuccess()) {
+      throwException("Request to compact \'" + columnFamily +
+          "\', sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
+    }
+  }
+
+  @Override
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+    TriggerSnapshotDefragRequest request = TriggerSnapshotDefragRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+    TriggerSnapshotDefragResponse response;
+    try {
+      response = rpcProxy.triggerSnapshotDefrag(NULL_RPC_CONTROLLER, request);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    if (!response.getSuccess()) {
+      throwException("Request to trigger snapshot defragmentation" +
+          ", sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
+    }
+    if (response.hasResult()) {
+      return response.getResult();
+    } else {
+      throwException("Missing result in TriggerSnapshotDefragResponse from " + omPrintInfo +
+          ". This likely indicates a server error.");
+      // Unreachable, required for compilation
+      return false;
+    }
+  }
+
   private void throwException(String errorMsg)
       throws IOException {
-    throw new IOException("Failed to Decommission OM. Error: " + errorMsg);
+    throw new IOException("Request Failed. Error: " + errorMsg);
   }
 
   @Override

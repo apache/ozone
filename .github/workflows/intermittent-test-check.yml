@@ -28,17 +28,33 @@ on:
         description: Test Name
         default:  ALL
         required: false
+      submodule:
+        description: Submodule
+        default: 'ozone-integration-test'
+        required: true
       iterations:
         description: Number of Iterations per split
         default: 10
         required: true
       splits:
         description: Number of splits
-        default: 2
+        default: 10
         required: true
       fail-fast:
         description: Stop after first failure
         default: false
+        required: true
+      ratis-repo:
+        description: Ratis repository
+        default: ''
+        required: false
+      ratis-ref:
+        description: Ratis ref (branch, tag or commit SHA)
+        default: ''
+        required: false
+      java-version:
+        description: Java version to use
+        default: '21'
         required: true
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
@@ -46,126 +62,190 @@ env:
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
+  RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
+  RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
+  JAVA_VERSION: ${{ github.event.inputs.java-version }}
+  # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
+  # SUREFIRE-1722, SUREFIRE-1815
+  SUREFIRE_VERSION: 3.0.0-M4
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
 jobs:
   prepare-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
-      test_type: ${{steps.check-test-existence.outputs.test_type}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
-      - name: Check for Test File
-        id: check-test-existence
-        run: |
-          filename="$TEST_CLASS.java"
-          found_file=$(find . -name "$filename" -type f -print -quit)
-          test_type=unit
-          if [ -n "$found_file" ]; then
-              echo "File path : $found_file"
-              if [[ "$found_file" == *"integration-test"* ]]; then
-                  test_type=integration
-              fi 
-              if [ "$TEST_METHOD" != "ALL" ]; then
-                  if grep -q "public void $TEST_METHOD(" "$found_file"; then
-                      echo "Test method $TEST_METHOD exists in $filename"
-                  else
-                      echo "Test method $TEST_METHOD does not exist in $filename.Stopping!"
-                      exit 1
-                  fi
-              fi
-              echo "Test file $filename found. Continuing.."
-          else
-              echo "Test file $filename not found.Stopping!"
-              exit 1
-          fi
-          echo "test_type=$test_type" >> $GITHUB_OUTPUT
       - id: generate
         name: Generate test matrix
         run: |
           splits=()
           for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
-              splits+=("$i")
+            splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
           split_matrix="[${x%,}]"
           echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
+  ratis:
+    uses: ./.github/workflows/build-ratis.yml
+    if: ${{ github.event.inputs.ratis-ref != '' }}
+    with:
+      repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
+      ref: ${{ github.event.inputs.ratis-ref }}
+  build:
+    if: ${{ !cancelled() }}
+    needs:
+      - prepare-job
+      - ratis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+      - name: Download Ratis repo
+        if: ${{ github.event.inputs.ratis-ref != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+      - name: Setup java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ github.event.inputs.java-version }}
+      - name: Build (most) of Ozone
+        run: |
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
+          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
+            args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
+            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
+            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
+            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+          fi
+
+          args="$args -am -pl :${{ github.event.inputs.submodule }}"
+
+          hadoop-ozone/dev-support/checks/build.sh $args
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
   run-test:
-    needs: prepare-job
+    if: ${{ !cancelled() }}
+    needs:
+      - prepare-job
+      - ratis
+      - build
     name: Run-Split
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
       fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-single
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ github.event.inputs.ratis-ref != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+        continue-on-error: true
       - name: Setup java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
-          test_type=${{ needs.prepare-job.outputs.test_type }}
-          args="-DexcludedGroups=unhealthy"
-          if [ "$test_type" = "integration" ]; then
-              args="$args -pl :ozone-integration-test,:mini-chaos-tests"
+          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
+            export OZONE_REPO_CACHED=true
           fi
+
+          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
+          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
+            args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
+            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
+            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
+            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+          fi
+
+          args="$args -pl :${{ github.event.inputs.submodule }}"
+
           if [ "$TEST_METHOD" = "ALL" ]; then
-              echo "Running all tests from $TEST_CLASS"
-              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS
+            echo "Running all tests from $TEST_CLASS"
+            set -x
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS,Abstract*Test*\$*"
           else
-              echo "Running test: $TEST_METHOD from $TEST_CLASS"
-              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS#$TEST_METHOD
+            echo "Running test: $TEST_METHOD from $TEST_CLASS"
+            set -x
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
         continue-on-error: true
         env:
-          CHECK: ${{ needs.prepare-job.outputs.test_type }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v3
-        if: always()
+        uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
         with:
-          name: result-${{ env.TEST_CLASS }}-split-${{ matrix.split }}
-          path: target/${{ needs.prepare-job.outputs.test_type }}
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
+          name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
+          path: target/unit
   count-failures:
-    if: ${{ always() }}
+    if: ${{ failure() }}
     needs: run-test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Download build results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Count failures
         run: |
-          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)
           echo "Total failures: $failures"
           if [[ $failures -gt 0 ]]; then
             echo ""
             echo "Failed runs:"
-            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            grep --text 'exit code: 1' */summary.txt | grep --text -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
             echo ""
             exit 1
           fi

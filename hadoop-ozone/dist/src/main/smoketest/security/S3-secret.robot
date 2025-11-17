@@ -26,6 +26,8 @@ GetSecret success
     ${output}=             Execute             ozone s3 getsecret -u testuser2
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
+    Should not contain     ${output}           isDeleted
+    Should not contain     ${output}           transactionLogIndex
 
 GetSecret failure
     ${output2}=            Execute and Ignore Error    ozone s3 getsecret -u testuser2

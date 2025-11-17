@@ -17,7 +17,7 @@
 Documentation       Test ozone admin pipeline command
 Library             BuiltIn
 Resource            ../commonlib.robot
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -25,30 +25,22 @@ ${PIPELINE}
 ${SCM}       scm
 
 *** Test Cases ***
-Create pipeline
-    ${output} =         Execute          ozone admin pipeline create
-                        Should contain   ${output}   is created.
-                        Should contain   ${output}   STANDALONE/ONE
-    ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
-                        Set Suite Variable    ${PIPELINE}    ${pipeline}
-
 List pipelines
     ${output} =         Execute          ozone admin pipeline list
-                        Should contain   ${output}   STANDALONE/ONE
+                        Should contain   ${output}   RATIS/ONE
+    ${pipeline} =       Execute          ozone admin pipeline list | grep 'ReplicationConfig: RATIS/ONE' | head -n 1 | cut -d' ' -f3 | sed 's/,$//'
+                        Set Suite Variable    ${PIPELINE}    ${pipeline}
 
 List pipeline with json option
-    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
-
+    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
     Should be true      $output
 
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
-                        Should contain   ${output}   STANDALONE/ONE
+                        Should contain   ${output}   RATIS/ONE
 
 List pipelines with explicit host and json option
-    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
-
-    Should be true      $output
+    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"
@@ -68,11 +60,15 @@ Close pipeline
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   close
                         Should contain   ${output}   create
                         Should contain   ${output}   deactivate
                         Should contain   ${output}   list
+
+Create pipeline
+    ${output} =         Execute And Ignore Error     ozone admin pipeline create -t RATIS -f ONE
+                        Should Contain Any   ${output}   is created.   RATIS/ONE   Cannot create pipeline
 
 #List pipelines on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose pipeline list --scm unknown-host

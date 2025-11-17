@@ -21,7 +21,8 @@ weight: 23
 -->
 
 {{< requirements >}}
- * docker and docker-compose
+ * [Docker Engine](https://docs.docker.com/engine/install/) latest stable version
+ * [Docker Compose](https://docs.docker.com/compose/install/) at least v2.30
 {{< /requirements >}}
 
 * Download the Ozone binary tarball and untar it.
@@ -58,4 +59,7 @@ To shutdown the cluster, please run
 {{< highlight bash >}}
 docker-compose down
 {{< /highlight >}}
+
+**You can refer to the link [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) for configuring `monitoring` and `profiling` add-ons**
+
 

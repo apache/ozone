@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
-
-import java.io.IOException;
 
 /**
  * Tests {@link AuthorizerLockImpl}.
@@ -40,7 +40,7 @@ public class TestAuthorizerLockImpl {
   @BeforeAll
   public static void init() {
     // Enable debug logging for the test
-    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
   }
 
   /**
@@ -103,17 +103,14 @@ public class TestAuthorizerLockImpl {
   public void testLockInOneThreadUnlockInAnother() {
 
     final AuthorizerLock authorizerLock = new AuthorizerLockImpl();
-
-    try {
+    assertDoesNotThrow(() -> {
       authorizerLock.tryWriteLockInOMRequest();
 
       // Spawn another thread to release the lock.
       // Works as long as they share the same AuthorizerLockImpl instance.
       final Thread thread1 = new Thread(authorizerLock::unlockWriteInOMRequest);
       thread1.start();
-    } catch (IOException e) {
-      fail("Should not have thrown: " + e.getMessage());
-    }
+    });
   }
 
   @Test

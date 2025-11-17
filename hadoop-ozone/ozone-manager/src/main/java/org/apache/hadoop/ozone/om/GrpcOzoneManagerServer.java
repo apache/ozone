@@ -1,56 +1,21 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
-
-import java.io.IOException;
-import java.util.OptionalInt;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
-import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressServerInterceptor;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
-import io.grpc.Server;
-import io.grpc.ServerInterceptors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER_DEFAULT;
@@ -63,8 +28,40 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_READ_THREAD_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.grpc.Server;
+import io.grpc.ServerInterceptors;
+import io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
+import java.io.IOException;
+import java.util.OptionalInt;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressServerInterceptor;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
- * Separated network server for gRPC transport OzoneManagerService s3g->OM.
+ * Separated network server for gRPC transport OzoneManagerService s3g-&gt;OM.
  */
 public class GrpcOzoneManagerServer {
   private static final Logger LOG =
@@ -151,9 +148,7 @@ public class GrpcOzoneManagerServer {
         .channelType(NioServerSocketChannel.class)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            new OzoneManagerServiceGrpc(omTranslator,
-                delegationTokenMgr,
-                omServerConfig),
+            new OzoneManagerServiceGrpc(omTranslator),
             new ClientAddressServerInterceptor(),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
             new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
@@ -163,9 +158,8 @@ public class GrpcOzoneManagerServer {
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
-        KeyStoresFactory factory = caClient.getServerKeyStoresFactory();
         SslContextBuilder sslClientContextBuilder =
-            SslContextBuilder.forServer(factory.getKeyManagers()[0]);
+            SslContextBuilder.forServer(caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder,
             SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
@@ -200,6 +194,7 @@ public class GrpcOzoneManagerServer {
       omS3gGrpcMetrics.unRegister();
     }
   }
+
   public int getPort() {
     return port;
   }

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,14 +19,14 @@ package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Arrays;
 import java.util.Collection;
-
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -36,11 +35,10 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.GenericTestUtils;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -48,13 +46,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test http server of OM with various HTTP option.
  */
 public class TestOzoneManagerHttpServer {
-  private static final String BASEDIR = GenericTestUtils
-      .getTempPath(TestOzoneManagerHttpServer.class.getSimpleName());
   private static String keystoresDir;
   private static String sslConfDir;
   private static OzoneConfiguration conf;
   private static URLConnectionFactory connectionFactory;
   private static File ozoneMetadataDirectory;
+
   public static Collection<Object[]> policy() {
     Object[][] params = new Object[][] {
         {HttpConfig.Policy.HTTP_ONLY},
@@ -63,17 +60,14 @@ public class TestOzoneManagerHttpServer {
     return Arrays.asList(params);
   }
 
-  @BeforeAll public static void setUp() throws Exception {
-    File base = new File(BASEDIR);
-    FileUtil.fullyDelete(base);
-
+  @BeforeAll public static void setUp(@TempDir File baseDir) throws Exception {
     // Create metadata directory
-    ozoneMetadataDirectory = new File(BASEDIR, "metadata");
-    ozoneMetadataDirectory.mkdirs();
+    ozoneMetadataDirectory = new File(baseDir.getPath(), "metadata");
+    assertTrue(ozoneMetadataDirectory.mkdirs());
 
     // Initialize the OzoneConfiguration
     conf = new OzoneConfiguration();
-    keystoresDir = new File(BASEDIR).getAbsolutePath();
+    keystoresDir = baseDir.getAbsolutePath();
     sslConfDir = KeyStoreTestUtil.getClasspathDir(
         TestOzoneManagerHttpServer.class);
     KeyStoreTestUtil.setupSSLConfig(keystoresDir, sslConfDir, conf, false);
@@ -95,7 +89,6 @@ public class TestOzoneManagerHttpServer {
 
   @AfterAll public static void tearDown() throws Exception {
     connectionFactory.destroy();
-    FileUtil.fullyDelete(new File(BASEDIR));
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, sslConfDir);
   }
 
@@ -154,15 +147,14 @@ public class TestOzoneManagerHttpServer {
       return false;
     }
     try {
-      URL url =
-          new URL(scheme + "://" + NetUtils.getHostPortString(addr) + "/jmx");
+      URL url = new URL(scheme + "://" + NetUtils.getHostPortString(addr) + "/jmx");
       URLConnection conn = connectionFactory.openConnection(url);
       conn.connect();
       conn.getContent();
-    } catch (Exception e) {
+      return true;
+    } catch (IOException e) {
       return false;
     }
-    return true;
   }
 
   private static boolean implies(boolean a, boolean b) {

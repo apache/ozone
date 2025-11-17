@@ -17,22 +17,43 @@
  */
 
 import React from 'react';
-import {Icon, Table, Tag} from 'antd';
-import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import './buckets.less';
-import {AutoReloadHelper} from 'utils/autoReloadHelper';
-import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
-import {ActionMeta, ValueType} from 'react-select';
-import {nullAwareLocaleCompare, showDataFetchError} from 'utils/common';
-import {ColumnSearch} from 'utils/columnSearch';
-import {BucketLayout, BucketLayoutTypeList, BucketStorage, BucketStorageTypeList, IAcl, IBucket} from 'types/om.types';
-import {AclPanel} from '../../components/aclDrawer/aclDrawer';
-import {ColumnProps} from 'antd/es/table';
-import QuotaBar from '../../components/quotaBar/quotaBar';
-import {AxiosGetHelper} from "../../utils/axiosRequestHelper";
+import { Table, Tag } from 'antd';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  CloudServerOutlined,
+  FileUnknownOutlined,
+  HddOutlined,
+  LaptopOutlined,
+  SaveOutlined
+} from '@ant-design/icons';
+import {
+  ColumnProps,
+  TablePaginationConfig
+} from 'antd/es/table';
+import { ActionMeta, ValueType } from 'react-select';
 import CreatableSelect from "react-select/creatable";
+
+import {
+  BucketLayout,
+  BucketLayoutTypeList,
+  BucketStorage,
+  BucketStorageTypeList,
+  IAcl,
+  IBucket
+} from '@/types/om.types';
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
+import { AclPanel } from '@/components/aclDrawer/aclDrawer';
+import { ColumnSearch } from '@/utils/columnSearch';
+import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
+import { nullAwareLocaleCompare, showDataFetchError } from '@/utils/common';
+import QuotaBar from '@/components/quotaBar/quotaBar';
+
+import './buckets.less';
+
 
 interface IBucketResponse {
   volumeName: string;
@@ -75,30 +96,42 @@ interface IBucketsState {
 }
 
 const LIMIT_OPTIONS: IOption[] = [
-  {label: "1000", value: "1000"},
-  {label: "5000", value: "5000"},
-  {label: "10000", value: "10000"},
-  {label: "20000", value: "20000"}
+  {
+    label: '1000',
+    value: '1000'
+  },
+  {
+    label: '5000',
+    value: '5000'
+  },
+  {
+    label: '10000',
+    value: '10000'
+  },
+  {
+    label: '20000',
+    value: '20000'
+  }
 ]
 
 const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
 
 const renderIsVersionEnabled = (isVersionEnabled: boolean) => {
   return isVersionEnabled ?
-    <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/> :
-    <Icon type='close-circle' theme='outlined' className='icon-neutral'/>;
+    <CheckCircleOutlined style={{ color: '#1da57a' }} className='icon-success' /> :
+    <CloseCircleOutlined className='icon-neutral' />
 };
 
 const renderStorageType = (bucketStorage: BucketStorage) => {
   const bucketStorageIconMap = {
-    RAM_DISK: <Icon type='laptop' theme='outlined'/>,
-    SSD: <Icon type='save' theme='outlined'/>,
-    DISK: <Icon type='hdd' theme='outlined'/>,
-    ARCHIVE: <Icon type='cloud-server' theme='outlined'/>
+    RAM_DISK: <LaptopOutlined />,
+    SSD: <SaveOutlined />,
+    DISK: <HddOutlined />,
+    ARCHIVE: <CloudServerOutlined />
   };
-  const icon = bucketStorage in bucketStorageIconMap ?
-    bucketStorageIconMap[bucketStorage] :
-    <Icon type='file-unknown'/>;
+  const icon = bucketStorage in bucketStorageIconMap
+    ? bucketStorageIconMap[bucketStorage]
+    : <FileUnknownOutlined />;
   return <span>{icon} {bucketStorage}</span>;
 };
 
@@ -153,7 +186,7 @@ const COLUMNS: BucketTableColumn[] = [
     key: 'storageType',
     isVisible: true,
     filterMultiple: true,
-    filters: BucketStorageTypeList.map(state => ({text: state, value: state})),
+    filters: BucketStorageTypeList.map(state => ({ text: state, value: state })),
     onFilter: (value: BucketStorage, record: IBucket) => record.storageType === value,
     sorter: (a: IBucket, b: IBucket) => a.storageType.localeCompare(b.storageType),
     render: (storageType: BucketStorage) => renderStorageType(storageType)
@@ -164,7 +197,7 @@ const COLUMNS: BucketTableColumn[] = [
     key: 'bucketLayout',
     isVisible: true,
     filterMultiple: true,
-    filters: BucketLayoutTypeList.map(state => ({text: state, value: state})),
+    filters: BucketLayoutTypeList.map(state => ({ text: state, value: state })),
     onFilter: (value: BucketLayout, record: IBucket) => record.bucketLayout === value,
     sorter: (a: IBucket, b: IBucket) => a.bucketLayout.localeCompare(b.bucketLayout),
     render: (bucketLayout: BucketLayout) => renderBucketLayout(bucketLayout)
@@ -282,7 +315,6 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       isVisible: true,
       render: (_: any, record: IBucket) => {
         return (
-          // eslint-disable-next-line jsx-a11y/anchor-is-valid
           <a
             key='acl'
             onClick={() => {
@@ -343,7 +375,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
   }
 
   _handleVolumeChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const {volumeBucketMap} = this.state;
+    const { volumeBucketMap } = this.state;
     const selectedVolumes = (selected as IOption[]);
 
     let selectedBuckets: IBucket[] = [];
@@ -390,8 +422,12 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       showPanel: false
     }));
 
-    const { request, controller} = AxiosGetHelper('/api/v1/buckets', cancelSignal,
-        "", { limit: this.state.selectedLimit.value});
+    const { request, controller } = AxiosGetHelper(
+      '/api/v1/buckets',
+      cancelSignal,
+      '',
+      { limit: this.state.selectedLimit.value }
+    );
     cancelSignal = controller;
     request.then(response => {
       const bucketsResponse: IBucketsResponse = response.data;
@@ -449,10 +485,10 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       }, () => {
         if (!this.state.selectedVolumes || this.state.selectedVolumes.length === 0) {
           // Select all volumes if it is first page load and volume search param is not specified
-          this._handleVolumeChange([allVolumesOption, ...volumeOptions], {action: 'select-option'});
+          this._handleVolumeChange([allVolumesOption, ...volumeOptions], { action: 'select-option' });
         } else {
           // The selected volumes remain unchanged if volumes have been previously selected
-          this._handleVolumeChange(this.state.selectedVolumes, {action: 'select-option'});
+          this._handleVolumeChange(this.state.selectedVolumes, { action: 'select-option' });
         }
       });
     }).catch(error => {
@@ -460,7 +496,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
         loading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -468,7 +504,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
     // For initial page (re)load, we get the volume from the URL search param
     const initialVolume = this._getVolumeSearchParam();
     if (initialVolume) {
-      const initialVolumeOption = {label: initialVolume, value: initialVolume};
+      const initialVolumeOption = { label: initialVolume, value: initialVolume };
       this.setState({
         selectedVolumes: [initialVolumeOption]
       });
@@ -489,10 +525,10 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
   };
 
   render() {
-    const {loading, totalCount, lastUpdated, selectedColumns,
+    const { loading, totalCount, lastUpdated, selectedColumns,
       columnOptions, volumeOptions, selectedVolumes,
-      selectedBuckets, showPanel, currentRow, selectedLimit} = this.state;
-    const paginationConfig: PaginationConfig = {
+      selectedBuckets, showPanel, currentRow, selectedLimit } = this.state;
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} buckets`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -532,23 +568,23 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           </div>
           <div className='limit-block'>
             <CreatableSelect
-                className='multi-select-container'
-                isClearable={false}
-                isDisabled={loading}
-                isLoading={loading}
-                onChange={this._handleLimitChange}
-                onCreateOption={this._onCreateOption}
-                isValidNewOption={(input, value, _option) => {
-                  // Only number will be accepted
-                  return !isNaN(parseInt(input))
-                }}
-                options={LIMIT_OPTIONS}
-                hideSelectedOptions={false}
-                value={selectedLimit}
-                createOptionPosition='last'
-                formatCreateLabel={(input) => {
-                  return `new limit... ${input}`
-                }}
+              className='multi-select-container'
+              isClearable={false}
+              isDisabled={loading}
+              isLoading={loading}
+              onChange={this._handleLimitChange}
+              onCreateOption={this._onCreateOption}
+              isValidNewOption={(input, value, _option) => {
+                // Only number will be accepted
+                return !isNaN(parseInt(input))
+              }}
+              options={LIMIT_OPTIONS}
+              hideSelectedOptions={false}
+              value={selectedLimit}
+              createOptionPosition='last'
+              formatCreateLabel={(input) => {
+                return `new limit... ${input}`
+              }}
             /> Limit
           </div>
           <AutoReloadPanel
@@ -580,11 +616,11 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
             loading={loading}
             pagination={paginationConfig}
             rowKey={(bucketRecord: IBucket) => `${bucketRecord.volumeName}_${bucketRecord.bucketName}`}
-            scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
-            locale={{filterTitle: ""}}
+            scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+            locale={{ filterTitle: '' }}
           />
         </div>
-        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType='Bucket'/>
+        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType='Bucket' />
       </div>
     );
   }

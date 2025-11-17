@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,38 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,42 +69,10 @@ import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -91,13 +89,13 @@ public class TestRatisUnderReplicationHandler {
   private ReplicationManagerMetrics metrics;
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
     nodeManager = mock(NodeManager.class);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
@@ -108,6 +106,7 @@ public class TestRatisUnderReplicationHandler {
             ReplicationManagerConfiguration.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(mock(ContainerReplicaPendingOps.class));
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -117,7 +116,7 @@ public class TestRatisUnderReplicationHandler {
         replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
-          return new NodeStatus(dn.getPersistedOpState(),
+          return NodeStatus.valueOf(dn.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY);
         });
 
@@ -140,8 +139,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -167,8 +166,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         0);
@@ -339,8 +338,8 @@ public class TestRatisUnderReplicationHandler {
     replicas.add(shouldDelete);
 
     List<ContainerReplicaOp> pending = Collections.singletonList(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-        shouldDelete.getDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+        shouldDelete.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
 
     assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
@@ -390,8 +389,8 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.UNHEALTHY, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
 
     testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
         1);
@@ -505,10 +504,10 @@ public class TestRatisUnderReplicationHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingRemove = MockDatanodeDetails.randomDatanodeDetails();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, System.currentTimeMillis(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0, null, System.currentTimeMillis(), 0));
 
     handler.processAndSendCommands(replicas, pendingOps,
         getUnderReplicatedHealthResult(), 2);
@@ -605,11 +604,11 @@ public class TestRatisUnderReplicationHandler {
         DECOMMISSIONING, State.UNHEALTHY, sequenceID);
     replicas.add(unhealthyReplica);
     UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
-    Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
+    when(result.hasVulnerableUnhealthy()).thenReturn(true);
 
     final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
         result, 2, 1);
-    Assertions.assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
   }
 
   /**

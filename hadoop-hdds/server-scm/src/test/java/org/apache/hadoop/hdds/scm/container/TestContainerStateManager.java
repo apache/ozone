@@ -1,21 +1,28 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,10 +30,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,27 +38,23 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Testing ContainerStatemanager.
@@ -62,8 +62,7 @@ import static org.mockito.Mockito.when;
 public class TestContainerStateManager {
 
   private ContainerStateManager containerStateManager;
-  private PipelineManager pipelineManager;
-  private SCMHAManager scmhaManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private Pipeline pipeline;
@@ -71,13 +70,10 @@ public class TestContainerStateManager {
   @BeforeEach
   public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    scmhaManager = SCMHAManagerStub.getInstance(true);
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerStateManager.class.getSimpleName() + UUID.randomUUID());
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
-    pipelineManager = mock(PipelineManager.class);
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+    PipelineManager pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
@@ -95,19 +91,16 @@ public class TestContainerStateManager {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
 
   }
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test
@@ -153,14 +146,63 @@ public class TestContainerStateManager {
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+      throws IOException {
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(lifeCycleState)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+    assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
+        .getState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSING", "QUASI_CLOSED", "CLOSED", "RECOVERING"})
+  public void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainer(
+      HddsProtos.LifeCycleState initialState) throws IOException {
+    // Negative test for non-OPEN Ratis container -> CLOSED transitions. OPEN -> CLOSED is tested in:
+    // TestContainerManagerImpl#testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers
+
+    HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
+    builder.setContainerID(1)
+        .setState(initialState)
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setOwner("root")
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE);
+
+    HddsProtos.ContainerInfoProto container = builder.build();
+    HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
+    containerStateManager.addContainer(container);
+    try {
+      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+      fail("Was expecting an Exception, but did not catch any.");
+    } catch (IOException e) {
+      assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
+    }
+  }
+
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {
     ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(cont.containerID())
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(node)
         .build();
-    containerStateManager
-        .updateContainerReplica(cont.containerID(), replica);
+    containerStateManager.updateContainerReplica(replica);
   }
 
   private ContainerInfo allocateContainer()

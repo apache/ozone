@@ -1,22 +1,30 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.erasurecode;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.rawcoder.NativeRSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.NativeXORRawErasureCoderFactory;
@@ -27,14 +35,6 @@ import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.XORRawErasureCoderFactory;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * Test CodecRegistry.
  */
@@ -44,10 +44,8 @@ public class TestCodecRegistry {
   public void testGetCodecs() {
     Set<String> codecs = CodecRegistry.getInstance().getCodecNames();
     assertEquals(2, codecs.size());
-    assertTrue(
-        codecs.contains(ECReplicationConfig.EcCodec.RS.name().toLowerCase()));
-    assertTrue(
-        codecs.contains(ECReplicationConfig.EcCodec.XOR.name().toLowerCase()));
+    assertThat(codecs).contains(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
+    assertThat(codecs).contains(ECReplicationConfig.EcCodec.XOR.name().toLowerCase());
   }
 
   @Test
@@ -55,14 +53,14 @@ public class TestCodecRegistry {
     List<RawErasureCoderFactory> coders = CodecRegistry.getInstance().
         getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(2, coders.size());
-    assertTrue(coders.get(0) instanceof NativeRSRawErasureCoderFactory);
-    assertTrue(coders.get(1) instanceof RSRawErasureCoderFactory);
+    assertInstanceOf(NativeRSRawErasureCoderFactory.class, coders.get(0));
+    assertInstanceOf(RSRawErasureCoderFactory.class, coders.get(1));
 
     coders = CodecRegistry.getInstance().
         getCoders(ECReplicationConfig.EcCodec.XOR.name().toLowerCase());
     assertEquals(2, coders.size());
-    assertTrue(coders.get(0) instanceof NativeXORRawErasureCoderFactory);
-    assertTrue(coders.get(1) instanceof XORRawErasureCoderFactory);
+    assertInstanceOf(NativeXORRawErasureCoderFactory.class, coders.get(0));
+    assertInstanceOf(XORRawErasureCoderFactory.class, coders.get(1));
   }
 
   @Test
@@ -83,18 +81,22 @@ public class TestCodecRegistry {
   @Test
   public void testUpdateCoders() {
     class RSUserDefinedIncorrectFactory implements RawErasureCoderFactory {
+      @Override
       public RawErasureEncoder createEncoder(ECReplicationConfig coderOptions) {
         return null;
       }
 
+      @Override
       public RawErasureDecoder createDecoder(ECReplicationConfig coderOptions) {
         return null;
       }
 
+      @Override
       public String getCoderName() {
         return "rs_java";
       }
 
+      @Override
       public String getCodecName() {
         return ECReplicationConfig.EcCodec.RS.name().toLowerCase();
       }
@@ -108,8 +110,8 @@ public class TestCodecRegistry {
     List<RawErasureCoderFactory> rsCoders = CodecRegistry.getInstance().
         getCoders(ECReplicationConfig.EcCodec.RS.name().toLowerCase());
     assertEquals(2, rsCoders.size());
-    assertTrue(rsCoders.get(0) instanceof NativeRSRawErasureCoderFactory);
-    assertTrue(rsCoders.get(1) instanceof RSRawErasureCoderFactory);
+    assertInstanceOf(NativeRSRawErasureCoderFactory.class, rsCoders.get(0));
+    assertInstanceOf(RSRawErasureCoderFactory.class, rsCoders.get(1));
 
     // check RS coder names
     String[] rsCoderNames = CodecRegistry.getInstance().
@@ -139,21 +141,21 @@ public class TestCodecRegistry {
     RawErasureCoderFactory coder = CodecRegistry.getInstance().
         getCoderByName(ECReplicationConfig.EcCodec.RS.name().toLowerCase(),
             RSRawErasureCoderFactory.CODER_NAME);
-    assertTrue(coder instanceof RSRawErasureCoderFactory);
+    assertInstanceOf(RSRawErasureCoderFactory.class, coder);
 
     coder = CodecRegistry.getInstance()
         .getCoderByName(ECReplicationConfig.EcCodec.RS.name().toLowerCase(),
             NativeRSRawErasureCoderFactory.CODER_NAME);
-    assertTrue(coder instanceof NativeRSRawErasureCoderFactory);
+    assertInstanceOf(NativeRSRawErasureCoderFactory.class, coder);
 
     coder = CodecRegistry.getInstance()
         .getCoderByName(ECReplicationConfig.EcCodec.XOR.name().toLowerCase(),
             XORRawErasureCoderFactory.CODER_NAME);
-    assertTrue(coder instanceof XORRawErasureCoderFactory);
+    assertInstanceOf(XORRawErasureCoderFactory.class, coder);
 
     coder = CodecRegistry.getInstance()
         .getCoderByName(ECReplicationConfig.EcCodec.XOR.name().toLowerCase(),
             NativeXORRawErasureCoderFactory.CODER_NAME);
-    assertTrue(coder instanceof NativeXORRawErasureCoderFactory);
+    assertInstanceOf(NativeXORRawErasureCoderFactory.class, coder);
   }
 }

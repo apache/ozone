@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,23 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
-import org.apache.ratis.thirdparty.io.netty.buffer.EmptyByteBuf;
-import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
-import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
-import org.apache.ratis.util.MemoizedSupplier;
-import org.apache.ratis.util.Preconditions;
-import org.apache.ratis.util.function.CheckedFunction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -42,24 +31,58 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
-
-import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
-import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
+import org.apache.ratis.thirdparty.io.netty.buffer.EmptyByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
+import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
+import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
-public class CodecBuffer implements AutoCloseable {
-  public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
+public class CodecBuffer implements UncheckedAutoCloseable {
+  private static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
+
+  private static final ByteBufAllocator POOL = PooledByteBufAllocator.DEFAULT;
+
+  private static final IntFunction<ByteBuf> POOL_DIRECT = c -> c >= 0
+      ? POOL.directBuffer(c, c) // allocate exact size
+      : POOL.directBuffer(-c);  // allocate a resizable buffer
+
+  private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
+      ? POOL.heapBuffer(c, c)   // allocate exact size
+      : POOL.heapBuffer(-c);    // allocate a resizable buffer
+
+  private static final CodecBuffer EMPTY_BUFFER = new CodecBuffer(new EmptyByteBuf(POOL), null);
+
+  private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
+
+  private final StackTraceElement[] elements;
+
+  private final ByteBuf buf;
+
+  private final Object wrapped;
+
+  private final CompletableFuture<Void> released = new CompletableFuture<>();
 
   /** To create {@link CodecBuffer} instances. */
   private static class Factory {
     private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f) {
+
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f, String name) {
       constructor = f;
-      LOG.info("Successfully set constructor to " + f);
+      LOG.info("Successfully set constructor to {}: {}", name, f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
@@ -88,7 +111,7 @@ public class CodecBuffer implements AutoCloseable {
    * Note that there is a severe performance penalty for leak detection.
    */
   public static void enableLeakDetection() {
-    Factory.set(LeakDetector::newCodecBuffer);
+    Factory.set(LeakDetector::newCodecBuffer, "LeakDetector::newCodecBuffer");
   }
 
   /** The size of a buffer. */
@@ -123,18 +146,6 @@ public class CodecBuffer implements AutoCloseable {
     }
   }
 
-  private static final ByteBufAllocator POOL
-      = PooledByteBufAllocator.DEFAULT;
-  private static final IntFunction<ByteBuf> POOL_DIRECT = c -> c >= 0
-      ? POOL.directBuffer(c, c) // allocate exact size
-      : POOL.directBuffer(-c);  // allocate a resizable buffer
-  private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
-      ? POOL.heapBuffer(c, c)   // allocate exact size
-      : POOL.heapBuffer(-c);    // allocate a resizable buffer
-
-  private static final CodecBuffer EMPTY_BUFFER = new CodecBuffer(
-      new EmptyByteBuf(POOL), null);
-
   public static CodecBuffer getEmptyBuffer() {
     return EMPTY_BUFFER;
   }
@@ -153,10 +164,6 @@ public class CodecBuffer implements AutoCloseable {
       }
     };
 
-    static Allocator getDirect() {
-      return DIRECT;
-    }
-
     Allocator HEAP = new Allocator() {
       @Override
       public CodecBuffer apply(int capacity) {
@@ -169,6 +176,10 @@ public class CodecBuffer implements AutoCloseable {
       }
     };
 
+    static Allocator getDirect() {
+      return DIRECT;
+    }
+
     static Allocator getHeap() {
       return HEAP;
     }
@@ -176,8 +187,6 @@ public class CodecBuffer implements AutoCloseable {
     /** Does this object allocate direct buffers? */
     boolean isDirect();
   }
-
-  private final StackTraceElement[] elements;
 
   /**
    * Allocate a buffer using the given allocator.
@@ -222,8 +231,6 @@ public class CodecBuffer implements AutoCloseable {
         Unpooled.wrappedBuffer(bytes.asReadOnlyByteBuffer()), bytes);
   }
 
-  private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
-
   /** Assert the number of leak detected is zero. */
   public static void assertNoLeaks() {
     final long leak = LEAK_COUNT.get();
@@ -231,10 +238,6 @@ public class CodecBuffer implements AutoCloseable {
       throw new AssertionError("Found " + leak + " leaked objects, check logs");
     }
   }
-
-  private final ByteBuf buf;
-  private final Object wrapped;
-  private final CompletableFuture<Void> released = new CompletableFuture<>();
 
   private CodecBuffer(ByteBuf buf, Object wrapped) {
     this.buf = buf;
@@ -340,6 +343,12 @@ public class CodecBuffer implements AutoCloseable {
     return buf.readableBytes();
   }
 
+  /** @return a writable {@link ByteBuffer}. */
+  public ByteBuffer asWritableByteBuffer() {
+    assertRefCnt(1);
+    return buf.nioBuffer(0, buf.maxCapacity());
+  }
+
   /** @return a readonly {@link ByteBuffer} view of this buffer. */
   public ByteBuffer asReadOnlyByteBuffer() {
     assertRefCnt(1);
@@ -421,17 +430,6 @@ public class CodecBuffer implements AutoCloseable {
   }
 
   /**
-   * Similar to {@link ByteBuffer#put(byte[])}.
-   *
-   * @return this object.
-   */
-  public CodecBuffer put(byte[] array) {
-    assertRefCnt(1);
-    buf.writeBytes(array);
-    return this;
-  }
-
-  /**
    * Similar to {@link ByteBuffer#put(ByteBuffer)}.
    *
    * @return this object.
@@ -464,16 +462,16 @@ public class CodecBuffer implements AutoCloseable {
    * @param source put bytes to an {@link OutputStream} and return the size.
    *               The returned size must be non-null and non-negative.
    * @return this object.
-   * @throws IOException in case the source throws an {@link IOException}.
+   * @throws CodecException in case the source throws an {@link IOException}.
    */
-  public CodecBuffer put(
-      CheckedFunction<OutputStream, Integer, IOException> source)
-      throws IOException {
+  public CodecBuffer put(CheckedFunction<OutputStream, Integer, IOException> source) throws CodecException {
     assertRefCnt(1);
     final int w = buf.writerIndex();
     final int size;
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
       size = source.apply(out);
+    } catch (IOException e) {
+      throw new CodecException("Failed to apply source to " + this + ", " + source, e);
     }
     final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
     Preconditions.assertSame(buf, returned, "buf");

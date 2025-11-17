@@ -1,26 +1,45 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container;
 
-import org.apache.hadoop.conf.StorageUnit;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -34,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -52,56 +72,26 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
 
 /**
  * Tests the EC recovery and over replication processing.
  */
 public class TestECContainerRecovery {
+  private static final int CHUNK_SIZE = 1024 * 1024;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
   private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
   private static String volumeName;
-  private static String bucketName;
   private static int dataBlocks = 3;
-  private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
+  private static byte[][] inputChunks = new byte[dataBlocks][CHUNK_SIZE];
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(TestECContainerRecovery.class);
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024 * 1024;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
-
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -138,24 +128,28 @@ public class TestECContainerRecovery {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
         TimeUnit.SECONDS);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
-        .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
-        .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES).build();
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(10)
+        .build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = UUID.randomUUID().toString();
-    bucketName = volumeName;
+    String bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
     initInputChunks();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -171,7 +165,7 @@ public class TestECContainerRecovery {
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                chunkSize)));
+                CHUNK_SIZE)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     return volume.getBucket(myBucket);
@@ -179,7 +173,7 @@ public class TestECContainerRecovery {
 
   private static void initInputChunks() {
     for (int i = 0; i < dataBlocks; i++) {
-      inputChunks[i] = getBytesWith(i + 1, chunkSize);
+      inputChunks[i] = getBytesWith(i + 1, CHUNK_SIZE);
     }
   }
 
@@ -200,7 +194,7 @@ public class TestECContainerRecovery {
     final Pipeline pipeline;
     ECReplicationConfig repConfig =
         new ECReplicationConfig(3, 2,
-            ECReplicationConfig.EcCodec.RS, chunkSize);
+            ECReplicationConfig.EcCodec.RS, CHUNK_SIZE);
     try (OzoneOutputStream out = bucket
         .createKey(keyName, 1024, repConfig, new HashMap<>())) {
       out.write(inputData);
@@ -268,7 +262,7 @@ public class TestECContainerRecovery {
     final Pipeline pipeline;
     ECReplicationConfig repConfig =
             new ECReplicationConfig(3, 2,
-                    ECReplicationConfig.EcCodec.RS, chunkSize);
+                    ECReplicationConfig.EcCodec.RS, CHUNK_SIZE);
     try (OzoneOutputStream out = bucket
             .createKey(keyName, 1024, repConfig, new HashMap<>())) {
       out.write(inputData);
@@ -308,7 +302,7 @@ public class TestECContainerRecovery {
               .mockFieldReflection(handler,
                       "coordinator");
 
-      Mockito.doAnswer(invocation -> {
+      doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
             dn.getDatanodeStateMachine()
                 .getContainer()
@@ -320,8 +314,8 @@ public class TestECContainerRecovery {
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;
-      }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.any());
+      }).when(coordinator).reconstructECBlockGroup(any(), any(),
+              any(), any());
     }
 
     // Shutting down DN triggers close pipeline and close container.
@@ -364,7 +358,7 @@ public class TestECContainerRecovery {
             .filter(r -> !ReplicationManager
                 .compareState(container.getState(), r.getState()))
             .collect(Collectors.toList());
-        return unhealthyReplicas.size() == 0;
+        return unhealthyReplicas.isEmpty();
       } catch (ContainerNotFoundException e) {
         return false;
       }
@@ -402,10 +396,10 @@ public class TestECContainerRecovery {
   }
 
   private byte[] getInputBytes(int numChunks) {
-    byte[] inputData = new byte[numChunks * chunkSize];
+    byte[] inputData = new byte[numChunks * CHUNK_SIZE];
     for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
-      Arrays.fill(inputData, start, start + chunkSize - 1,
+      int start = (i * CHUNK_SIZE);
+      Arrays.fill(inputData, start, start + CHUNK_SIZE - 1,
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;

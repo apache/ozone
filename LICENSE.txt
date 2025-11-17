@@ -213,8 +213,6 @@ Apache License 2.0
 hadoop-hdds/framework/src/main/resources/webapps/static/nvd3-1.8.5.min.js.map
 hadoop-hdds/framework/src/main/resources/webapps/static/nvd3-1.8.5.min.css.map
 hadoop-hdds/framework/src/main/resources/webapps/static/nvd3-1.8.5.min.js
-hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/AbstractFuture.java
-hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/common/volume/TimeoutFuture.java
 
 
 BSD 3-Clause

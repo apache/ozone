@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
@@ -22,23 +20,26 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Tests S3 Initiate Multipart Upload request.
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 public class TestS3InitiateMultipartUploadRequestWithFSO
     extends TestS3InitiateMultipartUploadRequest {
 
+  @Override
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -62,11 +64,19 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadReqFSO =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -98,10 +108,15 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     assertTrue(
         omKeyInfo.getLatestVersionLocations().isMultipartKey(),
         "isMultipartKey is false!");
-    assertEquals(fileName, omKeyInfo.getKeyName(),
-        "FileName mismatches!");
+    assertEquals(fileName, omKeyInfo.getFileName(), "FileName mismatches!");
     assertEquals(parentID, omKeyInfo.getParentObjectID(),
         "ParentId mismatches!");
+    assertNotNull(omKeyInfo.getMetadata());
+    assertEquals("custom-value1", omKeyInfo.getMetadata().get("custom-key1"));
+    assertEquals("custom-value2", omKeyInfo.getMetadata().get("custom-key2"));
+    assertNotNull(omKeyInfo.getTags());
+    assertEquals("tag-value1", omKeyInfo.getTags().get("tag-key1"));
+    assertEquals("tag-value2", omKeyInfo.getTags().get("tag-key2"));
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);
@@ -131,14 +146,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
-      OmDirectoryInfo omDirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
+      OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       assertNotNull(omDirInfo, "Invalid directory!");
       assertEquals(dirName, omDirInfo.getName(),
           "Invalid directory!");
@@ -151,11 +163,14 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+      OMRequest initiateMPURequest) throws IOException {
+    S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getLoginUser());
+    return request;
   }
 
+  @Override
   @Test
   public void testMultipartUploadInheritParentDefaultAcls()
       throws Exception {
@@ -241,7 +256,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
       System.out.println("  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
-      assertEquals(expectedInheritAcls, omDirAcls,
+      assertTrue(omDirAcls.containsAll(expectedInheritAcls),
           "Failed to inherit parent DEFAULT acls!");
 
       parentID = omDirInfo.getObjectID();
@@ -256,7 +271,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         List<OzoneAcl> fileAcls = fileInfo.getAcls();
         System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
         assertEquals(expectedInheritAcls.stream()
-                .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
                 .collect(Collectors.toList()), fileAcls,
             "Failed to inherit parent DEFAULT acls!");
       }

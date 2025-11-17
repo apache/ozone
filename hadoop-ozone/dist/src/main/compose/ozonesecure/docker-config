@@ -27,7 +27,7 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed
@@ -38,6 +38,7 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
@@ -84,13 +85,11 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
-OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
+# Ratis streaming is disabled to ensure coverage for both cases
+OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=false
 
-HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
-HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
-
+OZONE-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
@@ -114,7 +113,7 @@ OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.key
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
-OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=HTTP/recon@EXAMPLE.COM
+OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=*
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
 
 CORE-SITE.XML_hadoop.http.authentication.simple.anonymous.allowed=false
@@ -130,6 +129,7 @@ HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
+HADOOP-POLICY.XML_ozone.security.reconfigure.protocol.acl=*
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
@@ -148,7 +148,6 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 
 OZONE_CONF_DIR=/etc/hadoop

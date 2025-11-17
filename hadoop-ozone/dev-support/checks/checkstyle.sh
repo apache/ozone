@@ -24,7 +24,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx -Dcheckstyle.failOnViolation=false --no-transfer-progress'
+MAVEN_OPTIONS='-B -fae -DskipRecon -Dcheckstyle.failOnViolation=false --no-transfer-progress'
 
 declare -i rc
 mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
@@ -42,7 +42,7 @@ cat "${REPORT_DIR}/output.log"
 find "." -name checkstyle-errors.xml -print0 \
   | xargs -0 sed '$!N; /<file.*\n<\/file/d;P;D' \
   | sed \
-      -e '/<\?xml.*>/d' \
+      -e '/<?xml.*>/d' \
       -e '/<checkstyle.*/d' \
       -e '/<\/.*/d' \
       -e 's/<file name="\([^"]*\)".*/\1/' \
@@ -53,15 +53,8 @@ find "." -name checkstyle-errors.xml -print0 \
       -e "s/&gt;/>/g" \
   | tee "$REPORT_FILE"
 
-# check if Maven failed due to some error other than checkstyle violation
-if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
-  grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-fi
-
 ## generate counter
 grep -c ':' "$REPORT_FILE" > "$REPORT_DIR/failures"
 
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
-exit ${rc}
+ERROR_PATTERN="\[ERROR\]"
+source "${DIR}/_post_process.sh"

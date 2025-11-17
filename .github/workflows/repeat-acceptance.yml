@@ -51,11 +51,11 @@ env:
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
 jobs:
   prepare-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Verify Test Filter
@@ -76,13 +76,15 @@ jobs:
   build:
     needs:
       - prepare-job
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for npm dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pnpm-store
@@ -91,52 +93,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.m2/repository
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ env.JAVA_VERSION }}
           restore-keys: |
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Setup java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true
         env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Store binaries for tests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ozone-bin
           path: |
             hadoop-ozone/dist/target/ozone-*.tar.gz
             !hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
   acceptance:
     needs:
       - prepare-job
       - build
     name: Run-Split
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         split: ${{ fromJson(needs.prepare-job.outputs.matrix) }}
       fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ozone-bin
       - name: Untar binaries
@@ -147,19 +145,15 @@ jobs:
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          pushd hadoop-ozone/dist/target/ozone-*
-          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          popd
           ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
-          OZONE_VOLUME_OWNER: 1000
         continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: acceptance-${{ matrix.split }}

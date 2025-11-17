@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,16 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static java.lang.Thread.sleep;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -38,19 +43,9 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import static java.lang.Thread.sleep;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.apache.ozone.test.MetricsAsserts.assertGauge;
-import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
-import static org.apache.ozone.test.MetricsAsserts.getMetrics;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test cases to verify the metrics exposed by SCMNodeManager.
@@ -98,16 +93,8 @@ public class TestSCMNodeMetrics {
   @Test
   public void testHBProcessing() throws InterruptedException {
     long hbProcessed = getCounter("NumHBProcessed");
-
     createNodeReport();
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
-
+    nodeManager.processHeartbeat(registeredDatanode);
     assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
         "NumHBProcessed");
   }
@@ -117,17 +104,8 @@ public class TestSCMNodeMetrics {
    */
   @Test
   public void testHBProcessingFailure() {
-
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(MockDatanodeDetails
-        .randomDatanodeDetails(), layoutInfo);
-
+    nodeManager.processHeartbeat(MockDatanodeDetails.randomDatanodeDetails());
     assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
         "NumHBProcessingFailed");
   }
@@ -143,7 +121,7 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
+        HddsTestUtils.createStorageReport(registeredDatanode.getID(), "/tmp",
             100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -164,7 +142,7 @@ public class TestSCMNodeMetrics {
         MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        randomDatanode.getID(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -182,7 +160,7 @@ public class TestSCMNodeMetrics {
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        registeredDatanode.getID(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -252,13 +230,7 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalUsed", 10L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    nodeManager.processHeartbeat(registeredDatanode);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
     assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);

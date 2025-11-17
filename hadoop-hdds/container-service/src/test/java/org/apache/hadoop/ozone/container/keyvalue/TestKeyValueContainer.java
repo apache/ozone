@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,72 +17,11 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.CodecBuffer;
-import org.apache.hadoop.hdds.utils.db.DBProfile;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.util.DiskChecker;
-
-import org.assertj.core.api.Fail;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.LiveFileMetaData;
-
-import java.io.File;
-
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
@@ -98,11 +36,70 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
+import org.apache.hadoop.util.DiskChecker;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.LiveFileMetaData;
 
 /**
  * Class to test KeyValue Container operations.
@@ -110,7 +107,7 @@ import static org.mockito.Mockito.when;
 public class TestKeyValueContainer {
 
   @TempDir
-  private Path folder;
+  private File folder;
 
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -139,6 +136,7 @@ public class TestKeyValueContainer {
     CodecBuffer.enableLeakDetection();
 
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFile(true);
     dc.setAutoCompactionSmallSstFileNum(100);
     dc.setRocksdbDeleteObsoleteFilesPeriod(5000);
     CONF.setFromObject(dc);
@@ -229,7 +227,7 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir"))
+        Files.createDirectory(folder.toPath().resolve("volumeDir"))
             .toFile().getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -276,10 +274,10 @@ public class TestKeyValueContainer {
 
     //destination path
     File exportTar = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
-    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
       keyValueContainer.exportContainerData(fos, packer);
     }
 
@@ -288,12 +286,59 @@ public class TestKeyValueContainer {
     keyValueContainer.delete();
 
     // import container.
-    try (FileInputStream fis = new FileInputStream(exportTar)) {
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
       keyValueContainer.importContainerData(fis, packer);
     }
 
     // Make sure empty chunks dir was unpacked.
     checkContainerFilesPresent(data, 0);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testEmptyMerkleTreeImportExport(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+    closeContainer();
+
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+    // Create an empty checksum file that exists but has no valid merkle tree
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
+    ContainerProtos.ContainerChecksumInfo emptyContainerInfo = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      emptyContainerInfo.writeTo(tmpOutputStream);
+    }
+
+    // Check state of original container.
+    checkContainerFilesPresent(data, 0);
+
+    //destination path
+    File exportTar = Files.createFile(
+        folder.toPath().resolve("export.tar")).toFile();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+    //export the container
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    // import container.
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+    data = keyValueContainer.getContainerData();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerChecksumTreeManager.readChecksumInfo(data);
+    assertFalse(checksumInfo.hasContainerMerkleTree());
+    // The import should not fail and the checksum should be 0
+    assertEquals(0, data.getDataChecksum());
+    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    verifyAllDataChecksumsMatch(data, CONF);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -309,10 +354,10 @@ public class TestKeyValueContainer {
     keyValueContainer.update(data.getMetadata(), true);
 
     //destination path
-    File exportTar = Files.createFile(folder.resolve("export.tar")).toFile();
+    File exportTar = Files.createFile(folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
-    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
       keyValueContainer.exportContainerData(fos, packer);
     }
 
@@ -321,7 +366,7 @@ public class TestKeyValueContainer {
     keyValueContainer.delete();
 
     // import container.
-    try (FileInputStream fis = new FileInputStream(exportTar)) {
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
       keyValueContainer.importContainerData(fis, packer);
     }
 
@@ -345,14 +390,26 @@ public class TestKeyValueContainer {
     closeContainer();
     populate(numberOfKeysToWrite);
 
+    // Create merkle tree and set data checksum to simulate actual key value container.
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(
+        keyValueContainer.getContainerData());
+    ContainerProtos.ContainerMerkleTree containerMerkleTreeWriterProto = buildTestTree(CONF).toProto();
+    keyValueContainerData.setDataChecksum(containerMerkleTreeWriterProto.getDataChecksum());
+    ContainerProtos.ContainerChecksumInfo containerInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerId)
+        .setContainerMerkleTree(containerMerkleTreeWriterProto).build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      containerInfo.writeTo(tmpOutputStream);
+    }
+
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -375,7 +432,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -392,17 +449,21 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertEquals(keyValueContainerData.getDataChecksum(), containerData.getDataChecksum());
+      verifyAllDataChecksumsMatch(containerData, CONF);
+
+      assertNotNull(containerData.getContainerFileChecksum());
+      assertNotEquals(containerData.ZERO_CHECKSUM, container.getContainerData().getContainerFileChecksum());
 
       //Can't overwrite existing container
-      try {
-        try (FileInputStream fis = new FileInputStream(folderToExport)) {
-          container.importContainerData(fis, packer);
+      KeyValueContainer finalContainer = container;
+      assertThrows(IOException.class, () -> {
+        try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
+          finalContainer.importContainerData(fis, packer);
         }
-        fail("Container is imported twice. Previous files are overwritten");
-      } catch (IOException ex) {
-        //all good
-        assertTrue(container.getContainerFile().exists());
-      }
+      }, "Container is imported twice. Previous files are overwritten");
+      //all good
+      assertTrue(container.getContainerFile().exists());
 
       //Import failure should cleanup the container directory
       containerData =
@@ -416,18 +477,18 @@ public class TestKeyValueContainer {
       containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
       container.populatePathFields(scmId, containerVolume);
-      try {
-        FileInputStream fis = new FileInputStream(folderToExport);
-        fis.close();
-        container.importContainerData(fis, packer);
-        fail("Container import should fail");
-      } catch (Exception ex) {
-        assertInstanceOf(IOException.class, ex);
-      } finally {
-        File directory =
-            new File(container.getContainerData().getContainerPath());
-        assertFalse(directory.exists());
-      }
+      KeyValueContainer finalContainer1 = container;
+      assertThrows(IOException.class, () -> {
+        try {
+          InputStream fis = Files.newInputStream(folderToExport.toPath());
+          fis.close();
+          finalContainer1.importContainerData(fis, packer);
+        } finally {
+          File directory =
+              new File(finalContainer1.getContainerData().getContainerPath());
+          assertFalse(directory.exists());
+        }
+      });
     }
   }
 
@@ -500,7 +561,6 @@ public class TestKeyValueContainer {
     container.update(metadata, true);
   }
 
-
   /**
    * Set container state to CLOSED.
    */
@@ -524,7 +584,7 @@ public class TestKeyValueContainer {
         .mapToObj(i -> new Thread(() -> {
           try {
             File file = Files.createFile(
-                folder.resolve("concurrent" + i + ".tar")).toFile();
+                folder.toPath().resolve("concurrent" + i + ".tar")).toFile();
             try (OutputStream out = Files.newOutputStream(file.toPath())) {
               keyValueContainer.exportContainerData(out, packer);
             }
@@ -634,7 +694,6 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
-
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -675,10 +734,8 @@ public class TestKeyValueContainer {
     });
 
     assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
-    assertThat(exception)
-        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
+    assertThat(exception).hasMessageContaining(keyValueContainerData.toString());
   }
-
 
   @ContainerTestVersionInfo.ContainerTest
   public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)
@@ -691,7 +748,7 @@ public class TestKeyValueContainer {
 
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
-      long defaultCacheSize = 64 * OzoneConsts.MB;
+      long defaultCacheSize = OzoneConsts.GB;
       long cacheSize = Long.parseLong(store
           .getProperty("rocksdb.block-cache-capacity"));
       assertEquals(defaultCacheSize, cacheSize);
@@ -814,13 +871,13 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testAutoCompactionSmallSstFile(
+  void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir")).toFile()
+        Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
             .getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -859,10 +916,10 @@ public class TestKeyValueContainer {
         if (volume == newVolume) {
           File folderToExport =
               Files.createFile(
-                  folder.resolve(containerId + "_exported.tar.gz")).toFile();
+                  folder.toPath().resolve(containerId + "_exported.tar.gz")).toFile();
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
-          try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+          try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
             container.exportContainerData(fos, packer);
           }
           exportFiles.add(folderToExport);
@@ -885,11 +942,12 @@ public class TestKeyValueContainer {
         containerData.setSchemaVersion(schemaVersion);
         container = new KeyValueContainer(containerData, CONF);
         container.populatePathFields(scmId, hddsVolume);
-        try (FileInputStream fis =
-                 new FileInputStream(exportFiles.get(index))) {
+        try (InputStream fis =
+                 Files.newInputStream(exportFiles.get(index).toPath())) {
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           container.importContainerData(fis, packer);
           containerList.add(container);
+          assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, container.getContainerData().getState());
         }
       }
 
@@ -899,14 +957,16 @@ public class TestKeyValueContainer {
               CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      hddsVolume.check(true);
+      // When using Table.loadFromFile() in loadKVContainerData(),
+      // there were as many SST files generated as the number of imported containers
+      // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
+      assertEquals(0, fileMetaDataList1.size());
+      hddsVolume.compactDb();
       // Sleep a while to wait for compaction to complete
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      assertThat(fileMetaDataList2.size()).isLessThan(fileMetaDataList1.size());
-    } catch (Exception e) {
-      Fail.fail("TestAutoCompactionSmallSstFile failed");
+      assertThat(fileMetaDataList2).hasSizeLessThanOrEqualTo(fileMetaDataList1.size());
     } finally {
       // clean up
       for (KeyValueContainer c : containerList) {
@@ -929,12 +989,12 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -957,7 +1017,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -978,12 +1038,12 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -1005,7 +1065,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -1022,14 +1082,8 @@ public class TestKeyValueContainer {
   public void testImportV2ReplicaToV3HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, false);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = folder.getPath();
+    testMixedSchemaImport(testDir, false);
   }
 
   /**
@@ -1039,14 +1093,8 @@ public class TestKeyValueContainer {
   public void testImportV3ReplicaToV2HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, true);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = folder.getPath();
+    testMixedSchemaImport(testDir, true);
   }
 
   private void testMixedSchemaImport(String dir,
@@ -1093,7 +1141,7 @@ public class TestKeyValueContainer {
     if (!file1.createNewFile()) {
       fail("Failed to create file " + file1.getAbsolutePath());
     }
-    try (FileOutputStream fos = new FileOutputStream(file1)) {
+    try (OutputStream fos = Files.newOutputStream(file1.toPath())) {
       container.exportContainerData(fos, packer);
     }
 
@@ -1109,7 +1157,7 @@ public class TestKeyValueContainer {
     // import container to new HddsVolume
     KeyValueContainer importedContainer = new KeyValueContainer(data, conf);
     importedContainer.populatePathFields(scmId, hddsVolume2);
-    try (FileInputStream fio = new FileInputStream(file1)) {
+    try (InputStream fio = Files.newInputStream(file1.toPath())) {
       importedContainer.importContainerData(fio, packer);
     }
 
@@ -1117,5 +1165,20 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreationCommitSpaceReserve(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainerData = spy(keyValueContainerData);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+    keyValueContainer = spy(keyValueContainer);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // verify that
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
+    assertTrue(keyValueContainerData.isCommittedSpace());
   }
 }

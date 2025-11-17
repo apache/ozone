@@ -31,7 +31,7 @@ approach which is expensive. The Apache Ozone supports `RATIS/THREE` replication
 The Ozone default replication scheme `RATIS/THREE` has 200% overhead in storage
 space and other resources (e.g., network bandwidth).
 However, for warm and cold datasets with relatively low I/O activities, additional
-block replicas rarely accessed during normal operations, but still consume the same
+block replicas are rarely accessed during normal operations, but still consume the same
 amount of resources as the first replica.
 
 Therefore, a natural improvement is to use Erasure Coding (EC) in place of replication,
@@ -174,7 +174,9 @@ the configuration keys `ozone.server.default.replication.type` and `ozone.server
    <name>ozone.server.default.replication.type</name>
    <value>EC</value>
 </property>
+```
 
+```XML
 <property>
    <name>ozone.server.default.replication</name>
    <value>RS-6-3-1024k</value>
@@ -198,7 +200,7 @@ We can also reset the EC Replication Config with the following command.
 ozone sh bucket set-replication-config <bucket path> --type EC --replication rs-3-2-1024k
 ```
 
-Once we reset, only newly created keys take effect of this new setting. Prior created keys in the bucket stay with same older setting.
+Once we reset, only newly created keys will take effect of this new setting. Prior created keys in the bucket stay with same older setting.
 
 #### Setting EC Replication Config While Creating Keys/Files
 
@@ -206,6 +208,22 @@ We can pass the EC Replication Config while creating the keys irrespective of bu
 
 ```shell
 ozone sh key put <Ozone Key Object Path> <Local File> --type EC --replication rs-6-3-1024k
+```
+
+When using ofs/o3fs, we can pass the EC Replication Config by setting the configuration keys `ozone.replication.type` and `ozone.replication`.
+
+```XML
+<property>
+   <name>ozone.replication.type</name>
+   <value>EC</value>
+</property>
+```
+
+```XML
+<property>
+   <name>ozone.replication</name>
+   <value>rs-3-2-1024k</value>
+</property>
 ```
 
 In the case bucket already has default EC Replication Config, there is no need of passing EC Replication Config while creating key.
@@ -220,7 +238,7 @@ storage applications. Enabling ISA-L allows significantly improve EC performance
 To enable ISA-L you will also require Hadoop native libraries (libhadoop.so). 
 
 #### Installation
-Both libraries should be placed to the directory specified by the java.library.path property or set by  `LD_LIBRARY_PATH` environment variable.
+Both libraries should be placed in the directory specified by the java.library.path property or set by  `LD_LIBRARY_PATH` environment variable.
 The default value of java.library.path depends on the OS and Java version. For example, on Linux with OpenJDK 8 it is `/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib`.
 
 #### Verification
@@ -228,7 +246,7 @@ The default value of java.library.path depends on the OS and Java version. For e
 You can check if ISA-L is accessible to Ozone by running the following command:
 
 ```shell
-ozone checknative
+ozone debug checknative
 ```
 
 

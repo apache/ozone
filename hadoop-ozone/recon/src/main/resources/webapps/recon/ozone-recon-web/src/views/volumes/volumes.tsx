@@ -17,23 +17,26 @@
  */
 
 import React from 'react';
-import {Table} from 'antd';
-import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import './volumes.less';
-import {AutoReloadHelper} from 'utils/autoReloadHelper';
-import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
-import {ActionMeta, ValueType} from 'react-select';
-import {byteToSize, showDataFetchError} from 'utils/common';
-import {ColumnSearch} from 'utils/columnSearch';
-import {IAcl, IBucket, IVolume} from 'types/om.types';
-import {AclPanel} from '../../components/aclDrawer/aclDrawer';
-import {ColumnProps} from 'antd/es/table';
-import QuotaBar from '../../components/quotaBar/quotaBar';
-import {Link} from 'react-router-dom';
+import { Table } from 'antd';
+import { ColumnProps } from 'antd/es/table';
+import { TablePaginationConfig } from 'antd/es/table';
+import { Link } from 'react-router-dom';
+import { ActionMeta, ValueType } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
-import {AxiosGetHelper} from "../../utils/axiosRequestHelper";
+
+import { IAcl, IBucket, IVolume } from '@/types/om.types';
+import QuotaBar from '@/components/quotaBar/quotaBar';
+import { AclPanel } from '@/components/aclDrawer/aclDrawer';
+import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import { byteToSize, showDataFetchError } from '@/utils/common';
+import { ColumnSearch } from '@/utils/columnSearch';
+import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
+
+import './volumes.less';
+
 
 interface IVolumeResponse {
   volume: string;
@@ -110,7 +113,7 @@ const COLUMNS: VolumnTableColumn[] = [
     isVisible: true,
     sorter: (a: IVolume, b: IVolume) => a.modificationTime - b.modificationTime,
     render: (modificationTime: number) => {
-      return modificationTime  > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
+      return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -145,7 +148,7 @@ const COLUMNS: VolumnTableColumn[] = [
 
       return (
         <Link key="listBuckets" to={`/Buckets?${searchParams.toString()}`}>
-            Show buckets
+          Show buckets
         </Link>
       );
     }
@@ -163,10 +166,10 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
 }));
 
 const LIMIT_OPTIONS: IOption[] = [
-  {label: "1000", value: "1000"},
-  {label: "5000", value: "5000"},
-  {label: "10000", value: "10000"},
-  {label: "20000", value: "20000"}
+  { label: "1000", value: "1000" },
+  { label: "5000", value: "5000" },
+  { label: "10000", value: "10000" },
+  { label: "20000", value: "20000" }
 ]
 
 const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
@@ -202,7 +205,6 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       isVisible: true,
       render: (_: any, record: IVolume) => {
         return (
-          // eslint-disable-next-line jsx-a11y/anchor-is-valid
           <a
             key='acl'
             onClick={() => this._handleAclLinkClick(record)}
@@ -282,7 +284,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       showPanel: false
     }));
     const { request, controller } = AxiosGetHelper('/api/v1/volumes', cancelSignal,
-        "", { limit: this.state.selectedLimit.value});
+      "", { limit: this.state.selectedLimit.value });
     cancelSignal = controller;
     request.then(response => {
       const volumesResponse: IVolumesResponse = response.data;
@@ -314,7 +316,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
         loading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -334,9 +336,9 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   };
 
   render() {
-    const {dataSource, loading, totalCount, lastUpdated, selectedColumns,
-      columnOptions, showPanel, currentRow, selectedLimit} = this.state;
-    const paginationConfig: PaginationConfig = {
+    const { dataSource, loading, totalCount, lastUpdated, selectedColumns,
+      columnOptions, showPanel, currentRow, selectedLimit } = this.state;
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} volumes`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -356,29 +358,29 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
               hideSelectedOptions={false}
               value={selectedColumns}
               allOption={allColumnsOption}
-              isOptionDisabled={(option) => option.value === "volume"}
+              isOptionDisabled={(option) => option.value === 'volume'}
               onChange={this._handleColumnChange}
             /> Columns
           </div>
           <div className='limit-block'>
             <CreatableSelect
-                className='multi-select-container'
-                isClearable={false}
-                isDisabled={loading}
-                isLoading={loading}
-                onChange={this._handleLimitChange}
-                onCreateOption={this._onCreateOption}
-                isValidNewOption={(input, value, _option) => {
-                  // Only number will be accepted
-                  return !isNaN(parseInt(input))
-                }}
-                options={LIMIT_OPTIONS}
-                hideSelectedOptions={false}
-                value={selectedLimit}
-                createOptionPosition='last'
-                formatCreateLabel={(input) => {
-                  return `new limit... ${input}`
-                }}
+              className='multi-select-container'
+              isClearable={false}
+              isDisabled={loading}
+              isLoading={loading}
+              onChange={this._handleLimitChange}
+              onCreateOption={this._onCreateOption}
+              isValidNewOption={(input, _value, _option) => {
+                // Only number will be accepted
+                return !isNaN(parseInt(input))
+              }}
+              options={LIMIT_OPTIONS}
+              hideSelectedOptions={false}
+              value={selectedLimit}
+              createOptionPosition='last'
+              formatCreateLabel={(input) => {
+                return `new limit... ${input}`
+              }}
             /> Limit
           </div>
           <AutoReloadPanel
@@ -410,11 +412,11 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
             loading={loading}
             pagination={paginationConfig}
             rowKey='volume'
-            scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
-            locale={{filterTitle: ""}}
+            scroll={{ x: true, scrollToFirstRowOnChange: true }}
+            locale={{ filterTitle: '' }}
           />
         </div>
-        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume'/>
+        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume' />
       </div>
     );
   }

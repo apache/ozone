@@ -1,57 +1,47 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
@@ -65,6 +55,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class ECKeyOutputStream extends KeyOutputStream
     implements KeyMetadataAware {
+
+  private static final Logger LOG = LoggerFactory.getLogger(KeyOutputStream.class);
+
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private final BlockingQueue<ECChunkBuffers> ecStripeQueue;
@@ -74,7 +67,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final int numParityBlks;
   private final ByteBufferPool bufferPool;
   private final RawErasureEncoder encoder;
-  private final ExecutorService flushExecutor;
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
@@ -86,36 +78,12 @@ public final class ECKeyOutputStream extends KeyOutputStream
    */
   private boolean atomicKeyCreation;
 
-  private enum StripeWriteStatus {
-    SUCCESS,
-    FAILED
-  }
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyOutputStream.class);
-
   private volatile boolean closed;
   private volatile boolean closing;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
   private long writeOffset;
-  private final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool;
-
-  @VisibleForTesting
-  public List<BlockOutputStreamEntry> getStreamEntries() {
-    return blockOutputStreamEntryPool.getStreamEntries();
-  }
-
-  @VisibleForTesting
-  public XceiverClientFactory getXceiverClientFactory() {
-    return blockOutputStreamEntryPool.getXceiverClientFactory();
-  }
-
-  @VisibleForTesting
-  public List<OmKeyLocationInfo> getLocationInfoList() {
-    return blockOutputStreamEntryPool.getLocationInfoList();
-  }
 
   @VisibleForTesting
   public void insertFlushCheckpoint(long version) throws IOException {
@@ -128,8 +96,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private ECKeyOutputStream(Builder builder) {
-    super(builder.getReplicationConfig(), builder.getClientMetrics(),
-        builder.getClientConfig(), builder.getStreamBufferArgs());
+    super(builder.getReplicationConfig(), new ECBlockOutputStreamEntryPool(builder));
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
@@ -140,46 +107,24 @@ public final class ECKeyOutputStream extends KeyOutputStream
         ecChunkSize, numDataBlks, numParityBlks, bufferPool);
     chunkIndex = 0;
     ecStripeQueue = new ArrayBlockingQueue<>(config.getEcStripeQueueSize());
-    OmKeyInfo info = builder.getOpenHandler().getKeyInfo();
-    blockOutputStreamEntryPool =
-        new ECBlockOutputStreamEntryPool(config,
-            builder.getOmClient(), builder.getRequestID(),
-            builder.getReplicationConfig(),
-            builder.getMultipartUploadID(), builder.getMultipartNumber(),
-            builder.isMultipartKey(),
-            info, builder.isUnsafeByteBufferConversionEnabled(),
-            builder.getXceiverManager(), builder.getOpenHandler().getId(),
-            builder.getClientMetrics(), builder.getStreamBufferArgs());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(
         builder.getReplicationConfig());
-    this.flushExecutor = Executors.newSingleThreadExecutor();
     S3Auth s3Auth = builder.getS3CredentialsProvider().get();
     ThreadLocal<S3Auth> s3CredentialsProvider =
         builder.getS3CredentialsProvider();
-    flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
-    this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
+    this.flushFuture = builder.getExecutorServiceSupplier().get().submit(() -> {
+      s3CredentialsProvider.set(s3Auth);
+      return flushStripeFromQueue();
+    });
     this.flushCheckpoint = new AtomicLong(0);
     this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
-  /**
-   * When a key is opened, it is possible that there are some blocks already
-   * allocated to it for this open session. In this case, to make use of these
-   * blocks, we need to add these blocks to stream entries. But, a key's version
-   * also includes blocks from previous versions, we need to avoid adding these
-   * old blocks to stream entries, because these old blocks should not be picked
-   * for write. To do this, the following method checks that, only those
-   * blocks created in this particular open version are added to stream entries.
-   *
-   * @param version     the set of blocks that are pre-allocated.
-   * @param openVersion the version corresponding to the pre-allocation.
-   * @throws IOException
-   */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
-      long openVersion) throws IOException {
-    blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
+  @Override
+  protected ECBlockOutputStreamEntryPool getBlockOutputStreamEntryPool() {
+    return (ECBlockOutputStreamEntryPool) super.getBlockOutputStreamEntryPool();
   }
 
   /**
@@ -218,6 +163,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     final ByteBuffer[] dataBuffers = stripe.getDataBuffers();
     offset -= Arrays.stream(dataBuffers).mapToInt(Buffer::limit).sum();
 
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
     final ECBlockOutputStreamEntry failedStreamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
     failedStreamEntry.resetToFirstEntry();
@@ -256,8 +202,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private StripeWriteStatus commitStripeWrite(ECChunkBuffers stripe)
       throws IOException {
 
-    ECBlockOutputStreamEntry streamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
+    final ECBlockOutputStreamEntry streamEntry = getBlockOutputStreamEntryPool().getCurrentStreamEntry();
     List<ECBlockOutputStream> failedStreams =
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
@@ -297,6 +242,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
       List<ECBlockOutputStream> failedStreams) {
 
     // Exclude the failed pipeline
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
     blockOutputStreamEntryPool.getExcludeList().addPipeline(pipeline.getId());
 
     // If the failure is NOT caused by other reasons (e.g. container full),
@@ -362,7 +308,8 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private void writeDataCells(ECChunkBuffers stripe) throws IOException {
-    blockOutputStreamEntryPool.allocateBlockIfNeeded();
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
+    blockOutputStreamEntryPool.allocateBlockIfNeeded(false);
     ByteBuffer[] dataCells = stripe.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       if (dataCells[i].limit() > 0) {
@@ -374,6 +321,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private void writeParityCells(ECChunkBuffers stripe) {
     // Move the stream entry cursor to parity block index
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
     blockOutputStreamEntryPool
         .getCurrentStreamEntry().forceToFirstParityBlock();
     ByteBuffer[] parityCells = stripe.getParityBuffers();
@@ -413,7 +361,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
       // The len cannot be bigger than cell buffer size.
       assert buffer.limit() <= ecChunkSize : "The buffer size: " +
           buffer.limit() + " should not exceed EC chunk size: " + ecChunkSize;
-      writeToOutputStream(blockOutputStreamEntryPool.getCurrentStreamEntry(),
+      writeToOutputStream(getBlockOutputStreamEntryPool().getCurrentStreamEntry(),
           buffer.array(), buffer.limit(), 0, isParity);
     } catch (Exception e) {
       markStreamAsFailed(e);
@@ -449,8 +397,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     Preconditions.checkNotNull(t);
     boolean containerExclusionException = checkIfContainerToExclude(t);
     if (containerExclusionException) {
-      blockOutputStreamEntryPool.getExcludeList()
-          .addPipeline(streamEntry.getPipeline().getId());
+      getBlockOutputStreamEntryPool().getExcludeList().addPipeline(streamEntry.getPipeline().getId());
     }
     markStreamAsFailed(exception);
   }
@@ -460,7 +407,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private void markStreamAsFailed(Exception e) {
-    blockOutputStreamEntryPool.getCurrentStreamEntry().markFailed(e);
+    getBlockOutputStreamEntryPool().getCurrentStreamEntry().markFailed(e);
   }
 
   @Override
@@ -468,8 +415,19 @@ public final class ECKeyOutputStream extends KeyOutputStream
     LOG.debug("ECKeyOutputStream does not support flush.");
   }
 
+  @Override
+  public void hflush() {
+    throw new NotImplementedException("ECKeyOutputStream does not support hflush.");
+  }
+
+  @Override
+  public void hsync() {
+    throw new NotImplementedException("ECKeyOutputStream does not support hsync.");
+  }
+
   private void closeCurrentStreamEntry()
       throws IOException {
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
     if (!blockOutputStreamEntryPool.isEmpty()) {
       while (true) {
         try {
@@ -503,6 +461,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
       return;
     }
     closed = true;
+    final ECBlockOutputStreamEntryPool blockOutputStreamEntryPool = getBlockOutputStreamEntryPool();
     try {
       if (!closing) {
         // If stripe buffer is not empty, encode and flush the stripe.
@@ -539,7 +498,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
     } catch (InterruptedException e) {
       throw new IOException("Flushing thread was interrupted", e);
     } finally {
-      flushExecutor.shutdownNow();
       closeCurrentStreamEntry();
       blockOutputStreamEntryPool.cleanup();
     }
@@ -614,20 +572,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
     buf.position(limit);
   }
 
-  public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return blockOutputStreamEntryPool.getCommitUploadPartInfo();
-  }
-
-  @VisibleForTesting
-  public ExcludeList getExcludeList() {
-    return blockOutputStreamEntryPool.getExcludeList();
-  }
-
-  @Override
-  public Map<String, String> getMetadata() {
-    return this.blockOutputStreamEntryPool.getMetadata();
-  }
-
   /**
    * Builder class of ECKeyOutputStream.
    */
@@ -682,9 +626,8 @@ public final class ECKeyOutputStream extends KeyOutputStream
    */
   private void checkNotClosed() throws IOException {
     if (closing || closed) {
-      throw new IOException(
-          ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
-              + blockOutputStreamEntryPool.getKeyName());
+      throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
+          + getBlockOutputStreamEntryPool().getKeyName());
     }
   }
 
@@ -695,6 +638,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private static class CheckpointDummyStripe extends ECChunkBuffers {
     private final long version;
+
     CheckpointDummyStripe(long version) {
       super();
       this.version = version;
@@ -766,9 +710,9 @@ public final class ECKeyOutputStream extends KeyOutputStream
     }
 
     private void clearBuffers(ByteBuffer[] buffers) {
-      for (int i = 0; i < buffers.length; i++) {
-        buffers[i].clear();
-        buffers[i].limit(cellSize);
+      for (ByteBuffer buffer : buffers) {
+        buffer.clear();
+        buffer.limit(cellSize);
       }
     }
 
@@ -780,5 +724,10 @@ public final class ECKeyOutputStream extends KeyOutputStream
         }
       }
     }
+  }
+
+  private enum StripeWriteStatus {
+    SUCCESS,
+    FAILED
   }
 }

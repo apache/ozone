@@ -1,32 +1,29 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
 /**
  * In-memory state of a container replica.
@@ -36,36 +33,35 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final ContainerID containerID;
   private final ContainerReplicaProto.State state;
   private final DatanodeDetails datanodeDetails;
-  private final UUID placeOfBirth;
+  /**
+   * The origin creation of this replica.
+   * null: origin is the same as {@link #datanodeDetails}.
+   */
+  private final DatanodeID originDatanodeId;
+  /** The position at the pipeline. */
   private final int replicaIndex;
 
-  private Long sequenceId;
+  private final Long sequenceId;
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
+  private final long dataChecksum;
 
-  @SuppressWarnings("parameternumber")
-  private ContainerReplica(
-      final ContainerID containerID,
-      final ContainerReplicaProto.State state,
-      final int replicaIndex,
-      final DatanodeDetails datanode,
-      final UUID originNodeId,
-      long keyNum,
-      long dataSize,
-      boolean isEmpty) {
-    this.containerID = containerID;
-    this.state = state;
-    this.datanodeDetails = datanode;
-    this.placeOfBirth = originNodeId;
-    this.keyCount = keyNum;
-    this.bytesUsed = dataSize;
-    this.replicaIndex = replicaIndex;
-    this.isEmpty = isEmpty;
+  private ContainerReplica(ContainerReplicaBuilder b) {
+    this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
+    this.state = Objects.requireNonNull(b.state, "state == null");
+    this.datanodeDetails = Objects.requireNonNull(b.datanode, "datanode == null");
+    this.originDatanodeId = b.placeOfBirth;
+    this.keyCount = b.keyCount;
+    this.bytesUsed = b.bytesUsed;
+    this.replicaIndex = b.replicaIndex;
+    this.isEmpty = b.isEmpty;
+    this.sequenceId = b.sequenceId;
+    this.dataChecksum = b.dataChecksum;
   }
 
-  private void setSequenceId(Long seqId) {
-    sequenceId = seqId;
+  public ContainerID getContainerID() {
+    return containerID;
   }
 
   /**
@@ -82,8 +78,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
    *
    * @return UUID
    */
-  public UUID getOriginDatanodeId() {
-    return placeOfBirth;
+  public DatanodeID getOriginDatanodeId() {
+    return originDatanodeId != null ? originDatanodeId : datanodeDetails.getID();
   }
 
   /**
@@ -126,6 +122,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return isEmpty;
   }
 
+  public long getDataChecksum() {
+    return dataChecksum;
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
@@ -154,7 +154,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
   @Override
   public int compareTo(ContainerReplica that) {
-    Preconditions.checkNotNull(that);
+    Objects.requireNonNull(that);
     return new CompareToBuilder()
         .append(this.containerID, that.containerID)
         .append(this.datanodeDetails, that.datanodeDetails)
@@ -177,7 +177,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setContainerState(state)
         .setDatanodeDetails(datanodeDetails)
         .setKeyCount(keyCount)
-        .setOriginNodeId(placeOfBirth)
+        .setOriginNodeId(originDatanodeId)
         .setReplicaIndex(replicaIndex)
         .setSequenceId(sequenceId)
         .setEmpty(isEmpty);
@@ -185,18 +185,17 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
   @Override
   public String toString() {
-    return "ContainerReplica{" +
-        "containerID=" + containerID +
-        ", state=" + state +
-        ", datanodeDetails=" + datanodeDetails +
-        ", placeOfBirth=" + placeOfBirth +
-        ", sequenceId=" + sequenceId +
-        ", keyCount=" + keyCount +
-        ", bytesUsed=" + bytesUsed + ((replicaIndex > 0) ?
-        ",replicaIndex=" + replicaIndex :
-        "") +
-        ", isEmpty=" + isEmpty +
-        '}';
+    return "ContainerReplica{" + containerID
+        + " (" + state
+        + ") currentDN=" + datanodeDetails
+        + (originDatanodeId != null ? ", originDN=" + originDatanodeId : " (origin)")
+        + ", bcsid=" + sequenceId
+        + (replicaIndex > 0 ? ", replicaIndex=" + replicaIndex : "")
+        + ", keyCount=" + keyCount
+        + ", bytesUsed=" + bytesUsed
+        + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", dataChecksum=" + dataChecksum
+        + '}';
   }
 
   /**
@@ -207,12 +206,13 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private ContainerID containerID;
     private ContainerReplicaProto.State state;
     private DatanodeDetails datanode;
-    private UUID placeOfBirth;
+    private DatanodeID placeOfBirth;
     private Long sequenceId;
     private long bytesUsed;
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
+    private long dataChecksum;
 
     /**
      * Set Container Id.
@@ -256,7 +256,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
      * @param originNodeId origin node UUID
      * @return ContainerReplicaBuilder
      */
-    public ContainerReplicaBuilder setOriginNodeId(UUID originNodeId) {
+    public ContainerReplicaBuilder setOriginNodeId(DatanodeID originNodeId) {
       placeOfBirth = originNodeId;
       return this;
     }
@@ -287,24 +287,18 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setDataChecksum(long dataChecksum) {
+      this.dataChecksum = dataChecksum;
+      return this;
+    }
+
     /**
      * Constructs new ContainerReplicaBuilder.
      *
      * @return ContainerReplicaBuilder
      */
     public ContainerReplica build() {
-      Preconditions.checkNotNull(containerID,
-          "Container Id can't be null");
-      Preconditions.checkNotNull(state,
-          "Container state can't be null");
-      Preconditions.checkNotNull(datanode,
-          "DatanodeDetails can't be null");
-      ContainerReplica replica = new ContainerReplica(
-          containerID, state, replicaIndex, datanode,
-          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
-          keyCount, bytesUsed, isEmpty);
-      Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
-      return replica;
+      return new ContainerReplica(this);
     }
   }
 

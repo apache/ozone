@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -34,6 +34,15 @@ package org.apache.hadoop.hdds.server;
 public interface ServiceRuntimeInfo {
 
   /**
+   * Gets the namespace of Ozone.
+   *
+   * @return the namespace
+   */
+  default String getNamespace() {
+    return "";
+  }
+
+  /**
    * Gets the version of Hadoop.
    *
    * @return the version
@@ -46,13 +55,6 @@ public interface ServiceRuntimeInfo {
    * @return a string representing the version
    */
   String getSoftwareVersion();
-
-  /**
-   * Get the compilation information which contains date, user and branch.
-   *
-   * @return the compilation information, as a JSON string.
-   */
-  String getCompileInfo();
 
   /**
    * Gets the NN start time in milliseconds.

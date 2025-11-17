@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.exceptions;
 
 import java.io.IOException;
@@ -24,6 +24,17 @@ import java.io.IOException;
  */
 public class SCMException extends IOException {
   private final ResultCodes result;
+
+  /**
+   * Constructs an {@code SCMException} with {@code null}
+   * as its result code. <p>
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   */
+  public SCMException(String message) {
+    super(message);
+    this.result = null;
+  }
 
   /**
    * Constructs an {@code IOException} with {@code null}
@@ -126,12 +137,18 @@ public class SCMException extends IOException {
     FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY,
     FAILED_TO_INIT_LEADER_CHOOSE_POLICY,
     SCM_NOT_LEADER,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_REVOKE_CERTIFICATES,
     PIPELINE_NOT_FOUND,
     UNKNOWN_PIPELINE_STATE,
     CONTAINER_NOT_FOUND,
     CONTAINER_REPLICA_NOT_FOUND,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_CONNECT_TO_CRL_SERVICE,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_ADD_CRL_CLIENT,
     INVALID_PIPELINE_STATE,
     DUPLICATED_PIPELINE_ID,
@@ -139,6 +156,7 @@ public class SCMException extends IOException {
     CA_ROTATION_IN_PROGRESS,
     CA_ROTATION_IN_POST_PROGRESS,
     CONTAINER_ALREADY_CLOSED,
-    CONTAINER_ALREADY_CLOSING
+    CONTAINER_ALREADY_CLOSING,
+    UNSUPPORTED_OPERATION
   }
 }

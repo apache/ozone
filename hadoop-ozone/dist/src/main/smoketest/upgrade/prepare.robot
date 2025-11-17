@@ -16,12 +16,14 @@
 *** Settings ***
 Documentation       Prepares OMs
 Resource            ../commonlib.robot
+Resource            lib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
 Prepare Ozone Manager
     Pass Execution If    '%{OZONE_UPGRADE_FROM}' == '1.1.0'    OM prepare is skipped for version %{OZONE_UPGRADE_FROM}
-    ${result} =        Execute      ozone admin om prepare -id %{OM_SERVICE_ID}
-                       Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!
-
+    ${service_id} =      Get OM Service ID
+    Pass Execution If    '${service_id}' == ''    OM prepare skipped in non-HA
+    Wait Until Keyword Succeeds      3min       10sec     Prepare OM

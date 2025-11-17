@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,18 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-
+import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -38,7 +26,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.IOException;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 /**
  * REST APIs for namespace metadata summary.
@@ -53,6 +51,7 @@ public class NSSummaryEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
 
   private final OzoneStorageContainerManager reconSCM;
+
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
                            ReconOMMetadataManager omMetadataManager,
@@ -73,12 +72,12 @@ public class NSSummaryEndpoint {
   public Response getBasicInfo(
       @QueryParam("path") String path) throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
     NamespaceSummaryResponse namespaceSummaryResponse;
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       namespaceSummaryResponse =
           NamespaceSummaryResponse.newBuilder()
               .setEntityType(EntityType.UNKNOWN)
@@ -101,24 +100,25 @@ public class NSSummaryEndpoint {
    * @param path request path
    * @param listFile show subpath/disk usage for each key
    * @param withReplica count actual DU with replication
+   * @param sortSubpaths determines whether to sort the subpaths by their sizes in descending order
+   * and returns the N largest subpaths based on the configuration value DISK_USAGE_TOP_RECORDS_LIMIT.
    * @return DU response
    * @throws IOException
    */
   @GET
-  @Path("/du")
+  @Path("/usage")
   @SuppressWarnings("methodlength")
   public Response getDiskUsage(@QueryParam("path") String path,
-                               @DefaultValue("false")
-                               @QueryParam("files") boolean listFile,
-                               @DefaultValue("false")
-                               @QueryParam("replica") boolean withReplica)
+                               @DefaultValue("false") @QueryParam("files") boolean listFile,
+                               @DefaultValue("false") @QueryParam("replica") boolean withReplica,
+                               @DefaultValue("true") @QueryParam("sortSubPaths") boolean sortSubpaths)
       throws IOException {
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
     DUResponse duResponse = new DUResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       duResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(duResponse).build();
     }
@@ -127,8 +127,7 @@ public class NSSummaryEndpoint {
             reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, path);
 
-    duResponse = handler.getDuResponse(
-            listFile, withReplica);
+    duResponse = handler.getDuResponse(listFile, withReplica, sortSubpaths);
 
     return Response.ok(duResponse).build();
   }
@@ -145,12 +144,12 @@ public class NSSummaryEndpoint {
   public Response getQuotaUsage(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       quotaUsageResponse.setResponseCode(ResponseStatus.INITIALIZING);
       return Response.ok(quotaUsageResponse).build();
     }
@@ -175,13 +174,13 @@ public class NSSummaryEndpoint {
   public Response getFileSizeDistribution(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
     FileSizeDistributionResponse distResponse =
         new FileSizeDistributionResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       distResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(distResponse).build();
     }
@@ -193,21 +192,6 @@ public class NSSummaryEndpoint {
     distResponse = handler.getDistResponse();
 
     return Response.ok(distResponse).build();
-  }
-
-  /**
-   * Return if all OMDB tables that will be used are initialized.
-   * @return if tables are initialized
-   */
-  private boolean isInitializationComplete() {
-    if (omMetadataManager == null) {
-      return false;
-    }
-    return omMetadataManager.getVolumeTable() != null
-        && omMetadataManager.getBucketTable() != null
-        && omMetadataManager.getDirectoryTable() != null
-        && omMetadataManager.getFileTable() != null
-        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
   }
 
 }

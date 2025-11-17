@@ -32,31 +32,34 @@
       <source>NOTICE.txt</source>
       <outputDirectory>/</outputDirectory>
     </file>
-    <file>
-      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-angular-nvd3.txt</source>
-      <outputDirectory>/licenses</outputDirectory>
-    </file>
-    <file>
-      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-angular.txt</source>
-      <outputDirectory>/licenses</outputDirectory>
-    </file>
-    <file>
-      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-d3.txt</source>
-      <outputDirectory>/licenses</outputDirectory>
-    </file>
-    <file>
-      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-nvd3.txt</source>
-      <outputDirectory>/licenses</outputDirectory>
-    </file>
-    <file>
-      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-jquery.txt</source>
-      <outputDirectory>/licenses</outputDirectory>
-    </file>
   </files>
   <fileSets>
     <fileSet>
+      <directory>hadoop-ozone/dist/src/main/license/src/licenses</directory>
+      <outputDirectory>/licenses</outputDirectory>
+      <includes>
+        <include>LICENSE-*.txt</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>tools</directory>
+      <outputDirectory>/tools</outputDirectory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+      <excludes>
+        <exclude>**/.classpath</exclude>
+        <exclude>**/.project</exclude>
+        <exclude>**/.settings</exclude>
+        <exclude>**/*.iml</exclude>
+        <exclude>**/target/**</exclude>
+      </excludes>
+    </fileSet>
+    <fileSet>
       <directory>.</directory>
       <includes>
+        <include>.editorconfig</include>
         <include>pom.xml</include>
         <include>README.md</include>
         <include>HISTORY.md</include>
@@ -65,8 +68,22 @@
       </includes>
     </fileSet>
     <fileSet>
+      <directory>.run</directory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
       <directory>dev-support</directory>
       <useDefaultExcludes>true</useDefaultExcludes>
+      <excludes>
+        <exclude>**/.classpath</exclude>
+        <exclude>**/.project</exclude>
+        <exclude>**/.settings</exclude>
+        <exclude>**/*.iml</exclude>
+        <exclude>**/target/**</exclude>
+      </excludes>
     </fileSet>
     <fileSet>
       <directory>hadoop-hdds</directory>

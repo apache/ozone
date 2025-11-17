@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,39 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.balancer;
-
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.COMPLETED;
@@ -70,15 +38,49 @@ import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResu
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.anyLong;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for the MoveManager class.
@@ -149,7 +151,7 @@ public class TestMoveManager {
     assertMoveFailsWith(REPLICATION_FAIL_NODE_UNHEALTHY,
         containerInfo.containerID());
 
-    nodes.put(src, new NodeStatus(
+    nodes.put(src, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     nodes.put(tgt, NodeStatus.inServiceHealthy());
@@ -157,7 +159,7 @@ public class TestMoveManager {
         containerInfo.containerID());
 
     nodes.put(src, NodeStatus.inServiceHealthy());
-    nodes.put(tgt, new NodeStatus(
+    nodes.put(tgt, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     assertMoveFailsWith(REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
@@ -199,13 +201,13 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, clock.millis()));
+    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, null, clock.millis(), 0));
 
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_REPLICATION,
         containerInfo.containerID());
 
     pendingOps.clear();
-    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, clock.millis()));
+    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, null, clock.millis(), 0));
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_DELETION,
         containerInfo.containerID());
   }
@@ -321,11 +323,11 @@ public class TestMoveManager {
   public void testDeleteCommandFails() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    doThrow(new ContainerNotFoundException("test"))
+    doThrow(ContainerNotFoundException.newInstanceForTesting())
         .when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult moveResult = res.get();
@@ -337,14 +339,14 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, 0, clock.millis() + 1000);
+        DELETE, src, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -374,7 +376,7 @@ public class TestMoveManager {
         anyLong());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, srcReplica.getReplicaIndex(), clock.millis() + 1000);
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
@@ -382,7 +384,7 @@ public class TestMoveManager {
         eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, srcReplica.getReplicaIndex(), clock.millis() + 1000);
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -394,7 +396,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -406,14 +408,14 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
-        DELETE, src, 0, clock.millis() + 1000);
+        DELETE, src, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -434,7 +436,7 @@ public class TestMoveManager {
       }
     }
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -450,7 +452,7 @@ public class TestMoveManager {
 
     nodes.put(src, NodeStatus.inServiceStale());
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -464,11 +466,11 @@ public class TestMoveManager {
   public void testMoveCompleteSrcNotInService() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    nodes.put(src, new NodeStatus(
+    nodes.put(src, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -487,7 +489,7 @@ public class TestMoveManager {
             .MisReplicatedHealthResult(containerInfo, false, null));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, 0, clock.millis() + 1000);
+        ADD, tgt, 0, null, clock.millis() + 1000, 0);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
@@ -495,6 +497,54 @@ public class TestMoveManager {
 
     verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
+  }
+
+  @Test
+  public void testDeleteNotSentWithExpirationTimeInPast() throws Exception {
+    containerInfo = ReplicationTestUtil.createContainer(
+        HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
+    setupMocks();
+    long moveTimeout = 55 * 60 * 1000, replicationTimeout = 50 * 60 * 1000;
+    moveManager.setMoveTimeout(moveTimeout);
+    moveManager.setReplicationTimeout(replicationTimeout);
+
+    replicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(), 1, 2, 3, 4, 5));
+    Iterator<ContainerReplica> iterator = replicas.iterator();
+    ContainerReplica srcReplica = iterator.next();
+    src = srcReplica.getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    CompletableFuture<MoveManager.MoveResult> res =
+        moveManager.move(containerInfo.containerID(), src, tgt);
+    ArgumentCaptor<Long> longCaptorReplicate = ArgumentCaptor.forClass(Long.class);
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
+        eq(tgt), longCaptorReplicate.capture());
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+    ArgumentCaptor<Long> longCaptorDelete = ArgumentCaptor.forClass(Long.class);
+    verify(replicationManager).sendDeleteCommand(
+        eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
+        eq(true), longCaptorDelete.capture());
+
+    // verify that command is sent with deadline as (moveStartTime + moveTimeout)
+    // moveStartTime can be calculated as (expirationTime set for replication - replicationTimeout)
+    assertEquals(longCaptorReplicate.getValue() - replicationTimeout + moveTimeout, longCaptorDelete.getValue());
+    // replicationManager sends a datanode command with the deadline as
+    // (scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset()). The offset is 6 minutes by default.
+    // For the datanode deadline to not be in the past, the below condition is checked.
+    assertTrue((longCaptorDelete.getValue() - Duration.ofMinutes(6).toMillis()) > clock.millis());
+
+    op = new ContainerReplicaOp(
+        DELETE, src, srcReplica.getReplicaIndex(), null, clock.millis() + 1000, 0);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+    MoveManager.MoveResult finalResult = res.get();
+    assertEquals(COMPLETED, finalResult);
   }
 
   private CompletableFuture<MoveManager.MoveResult> setupSuccessfulMove()

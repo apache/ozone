@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
@@ -26,15 +26,29 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
-
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** {@link ChunkBuffer} implementation using a single {@link ByteBuffer}. */
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
+  private final UncheckedAutoCloseable underlying;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
+    this(buffer, null);
+  }
+
+  ChunkBufferImplWithByteBuffer(ByteBuffer buffer, UncheckedAutoCloseable underlying) {
     this.buffer = Objects.requireNonNull(buffer, "buffer == null");
+    this.underlying = underlying;
+  }
+
+  @Override
+  public void close() {
+    if (underlying != null) {
+      underlying.close();
+    }
   }
 
   @Override
@@ -88,7 +102,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    return channel.write(buffer);
+    return BufferUtils.writeFully(channel, buffer);
   }
 
   @Override
@@ -147,6 +161,6 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   @Override
   public String toString() {
     return getClass().getSimpleName() + ":limit=" + buffer.limit()
-        + "@" + Integer.toHexString(hashCode());
+        + "@" + Integer.toHexString(super.hashCode());
   }
 }

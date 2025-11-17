@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,22 +17,21 @@
 
 package org.apache.hadoop.fs.contract;
 
+import static org.apache.hadoop.fs.CommonPathCapabilities.ETAGS_AVAILABLE;
+import static org.apache.hadoop.fs.CommonPathCapabilities.ETAGS_PRESERVED_IN_RENAME;
+import static org.assertj.core.api.Assumptions.assumeThat;
+
 import java.nio.charset.StandardCharsets;
-
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.fs.EtagSource;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-
-import static org.apache.hadoop.fs.CommonPathCapabilities.ETAGS_AVAILABLE;
-import static org.apache.hadoop.fs.CommonPathCapabilities.ETAGS_PRESERVED_IN_RENAME;
-import static org.assertj.core.api.Assumptions.assumeThat;
+import org.apache.ratis.util.Preconditions;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * For filesystems which support etags, validate correctness
@@ -86,7 +84,7 @@ public abstract class AbstractContractEtagTest extends
     Assertions.assertThat(st)
         .describedAs("FileStatus %s", st)
         .isInstanceOf(EtagSource.class);
-    final String etag = ((EtagSource) st).getEtag();
+    final String etag = Preconditions.assertInstanceOf(st, EtagSource.class).getEtag();
     Assertions.assertThat(etag)
         .describedAs("Etag of %s", st)
         .isNotBlank();

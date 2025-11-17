@@ -21,29 +21,37 @@ Library             String
 Resource            ../commonlib.robot
 Resource            ./commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
 Default Tags        no-bucket-type
+Test Setup          Run Keywords       Kinit test user    testuser    testuser.keytab
+...                 AND                Revoke S3 secrets
+Suite Setup         Get Security Enabled From Config
+Suite Teardown      Setup v4 headers
 
 *** Variables ***
-${ENDPOINT_URL}       http://s3g:9878
-${SECURITY_ENABLED}   true
+${ENDPOINT_URL}       http://s3g:19878
 
 *** Test Cases ***
 
 S3 Gateway Revoke Secret
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+                        Execute                             ozone s3 getsecret ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret
-                        IF   '${SECURITY_ENABLED}' == 'true'
-                            Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        ELSE
-                            Should contain      ${result}       S3 Secret endpoint is disabled.
-                        END
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+                        Execute                             ozone s3 getsecret -u testuser ${OM_HA_PARAM}
+    ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
+
+S3 Gateway Revoke Secret By Username For Other User
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+                        Execute                             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
-                        IF   '${SECURITY_ENABLED}' == 'true'
-                            Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        ELSE
-                            Should contain      ${result}       S3 Secret endpoint is disabled.
-                        END
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
+
+S3 Gateway Reject Secret Revoke By Non-admin User
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+    Run Keyword                                             Kinit test user   testuser2   testuser2.keytab
+    ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Should contain          ${result}   HTTP/1.1 403 FORBIDDEN    ignore_case=True

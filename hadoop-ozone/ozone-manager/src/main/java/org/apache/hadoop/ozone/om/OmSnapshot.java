@@ -1,32 +1,41 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
-import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -40,14 +49,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Metadata Reading class for OM Snapshots.
@@ -74,6 +75,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  private final UUID snapshotID;
   // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
   private final KeyManager keyManager;
@@ -83,7 +85,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
                     OzoneManager ozoneManager,
                     String volumeName,
                     String bucketName,
-                    String snapshotName) {
+                    String snapshotName,
+                    UUID snapshotID) {
     IAccessAuthorizer accessAuthorizer =
         OzoneAuthorizerFactory.forSnapshot(ozoneManager,
             keyManager, prefixManager);
@@ -93,6 +96,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
+    this.snapshotID = snapshotID;
     this.keyManager = keyManager;
     this.omMetadataManager = keyManager.getMetadataManager();
   }
@@ -181,6 +185,11 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
+    return omMetadataReader.getObjectTagging(normalizeOmKeyArgs(args));
+  }
+
   private OzoneObj normalizeOzoneObj(OzoneObj o) {
     if (o == null) {
       return null;
@@ -195,7 +204,6 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         .setOzonePrefixPath(o.getOzonePrefixPathViewer()).build();
 
   }
-
 
   // Remove snapshot indicator from keyname
   private String normalizeKeyName(String keyname) {
@@ -293,6 +301,10 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   public String getName() {
     return snapshotName;
+  }
+
+  public UUID getSnapshotID() {
+    return snapshotID;
   }
 
   @Override

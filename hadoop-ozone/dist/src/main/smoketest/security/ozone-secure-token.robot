@@ -20,14 +20,18 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
+
+*** Variables ***
+${TOKEN_FILE}    ${TEMP_DIR}/ozone.token
 
 *** Keywords ***
 Get and use Token in Secure Cluster
     Run Keyword   Kinit test user     testuser     testuser.keytab
-    Execute                      ozone sh token get -t ./ozone.token
-    File Should Not Be Empty     ./ozone.token
+    Execute                      ozone sh token get -t ${TOKEN_FILE}
+    File Should Not Be Empty     ${TOKEN_FILE}
     Execute                      kdestroy
-    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    ./ozone.token
+    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    ${TOKEN_FILE}
     ${output} =                  Execute             ozone sh volume list /
     Should not contain           ${output}           Client cannot authenticate
     Remove Environment Variable  HADOOP_TOKEN_FILE_LOCATION
@@ -36,13 +40,13 @@ Get and use Token in Secure Cluster
     Run Keyword                  Kinit test user     testuser  testuser.keytab
 
 Get Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token get -t ./ozone.token
+    ${output} =                  Execute             ozone sh token get -t ${TOKEN_FILE}
     Should Contain               ${output}           ozone sh token get
     Should Contain               ${output}           only when security is enabled
 
 # should be executed after Get Token
 Print Valid Token File
-    ${output} =                  Execute             ozone sh token print -t ./ozone.token
+    ${output} =                  Execute             ozone sh token print -t ${TOKEN_FILE}
     Should Not Be Empty          ${output}
 
 Print Nonexistent Token File
@@ -50,20 +54,20 @@ Print Nonexistent Token File
     Should Contain               ${output}           operation failed as token file: /asdf
 
 Renew Token in Secure Cluster
-    ${output} =                  Execute             ozone sh token renew -t ./ozone.token
+    ${output} =                  Execute             ozone sh token renew -t ${TOKEN_FILE}
     Should contain               ${output}           Token renewed successfully
 
 Renew Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token renew -t ./ozone.token
+    ${output} =                  Execute             ozone sh token renew -t ${TOKEN_FILE}
     Should Contain               ${output}           ozone sh token renew
     Should Contain               ${output}           only when security is enabled
 
 Cancel Token in Secure Cluster
-    ${output} =                  Execute             ozone sh token cancel -t ./ozone.token
+    ${output} =                  Execute             ozone sh token cancel -t ${TOKEN_FILE}
     Should contain               ${output}           Token canceled successfully
 
 Cancel Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token cancel -t ./ozone.token
+    ${output} =                  Execute             ozone sh token cancel -t ${TOKEN_FILE}
     Should Contain               ${output}           ozone sh token cancel
     Should Contain               ${output}           only when security is enabled
 

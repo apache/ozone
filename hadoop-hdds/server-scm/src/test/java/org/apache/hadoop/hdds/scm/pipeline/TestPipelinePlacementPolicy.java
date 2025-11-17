@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,17 +17,33 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,10 +56,9 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -52,43 +66,39 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
-
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for PipelinePlacementPolicy.
  */
 public class TestPipelinePlacementPolicy {
+  private static final Node[] NODES = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
+  };
+
+  // 3 racks with single node.
+  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
+  };
+
   private MockNodeManager nodeManager;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
@@ -96,6 +106,7 @@ public class TestPipelinePlacementPolicy {
   private NetworkTopologyImpl cluster;
   private static final int PIPELINE_PLACEMENT_MAX_NODES_COUNT = 10;
   private static final int PIPELINE_LOAD_LIMIT = 5;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -109,16 +120,12 @@ public class TestPipelinePlacementPolicy {
     // start with nodes with rack awareness.
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelinePlacementPolicy.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -135,8 +142,6 @@ public class TestPipelinePlacementPolicy {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private NetworkTopologyImpl initTopology() {
@@ -198,7 +203,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -235,7 +240,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -251,25 +256,19 @@ public class TestPipelinePlacementPolicy {
 
     String expectedMessageSubstring = "Unable to find enough nodes that meet " +
         "the space requirement";
-    try {
-      // A huge container size
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired,
-          0, 10 * OzoneConsts.TB);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
 
-    try {
-      // a huge free space min configured
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
-          0);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
+    // A huge container size
+    SCMException ex =
+        assertThrows(SCMException.class,
+            () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
+
+    // a huge free space min configured
+    ex = assertThrows(SCMException.class,
+        () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
   }
 
   @Test
@@ -378,24 +377,6 @@ public class TestPipelinePlacementPolicy {
     assertEquals(results.get(0).getNetworkLocation(), results.get(2).getNetworkLocation());
   }
 
-  private static final Node[] NODES = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
-  };
-
-  // 3 racks with single node.
-  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
-  };
-
   private NetworkTopology createNetworkTopologyOnDifRacks() {
     NetworkTopology topology =
         new NetworkTopologyImpl(new OzoneConfiguration());
@@ -411,9 +392,9 @@ public class TestPipelinePlacementPolicy {
         .setUuid(datanode.getUuid())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.STANDALONE))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.RATIS))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.REST))
+        .addPort(datanode.getStandalonePort())
+        .addPort(datanode.getRatisPort())
+        .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
     return result;
   }
@@ -478,7 +459,6 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicyOK() {
-    cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
@@ -531,8 +511,9 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
-    cluster = initTopology();
-    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
+    NetworkTopologyImpl localCluster = initTopology();
+
+    nodeManager = new MockNodeManager(localCluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
@@ -545,7 +526,7 @@ public class TestPipelinePlacementPolicy {
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host3", "/rack1"));
     for (DatanodeDetails dn : dns) {
-      cluster.add(dn);
+      localCluster.add(dn);
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
@@ -610,8 +591,6 @@ public class TestPipelinePlacementPolicy {
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
-    cluster = initTopology();
-
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host1", "/rack1"));
@@ -634,14 +613,6 @@ public class TestPipelinePlacementPolicy {
         map(DatanodeDetails::getUuid).
         collect(Collectors.toCollection(HashSet::new));
     return uuids.size() == nodes.size();
-  }
-
-  private Set<PipelineID> mockPipelineIDs(int count) {
-    Set<PipelineID> pipelineIDs = new HashSet<>(count);
-    for (int i = 0; i < count; i++) {
-      pipelineIDs.add(PipelineID.randomId());
-    }
-    return pipelineIDs;
   }
 
   private void insertHeavyNodesIntoNodeManager(

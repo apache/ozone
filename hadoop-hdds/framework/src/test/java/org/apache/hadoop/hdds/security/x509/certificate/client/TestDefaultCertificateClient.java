@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,24 +13,29 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,39 +49,29 @@ import java.security.Signature;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.UUID;
 import java.util.function.Predicate;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-
-
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
@@ -88,26 +82,24 @@ public class TestDefaultCertificateClient {
   private X509Certificate x509Certificate;
   private DNCertificateClient dnCertClient;
   private HDDSKeyGenerator keyGenerator;
+  @TempDir
   private Path dnMetaDirPath;
   private SecurityConfig dnSecurityConfig;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
-  private KeyCodec dnKeyCodec;
+  private KeyStorage dnKeyStorage;
 
   @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
     config.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
-    final String dnPath = GenericTestUtils
-        .getTempPath(UUID.randomUUID().toString());
 
-    dnMetaDirPath = Paths.get(dnPath, "test");
     config.set(HDDS_METADATA_DIR_NAME, dnMetaDirPath.toString());
     dnSecurityConfig = new SecurityConfig(config);
 
     keyGenerator = new HDDSKeyGenerator(dnSecurityConfig);
-    dnKeyCodec = new KeyCodec(dnSecurityConfig, DN_COMPONENT);
+    dnKeyStorage = new KeyStorage(dnSecurityConfig, DN_COMPONENT);
 
     Files.createDirectories(dnSecurityConfig.getKeyLocation(DN_COMPONENT));
     x509Certificate = generateX509Cert(null);
@@ -130,7 +122,6 @@ public class TestDefaultCertificateClient {
   public void tearDown() throws IOException {
     dnCertClient.close();
     dnCertClient = null;
-    FileUtils.deleteQuietly(dnMetaDirPath.toFile());
   }
 
   /**
@@ -158,8 +149,7 @@ public class TestDefaultCertificateClient {
   private KeyPair generateKeyPairFiles() throws Exception {
     cleanupOldKeyPair();
     KeyPair keyPair = keyGenerator.generateKey();
-    dnKeyCodec.writePrivateKey(keyPair.getPrivate());
-    dnKeyCodec.writePublicKey(keyPair.getPublic());
+    dnKeyStorage.storeKeyPair(keyPair);
     return keyPair;
   }
 
@@ -201,7 +191,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testSignDataStream() throws Exception {
-    String data = RandomStringUtils.random(100);
+    String data = RandomStringUtils.secure().next(100);
     FileUtils.deleteQuietly(Paths.get(
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getPrivateKeyFileName()).toFile());
@@ -238,7 +228,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureStream() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
@@ -256,7 +246,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureDataArray() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
@@ -380,8 +370,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testInitCertAndKeypairValidationFailures() throws Exception {
-    GenericTestUtils.LogCapturer dnClientLog = GenericTestUtils.LogCapturer
-        .captureLogs(dnCertClient.getLogger());
+    LogCapturer dnClientLog = LogCapturer.captureLogs(DNCertificateClient.class);
     KeyPair keyPair = keyGenerator.generateKey();
     KeyPair keyPair1 = keyGenerator.generateKey();
     dnClientLog.clearOutput();
@@ -393,9 +382,8 @@ public class TestDefaultCertificateClient {
     FileUtils.deleteQuietly(Paths.get(
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getPublicKeyFileName()).toFile());
-    dnKeyCodec.writePrivateKey(keyPair.getPrivate());
-    dnKeyCodec.writePublicKey(keyPair1.getPublic());
-
+    dnKeyStorage.storePrivateKey(keyPair.getPrivate());
+    dnKeyStorage.storePublicKey(keyPair1.getPublic());
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
     assertThat(dnClientLog.getOutput()).contains("Keypair validation failed");
@@ -408,10 +396,8 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getCertificateFileName()).toFile());
 
-    CertificateCodec dnCertCodec = new CertificateCodec(dnSecurityConfig,
-        DN_COMPONENT);
-    dnCertCodec.writeCertificate(new X509CertificateHolder(
-        x509Certificate.getEncoded()));
+    CertificateCodec dnCertCodec = new CertificateCodec(dnSecurityConfig, DN_COMPONENT);
+    dnCertCodec.writeCertificate(x509Certificate);
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
     assertThat(dnClientLog.getOutput()).contains("Keypair validation failed");
@@ -425,7 +411,7 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getPublicKeyFileName()).toFile());
     getCertClient();
-    dnKeyCodec.writePublicKey(keyPair.getPublic());
+    dnKeyStorage.storePublicKey(keyPair.getPublic());
 
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
@@ -472,8 +458,7 @@ public class TestDefaultCertificateClient {
     // save the certificate on dn
     CertificateCodec certCodec = new CertificateCodec(dnSecurityConfig,
         dnSecurityConfig.getCertificateLocation(DN_COMPONENT));
-    certCodec.writeCertificate(
-        new X509CertificateHolder(x509Certificate.getEncoded()));
+    certCodec.writeCertificate(x509Certificate);
 
     X509Certificate newCert = generateX509Cert(null);
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
@@ -521,8 +506,8 @@ public class TestDefaultCertificateClient {
     Files.createDirectories(newKeyDir.toPath());
     Files.createDirectories(newCertDir.toPath());
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    KeyCodec newKeyCodec = new KeyCodec(dnSecurityConfig, newKeyDir.toPath());
-    newKeyCodec.writeKey(keyPair);
+    KeyStorage newKeyStorage = new KeyStorage(dnSecurityConfig, DN_COMPONENT, HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX);
+    newKeyStorage.storeKeyPair(keyPair);
 
     X509Certificate cert = KeyStoreTestUtil.generateCertificate(
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
@@ -559,7 +544,7 @@ public class TestDefaultCertificateClient {
 
     CertificateCodec certCodec = new CertificateCodec(conf, compName);
     X509Certificate cert = generateX509Cert(null);
-    certCodec.writeCertificate(new X509CertificateHolder(cert.getEncoded()));
+    certCodec.writeCertificate(cert);
 
     Logger logger = mock(Logger.class);
     String certId = cert.getSerialNumber().toString();
@@ -568,21 +553,12 @@ public class TestDefaultCertificateClient {
     ) {
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath) {
-        return "";
-      }
-
-      @Override
-      protected SCMGetCertResponseProto getCertificateSignResponse(
-          PKCS10CertificationRequest request) {
+      protected SCMGetCertResponseProto sign(CertificateSignRequest request) {
         return null;
       }
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath,
-          boolean renew) {
+      protected String signAndStoreCertificate(CertificateSignRequest request, Path certificatePath, boolean renew) {
         return null;
       }
     };

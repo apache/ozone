@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,52 +13,53 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.List;
-
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataReader;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
+import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Base test class for S3 Multipart upload request.
@@ -86,8 +86,8 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = mock(AuditLogger.class);
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
-        mock(ReferenceCounted.class);
+    UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader =
+        mock(UncheckedAutoCloseableSupplier.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
     OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
@@ -111,9 +111,9 @@ public class TestS3MultipartRequest {
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
   }
-
 
   @AfterEach
   public void stop() {
@@ -131,9 +131,41 @@ public class TestS3MultipartRequest {
    */
   protected OMRequest doPreExecuteInitiateMPU(
       String volumeName, String bucketName, String keyName) throws Exception {
+    return doPreExecuteInitiateMPU(volumeName, bucketName, keyName, Collections.emptyMap());
+  }
+
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param metadata
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPU(
+      String volumeName, String bucketName, String keyName,
+      Map<String, String> metadata) throws Exception {
+    return doPreExecuteInitiateMPU(volumeName, bucketName, keyName, metadata,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param metadata
+   * @param tags
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPU(
+      String volumeName, String bucketName, String keyName,
+      Map<String, String> metadata, Map<String, String> tags) throws Exception {
     OMRequest omRequest =
         OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
-            keyName);
+            keyName, metadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(omRequest);
@@ -148,30 +180,63 @@ public class TestS3MultipartRequest {
     assertThat(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
+    if (metadata != null) {
+      Map<String, String> modifiedKeyMetadata = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+              .getKeyArgs().getMetadataList());
+
+      assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
+    }
+
+    if (tags != null) {
+      Map<String, String> modifiedKeyTags = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+              .getKeyArgs().getTagsList());
+
+      assertThat(modifiedKeyTags).containsAllEntriesOf(tags);
+    }
+
     return modifiedRequest;
   }
 
   /**
-   * Perform preExecute of Commit Multipart Upload request for given volume,
-   * bucket and keyName.
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @param clientID
-   * @param multipartUploadID
-   * @param partNumber
+   * Perform preExecute of Commit Multipart Upload request.
+   * @param volumeName volume name.
+   * @param bucketName bucket name.
+   * @param keyName key name.
+   * @param clientID client ID.
+   * @param multipartUploadID multipart upload ID.
+   * @param partNumber part number.
    * @return OMRequest - returned from preExecute.
    */
   protected OMRequest doPreExecuteCommitMPU(
       String volumeName, String bucketName, String keyName,
       long clientID, String multipartUploadID, int partNumber)
       throws Exception {
+    return doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, multipartUploadID,
+        partNumber, Collections.emptyList());
+  }
 
-    // Just set dummy size
-    long dataSize = 100L;
+  /**
+   * Perform preExecute of Commit Multipart Upload request.
+   * @param volumeName volume name.
+   * @param bucketName bucket name.
+   * @param keyName key name.
+   * @param clientID client ID.
+   * @param multipartUploadID multipart upload ID.
+   * @param partNumber part number.
+   * @param keyLocations key location info list.
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteCommitMPU(
+      String volumeName, String bucketName, String keyName,
+      long clientID, String multipartUploadID, int partNumber, List<KeyLocation> keyLocations)
+      throws Exception {
+
+    long dataSize = keyLocations.stream().mapToLong(KeyLocation::getLength).sum();
     OMRequest omRequest =
         OMRequestTestUtils.createCommitPartMPURequest(volumeName, bucketName,
-            keyName, clientID, dataSize, multipartUploadID, partNumber);
+            keyName, clientID, dataSize, multipartUploadID, partNumber, keyLocations);
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
         getS3MultipartUploadCommitReq(omRequest);
 
@@ -237,7 +302,6 @@ public class TestS3MultipartRequest {
 
   }
 
-
   /**
    * Perform preExecute of Initiate Multipart upload request for given
    * volume, bucket and key name.
@@ -248,9 +312,26 @@ public class TestS3MultipartRequest {
    */
   protected OMRequest doPreExecuteInitiateMPUWithFSO(
       String volumeName, String bucketName, String keyName) throws Exception {
+    return doPreExecuteInitiateMPUWithFSO(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param metadata
+   * @param tags
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPUWithFSO(
+      String volumeName, String bucketName, String keyName,
+      Map<String, String> metadata, Map<String, String> tags) throws Exception {
     OMRequest omRequest =
         OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
-            keyName);
+            keyName, metadata, tags);
 
     S3InitiateMultipartUploadRequestWithFSO
         s3InitiateMultipartUploadRequestWithFSO =
@@ -266,26 +347,47 @@ public class TestS3MultipartRequest {
         .getKeyArgs().getMultipartUploadID());
     assertThat(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime()).isGreaterThan(0);
+    if (metadata != null) {
+      Map<String, String> modifiedKeyMetadata = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+          .getKeyArgs().getMetadataList());
+
+      assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
+    }
+
+    if (tags != null) {
+      Map<String, String> modifiedKeyTags = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+              .getKeyArgs().getTagsList());
+
+      assertThat(modifiedKeyTags).containsAllEntriesOf(tags);
+    }
 
     return modifiedRequest;
   }
 
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
-      OMRequest omRequest) {
-    return new S3MultipartUploadCompleteRequest(omRequest,
+      OMRequest omRequest) throws IOException {
+    S3MultipartUploadCompleteRequest request = new S3MultipartUploadCompleteRequest(omRequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-      OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequest(omRequest,
+      OMRequest omRequest) throws IOException {
+    S3MultipartUploadCommitPartRequest request = new S3MultipartUploadCommitPartRequest(omRequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequest(initiateMPURequest,
+      OMRequest initiateMPURequest) throws IOException {
+    S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequest(initiateMPURequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(

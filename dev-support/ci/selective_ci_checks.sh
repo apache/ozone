@@ -87,7 +87,6 @@ function set_outputs_run_everything_and_exit() {
                        | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
-    dependency_check_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
 
@@ -99,7 +98,6 @@ function set_outputs_run_everything_and_exit() {
 function set_output_skip_all_tests_and_exit() {
     BASIC_CHECKS=""
     compose_tests_needed=false
-    dependency_check_needed=false
     integration_tests_needed=false
     kubernetes_tests_needed=false
 
@@ -201,6 +199,7 @@ function run_all_tests_if_environment_files_changed() {
     )
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
     )
     filter_changed_files
 
@@ -233,6 +232,7 @@ function get_count_compose_files() {
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/k8s"
         "^hadoop-ozone/dist/src/main/license"
+        "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
         "\.md$"
     )
     filter_changed_files true
@@ -246,6 +246,7 @@ function get_count_doc_files() {
     local pattern_array=(
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
+        "^hadoop-ozone/dev-support/checks/install/hugo.sh"
     )
     filter_changed_files true
     COUNT_DOC_CHANGED_FILES=${match_count}
@@ -260,20 +261,10 @@ function get_count_integration_files() {
         "^hadoop-ozone/dev-support/checks/integration.sh"
         "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
+        "^hadoop-ozone/mini-cluster"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
-    )
-    # Ozone's unit test naming convention: Test*.java
-    # The following makes this filter ignore all tests except those in
-    # integration-test and fault-injection-test.
-    # Directories starting with `i` under hadoop-ozone need to be listed
-    # explicitly, other subdirectories are captured by the second item.
-    local ignore_array=(
-        "^hadoop-hdds/.*/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/[a-eghj-z].*/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/insight/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/interface-client/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/interface-storage/src/test/java/.*/Test.*.java"
+        "src/test/resources"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
@@ -285,6 +276,8 @@ function get_count_kubernetes_files() {
     start_end::group_start "Count kubernetes files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
+        "^hadoop-ozone/dev-support/checks/install/flekszible.sh"
+        "^hadoop-ozone/dev-support/checks/install/k3s.sh"
         "^hadoop-ozone/dist"
     )
     local ignore_array=(
@@ -313,7 +306,9 @@ function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/build.sh"
-        "^hadoop-ozone/dev-support/checks/native_check.sh"
+        "^hadoop-ozone/dev-support/checks/dependency.sh"
+        "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
+        "^hadoop-ozone/dist/src/main/license/jar-report.txt"
         "src/main/java"
         "src/main/resources"
     )
@@ -363,7 +358,7 @@ function check_needs_bats() {
     local pattern_array=(
         "\.bash$"
         "\.bats$"
-        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh
+        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh and hadoop-ozone/dev-support/checks/install/bats.sh
     )
     filter_changed_files
 
@@ -381,6 +376,7 @@ function check_needs_checkstyle() {
         "^hadoop-hdds/dev-support/checkstyle"
         "pom.xml"
         "src/..../java"
+        "src/..../resources/.*\.properties"
     )
     local ignore_array=(
         "^hadoop-ozone/dist"
@@ -400,28 +396,11 @@ function check_needs_docs() {
     fi
 }
 
-function check_needs_dependency() {
-    start_end::group_start "Check if dependency is needed"
-    local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/dependency.sh"
-        "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
-        "^hadoop-ozone/dist/src/main/license/jar-report.txt"
-        "pom.xml"
-    )
-    filter_changed_files
-
-    dependency_check_needed=false
-    if [[ ${match_count} != "0" ]]; then
-        dependency_check_needed=true
-    fi
-
-    start_end::group_end
-}
-
 function check_needs_findbugs() {
     start_end::group_start "Check if findbugs is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/findbugs.sh"
+        "^hadoop-ozone/dev-support/checks/install/spotbugs.sh"
         "findbugsExcludeFile.xml"
         "pom.xml"
         "src/..../java"
@@ -438,41 +417,21 @@ function check_needs_findbugs() {
     start_end::group_end
 }
 
-function check_needs_native() {
-    start_end::group_start "Check if native is needed"
+function check_needs_pmd() {
+    start_end::group_start "Check if pmd is needed"
     local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/native.sh"
-        "^hadoop-hdds/rocks-native"
-        # include tests tagged as @Native in any module
-        $(grep -Flr 'org.apache.ozone.test.tag.Native' hadoop-*/*/src/test/java)
-    )
-    filter_changed_files true
-
-    if [[ ${match_count} != "0" ]]; then
-        add_basic_check native
-    fi
-
-    start_end::group_end
-}
-
-function check_needs_unit_test() {
-    start_end::group_start "Check if unit test is needed"
-    local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
-        "^hadoop-ozone/dev-support/checks/unit.sh"
-        "^hadoop-ozone/dev-support/checks/junit.sh"
-        "src/test/java"
-        "src/test/resources"
+        "^hadoop-ozone/dev-support/checks/pmd.sh"
+        "pom.xml"
+        "src/..../java"
+        "pmd-ruleset.xml"
     )
     local ignore_array=(
         "^hadoop-ozone/dist"
-        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
-        "^hadoop-ozone/integration-test"
     )
-    filter_changed_files true
+    filter_changed_files
 
     if [[ ${match_count} != "0" ]]; then
-        add_basic_check unit
+        add_basic_check pmd
     fi
 
     start_end::group_end
@@ -484,6 +443,7 @@ function get_count_misc_files() {
     start_end::group_start "Count misc. files"
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
@@ -493,13 +453,16 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "pmd-ruleset.xml"
         "/NOTICE$"
+        "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
     )
     local ignore_array=(
         "^.github/workflows/post-commit.yml"
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/acceptance.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
     )
     filter_changed_files true
@@ -532,7 +495,6 @@ function calculate_test_types_to_run() {
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
-        add_basic_check unit
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
@@ -564,7 +526,6 @@ function set_outputs() {
     initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compile "${compile_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
-    initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
 }
@@ -608,10 +569,8 @@ BASIC_CHECKS="rat"
 check_needs_author
 check_needs_bats
 check_needs_checkstyle
-check_needs_dependency
 check_needs_docs
 check_needs_findbugs
-check_needs_native
-check_needs_unit_test
+check_needs_pmd
 calculate_test_types_to_run
 set_outputs

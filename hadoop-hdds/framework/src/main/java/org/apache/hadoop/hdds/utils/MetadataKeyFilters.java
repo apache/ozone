@@ -1,42 +1,29 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 /**
  * An utility class to filter levelDB keys.
  */
 public final class MetadataKeyFilters {
   private MetadataKeyFilters() { }
-
-  @Deprecated
-  public static KeyPrefixFilter getDeletingKeyFilter() {
-    return new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-  }
 
   /**
    * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
@@ -45,142 +32,52 @@ public final class MetadataKeyFilters {
    * added in the future.
    */
   public static KeyPrefixFilter getUnprefixedKeyFilter() {
-    return new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter("#", true);
-  }
-  /**
-   * Interface for RocksDB key filters.
-   */
-  public interface MetadataKeyFilter {
-    /**
-     * Filter levelDB key with a certain condition.
-     *
-     * @param preKey     previous key.
-     * @param currentKey current key.
-     * @param nextKey    next key.
-     * @return true if a certain condition satisfied, return false otherwise.
-     */
-    boolean filterKey(byte[] preKey, byte[] currentKey, byte[] nextKey);
-
-    default int getKeysScannedNum() {
-      return 0;
-    }
-
-    default int getKeysHintedNum() {
-      return 0;
-    }
+    return KeyPrefixFilter.newFilter("#", true);
   }
 
   /**
-   * Utility class to filter key by a string prefix. This filter
-   * assumes keys can be parsed to a string.
+   * Filter key by a byte[] prefix.
    */
-  public static class KeyPrefixFilter implements MetadataKeyFilter {
+  public static final class KeyPrefixFilter {
+    private static final KeyPrefixFilter NULL_FILTER = new KeyPrefixFilter(null, true);
 
-    private List<String> positivePrefixList = new ArrayList<>();
-    private List<String> negativePrefixList = new ArrayList<>();
-    private boolean atleastOnePositiveMatch;
+    private final byte[] prefix;
+    private final boolean isPositive;
     private int keysScanned = 0;
     private int keysHinted = 0;
 
-    public KeyPrefixFilter() { }
-
-    /**
-     * KeyPrefixFilter constructor. It is made of positive and negative prefix
-     * list. PositivePrefixList is the list of prefixes which are accepted
-     * whereas negativePrefixList contains the list of prefixes which are
-     * rejected.
-     *
-     * @param atleastOnePositiveMatch if positive it requires key to be accepted
-     *                               by atleast one positive filter.
-     */
-    public KeyPrefixFilter(boolean atleastOnePositiveMatch) {
-      this.atleastOnePositiveMatch = atleastOnePositiveMatch;
+    private KeyPrefixFilter(byte[] prefix, boolean isPositive) {
+      this.prefix = prefix;
+      this.isPositive = isPositive;
     }
 
-    public KeyPrefixFilter addFilter(String keyPrefix) {
-      addFilter(keyPrefix, false);
-      return this;
-    }
-
-    public KeyPrefixFilter addFilter(String keyPrefix, boolean negative) {
-      Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
-          "KeyPrefix is null or empty: %s", keyPrefix);
-      // keyPrefix which needs to be added should not be prefix of any opposing
-      // filter already present. If keyPrefix is a negative filter it should not
-      // be a prefix of any positive filter. Nor should any opposing filter be
-      // a prefix of keyPrefix.
-      // For example if b0 is accepted b can not be rejected and
-      // if b is accepted b0 can not be rejected. If these scenarios need to be
-      // handled we need to add priorities.
-      if (negative) {
-        Preconditions.checkArgument(positivePrefixList.stream().noneMatch(
-            prefix -> prefix.startsWith(keyPrefix) || keyPrefix
-                .startsWith(prefix)),
-            "KeyPrefix: " + keyPrefix + " already accepted.");
-        this.negativePrefixList.add(keyPrefix);
-      } else {
-        Preconditions.checkArgument(negativePrefixList.stream().noneMatch(
-            prefix -> prefix.startsWith(keyPrefix) || keyPrefix
-                .startsWith(prefix)),
-            "KeyPrefix: " + keyPrefix + " already rejected.");
-        this.positivePrefixList.add(keyPrefix);
-      }
-      return this;
-    }
-
-    @Override
-    public boolean filterKey(byte[] preKey, byte[] currentKey,
-        byte[] nextKey) {
+    /** @return true if the given should be returned. */
+    public boolean filterKey(byte[] currentKey) {
       keysScanned++;
       if (currentKey == null) {
         return false;
       }
-      boolean accept;
-
       // There are no filters present
-      if (positivePrefixList.isEmpty() && negativePrefixList.isEmpty()) {
+      if (prefix == null) {
         return true;
       }
-
-      accept = !positivePrefixList.isEmpty() && positivePrefixList.stream()
-          .anyMatch(prefix -> {
-            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
-            return prefixMatch(prefixBytes, currentKey);
-          });
-      if (accept) {
-        keysHinted++;
-        return true;
-      } else if (atleastOnePositiveMatch) {
-        return false;
-      }
-
-      accept = !negativePrefixList.isEmpty() && negativePrefixList.stream()
-          .allMatch(prefix -> {
-            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
-            return !prefixMatch(prefixBytes, currentKey);
-          });
-      if (accept) {
+      // Use == since true iff (positive && matched) || (!positive && !matched)
+      if (isPositive == prefixMatch(prefix, currentKey)) {
         keysHinted++;
         return true;
       }
-
       return false;
     }
 
-    @Override
     public int getKeysScannedNum() {
       return keysScanned;
     }
 
-    @Override
     public int getKeysHintedNum() {
       return keysHinted;
     }
 
     private static boolean prefixMatch(byte[] prefix, byte[] key) {
-      Preconditions.checkNotNull(prefix);
-      Preconditions.checkNotNull(key);
       if (key.length < prefix.length) {
         return false;
       }
@@ -190,6 +87,27 @@ public final class MetadataKeyFilters {
         }
       }
       return true;
+    }
+
+    /** The same as newFilter(prefix, false). */
+    public static KeyPrefixFilter newFilter(String prefix) {
+      return newFilter(prefix, false);
+    }
+
+    /** @return a positive/negative filter for the given prefix. */
+    public static KeyPrefixFilter newFilter(String prefix, boolean negative) {
+      if (prefix == null) {
+        if (negative) {
+          throw new IllegalArgumentException("The prefix of a negative filter cannot be null");
+        }
+        return NULL_FILTER;
+      }
+
+      // TODO: HDDS-13329: Two exising bugs in the code:
+      //       Bug 1: StringUtils.string2Bytes may silently replace unsupported characters with '?'.
+      //       Bug 2: The encoding of StringUtils.string2Bytes can be different from the Codec of key.
+      //       It should use the same Codec as the key in order to fix them.
+      return new KeyPrefixFilter(StringUtils.string2Bytes(prefix), !negative);
     }
   }
 }

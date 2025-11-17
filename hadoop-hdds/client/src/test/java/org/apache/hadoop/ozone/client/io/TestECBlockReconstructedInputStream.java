@@ -1,31 +1,25 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,10 +30,17 @@ import java.util.SplittableRandom;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
-
-import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.
@@ -54,6 +55,7 @@ public class TestECBlockReconstructedInputStream {
   private ByteBufferPool bufferPool = new ElasticByteBufferPool();
   private ExecutorService ecReconstructExecutor =
       Executors.newFixedThreadPool(3);
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -74,8 +76,11 @@ public class TestECBlockReconstructedInputStream {
     BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
-        null, null, streamFactory, bufferPool, ecReconstructExecutor);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+        null, null, streamFactory, bufferPool, ecReconstructExecutor,
+        clientConfig);
   }
 
   @Test
@@ -151,7 +156,6 @@ public class TestECBlockReconstructedInputStream {
       }
     }
   }
-
 
   @Test
   public void testReadDataWithUnbuffer() throws IOException {
@@ -343,8 +347,6 @@ public class TestECBlockReconstructedInputStream {
       dataGenerator.nextInt(255);
     }
   }
-
-
 
   /**
    * Return a list of num ByteBuffers of the given size.

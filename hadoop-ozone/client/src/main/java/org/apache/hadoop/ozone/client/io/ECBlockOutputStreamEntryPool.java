@@ -1,35 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamBufferArgs;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-
-import java.time.Clock;
-import java.time.ZoneOffset;
 
 /**
  * {@link BlockOutputStreamEntryPool} is responsible to manage OM communication
@@ -44,37 +32,14 @@ import java.time.ZoneOffset;
  * @see ECBlockOutputStreamEntry
  */
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
-
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
-      OzoneManagerProtocol omClient,
-      String requestId,
-      ReplicationConfig replicationConfig,
-      String uploadID,
-      int partNumber,
-      boolean isMultipart,
-      OmKeyInfo info,
-      boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory,
-      long openID,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs) {
-    super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
-        isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
-        openID, clientMetrics, streamBufferArgs);
-    assert replicationConfig instanceof ECReplicationConfig;
+  public ECBlockOutputStreamEntryPool(ECKeyOutputStream.Builder builder) {
+    super(builder);
   }
 
   @Override
-  ExcludeList createExcludeList() {
-    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
-        Clock.system(ZoneOffset.UTC));
-  }
-
-  @Override
-  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
-    return
-        new ECBlockOutputStreamEntry.Builder()
-            .setBlockID(subKeyInfo.getBlockID())
+  ECBlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
+    final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
+    b.setBlockID(subKeyInfo.getBlockID())
             .setKey(getKeyName())
             .setXceiverClientManager(getXceiverClientFactory())
             .setPipeline(subKeyInfo.getPipeline())
@@ -84,7 +49,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(getClientMetrics())
             .setStreamBufferArgs(getStreamBufferArgs())
-            .build();
+            .setExecutorServiceSupplier(getExecutorServiceSupplier());
+    return b.build();
   }
 
   @Override

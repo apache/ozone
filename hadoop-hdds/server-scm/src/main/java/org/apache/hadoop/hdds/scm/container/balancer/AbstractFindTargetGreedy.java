@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +18,12 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -30,14 +35,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
-
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Find a target for a source datanode with greedy strategy.
@@ -56,7 +53,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       ContainerManager containerManager,
       PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager) {
-    sizeEnteringNode = new HashMap<>();
+    sizeEnteringNode = new ConcurrentHashMap<>();
     this.containerManager = containerManager;
     this.placementPolicyValidateProxy = placementPolicyValidateProxy;
     this.nodeManager = nodeManager;
@@ -83,9 +80,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     if (ret != 0) {
       return ret;
     }
-    UUID uuidA = a.getDatanodeDetails().getUuid();
-    UUID uuidB = b.getDatanodeDetails().getUuid();
-    return uuidA.compareTo(uuidB);
+    return a.getDatanodeID().compareTo(b.getDatanodeID());
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
@@ -96,7 +91,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    * Find a {@link ContainerMoveSelection} consisting of a target and
    * container to move for a source datanode. Favours more under-utilized nodes.
    * @param source Datanode to find a target for
-   * @param candidateContainers Set of candidate containers satisfying
+   * @param container candidate container satisfying
    *                            selection criteria
    *                            {@link ContainerBalancerSelectionCriteria}
    * (DatanodeDetails, Long) method returns true if the size specified in the
@@ -105,33 +100,31 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    */
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Set<ContainerID> candidateContainers) {
+      DatanodeDetails source, ContainerID container) {
     sortTargetForSource(source);
     for (DatanodeUsageInfo targetInfo : potentialTargets) {
       DatanodeDetails target = targetInfo.getDatanodeDetails();
-      for (ContainerID container : candidateContainers) {
-        Set<ContainerReplica> replicas;
-        ContainerInfo containerInfo;
-        try {
-          replicas = containerManager.getContainerReplicas(container);
-          containerInfo = containerManager.getContainer(container);
-        } catch (ContainerNotFoundException e) {
-          logger.warn("Could not get Container {} from Container Manager for " +
-              "obtaining replicas in Container Balancer.", container, e);
-          continue;
-        }
+      Set<ContainerReplica> replicas;
+      ContainerInfo containerInfo;
+      try {
+        replicas = containerManager.getContainerReplicas(container);
+        containerInfo = containerManager.getContainer(container);
+      } catch (ContainerNotFoundException e) {
+        logger.warn("Could not get Container {} from Container Manager for " +
+            "obtaining replicas in Container Balancer.", container, e);
+        return null;
+      }
 
-        if (replicas.stream().noneMatch(
-            replica -> replica.getDatanodeDetails().equals(target)) &&
-            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
-            target) &&
-            canSizeEnterTarget(target, containerInfo.getUsedBytes())) {
-          return new ContainerMoveSelection(target, container);
-        }
+      if (replicas.stream().noneMatch(
+          replica -> replica.getDatanodeDetails().equals(target)) &&
+          containerMoveSatisfiesPlacementPolicy(container, replicas, source,
+          target) &&
+          canSizeEnterTarget(target, containerInfo.getUsedBytes())) {
+        return new ContainerMoveSelection(target, container);
       }
     }
-    logger.info("Container Balancer could not find a target for " +
-        "source datanode {}", source.getUuidString());
+    logger.debug("Container Balancer could not find a target for " +
+        "source datanode {}", source);
     return null;
   }
 
@@ -168,8 +161,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
     if (!isPolicySatisfied) {
       logger.debug("Moving container {} from source {} to target {} will not " +
-              "satisfy placement policy.", containerID, source.getUuidString(),
-          target.getUuidString());
+              "satisfy placement policy.", containerID, source, target);
     }
     return isPolicySatisfied;
   }
@@ -195,7 +187,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       if (sizeEnteringAfterMove > config.getMaxSizeEnteringTarget()) {
         logger.debug("{} bytes cannot enter datanode {} because 'size" +
                 ".entering.target.max' limit is {} and {} bytes have already " +
-                "entered.", size, target.getUuidString(),
+                "entered.", size, target,
             config.getMaxSizeEnteringTarget(),
             sizeEnteringNode.get(target));
         return false;
@@ -204,14 +196,13 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
           .calculateUtilization(sizeEnteringAfterMove), upperLimit) > 0) {
         logger.debug("{} bytes cannot enter datanode {} because its " +
                 "utilization will exceed the upper limit of {}.", size,
-            target.getUuidString(), upperLimit);
+            target, upperLimit);
         return false;
       }
       return true;
     }
 
-    logger.warn("No record of how much size has entered datanode {}",
-        target.getUuidString());
+    logger.warn("No record of how much size has entered datanode {}", target);
     return false;
   }
 
@@ -228,11 +219,13 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       if (totalEnteringSize < config.getMaxSizeEnteringTarget()) {
         //reorder
         potentialTargets.add(nodeManager.getUsageInfo(target));
+      } else {
+        logger.debug("Datanode {} removed from the list of potential targets. The total size of data entering it in " +
+            "this iteration is {}.", target, totalEnteringSize);
       }
       return;
     }
-    logger.warn("Cannot find {} in the candidates target nodes",
-        target.getUuid());
+    logger.warn("Cannot find {} in the candidates target nodes", target);
   }
 
   /**
@@ -278,4 +271,13 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     return nodeManager;
   }
 
+  @Override
+  public Map<DatanodeDetails, Long> getSizeEnteringNodes() {
+    return sizeEnteringNode;
+  }
+
+  @Override
+  public void clearSizeEnteringNodes() {
+    sizeEnteringNode.clear();
+  }
 }

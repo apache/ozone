@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,62 +14,63 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.Set;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test Node Storage Map.
  */
 public class TestSCMNodeStorageStatMap {
   private static final int DATANODE_COUNT = 100;
-  private final long capacity = 10L * OzoneConsts.GB;
-  private final long used = 2L * OzoneConsts.GB;
-  private final long remaining = capacity - used;
+  private static final long CAPACITY = 10L * OzoneConsts.GB;
+  private static final long USED = 2L * OzoneConsts.GB;
+  private static final long REMAINING = CAPACITY - USED;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private final Map<UUID, Set<StorageLocationReport>> testData =
       new ConcurrentHashMap<>();
+  @TempDir
+  private File tempFile;
 
   private void generateData() {
     for (int dnIndex = 1; dnIndex <= DATANODE_COUNT; dnIndex++) {
       UUID dnId = UUID.randomUUID();
       Set<StorageLocationReport> reportSet = new HashSet<>();
-      String path = GenericTestUtils.getTempPath(
-          TestSCMNodeStorageStatMap.class.getSimpleName() + "-" + dnIndex);
+      String path = tempFile.getPath() + "-" + dnIndex;
       StorageLocationReport.Builder builder =
           StorageLocationReport.newBuilder();
       builder.setStorageType(StorageType.DISK).setId(dnId.toString())
-          .setStorageLocation(path).setScmUsed(used).setRemaining(remaining)
-          .setCapacity(capacity).setFailed(false);
+          .setStorageLocation(path).setScmUsed(USED).setRemaining(REMAINING)
+          .setCapacity(CAPACITY).setFailed(false);
       reportSet.add(builder.build());
       testData.put(UUID.randomUUID(), reportSet);
     }
@@ -114,13 +114,12 @@ public class TestSCMNodeStorageStatMap {
   public void testUpdateUnknownDatanode() {
     SCMNodeStorageStatMap map = new SCMNodeStorageStatMap(conf);
     UUID unknownNode = UUID.randomUUID();
-    String path = GenericTestUtils.getTempPath(
-        TestSCMNodeStorageStatMap.class.getSimpleName() + "-" + unknownNode);
+    String path = tempFile.getPath() + "-" + unknownNode;
     Set<StorageLocationReport> reportSet = new HashSet<>();
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
     builder.setStorageType(StorageType.DISK).setId(unknownNode.toString())
-        .setStorageLocation(path).setScmUsed(used).setRemaining(remaining)
-        .setCapacity(capacity).setFailed(false);
+        .setStorageLocation(path).setScmUsed(USED).setRemaining(REMAINING)
+        .setCapacity(CAPACITY).setFailed(false);
     reportSet.add(builder.build());
     Throwable t = assertThrows(SCMException.class,
         () -> map.updateDatanodeMap(unknownNode, reportSet));
@@ -135,9 +134,8 @@ public class TestSCMNodeStorageStatMap {
     SCMNodeStorageStatMap map = new SCMNodeStorageStatMap(conf);
     map.insertNewDatanode(key, reportSet);
     assertTrue(map.isKnownDatanode(key));
-    UUID storageId = UUID.randomUUID();
-    String path =
-        GenericTestUtils.getRandomizedTempPath().concat("/" + storageId);
+    DatanodeID storageId = DatanodeID.randomID();
+    String path = tempFile.getPath().concat("/" + storageId);
     StorageLocationReport report = reportSet.iterator().next();
     long reportCapacity = report.getCapacity();
     long reportScmUsed = report.getScmUsed();
@@ -158,7 +156,7 @@ public class TestSCMNodeStorageStatMap {
     assertEquals(SCMNodeStorageStatMap.ReportStatus.ALL_IS_WELL, result.getStatus());
 
     reportList.add(HddsTestUtils
-        .createStorageReport(UUID.randomUUID(), path, reportCapacity,
+        .createStorageReport(DatanodeID.randomID(), path, reportCapacity,
             reportCapacity, 0, null));
     result = map.processNodeReport(key, HddsTestUtils.createNodeReport(
         reportList, Collections.emptyList()));
@@ -184,22 +182,20 @@ public class TestSCMNodeStorageStatMap {
         .entrySet()) {
       map.insertNewDatanode(keyEntry.getKey(), keyEntry.getValue());
     }
-    assertEquals(DATANODE_COUNT * capacity, map.getTotalCapacity());
-    assertEquals(DATANODE_COUNT * remaining, map.getTotalFreeSpace());
-    assertEquals(DATANODE_COUNT * used, map.getTotalSpaceUsed());
+    assertEquals(DATANODE_COUNT * CAPACITY, map.getTotalCapacity());
+    assertEquals(DATANODE_COUNT * REMAINING, map.getTotalFreeSpace());
+    assertEquals(DATANODE_COUNT * USED, map.getTotalSpaceUsed());
 
     // update 1/4th of the datanode to be full
     for (Map.Entry<UUID, Set<StorageLocationReport>> keyEntry : testData
         .entrySet()) {
       Set<StorageLocationReport> reportSet = new HashSet<>();
-      String path = GenericTestUtils.getTempPath(
-          TestSCMNodeStorageStatMap.class.getSimpleName() + "-" + keyEntry
-              .getKey().toString());
+      String path = tempFile.getPath() + "-" + keyEntry.getKey().toString();
       StorageLocationReport.Builder builder =
           StorageLocationReport.newBuilder();
       builder.setStorageType(StorageType.DISK)
           .setId(keyEntry.getKey().toString()).setStorageLocation(path)
-          .setScmUsed(capacity).setRemaining(0).setCapacity(capacity)
+          .setScmUsed(CAPACITY).setRemaining(0).setCapacity(CAPACITY)
           .setFailed(false);
       reportSet.add(builder.build());
 
@@ -216,9 +212,9 @@ public class TestSCMNodeStorageStatMap {
     assertEquals(0.75 * DATANODE_COUNT,
         map.getDatanodeList(SCMNodeStorageStatMap.UtilizationThreshold.NORMAL).size(), 0);
 
-    assertEquals(DATANODE_COUNT * capacity, map.getTotalCapacity(), 0);
-    assertEquals(0.75 * DATANODE_COUNT * remaining, map.getTotalFreeSpace(), 0);
-    assertEquals(0.75 * DATANODE_COUNT * used + (0.25 * DATANODE_COUNT * capacity),
+    assertEquals(DATANODE_COUNT * CAPACITY, map.getTotalCapacity(), 0);
+    assertEquals(0.75 * DATANODE_COUNT * REMAINING, map.getTotalFreeSpace(), 0);
+    assertEquals(0.75 * DATANODE_COUNT * USED + (0.25 * DATANODE_COUNT * CAPACITY),
         map.getTotalSpaceUsed(), 0);
     counter = 1;
     // Remove 1/4 of the DataNodes from the Map
@@ -236,9 +232,9 @@ public class TestSCMNodeStorageStatMap {
     assertEquals(0.75 * DATANODE_COUNT,
         map.getDatanodeList(SCMNodeStorageStatMap.UtilizationThreshold.NORMAL).size(), 0);
 
-    assertEquals(0.75 * DATANODE_COUNT * capacity, map.getTotalCapacity(), 0);
-    assertEquals(0.75 * DATANODE_COUNT * remaining, map.getTotalFreeSpace(), 0);
-    assertEquals(0.75 * DATANODE_COUNT * used, map.getTotalSpaceUsed(), 0);
+    assertEquals(0.75 * DATANODE_COUNT * CAPACITY, map.getTotalCapacity(), 0);
+    assertEquals(0.75 * DATANODE_COUNT * REMAINING, map.getTotalFreeSpace(), 0);
+    assertEquals(0.75 * DATANODE_COUNT * USED, map.getTotalSpaceUsed(), 0);
 
   }
 }

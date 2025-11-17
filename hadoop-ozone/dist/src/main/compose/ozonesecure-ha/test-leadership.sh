@@ -17,6 +17,8 @@
 
 #suite:leadership
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -31,7 +33,7 @@ start_docker_env
 
 execute_robot_test s3g kinit.robot
 
-execute_robot_test s3g admincli
+execute_robot_test s3g admincli/scmrole.robot
 
 execute_robot_test s3g omha/om-fetch-key.robot
 

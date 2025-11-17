@@ -1,21 +1,33 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.security.cert.X509Certificate;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -23,7 +35,6 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -44,28 +55,15 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.InetAddress;
-import java.security.cert.X509Certificate;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
-
 /**
  * Utilities for SCM HA security.
  */
-public final class HASecurityUtils {
+public final class  HASecurityUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(HASecurityUtils.class);
 
   private HASecurityUtils() {
   }
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HASecurityUtils.class);
 
   /**
    * Initialize Security which generates public, private key pair and get SCM
@@ -151,16 +149,12 @@ public final class HASecurityUtils {
    *
    * @param conf
    * @param certificateClient
-   * @return
    */
   public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
       CertificateClient certificateClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      KeyStoresFactory serverKeyFactory =
-          certificateClient.getServerKeyStoresFactory();
-
-      return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
-          serverKeyFactory.getTrustManagers()[0], true);
+      return new GrpcTlsConfig(certificateClient.getKeyManager(),
+          certificateClient.getTrustManager(), true);
     }
     return null;
   }

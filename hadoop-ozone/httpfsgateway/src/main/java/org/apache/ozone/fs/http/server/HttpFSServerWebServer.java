@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.fs.http.server;
 
-import static org.apache.hadoop.util.StringUtils.startupShutdownMessage;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.startupShutdownMessage;
+import static org.apache.hadoop.ozone.util.OzoneVersionInfo.OZONE_VERSION_INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -26,10 +27,11 @@ import java.net.URI;
 import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Set;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
 import org.apache.hadoop.security.authorize.AccessControlList;
@@ -71,7 +73,7 @@ public class HttpFSServerWebServer {
   private final HttpServer2 httpServer;
   private final String scheme;
 
-  HttpFSServerWebServer(Configuration conf, Configuration sslConf) throws
+  HttpFSServerWebServer(OzoneConfiguration conf, Configuration sslConf) throws
       Exception {
     // Override configuration with deprecated environment variables.
     deprecateEnv("HTTPFS_HTTP_HOSTNAME", conf, HTTP_HOSTNAME_KEY,
@@ -122,7 +124,7 @@ public class HttpFSServerWebServer {
     httpServer = new HttpServer2.Builder()
         .setName(NAME)
         .setConf(conf)
-        .setSSLConf(sslConf)
+        .setSSLConf(new LegacyHadoopConfigurationSource(sslConf))
         .authFilterConfigurationPrefix(HttpFSAuthenticationFilter.CONF_PREFIX)
         .setACL(new AccessControlList(conf.get(HTTP_ADMINS_KEY, " ")))
         .addEndpoint(endpoint)
@@ -176,8 +178,8 @@ public class HttpFSServerWebServer {
   }
 
   public static void main(String[] args) throws Exception {
-    startupShutdownMessage(HttpFSServerWebServer.class, args, LOG);
-    Configuration conf = new Configuration(true);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    startupShutdownMessage(OZONE_VERSION_INFO, HttpFSServerWebServer.class, args, LOG, conf);
     Configuration sslConf = SSLFactory.readSSLConfiguration(conf,
         SSLFactory.Mode.SERVER);
     HttpFSServerWebServer webServer =

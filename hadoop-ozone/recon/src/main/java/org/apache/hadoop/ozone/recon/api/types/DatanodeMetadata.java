@@ -1,30 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-
+import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.util.List;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
 /**
  * Metadata object that represents a Datanode.
@@ -33,51 +34,62 @@ import java.util.List;
 public final class DatanodeMetadata {
 
   @XmlElement(name = "uuid")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String uuid;
 
   @XmlElement(name = "hostname")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String hostname;
 
   @XmlElement(name = "state")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeState state;
 
   @XmlElement(name = "opState")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeOperationalState opState;
 
   @XmlElement(name = "lastHeartbeat")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long lastHeartbeat;
 
   @XmlElement(name = "storageReport")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private DatanodeStorageReport datanodeStorageReport;
 
   @XmlElement(name = "pipelines")
   private List<DatanodePipeline> pipelines;
 
   @XmlElement(name = "containers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int containers;
 
   @XmlElement(name = "openContainers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int openContainers;
 
   @XmlElement(name = "leaderCount")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int leaderCount;
 
   @XmlElement(name = "version")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String version;
 
   @XmlElement(name = "setupTime")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long setupTime;
 
   @XmlElement(name = "revision")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String revision;
 
-  @XmlElement(name = "buildDate")
-  private String buildDate;
-
   @XmlElement(name = "layoutVersion")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int layoutVersion;
 
   @XmlElement(name = "networkLocation")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String networkLocation;
 
   private DatanodeMetadata(Builder builder) {
@@ -94,7 +106,6 @@ public final class DatanodeMetadata {
     this.version = builder.version;
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
-    this.buildDate = builder.buildDate;
     this.layoutVersion = builder.layoutVersion;
     this.networkLocation = builder.networkLocation;
   }
@@ -151,10 +162,6 @@ public final class DatanodeMetadata {
     return revision;
   }
 
-  public String getBuildDate() {
-    return buildDate;
-  }
-
   public int getLayoutVersion() {
     return layoutVersion;
   }
@@ -175,7 +182,6 @@ public final class DatanodeMetadata {
   /**
    * Builder for DatanodeMetadata.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String hostname;
     private String uuid;
@@ -190,7 +196,6 @@ public final class DatanodeMetadata {
     private String version;
     private long setupTime;
     private String revision;
-    private String buildDate;
     private int layoutVersion;
     private String networkLocation;
 
@@ -200,86 +205,67 @@ public final class DatanodeMetadata {
       this.leaderCount = 0;
     }
 
-    public Builder withHostname(String hostname) {
+    public Builder setHostname(String hostname) {
       this.hostname = hostname;
       return this;
     }
 
-    public Builder withState(NodeState state) {
+    public Builder setState(NodeState state) {
       this.state = state;
       return this;
     }
 
-    public Builder withOperationalState(NodeOperationalState opState) {
-      this.opState = opState;
-      return this;
-    }
-
-    public Builder withLastHeartbeat(long lastHeartbeat) {
+    public Builder setLastHeartbeat(long lastHeartbeat) {
       this.lastHeartbeat = lastHeartbeat;
       return this;
     }
 
-    public Builder withDatanodeStorageReport(DatanodeStorageReport 
+    public Builder setDatanodeStorageReport(DatanodeStorageReport 
                                                  datanodeStorageReport) {
       this.datanodeStorageReport = datanodeStorageReport;
       return this;
     }
 
-    public Builder withPipelines(List<DatanodePipeline> pipelines) {
+    public Builder setPipelines(List<DatanodePipeline> pipelines) {
       this.pipelines = pipelines;
       return this;
     }
 
-    public Builder withContainers(int containers) {
+    public Builder setContainers(int containers) {
       this.containers = containers;
       return this;
     }
 
-    public Builder withOpenContainers(int openContainers) {
+    public Builder setOpenContainers(int openContainers) {
       this.openContainers = openContainers;
       return this;
     }
 
-    public Builder withLeaderCount(int leaderCount) {
+    public Builder setLeaderCount(int leaderCount) {
       this.leaderCount = leaderCount;
       return this;
     }
 
-    public Builder withUUid(String uuid) {
+    public Builder setUuid(String uuid) {
       this.uuid = uuid;
       return this;
     }
 
-    public Builder withVersion(String version) {
-      this.version = version;
+    public Builder setDatanode(DatanodeInfo datanode) {
+      this.uuid = datanode.getUuidString();
+      this.hostname = datanode.getHostName();
+      this.networkLocation = datanode.getNetworkLocation();
+
+      this.opState = datanode.getPersistedOpState();
+
+      this.version = datanode.getVersion();
+      this.revision = datanode.getRevision();
+      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
+
+      this.setupTime = datanode.getSetupTime();
       return this;
     }
 
-    public Builder withSetupTime(long setupTime) {
-      this.setupTime = setupTime;
-      return this;
-    }
-
-    public Builder withRevision(String revision) {
-      this.revision = revision;
-      return this;
-    }
-
-    public Builder withBuildDate(String buildDate) {
-      this.buildDate = buildDate;
-      return this;
-    }
-
-    public Builder withLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder withNetworkLocation(String networkLocation) {
-      this.networkLocation = networkLocation;
-      return this;
-    }
     /**
      * Constructs DatanodeMetadata.
      *

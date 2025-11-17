@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.common;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,18 +31,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
-
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
-
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -47,9 +47,18 @@ public class TestChunkBuffer {
     return ThreadLocalRandom.current().nextInt(n);
   }
 
+  @BeforeAll
+  public static void beforeAll() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
+  }
+
   @Test
-  @Timeout(1)
-  public void testImplWithByteBuffer() {
+  void testImplWithByteBuffer() throws IOException {
     runTestImplWithByteBuffer(1);
     runTestImplWithByteBuffer(1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -57,15 +66,16 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithByteBuffer(int n) {
+  private static void runTestImplWithByteBuffer(int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, 0, ChunkBuffer.allocate(n));
+    try (ChunkBuffer c = ChunkBuffer.allocate(n)) {
+      runTestImpl(expected, 0, c);
+    }
   }
 
   @Test
-  @Timeout(1)
-  public void testIncrementalChunkBuffer() {
+  void testIncrementalChunkBuffer() throws IOException {
     runTestIncrementalChunkBuffer(1, 1);
     runTestIncrementalChunkBuffer(4, 8);
     runTestIncrementalChunkBuffer(16, 1 << 10);
@@ -76,16 +86,16 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestIncrementalChunkBuffer(int increment, int n) {
+  private static void runTestIncrementalChunkBuffer(int increment, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment,
-        new IncrementalChunkBuffer(n, increment, false));
+    try (IncrementalChunkBuffer c = new IncrementalChunkBuffer(n, increment, false)) {
+      runTestImpl(expected, increment, c);
+    }
   }
 
   @Test
-  @Timeout(1)
-  public void testImplWithList() {
+  void testImplWithList() throws IOException {
     runTestImplWithList(4, 8);
     runTestImplWithList(16, 1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -95,7 +105,7 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithList(int count, int n) {
+  private static void runTestImplWithList(int count, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
 
@@ -117,7 +127,7 @@ public class TestChunkBuffer {
     runTestImpl(expected, -1, impl);
   }
 
-  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) {
+  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) throws IOException {
     final int n = expected.length;
     System.out.println("n=" + n + ", impl=" + impl);
 
@@ -207,33 +217,13 @@ public class TestChunkBuffer {
         "offset=" + offset + ", length=" + length);
   }
 
-  private static void assertWrite(byte[] expected, ChunkBuffer impl) {
+  private static void assertWrite(byte[] expected, ChunkBuffer impl) throws IOException {
     impl.rewind();
     assertEquals(0, impl.position());
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
-
-    try {
-      impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
-    } catch (IOException e) {
-      fail("Unexpected error: " + e);
-    }
-
+    impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
     assertArrayEquals(expected, output.toByteArray());
     assertFalse(impl.hasRemaining());
-  }
-
-  private static String toString(byte[] arr) {
-    if (arr == null || arr.length == 0) {
-      return "";
-    }
-
-    StringBuilder sb = new StringBuilder();
-    for (byte b : arr) {
-      sb.append(Character.forDigit((b >> 4) & 0xF, 16))
-          .append(Character.forDigit((b & 0xF), 16))
-          .append(" ");
-    }
-    return sb.deleteCharAt(sb.length() - 1).toString();
   }
 }

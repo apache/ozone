@@ -1,31 +1,30 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.ratis.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Clock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A common implementation for background SCMService.
@@ -45,17 +44,14 @@ public final class BackgroundSCMService implements SCMService {
   private final Runnable periodicalTask;
   private volatile boolean runImmediately = false;
 
-  private BackgroundSCMService(
-      final Clock clock, final SCMContext scmContext,
-      final String serviceName, final long intervalInMillis,
-      final long waitTimeInMillis, final Runnable task) {
-    this.scmContext = scmContext;
-    this.clock = clock;
-    this.periodicalTask = task;
-    this.serviceName = serviceName;
-    this.log = LoggerFactory.getLogger(serviceName);
-    this.intervalInMillis = intervalInMillis;
-    this.waitTimeInMillis = waitTimeInMillis;
+  private BackgroundSCMService(Builder b) {
+    scmContext = b.scmContext;
+    clock = b.clock;
+    periodicalTask = b.periodicalTask;
+    serviceName = b.serviceName;
+    log = LoggerFactory.getLogger(serviceName);
+    intervalInMillis = b.intervalInMillis;
+    waitTimeInMillis = b.waitTimeInMillis;
     start();
   }
 
@@ -206,8 +202,7 @@ public final class BackgroundSCMService implements SCMService {
       Preconditions.assertNotNull(clock, "clock is null");
       Preconditions.assertNotNull(serviceName, "serviceName is null");
 
-      return new BackgroundSCMService(clock, scmContext, serviceName,
-          intervalInMillis, waitTimeInMillis, periodicalTask);
+      return new BackgroundSCMService(this);
     }
   }
 }

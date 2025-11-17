@@ -218,27 +218,10 @@ EDL 1.0
 EPL 2.0
 =====================
 
+   com.github.jnr:jnr-posix
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
-   org.aspectj:aspectjweaver
-
-
-CDDL 1.1 + GPLv2 with classpath exception
-=====================
-
-   com.sun.istack:istack-commons-runtime
-   com.sun.jersey:jersey-client
-   com.sun.jersey:jersey-core
-   com.sun.jersey:jersey-json
-   com.sun.jersey:jersey-server
-   com.sun.jersey:jersey-servlet
-   javax.annotation:javax.annotation-api
-   javax.el:javax.el-api
-   javax.interceptor:javax.interceptor-api
-   javax.servlet:javax.servlet-api
-   javax.servlet.jsp:jsp-api
-   javax.ws.rs:jsr311-api
    org.glassfish.hk2.external:aopalliance-repackaged
    org.glassfish.hk2.external:jakarta.inject
    org.glassfish.hk2.external:javax.inject
@@ -247,9 +230,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    org.glassfish.hk2:hk2-locator
    org.glassfish.hk2:hk2-utils
    org.glassfish.hk2:osgi-resource-locator
-   org.glassfish.jaxb:jaxb-runtime
-   org.glassfish.jaxb:txw2
-   org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
    org.glassfish.jersey.core:jersey-client
    org.glassfish.jersey.core:jersey-common
@@ -259,6 +239,24 @@ CDDL 1.1 + GPLv2 with classpath exception
    org.glassfish.jersey.inject:jersey-hk2
    org.glassfish.jersey.media:jersey-media-jaxb
    org.glassfish.jersey.media:jersey-media-json-jackson
+   org.jgrapht:jgrapht-core
+   org.jgrapht:jgrapht-ext
+
+
+CDDL 1.1 + GPLv2 with classpath exception
+=====================
+
+   com.sun.istack:istack-commons-runtime
+   com.sun.jersey:jersey-client
+   com.sun.jersey:jersey-core
+   javax.annotation:javax.annotation-api
+   javax.el:javax.el-api
+   javax.interceptor:javax.interceptor-api
+   javax.servlet:javax.servlet-api
+   javax.servlet.jsp:jsp-api
+   javax.ws.rs:jsr311-api
+   org.glassfish.jaxb:jaxb-runtime
+   org.glassfish.jaxb:txw2
 
 
 Apache License 2.0
@@ -267,6 +265,7 @@ Apache License 2.0
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
+   com.amazonaws:aws-java-sdk-logs
    com.amazonaws:aws-java-sdk-s3
    com.amazonaws:jmespath-java
    com.carrotsearch:hppc
@@ -276,12 +275,17 @@ Apache License 2.0
    com.fasterxml.jackson.dataformat:jackson-dataformat-cbor
    com.fasterxml.jackson.dataformat:jackson-dataformat-xml
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-base
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
+   com.github.jnr:jnr-a64asm
+   com.github.jnr:jnr-constants
+   com.github.jnr:jnr-ffi
+   com.github.jnr:jffi
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
-   com.google.code.findbugs:jsr305
    com.google.code.gson:gson
    com.google.errorprone:error_prone_annotations
    com.google.guava:failureaccess
@@ -295,22 +299,22 @@ Apache License 2.0
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
-   com.squareup.okhttp3:okhttp
-   com.squareup.okio:okio
+   com.squareup.okhttp3:okhttp-jvm
+   com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-collections:commons-collections
    commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
    commons-io:commons-io
    commons-lang:commons-lang
-   commons-logging:commons-logging
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
    info.picocli:picocli
+   info.picocli:picocli-shell-jline3
+   io.airlift:aircompressor
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
    io.grpc:grpc-context
@@ -319,10 +323,7 @@ Apache License 2.0
    io.grpc:grpc-protobuf
    io.grpc:grpc-protobuf-lite
    io.grpc:grpc-stub
-   io.jaegertracing:jaeger-client
-   io.jaegertracing:jaeger-core
-   io.jaegertracing:jaeger-thrift
-   io.jaegertracing:jaeger-tracerresolver
+   io.grpc:grpc-util
    io.netty:netty-buffer
    io.netty:netty-codec
    io.netty:netty-codec-http
@@ -341,22 +342,34 @@ Apache License 2.0
    io.netty:netty-transport-native-unix-common
    io.opencensus:opencensus-api
    io.opencensus:opencensus-contrib-grpc-metrics
-   io.opentracing.contrib:opentracing-tracerresolver
-   io.opentracing:opentracing-api
-   io.opentracing:opentracing-noop
-   io.opentracing:opentracing-util
+   io.opentelemetry:opentelemetry-api
+   io.opentelemetry:opentelemetry-common
+   io.opentelemetry:opentelemetry-context
+   io.opentelemetry:opentelemetry-exporter-common
+   io.opentelemetry:opentelemetry-exporter-otlp-common
+   io.opentelemetry:opentelemetry-exporter-otlp
+   io.opentelemetry:opentelemetry-exporter-sender-okhttp
+   io.opentelemetry:opentelemetry-sdk
+   io.opentelemetry:opentelemetry-sdk-common
+   io.opentelemetry:opentelemetry-sdk-common-extension-autoconfigure-spi
+   io.opentelemetry:opentelemetry-sdk-logs
+   io.opentelemetry:opentelemetry-sdk-metrics
+   io.opentelemetry:opentelemetry-sdk-trace
    io.perfmark:perfmark-api
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
    joda-time:joda-time
+   jakarta.inject:jakarta.inject-api
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
+   log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
+   org.apache.commons:commons-collections4
    org.apache.commons:commons-lang3
    org.apache.commons:commons-pool2
    org.apache.commons:commons-text
@@ -369,7 +382,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-hdfs
    org.apache.hadoop:hadoop-hdfs-client
    org.apache.hadoop:hadoop-shaded-guava
-   org.apache.hadoop:hadoop-shaded-protobuf
+   org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpasyncclient
    org.apache.httpcomponents:httpcore
    org.apache.httpcomponents:httpcore-nio
@@ -392,6 +405,7 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.orc:orc-core
+   org.apache.orc:orc-shims
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-audit
@@ -400,19 +414,16 @@ Apache License 2.0
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc
-   org.apache.ratis:ratis-metrics
+   org.apache.ratis:ratis-metrics-api
+   org.apache.ratis:ratis-metrics-dropwizard3
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api
+   org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
-   org.apache.thrift:libthrift
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.codehaus.jackson:jackson-core-asl
-   org.codehaus.jackson:jackson-jaxrs
-   org.codehaus.jackson:jackson-mapper-asl
-   org.codehaus.jackson:jackson-xc
    org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
@@ -424,14 +435,14 @@ Apache License 2.0
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
    org.javassist:javassist
+   org.jboss.weld.servlet:weld-servlet-shaded
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
-   org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jboss.weld.servlet:weld-servlet-shaded
    org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
+   org.jspecify:jspecify
    org.rocksdb:rocksdbjni
    org.springframework:spring-beans
    org.springframework:spring-core
@@ -440,38 +451,20 @@ Apache License 2.0
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
-   software.amazon.ion:ion-java
 
 MIT
 =====================
 
    com.bettercloud:vault-java-driver
+   com.github.jnr:jnr-x86asm
    com.kstruct:gethostname4j
-   org.bouncycastle:bcpkix-jdk15on
-   org.bouncycastle:bcprov-jdk15on
-   org.checkerframework:checker-qual
+   org.bouncycastle:bcpkix-jdk18on
+   org.bouncycastle:bcprov-jdk18on
+   org.bouncycastle:bcutil-jdk18on
    org.codehaus.mojo:animal-sniffer-annotations
-   org.kohsuke.metainf-services:metainf-services
+   org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
-
-
-EPL 2.0
-=====================
-
-   jakarta.annotation:jakarta.annotation-api
-   jakarta.ws.rs:jakarta.ws.rs-api
-   org.jgrapht:jgrapht-core
-   org.jgrapht:jgrapht-ext
-
-
-CDDL + GPLv2 with classpath exception
-=====================
-
-   javax.annotation:javax.annotation-api
-   javax.el:javax.el-api
-   javax.interceptor:javax.interceptor-api
-   javax.servlet:javax.servlet-api
 
 
 Public Domain
@@ -485,10 +478,15 @@ BSD 3-Clause
 
    com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
-   com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   org.jline:jline3
+   org.ow2.asm:asm
+   org.ow2.asm:asm-analysis
+   org.ow2.asm:asm-commons
+   org.ow2.asm:asm-tree
+   org.ow2.asm:asm-util
 
 
 BSD 2-Clause
@@ -515,8 +513,6 @@ Apache Software Foundation License 2.0
 nvd3-1.8.5.min.js.map
 nvd3-1.8.5.min.css.map
 nvd3-1.8.5.min.js
-AbstractFuture.java
-TimeoutFuture.java
 
 
 BSD 3-Clause

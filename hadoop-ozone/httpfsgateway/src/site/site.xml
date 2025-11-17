@@ -17,12 +17,12 @@
     <skin>
       <groupId>org.apache.maven.skins</groupId>
       <artifactId>maven-stylus-skin</artifactId>
-      <version>${maven-stylus-skin.version}</version>
+      <version>1.5</version>
     </skin>
 
     <body>
       <links>
-        <item name="Apache Hadoop" href="http://hadoop.apache.org/"/>
+        <item name="Apache Ozone" href="https://ozone.apache.org/"/>
       </links>
     </body>
 

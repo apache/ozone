@@ -1,3 +1,16 @@
+<div align="center">
+  <a href="https://ozone.apache.org">
+    <img src="https://www.apache.org/logos/res/ozone/default.png" alt="Apache Ozone Logo" />
+  </a>
+</div>
+
+[![License](https://img.shields.io/:license-Apache%202-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
+[![Docker Pulls](https://img.shields.io/docker/pulls/apache/ozone.svg)](https://hub.docker.com/r/apache/ozone)
+[![Docker Stars](https://img.shields.io/docker/stars/apache/ozone.svg)](https://hub.docker.com/r/apache/ozone)
+[![Contributors](https://img.shields.io/github/contributors/apache/ozone)](https://github.com/apache/ozone/graphs/contributors)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/apache/ozone)](https://github.com/apache/ozone/commits/master)
+[![OSSRank](https://shields.io/endpoint?url=https://ossrank.com/shield/3018)](https://ossrank.com/p/3018-apache-ozone)
+
 Apache Ozone
 ===
 
@@ -37,18 +50,35 @@ Latest release artifacts (source release and binary packages) are [available](ht
 
 ## Quick start
 
-### Run Ozone from published Docker image
+### Run Ozone with Docker Compose
 
-The easiest way to start a cluster with docker is:
+The easiest way to start a cluster with docker is by using Docker Compose:
 
+- Obtain Ozone’s sample Docker Compose configuration:
+```bash
+curl -O https://raw.githubusercontent.com/apache/ozone-docker/refs/heads/latest/docker-compose.yaml
 ```
-docker run -p 9878:9878 apache/ozone
+
+- Start the cluster
+```bash
+docker compose up -d --scale datanode=3
 ```
+
+- Note: By default, the cluster will be started with replication factor set to 1. It can be changed by setting the environment variable `OZONE_REPLICATION_FACTOR` to the desired value.
 
 And you can use AWS S3 cli:
 
+- First, let’s configure AWS access key and secret key. Because the cluster is not secured, you can use any arbitrary access key and secret key. For example:
+```bash
+export AWS_ACCESS_KEY_ID=testuser/scm@EXAMPLE.COM
+export AWS_SECRET_ACCESS_KEY=c261b6ecabf7d37d5f9ded654b1c724adac9bd9f13e247a235e567e8296d2999
+```
+
+- Then we can create a bucket and upload a file to it:
 ```
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=wordcount
+# create a temporary file to upload to Ozone via S3 support 
+ls -1 > /tmp/testfile
 aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /tmp/testfile  s3://wordcount/testfile
 ```
 

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
@@ -24,20 +22,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Test;
-
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests S3 Initiate Multipart Upload request.
@@ -51,7 +50,6 @@ public class TestS3InitiateMultipartUploadRequest
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
   }
 
-
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -62,8 +60,16 @@ public class TestS3InitiateMultipartUploadRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -84,6 +90,13 @@ public class TestS3InitiateMultipartUploadRequest
     assertNotNull(openMPUKeyInfo);
     assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
     assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
+    assertNotNull(openMPUKeyInfo.getMetadata());
+    assertEquals("custom-value1", openMPUKeyInfo.getMetadata().get("custom-key1"));
+    assertEquals("custom-value2", openMPUKeyInfo.getMetadata().get("custom-key2"));
+    assertNotNull(openMPUKeyInfo.getTags());
+    assertEquals("tag-value1", openMPUKeyInfo.getTags().get("tag-key1"));
+    assertEquals("tag-value2", openMPUKeyInfo.getTags().get("tag-key2"));
+
     assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
@@ -99,7 +112,6 @@ public class TestS3InitiateMultipartUploadRequest
             .getModificationTime(), openMPUKeyInfo.getCreationTime());
 
   }
-
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
@@ -224,21 +236,20 @@ public class TestS3InitiateMultipartUploadRequest
 
     List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
         .collect(Collectors.toList());
 
-    OzoneAcl parentAccessAcl = bucketAcls.stream()
+    List<OzoneAcl> parentAccessAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
-        .findAny().orElse(null);
+        .collect(Collectors.toList());
 
     // Should inherit parent DEFAULT Acls
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    assertEquals(parentDefaultAcl.stream()
-            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
-            .collect(Collectors.toList()), keyAcls,
+    assertTrue(keyAcls.containsAll(parentDefaultAcl),
         "Failed to inherit parent DEFAULT acls!");
 
     // Should not inherit parent ACCESS Acls
-    assertThat(keyAcls).doesNotContain(parentAccessAcl);
+    assertThat(keyAcls).doesNotContainAnyElementsOf(parentAccessAcl);
   }
 
 }

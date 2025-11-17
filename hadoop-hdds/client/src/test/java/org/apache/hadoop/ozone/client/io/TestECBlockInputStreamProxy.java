@@ -1,31 +1,25 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -35,10 +29,17 @@ import java.util.Map;
 import java.util.SplittableRandom;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for the  ECBlockInputStreamProxy class.
@@ -52,6 +53,7 @@ public class TestECBlockInputStreamProxy {
   private long randomSeed;
   private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGenerator;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() {
@@ -169,7 +171,7 @@ public class TestECBlockInputStreamProxy {
     BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
       assertThat(streamFactory.getStreams()).containsKey(false);
@@ -181,7 +183,7 @@ public class TestECBlockInputStreamProxy {
     dnMap = ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
       assertThat(streamFactory.getStreams()).doesNotContainKey(false);
@@ -342,8 +344,11 @@ public class TestECBlockInputStreamProxy {
 
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
       BlockLocationInfo blockInfo) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     return new ECBlockInputStreamProxy(
-        rConfig, blockInfo, true, null, null, streamFactory);
+        rConfig, blockInfo, null, null, streamFactory,
+        clientConfig);
   }
 
   private static class TestECBlockInputStreamFactory
@@ -372,8 +377,9 @@ public class TestECBlockInputStreamProxy {
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-        Function<BlockID, BlockLocationInfo> refreshFunction) {
+        XceiverClientFactory xceiverFactory,
+        Function<BlockID, BlockLocationInfo> refreshFunction,
+        OzoneClientConfig config) {
       this.failedLocations = failedDatanodes;
       ByteBuffer wrappedBuffer =
           ByteBuffer.wrap(data.array(), 0, data.capacity());

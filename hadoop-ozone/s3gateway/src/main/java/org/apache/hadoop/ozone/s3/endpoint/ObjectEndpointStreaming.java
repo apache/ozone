@@ -1,49 +1,48 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import javax.ws.rs.core.Response;
-import javax.xml.bind.DatatypeConverter;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
-import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
-import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.util.Map;
-
-import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
+import javax.ws.rs.core.Response;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Key level rest endpoints for Streaming.
@@ -62,12 +61,13 @@ final class ObjectEndpointStreaming {
       OzoneBucket bucket, String keyPath,
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
+      Map<String, String> tags,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
-          length, chunkSize, replicationConfig, keyMetadata, body, perf);
+          length, chunkSize, replicationConfig, keyMetadata, tags, body, perf);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -77,7 +77,7 @@ final class ObjectEndpointStreaming {
               keyPath);
           os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
               "when calling the PutObject/MPU PartUpload operation: " +
-              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+              OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
               " considered as Unix Paths. Path has Violated FS Semantics " +
               "which caused put operation to fail.");
           throw os3Exception;
@@ -98,19 +98,20 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
+      Map<String, String> tags,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
     long startNanos = Time.monotonicNowNanos();
     long writeLen;
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata)) {
+        length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
-      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
     return Pair.of(eTag, writeLen);
   }
@@ -123,15 +124,19 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      InputStream body, PerformanceStringBuilder perf, long startNanos)
+      DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
+      Map<String, String> tags)
       throws IOException {
-    long writeLen = 0;
+    long writeLen;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata)) {
+        length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
-      perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
+      String eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+          .toLowerCase();
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
     return writeLen;
   }
@@ -161,11 +166,6 @@ final class ObjectEndpointStreaming {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
-    // OmMultipartCommitUploadPartInfo can only be gotten after the
-    // OzoneDataStreamOutput is closed, so we need to save the
-    // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
-    // OmMultipartCommitUploadPartInfo after OzoneDataStreamOutput is closed.
-    KeyDataStreamOutput keyDataStreamOutput = null;
     try {
       try (OzoneDataStreamOutput streamOutput = ozoneBucket
           .createMultipartStreamKey(key, length, partNumber, uploadID)) {
@@ -174,11 +174,10 @@ final class ObjectEndpointStreaming {
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest().digest()).toLowerCase();
-        ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
+        ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         perf.appendSizeBytes(putLength);
-        keyDataStreamOutput = streamOutput.getKeyDataStreamOutput();
       }
     } catch (OMException ex) {
       if (ex.getResult() ==
@@ -190,13 +189,9 @@ final class ObjectEndpointStreaming {
             ozoneBucket.getName() + "/" + key);
       }
       throw ex;
-    } finally {
-      if (keyDataStreamOutput != null) {
-        OmMultipartCommitUploadPartInfo commitUploadPartInfo =
-            keyDataStreamOutput.getCommitUploadPartInfo();
-        eTag = commitUploadPartInfo.getPartName();
-      }
     }
-    return Response.ok().header("ETag", eTag).build();
+    return Response.ok()
+        .header(OzoneConsts.ETAG, wrapInQuotes(eTag))
+        .build();
   }
 }

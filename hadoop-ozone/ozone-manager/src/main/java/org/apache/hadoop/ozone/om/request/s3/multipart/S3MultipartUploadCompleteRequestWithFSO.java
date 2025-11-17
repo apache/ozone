@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,38 +17,34 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 /**
  * Handle Multipart upload complete request.
  */
 public class S3MultipartUploadCompleteRequestWithFSO
         extends S3MultipartUploadCompleteRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
   public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -72,6 +67,36 @@ public class S3MultipartUploadCompleteRequestWithFSO
           " as there is already directory in the given path",
           NOT_A_FILE);
     }
+  }
+
+  @Override
+  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
+      List<OmDirectoryInfo> missingParentInfos,
+      OMMetadataManager omMetadataManager, long volumeId, long bucketId,
+      long transactionLogIndex) throws IOException {
+
+    // validate and update namespace for missing parent directory.
+    checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
+    omBucketInfo.incrUsedNamespace(missingParentInfos.size());
+
+    // Add cache entries for the missing parent directories.
+    OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+        volumeId, bucketId, transactionLogIndex,
+        missingParentInfos, null);
+  }
+
+  @Override
+  protected void addMultiPartToCache(
+      OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
+      String keyName, long transactionLogIndex
+  ) throws IOException {
+
+    // Add multi part to cache
+    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        keyName, transactionLogIndex);
+
   }
 
   @Override
@@ -130,22 +155,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected String getDBMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String uploadID, OMMetadataManager omMetadataManager)
       throws IOException {
-
-    long parentId =
-        getParentId(omMetadataManager, volumeName, bucketName, keyName);
-
-    String fileName = keyName;
-    Path filePath = Paths.get(keyName).getFileName();
-    if (filePath != null) {
-      fileName = filePath.toString();
-    }
-
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-
-    return omMetadataManager.getMultipartKey(volumeId, bucketId,
-            parentId, fileName, uploadID);
+    return omMetadataManager.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
   }
 
   @Override
@@ -162,11 +172,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
+      OmMultipartKeyInfo multipartKeyInfo) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo, volumeId, bucketId);
+        getBucketLayout(), omBucketInfo, volumeId, bucketId,
+        missingParentInfos, multipartKeyInfo);
   }
 
   @Override

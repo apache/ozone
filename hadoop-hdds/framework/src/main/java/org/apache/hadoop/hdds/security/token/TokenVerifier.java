@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +18,9 @@
 package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.base.Strings;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
@@ -26,10 +28,6 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.security.token.Token;
-
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 
 /**
  * Ozone GRPC token header verifier.
@@ -42,18 +40,16 @@ public interface TokenVerifier {
    * Verify if {@code token} is valid to allow execution of {@code cmd} for
    * {@code user}.
    *
-   * @param user user of the request
    * @param token the token to verify
    * @param cmd container command
    * @throws SCMSecurityException if token verification fails.
    */
-  void verify(String user, Token<?> token,
+  void verify(Token<?> token,
       ContainerCommandRequestProtoOrBuilder cmd)
       throws SCMSecurityException;
 
-  /** Same as {@link #verify(String, Token,
-   * ContainerCommandRequestProtoOrBuilder)}, but with encoded token. */
-  default void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
+  /** Same as {@link #verify}, but with encoded token. */
+  default void verify(ContainerCommandRequestProtoOrBuilder cmd,
       String encodedToken) throws SCMSecurityException {
 
     if (Strings.isNullOrEmpty(encodedToken)) {
@@ -68,7 +64,7 @@ public interface TokenVerifier {
       throw new BlockTokenException("Failed to decode token : " + encodedToken);
     }
 
-    verify(user, token, cmd);
+    verify(token, cmd);
   }
 
   /** Create appropriate token verifier based on the configuration. */

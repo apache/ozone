@@ -44,6 +44,9 @@ Put object to s3
 Get object from s3
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
+                                Should not contain        ${result}   TagCount
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte /tmp/zerobyte.result
+    Compare files               /tmp/zerobyte              /tmp/zerobyte.result
 
 #This test depends on the previous test case. Can't be executed alone
 Get object with wrong signature
@@ -151,38 +154,18 @@ Incorrect values for end and start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Zero byte file
-    ${result} =			        Execute                    ozone sh bucket info /s3v/${BUCKET}
-    ${linked} = 		        Execute				       echo '${result}' | jq -j '.sourceVolume,"/",.sourceBucket'
-    ${eval} = 			        Evaluate			       "source" in """${linked}"""
-    	      			        IF	${eval} == ${True}
-    ${result} =                 Execute				       ozone sh bucket info ${linked}
-				                END
-    ${fsolayout} =    		    Evaluate    	   	       "OPTIMIZED" in """${result}"""
-
     ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
-    	      			        IF 	${fsolayout} == ${True}
-                                Should contain              ${result}       NoSuchKey
-				                ELSE
                                 Should contain              ${result}       InvalidRange
-				                END
 
     ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
-                                IF 	${fsolayout} == ${True}
-                                Should contain              ${result}       NoSuchKey
-                                ELSE
                                 Should contain              ${result}       InvalidRange
-				                END
 
     ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
-    	      			        IF 	${fsolayout} == ${True}
-                                Should contain              ${result}       NoSuchKey
-				                ELSE
                                 Should contain              ${result}       InvalidRange
-				                END
 
-Create file with user defined metadata
+Create file with user defined metadata and tags
                                 Execute                   echo "Randomtext" > /tmp/testfile2
-                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"
 
     ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
                                 Should contain            ${result}    \"custom-key1\": \"custom-value1\"
@@ -191,6 +174,13 @@ Create file with user defined metadata
     ${result} =                 Execute                   ozone sh key info /s3v/${BUCKET}/${PREFIX}/putobject/custom-metadata/key1
                                 Should contain            ${result}   \"custom-key1\" : \"custom-value1\"
                                 Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
+                                Should contain            ${result}   \"tag-key1\" : \"tag-value1\"
+                                Should contain            ${result}   \"tag-key2\" : \"tag-value2\"
+
+    ${result} =                 Execute AWSS3APICli       get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 /tmp/testfile2.result
+                                Should contain            ${result}   TagCount
+    ${tagCount} =               Execute and checkrc       echo '${result}' | jq -r '.TagCount'    0
+                                Should Be Equal           ${tagCount}    2
 
 Create file with user defined metadata with gdpr enabled value in request
                                 Execute                    echo "Randomtext" > /tmp/testfile2
@@ -202,9 +192,31 @@ Create file with user defined metadata with gdpr enabled value in request
 
 Create file with user defined metadata size larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
-    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
-    ${result} =                 Execute AWSS3APICli and ignore error        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"
-                                Should not contain                          ${result}   custom-key1: ${custom_metadata_value}
+    ${custom_metadata_value} =  Generate Random String    3000
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"    255
+                                Should contain                        ${result}   MetadataTooLarge
+                                Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
+
+Create files invalid tags
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=tag-value1&tag-key1=tag-value2"    255
+                                Should contain                        ${result}   InvalidTag
+    ${long_tag_key} =           Generate Random String    129
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="${long_tag_key}=tag-value1"    255
+                                Should contain                        ${result}   InvalidTag
+    ${long_tag_value} =         Generate Random String    257
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=${long_tag_value}"    255
+                                Should contain                        ${result}   InvalidTag
+
+Create files with too many tags
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    @{tags_list} =              Create List
+    FOR    ${i}    IN RANGE     11
+        Append To List    ${tags_list}    tag-key-${i}=tag-value-${i}
+    END
+
+    ${tags_over_limit} =        Catenate    SEPARATOR=&    @{tags_list}
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="${tags_over_limit}"    255
+                                Should contain                        ${result}   InvalidTag
 
 Create small file and expect ETag (MD5) in a reponse header
                                 Execute                    head -c 1MB </dev/urandom > /tmp/small_file
@@ -226,7 +238,7 @@ Create key with custom etag metadata and expect it won't conflict with ETag resp
     ${file_md5_checksum}                    Execute                             md5sum /tmp/small_file | awk '{print $1}'
                                             Execute AWSS3CliDebug               cp --metadata "ETag=custom-etag-value" /tmp/small_file s3://${BUCKET}/test_file
     ${result}                               Execute AWSS3CliDebug               cp s3://${BUCKET}/test_file /tmp/test_file_downloaded
-    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL
+    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL | IGNORECASE
                                             Should Be Equal As Strings          ${ETag}     ${file_md5_checksum}
                                             Should BE Equal As Strings          ${etagCustom}       custom-etag-value
                                             Should Not Be Equal As Strings      ${ETag}     ${etagCustom}
@@ -250,11 +262,57 @@ Create key twice with different content and expect different ETags
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file1
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file2
     ${file1UploadResult}        Execute AWSS3CliDebug      cp /tmp/file1 s3://${BUCKET}/test_key_to_check_etag_differences
-    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL | IGNORECASE
     ${file2UploadResult}        Execute AWSS3CliDebug      cp /tmp/file2 s3://${BUCKET}/test_key_to_check_etag_differences
-    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL | IGNORECASE
                                 Should Not Be Equal As Strings  ${etag1}    ${etag2}
                                 # clean up
                                 Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences
                                 Execute                    rm -rf /tmp/file1
                                 Execute                    rm -rf /tmp/file2
+
+Create&Download big file by multipart upload and get file via part numbers
+                                Execute                            head -c 10000000 </dev/urandom > /tmp/big_file
+    ${result}                   Execute AWSS3CliDebug              cp /tmp/big_file s3://${BUCKET}/
+    ${get_part_1_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 1
+    ${part_1_size} =            Execute and checkrc                echo '${get_part_1_response}' | jq -r '.ContentLength'  0
+                                Should contain                     ${get_part_1_response}    \"PartsCount\": 2
+    ${get_part_2_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_2 --part-number 2
+    ${part_2_size} =            Execute and checkrc                echo '${get_part_2_response}' | jq -r '.ContentLength'  0
+                                Should contain                     ${get_part_2_response}    \"PartsCount\": 2
+
+                                Should Be Equal As Integers        10000000    ${${part_1_size} + ${part_2_size}}
+
+    ${get_part_3_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_3 --part-number 3
+                                Should contain                     ${get_part_3_response}    \"ContentLength\": 0
+                                Should contain                     ${get_part_3_response}    \"PartsCount\": 2
+                                # clean up
+                                Execute AWSS3Cli                   rm s3://${BUCKET}/big_file
+                                Execute                            rm -rf /tmp/big_file
+                                Execute                            rm -rf /tmp/big_file_1
+                                Execute                            rm -rf /tmp/big_file_2
+                                Execute                            rm -rf /tmp/big_file_3
+
+Create&Download big file by multipart upload and get file not existed part number
+                                Execute                    head -c 10000000 </dev/urandom > /tmp/big_file
+    ${result}                   Execute AWSS3CliDebug      cp /tmp/big_file s3://${BUCKET}/
+    ${get_part_99_response}     Execute AWSS3APICli        get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 99
+                                Should contain             ${get_part_99_response}    \"ContentLength\": 0
+                                Should contain             ${get_part_99_response}    \"PartsCount\": 2
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/big_file
+                                Execute                    rm -rf /tmp/big_file
+                                Execute                    rm -rf /tmp/big_file_1
+
+Check Bucket Ownership Verification
+    Execute             echo "Randomtext" > /tmp/testfile
+    ${correct_owner} =    Get bucket owner    ${BUCKET}
+    # test put
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  ${correct_owner}
+
+    # test get
+    Execute AWSS3APICli with bucket owner check         get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  ${correct_owner}
+
+    # create directory
+    Execute                                             touch /tmp/emptyfile
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  ${correct_owner}

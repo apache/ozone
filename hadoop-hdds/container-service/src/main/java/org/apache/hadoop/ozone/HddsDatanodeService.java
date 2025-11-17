@@ -1,46 +1,59 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
 
-import javax.management.ObjectName;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -48,8 +61,8 @@ import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -70,22 +83,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
-import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
-import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
-import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
-import static org.apache.hadoop.util.ExitUtil.terminate;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -98,10 +95,13 @@ import picocli.CommandLine.Command;
     hidden = true, description = "Start the datanode for ozone",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class HddsDatanodeService extends GenericCli implements ServicePlugin {
+public class HddsDatanodeService extends GenericCli implements Callable<Void>, ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
+
+  public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
   private SecurityConfig secConf;
@@ -118,10 +118,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
+  private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
-  private DatanodeCRLStore dnCRLStore;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
@@ -166,15 +164,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
-  public static Logger getLogger() {
-    return LOG;
-  }
-
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
-      StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+      HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
     }
     start(configuration);
@@ -213,6 +207,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      @Override
+      public String getNamespace() {
+        return HddsUtils.getScmServiceId(conf);
+      }
+    };
     serviceRuntimeInfo.setStartTime();
 
     ratisReporterList = RatisDropwizardExports
@@ -222,40 +222,37 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
-      String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
-      datanodeDetails.setIpAddress(ip);
+      serviceRuntimeInfo.setHostName(hostname);
+      datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8), conf);
-      LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
+          "HddsDatanodeService." + datanodeDetails.getID(), conf);
+      LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails.getUuidString();
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
               conf.get(
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
               .login(conf,
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
           throw new AuthenticationException(SecurityUtil.
@@ -270,9 +267,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (layoutStorage.getState() != INITIALIZED) {
         layoutStorage.initialize();
       }
-
-      // initialize datanode CRL store
-      dnCRLStore = new DatanodeCRLStoreImpl(conf);
 
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
@@ -291,31 +285,46 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-                  this::reconfigDeletingServiceWorkers);
+                  this::reconfigDeletingServiceWorkers)
+              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+                  this::reconfigBlockDeletingServiceInterval)
+              .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+                  this::reconfigBlockDeletingServiceTimeout)
+              .register(REPLICATION_STREAMS_LIMIT_KEY,
+                  this::reconfigReplicationStreamsLimit);
 
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
+      reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+
+      datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
+          dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                  httpServer.getHttpAddress().getPort()));
+          int httpPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP, httpPort));
+          serviceRuntimeInfo.setHttpPort(String.valueOf(httpPort));
         }
+
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                  httpServer.getHttpsAddress().getPort()));
+          int httpsPort = httpServer.getHttpsAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
+          serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
+
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
+
+      int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
+      serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
 
       // Get admin list
       String starterUser =
@@ -421,17 +430,18 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
+    DatanodeDetails details;
     if (idFile.exists()) {
-      return ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
-      return details;
+      details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
+      details.setInitialVersion(getInitialVersion());
     }
+    // Current version is always overridden to the latest
+    details.setCurrentVersion(getCurrentVersion());
+    return details;
   }
 
   /**
@@ -501,11 +511,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return clientProtocolServer;
   }
 
-  @VisibleForTesting
-  public DatanodeCRLStore getCRLStore() {
-    return dnCRLStore;
-  }
-
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -557,14 +562,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         getClientProtocolServer().stop();
       }
       unregisterMXBean();
-      // stop dn crl store
-      try {
-        if (dnCRLStore != null) {
-          dnCRLStore.stop();
-        }
-      } catch (Exception ex) {
-        LOG.error("Datanode CRL store stop failed", ex);
-      }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
       if (secretKeyClient != null) {
@@ -636,6 +633,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  public boolean isStopped() {
+    return isStopped.get();
+  }
+
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
@@ -661,10 +662,41 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   private String reconfigDeletingServiceWorkers(String value) {
+    Preconditions.checkArgument(Integer.parseInt(value) >= 0,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
+    return value;
+  }
 
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+  private String reconfigReplicationStreamsLimit(String value) {
+    getConf().set(REPLICATION_STREAMS_LIMIT_KEY, value);
+
+    getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
+  }
+
+  private String reconfigBlockDeletingServiceInterval(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceTimeout(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
+    return value;
+  }
+
+  /**
+   * Returns the initial version of the datanode.
+   */
+  private int getInitialVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
+  }
+
+  /**
+   * Returns the current version of the datanode.
+   */
+  private int getCurrentVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
   }
 }

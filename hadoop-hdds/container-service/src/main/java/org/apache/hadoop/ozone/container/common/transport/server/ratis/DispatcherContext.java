@@ -1,28 +1,29 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.ratis.server.protocol.TermIndex;
+package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * DispatcherContext class holds transport protocol specific context info
@@ -39,6 +40,21 @@ public final class DispatcherContext {
       = newBuilder(Op.HANDLE_GET_SMALL_FILE).build();
   private static final DispatcherContext HANDLE_PUT_SMALL_FILE
       = newBuilder(Op.HANDLE_PUT_SMALL_FILE).build();
+
+  private final Op op;
+  // whether the chunk data needs to be written or committed or both
+  private final WriteChunkStage stage;
+  // which term the request is being served in Ratis
+  private final long term;
+  // the log index in Ratis log to which the request belongs to
+  private final long logIndex;
+
+  private final Map<Long, Long> container2BCSIDMap;
+
+  private final boolean releaseSupported;
+  private volatile Runnable releaseMethod;
+
+  private final long startTime = Time.monotonicNowNanos();
 
   public static DispatcherContext getHandleReadChunk() {
     return HANDLE_READ_CHUNK;
@@ -108,22 +124,13 @@ public final class DispatcherContext {
     return context == null ? Op.NULL : context.getOp();
   }
 
-  private final Op op;
-  // whether the chunk data needs to be written or committed or both
-  private final WriteChunkStage stage;
-  // which term the request is being served in Ratis
-  private final long term;
-  // the log index in Ratis log to which the request belongs to
-  private final long logIndex;
-
-  private final Map<Long, Long> container2BCSIDMap;
-
   private DispatcherContext(Builder b) {
     this.op = Objects.requireNonNull(b.op, "op == null");
     this.term = b.term;
     this.logIndex = b.logIndex;
     this.stage = b.stage;
     this.container2BCSIDMap = b.container2BCSIDMap;
+    this.releaseSupported = b.releaseSupported;
   }
 
   /** Use {@link DispatcherContext#op(DispatcherContext)} for handling null. */
@@ -147,6 +154,25 @@ public final class DispatcherContext {
     return container2BCSIDMap;
   }
 
+  public long getStartTime() {
+    return startTime;
+  }
+
+  public boolean isReleaseSupported() {
+    return releaseSupported;
+  }
+
+  public void setReleaseMethod(Runnable releaseMethod) {
+    Preconditions.assertTrue(releaseSupported, "Unsupported release method");
+    this.releaseMethod = releaseMethod;
+  }
+
+  public void release() {
+    if (releaseMethod != null) {
+      releaseMethod.run();
+    }
+  }
+
   @Override
   public String toString() {
     return op + "-" + stage + TermIndex.valueOf(term, logIndex);
@@ -165,6 +191,7 @@ public final class DispatcherContext {
     private long term;
     private long logIndex;
     private Map<Long, Long> container2BCSIDMap;
+    private boolean releaseSupported;
 
     private Builder(Op op) {
       this.op = op;
@@ -213,6 +240,12 @@ public final class DispatcherContext {
       this.container2BCSIDMap = map;
       return this;
     }
+
+    public Builder setReleaseSupported(boolean releaseSupported) {
+      this.releaseSupported = releaseSupported;
+      return this;
+    }
+
     /**
      * Builds and returns DispatcherContext instance.
      *

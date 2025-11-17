@@ -60,6 +60,7 @@ run_robot_test() {
    TEST_NAME=$1
    robot \
        --nostatusrc \
+       --exclude aws-skip \
        -v ENDPOINT_URL:https://s3.$OZONE_TEST_S3_REGION.amazonaws.com \
        -v BUCKET:$OZONE_TEST_S3_BUCKET1 \
        -v DESTBUCKET:$OZONE_TEST_S3_BUCKET2 \
@@ -83,5 +84,7 @@ run_robot_test objectcopy
 run_robot_test objectmultidelete
 run_robot_test objecthead
 run_robot_test MultipartUpload
+run_robot_test objecttagging
+run_robot_test objectlist
 
 rebot --outputdir results/ results/*.xml

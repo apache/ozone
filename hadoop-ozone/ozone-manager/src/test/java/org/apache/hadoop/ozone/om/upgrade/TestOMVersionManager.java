@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,9 +24,9 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VA
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -38,7 +37,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Optional;
-
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -65,13 +63,8 @@ public class TestOMVersionManager {
   public void testOMLayoutVersionManagerInitError() {
     int lV = OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
         .layoutVersion() + 1;
-
-    try {
-      new OMLayoutVersionManager(lV);
-      fail();
-    } catch (OMException ex) {
-      assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> new OMLayoutVersionManager(lV));
+    assertEquals(NOT_SUPPORTED_OPERATION, ome.getResult());
   }
 
   @Test

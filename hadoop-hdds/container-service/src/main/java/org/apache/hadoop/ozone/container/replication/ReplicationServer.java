@@ -1,29 +1,33 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.MANAGEMENT;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -33,7 +37,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -42,10 +45,6 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.MANAGEMENT;
-import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
 /**
  * Separated network server for server2server container replication.
@@ -102,25 +101,24 @@ public class ReplicationServer {
   }
 
   public void init() {
+    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
+        new OnDemandContainerReplicationSource(controller), importer);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(ServerInterceptors.intercept(new GrpcReplicationService(
-            new OnDemandContainerReplicationSource(controller),
-            importer
-        ), new GrpcServerInterceptor()))
+        .addService(ServerInterceptors.intercept(
+            grpcReplicationService.bindServiceWithZeroCopy(),
+            new GrpcServerInterceptor()))
         .executor(executor);
 
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
-            caClient.getServerKeyStoresFactory().getKeyManagers()[0]);
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(caClient.getKeyManager());
 
         sslContextBuilder = GrpcSslContexts.configure(
             sslContextBuilder, secConf.getGrpcSslProvider());
 
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager(
-            caClient.getServerKeyStoresFactory().getTrustManagers()[0]);
+        sslContextBuilder.trustManager(caClient.getTrustManager());
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {
@@ -152,6 +150,31 @@ public class ReplicationServer {
 
   public int getPort() {
     return port;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    if (size > currentCorePoolSize) {
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else {
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
+  }
+
+  @VisibleForTesting
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
   }
 
   /**

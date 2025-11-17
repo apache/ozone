@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.common;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.Checksum;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.PureJavaCrc32C;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Random;
-import java.util.zip.Checksum;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test {@link ChecksumByteBuffer} implementations.
@@ -45,6 +46,23 @@ public class TestChecksumByteBuffer {
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 
+  @Test
+  public void testWithDirectBuffer() {
+    final ChecksumByteBuffer checksum = ChecksumByteBufferFactory.crc32CImpl();
+    byte[] value = "test".getBytes(StandardCharsets.UTF_8);
+    checksum.reset();
+    checksum.update(value, 0, value.length);
+    long checksum1 = checksum.getValue();
+
+    ByteBuffer byteBuffer = ByteBuffer.allocateDirect(value.length);
+    byteBuffer.put(value).rewind();
+    checksum.reset();
+    checksum.update(byteBuffer);
+    long checksum2 = checksum.getValue();
+
+    Assertions.assertEquals(checksum1, checksum2);
+  }
+
   static class VerifyChecksumByteBuffer {
     private final Checksum expected;
     private final ChecksumByteBuffer testee;
@@ -59,11 +77,10 @@ public class TestChecksumByteBuffer {
 
       checkBytes("hello world!".getBytes(StandardCharsets.UTF_8));
 
-      final Random random = new Random();
-      final byte[] bytes = new byte[1 << 10];
+      final int len = 1 << 10;
       for (int i = 0; i < 1000; i++) {
-        random.nextBytes(bytes);
-        checkBytes(bytes, random.nextInt(bytes.length));
+        checkBytes(RandomUtils.secure().randomBytes(len),
+            RandomUtils.secure().randomInt(0, len));
       }
     }
 

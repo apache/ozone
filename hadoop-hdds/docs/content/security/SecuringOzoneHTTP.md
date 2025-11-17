@@ -1,6 +1,6 @@
 ---
 title: "Securing HTTP"
-date: "2020-June-17"
+date: "2020-06-17"
 summary: Secure HTTP web-consoles for Ozone services 
 weight: 4
 menu:

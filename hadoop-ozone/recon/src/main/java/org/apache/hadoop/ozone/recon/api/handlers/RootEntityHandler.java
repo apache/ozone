@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -24,20 +31,15 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.CountStats;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Class for handling root entity type.
@@ -88,7 +90,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -137,6 +139,13 @@ public class RootEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(totalDataSizeWithReplica);
     }
     duResponse.setSize(totalDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort volumeDuData in descending order of size and returns the top N elements.
+      volumeDuData = sortDiskUsageDescendingWithLimit(volumeDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(volumeDuData);
 
     return duResponse;
@@ -148,7 +157,8 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true).getSizeWithReplica();
+    long quotaUsedInBytes =
+        getDuResponse(true, true, false).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;

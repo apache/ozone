@@ -1,36 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
-
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+
+import java.util.Collections;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test ContainerClientMetrics.
@@ -47,9 +45,9 @@ public class TestContainerClientMetrics {
   public void testRecordChunkMetrics() {
     ContainerClientMetrics metrics = ContainerClientMetrics.acquire();
     PipelineID pipelineId1 = PipelineID.randomId();
-    UUID leaderId1 = UUID.randomUUID();
+    DatanodeID leaderId1 = DatanodeID.randomID();
     PipelineID pipelineId2 = PipelineID.randomId();
-    UUID leaderId2 = UUID.randomUUID();
+    DatanodeID leaderId2 = DatanodeID.randomID();
     PipelineID pipelineId3 = PipelineID.randomId();
 
     metrics.recordWriteChunk(createPipeline(pipelineId1, leaderId1), 10);
@@ -105,7 +103,7 @@ public class TestContainerClientMetrics {
     assertNotNull(ContainerClientMetrics.acquire());
   }
 
-  private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {
+  private Pipeline createPipeline(PipelineID piplineId, DatanodeID leaderId) {
     return Pipeline.newBuilder()
         .setId(piplineId)
         .setReplicationConfig(mock(ReplicationConfig.class))

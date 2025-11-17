@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,31 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
+
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.commons.collections.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The class represents a cluster of computers with a tree hierarchical
@@ -48,7 +48,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DE
  * manages traffic in/out of data centers or racks.
  */
 public class NetworkTopologyImpl implements NetworkTopology {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */
@@ -73,6 +73,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+    schemaManager = NodeSchemaManager.getInstance();
+    schemaManager.init(schemaFile);
+    maxLevel = schemaManager.getMaxLevel();
+    shuffleOperation = Collections::shuffle;
+    factory = InnerNodeImpl.FACTORY;
+    this.clusterTree = clusterTree;
   }
 
   @VisibleForTesting
@@ -223,10 +232,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private boolean containsNode(Node node) {
     Node parent = node.getParent();
-    while (parent != null && parent != clusterTree) {
+    while (parent != null && !Objects.equals(parent, clusterTree)) {
       parent = parent.getParent();
     }
-    return parent == clusterTree;
+    return Objects.equals(parent, clusterTree);
   }
 
   /**
@@ -240,7 +249,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
     netlock.readLock().lock();
     try {
-      return node1.getAncestor(ancestorGen) == node2.getAncestor(ancestorGen);
+      Node ancestor1 = node1.getAncestor(ancestorGen);
+      Node ancestor2 = node2.getAncestor(ancestorGen);
+      return Objects.equals(ancestor1, ancestor2);
     } finally {
       netlock.readLock().unlock();
     }
@@ -259,7 +270,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     try {
       node1 = node1.getParent();
       node2 = node2.getParent();
-      return node1 == node2;
+      return Objects.equals(node1, node2);
     } finally {
       netlock.readLock().unlock();
     }
@@ -657,7 +668,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         ancestorGen);
 
     if (availableNodes <= 0) {
-      LOG.warn("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
+      LOG.info("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
               "excludedNodes=\"{}\"  ancestorGen=\"{}\").",
           scopeNode.getNetworkFullPath(), excludedScopes, excludedNodes,
           ancestorGen);
@@ -704,8 +715,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
    */
   @Override
   public int getDistanceCost(Node node1, Node node2) {
-    if ((node1 != null && node1.equals(node2)) ||
-        (node1 == null && node2 == null))  {
+    if (Objects.equals(node1, node2)) {
       return 0;
     }
     if (node1 == null || node2 == null) {
@@ -726,8 +736,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
     int cost = 0;
     netlock.readLock().lock();
     try {
-      if ((node1.getAncestor(level1 - 1) != clusterTree) ||
-          (node2.getAncestor(level2 - 1) != clusterTree)) {
+      Node ancestor1 = node1.getAncestor(level1 - 1);
+      Node ancestor2 = node2.getAncestor(level2 - 1);
+      if (!Objects.equals(ancestor1, clusterTree) ||
+          !Objects.equals(ancestor2, clusterTree)) {
         LOG.debug("One of the nodes is outside of network topology");
         return Integer.MAX_VALUE;
       }
@@ -741,7 +753,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         level2--;
         cost += node2 == null ? 0 : node2.getCost();
       }
-      while (node1 != null && node2 != null && node1 != node2) {
+      while (node1 != null && node2 != null && !Objects.equals(node1, node2)) {
         node1 = node1.getParent();
         node2 = node2.getParent();
         cost += node1 == null ? 0 : node1.getCost();
@@ -776,6 +788,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
       List<N> shuffledNodes =
           new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Sorted datanodes {}, result: {}", nodes, shuffledNodes);
+      }
       return shuffledNodes;
     }
     // Sort weights for the nodes array
@@ -802,6 +817,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
     Preconditions.checkState(ret.size() == activeLen,
         "Wrong number of nodes sorted!");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
+    }
     return ret;
   }
 
@@ -875,18 +893,18 @@ public class NetworkTopologyImpl implements NetworkTopology {
     StringBuilder tree = new StringBuilder();
     tree.append("Level: ");
     tree.append(maxLevel);
-    tree.append("\n");
+    tree.append('\n');
     netlock.readLock().lock();
     try {
       // print the number of leaves
       int numOfLeaves = clusterTree.getNumOfLeaves();
       tree.append("Number of leaves:");
       tree.append(numOfLeaves);
-      tree.append("\n");
+      tree.append('\n');
       // print all nodes
       for (int i = 0; i < numOfLeaves; i++) {
         tree.append(clusterTree.getLeaf(i).getNetworkFullPath());
-        tree.append("\n");
+        tree.append('\n');
       }
     } finally {
       netlock.readLock().unlock();

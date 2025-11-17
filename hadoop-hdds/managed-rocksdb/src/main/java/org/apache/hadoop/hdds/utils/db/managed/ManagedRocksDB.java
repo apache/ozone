@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,23 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import java.io.File;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
 
 /**
  * Managed {@link RocksDB}.
@@ -43,6 +45,13 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
 
   ManagedRocksDB(RocksDB original) {
     super(original);
+  }
+
+  public static ManagedRocksDB openReadOnly(
+      final ManagedOptions options,
+      final String path)
+      throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.openReadOnly(options, path));
   }
 
   public static ManagedRocksDB openReadOnly(
@@ -77,13 +86,28 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
-  public static ManagedRocksDB open(
-      final String path,
+  /**
+   * Open a RocksDB option with the latest options. Other than {@link ManagedConfigOptions} and
+   * path, the other options and handles should be empty since it will be populated with
+   * loadLatestOptions. Nevertheless, the caller is still responsible in cleaning up / closing the resources.
+   * @param configOptions Config options.
+   * @param options DBOptions. This would be modified based on the latest options.
+   * @param path DB path.
+   * @param columnFamilyDescriptors Column family descriptors. These would be modified based on the latest options.
+   * @param columnFamilyHandles Column family handles of the underlying column family
+   * @return A RocksDB instance.
+   * @throws RocksDBException thrown if error happens in underlying native library.
+   */
+  public static ManagedRocksDB openWithLatestOptions(
+      final ManagedConfigOptions configOptions,
+      final DBOptions options, final String path,
       final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
       final List<ColumnFamilyHandle> columnFamilyHandles)
       throws RocksDBException {
+    // Preserve all the previous DB options
+    OptionsUtil.loadLatestOptions(configOptions, path, options, columnFamilyDescriptors);
     return new ManagedRocksDB(
-        RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
+        RocksDB.open(options, path, columnFamilyDescriptors, columnFamilyHandles)
     );
   }
 
@@ -92,14 +116,27 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
    * This function makes the RocksDB#deleteFile Api synchronized by waiting
    * for the deletes to happen.
    * @param fileToBeDeleted File to be deleted.
-   * @throws RocksDBException In the underlying db throws an exception.
-   * @throws IOException In the case file is not deleted.
+   * @throws RocksDatabaseException if the underlying db throws an exception
+   *                                or the file is not deleted within a time limit.
    */
-  public void deleteFile(LiveFileMetaData fileToBeDeleted)
-      throws RocksDBException, IOException {
+  public void deleteFile(LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
     String sstFileName = fileToBeDeleted.fileName();
-    this.get().deleteFile(sstFileName);
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
+    try {
+      get().deleteFile(sstFileName);
+    } catch (RocksDBException e) {
+      throw new RocksDatabaseException("Failed to delete " + file, e);
+    }
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
+  }
+
+  public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
+    return db.getLiveFilesMetaData().stream().collect(
+            Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
+                liveFileMetaData -> liveFileMetaData));
+  }
+
+  public Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles() {
+    return getLiveMetadataForSSTFiles(this.get());
   }
 }

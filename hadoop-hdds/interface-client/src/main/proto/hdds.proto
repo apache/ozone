@@ -33,8 +33,12 @@ message UUID {
    required int64 leastSigBits = 2;
 }
 
+message DatanodeIDProto {
+    required UUID uuid = 1;
+}
+
 message DatanodeDetailsProto {
-    // deprecated, please use uuid128 instead
+    // deprecated, please use DatanodeIDProto instead
     optional string uuid = 1;  // UUID assigned to the Datanode.
     required string ipAddress = 2;     // IP address
     required string hostName = 3;      // hostname
@@ -45,8 +49,12 @@ message DatanodeDetailsProto {
     optional string networkLocation = 7; // Network topology location
     optional NodeOperationalState persistedOpState = 8; // The Operational state persisted in the datanode.id file
     optional int64 persistedOpStateExpiry = 9; // The seconds after the epoch when the OpState should expire
+    optional int32 currentVersion = 10;  // Current datanode wire version
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
+    optional uint32 level = 101;
+    // TODO: Replace UUID with DatanodeID and  make it required
+    optional DatanodeIDProto id = 102;
 }
 
 /**
@@ -59,7 +67,7 @@ message ExtendedDatanodeDetailsProto {
     optional string version = 2;
     optional int64 setupTime = 3;
     optional string revision = 4;
-    optional string buildDate = 5;
+    optional string buildDate = 5; // unused, reserved for compatibility
 }
 
 message MoveDataNodePairProto {
@@ -121,19 +129,36 @@ message Pipeline {
     optional ReplicationType type = 3 [default = STAND_ALONE];
     optional ReplicationFactor factor = 4 [default = ONE];
     required PipelineID id = 5;
+    // TODO: Deprecate this and replace with leaderDatanodeID
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
+    // TODO: Deprecate this and replace with suggestedLeaderDatanodeID
     optional UUID suggestedLeaderID = 9;
     repeated uint32 memberReplicaIndexes = 10;
     optional ECReplicationConfig ecReplicationConfig = 11;
-    // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
+
+    // TODO: Replace UUID with DatanodeIDProto
     optional UUID leaderID128 = 100;
+
+    optional DatanodeIDProto leaderDatanodeID = 101;
+    optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
 }
 
 message KeyValue {
     required string key = 1;
     optional string value = 2;
+}
+
+/**
+ * Types of storage media.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+  PROVIDED = 5;
 }
 
 /**
@@ -175,6 +200,8 @@ message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
     repeated NodeOperationalState nodeOperationalStates = 3;
+    optional int32 totalVolumeCount = 4;
+    optional int32 healthyVolumeCount = 5;
 }
 
 message NodePool {
@@ -189,6 +216,7 @@ message DatanodeUsageInfoProto {
     optional int64 containerCount = 5;
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
+    optional int64 pipelineCount = 8;
 }
 
 /**
@@ -320,6 +348,7 @@ enum ScmOps {
 }
 
 message ExcludeListProto {
+    // TODO: Replace with DatanodeID
     repeated string datanodes = 1;
     // Replace int64 with ContainerID message
     repeated int64 containerIds = 2;
@@ -420,6 +449,7 @@ message ContainerReplicaHistoryProto {
     required int64 lastSeenTime = 3;
     required int64 bcsId = 4;
     optional string state = 5;
+    optional int64 dataChecksum = 6;
 }
 
 message SCMContainerReplicaProto {
@@ -431,6 +461,7 @@ message SCMContainerReplicaProto {
     required int64 keyCount = 6;
     required int64 bytesUsed = 7;
     optional int64 replicaIndex = 8;
+    optional int64 dataChecksum = 9;
 }
 
 message KeyContainerIDList {
@@ -488,6 +519,7 @@ message CompactionFileInfoProto {
     optional string startKey = 2;
     optional string endKey = 3;
     optional string columnFamily = 4;
+    optional bool pruned = 5;
 }
 
 message CompactionLogEntryProto {
@@ -496,4 +528,27 @@ message CompactionLogEntryProto {
     repeated CompactionFileInfoProto inputFileIntoList = 3;
     repeated CompactionFileInfoProto outputFileIntoList = 4;
     optional string compactionReason = 5;
+}
+
+message NodeTopology {
+    optional string name = 1;
+    optional string location = 2;
+    optional uint32 cost = 3;
+    optional uint32 level = 4;
+}
+
+message NetworkNode {
+    optional DatanodeDetailsProto datanodeDetails = 1;
+    optional InnerNode innerNode = 3;
+}
+
+message ChildrenMap {
+    optional string networkName = 1;
+    optional NetworkNode networkNode = 2;
+}
+
+message InnerNode {
+    optional NodeTopology nodeTopology = 1;
+    optional uint32 numOfLeaves = 2;
+    repeated ChildrenMap childrenMap = 3;
 }

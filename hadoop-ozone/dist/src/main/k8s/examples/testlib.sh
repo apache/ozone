@@ -15,6 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPT_DIR}/../../smoketest/testlib.sh"
+
 retry() {
    local -i n=0
    local -i attempts=${RETRY_ATTEMPTS:-100}
@@ -129,7 +132,7 @@ regenerate_resources() {
   if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
     #running from src dir
     local version
-    version=$(cd ../../../../.. && mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+    version=$(cd ../../../../.. && mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
     OZONE_ROOT=$(realpath ../../../../../target/ozone-${version})
   else
     #running from dist
@@ -167,7 +170,7 @@ execute_robot_test() {
 combine_reports() {
   if [[ -d result ]]; then
     rm -f result/output.xml
-    rebot -d result --nostatusrc -o output.xml -N $(basename "$(pwd)") result/*.xml
+    run_rebot result result "-o output.xml -N '$(basename $(pwd))' *.xml"
   fi
 }
 

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,23 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.commons.lang3.RandomStringUtils.secure;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.protobuf.Message;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,9 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
-import com.google.protobuf.Message;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,44 +51,31 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.TestDatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
-
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
-@Timeout(30)
 public class TestVolumeSetDiskChecks {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      TestVolumeSetDiskChecks.class);
+  @TempDir
+  private Path tempDir;
+
+  @TempDir
+  private File dir;
 
   private OzoneConfiguration conf = null;
 
@@ -87,7 +85,7 @@ public class TestVolumeSetDiskChecks {
   @AfterEach
   public void cleanup() {
     final Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
+        ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
 
     for (String d: dirs) {
       FileUtils.deleteQuietly(new File(d));
@@ -112,7 +110,7 @@ public class TestVolumeSetDiskChecks {
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
+        ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
     for (String d : dirs) {
       assertTrue(new File(d).isDirectory());
     }
@@ -217,21 +215,21 @@ public class TestVolumeSetDiskChecks {
     final OzoneConfiguration ozoneConf = new OzoneConfiguration();
     final List<String> dirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      dirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      dirs.add(new File(dir, secure().nextAlphanumeric(10)).toString());
     }
-    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
+    ozoneConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         String.join(",", dirs));
 
     final List<String> metaDirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      metaDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      metaDirs.add(new File(dir, secure().nextAlphanumeric(10)).toString());
     }
-    ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    ozoneConf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",", metaDirs));
 
     final List<String> dbDirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      dbDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      dbDirs.add(new File(dir, secure().nextAlphanumeric(10)).toString());
     }
     ozoneConf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         String.join(",", dbDirs));
@@ -261,11 +259,10 @@ public class TestVolumeSetDiskChecks {
         new DummyChecker(conf, new Timer(), 0);
 
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    ContainerSet conSet = new ContainerSet(20);
+    ContainerSet conSet = newContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
-    String path = GenericTestUtils
-        .getTempPath(TestDatanodeStateMachine.class.getSimpleName());
+    String path = dir.getPath();
     File testRoot = new File(path);
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -301,11 +298,15 @@ public class TestVolumeSetDiskChecks {
         dummyChecker);
 
     KeyValueContainer container = new KeyValueContainer(data, conf);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container);
 
     KeyValueContainer container1 = new KeyValueContainer(data1, conf);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet1.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container1.create(volumeSet1,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container1);
@@ -330,6 +331,7 @@ public class TestVolumeSetDiskChecks {
     conSet.handleVolumeFailures(stateContext);
     // ContainerID1 should be removed belonging to failed volume
     assertNull(conSet.getContainer(containerID1));
+    assertTrue(conSet.getMissingContainerSet().contains(containerID1));
     // ContainerID should exist belonging to normal volume
     assertNotNull(conSet.getContainer(containerID));
     expectedReportCount.put(

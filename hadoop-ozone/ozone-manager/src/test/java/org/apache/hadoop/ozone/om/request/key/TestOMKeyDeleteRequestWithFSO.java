@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,29 +17,33 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OmKeyDelete request with prefix layout.
@@ -72,11 +75,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
             bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
         FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
@@ -96,11 +99,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         bucketName, key, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE,
-            parentId + 1,
-            parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     omKeyInfo.setKeyName(key);
     return omKeyInfo.getPath();
   }
@@ -112,7 +115,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     doPreExecute(createDeleteKeyRequest());
   }
@@ -142,19 +145,14 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     verifyPath(ozonePrefixPath, "c/d", "c/d/e");
     verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
 
-    try {
-      ozonePrefixPath.getChildren("c/d/e/file1");
-      fail("Should throw INVALID_KEY_NAME as the given " +
-          "path is a file.");
-    } catch (OMException ome) {
-      assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozonePrefixPath.getChildren("c/d/e/file1"),
+        "Should throw INVALID_KEY_NAME as the given path is a file.");
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, ome.getResult());
 
     // OzonePrefixPathImpl on a file
-    ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
+    OzonePrefixPathImpl ozonePrefixPathFile1 = new OzonePrefixPathImpl(volumeName,
         bucketName, "c/d/e/file1", keyManager);
-    status = ozonePrefixPath.getOzoneFileStatus();
+    status = ozonePrefixPathFile1.getOzoneFileStatus();
     assertNotNull(status);
     assertEquals("c/d/e/file1", status.getTrimmedName());
     assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());
@@ -168,12 +166,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         pathName);
     assertTrue(pathItr.hasNext(), "Failed to list keyPaths");
     assertEquals(expectedPath, pathItr.next().getTrimmedName());
-    try {
-      pathItr.next();
-      fail("Reached end of the list!");
-    } catch (NoSuchElementException nse) {
-      // expected
-    }
+    assertThrows(NoSuchElementException.class, () -> pathItr.next(), "Reached end of the list!");
   }
 
   @Test
@@ -238,5 +231,32 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
     assertFalse(pathViewer.isCheckRecursiveAccess());
+  }
+
+  @Test
+  public void testDeleteDirectoryWithColonInFSOBucket() throws Exception {
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String dirName = "foo:dir/";
+    String dirKeyPath = addKeyToDirTable(volumeName, bucketName, dirName);
+
+    long parentObjectID = 0L;
+    long dirObjectID = 12345L;
+    OmDirectoryInfo omDirectoryInfo = OMRequestTestUtils.createOmDirectoryInfo(dirName, dirObjectID, parentObjectID);
+    omMetadataManager.getDirectoryTable().put(dirKeyPath, omDirectoryInfo);
+
+    OmDirectoryInfo storedDirInfo = omMetadataManager.getDirectoryTable().get(dirKeyPath);
+    assertNotNull(storedDirInfo);
+    assertEquals(dirName, storedDirInfo.getName());
+    assertEquals(dirObjectID, storedDirInfo.getObjectID());
+    assertEquals(parentObjectID, storedDirInfo.getParentObjectID());
+
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(dirName));
+    OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(deleteRequest);
+    OMClientResponse response = omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getDirectoryTable().get(dirName));
   }
 }

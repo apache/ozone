@@ -12,66 +12,56 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-datanode</artifactId>
-  <name>Apache Ozone Datanode</name>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <version>1.5.0-SNAPSHOT</version>
+  <name>Apache Ozone Datanode</name>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <classpath.skip>false</classpath.skip>
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
     <spotbugs.skip>true</spotbugs.skip>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-server</artifactId>
-      <scope>compile</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>com.sun.xml.bind</groupId>
-          <artifactId>jaxb-impl</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.xml.bind</groupId>
-      <artifactId>jakarta.xml.bind-api</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jaxb</groupId>
       <artifactId>jaxb-runtime</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.activation</groupId>
-      <artifactId>jakarta.activation-api</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
   <build>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
             <id>add-classpath-descriptor</id>
-            <phase>prepare-package</phase>
             <goals>
               <goal>build-classpath</goal>
             </goals>
+            <phase>prepare-package</phase>
             <configuration>
               <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>

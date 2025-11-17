@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,41 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -61,6 +94,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -69,6 +103,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -83,39 +118,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests container commands on EC containers.
@@ -129,15 +133,15 @@ public class TestContainerCommandsEC {
   private static ObjectStore store;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final int EC_DATA = 3;
   private static final int EC_PARITY = 2;
   private static final EcCodec EC_CODEC = EcCodec.RS;
   private static final int EC_CHUNK_SIZE = 1024 * 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
   private static final int NUM_DN = EC_DATA + EC_PARITY + 3;
-  private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
+  // Data slots are EC_DATA + 1 so we can generate enough data to have a full stripe
+  // plus one extra chunk.
+  private static byte[][] inputChunks = new byte[EC_DATA + 1][EC_CHUNK_SIZE];
 
   // Each key size will be in range [min, max), min inclusive, max exclusive
   private static final int[][] KEY_SIZE_RANGES =
@@ -159,13 +163,13 @@ public class TestContainerCommandsEC {
   private static CertificateClient certClient;
 
   private static OzoneBucket classBucket;
-  private static OzoneVolume classVolume;
   private static ReplicationConfig repConfig;
 
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
     config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    config.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     config.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
@@ -234,7 +238,7 @@ public class TestContainerCommandsEC {
             Pipeline.PipelineState.OPEN)
         .forEach(p -> {
           try {
-            scm.getPipelineManager().closePipeline(p, false);
+            scm.getPipelineManager().closePipeline(p.getId());
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -250,7 +254,7 @@ public class TestContainerCommandsEC {
     String keyName = UUID.randomUUID().toString();
     try (OutputStream out = classBucket
         .createKey(keyName, keyLen, repConfig, new HashMap<>())) {
-      out.write(RandomUtils.nextBytes(keyLen));
+      out.write(RandomUtils.secure().randomBytes(keyLen));
     }
     long orphanContainerID = classBucket.getKey(keyName)
         .getOzoneKeyLocations().get(0).getContainerID();
@@ -263,10 +267,10 @@ public class TestContainerCommandsEC {
 
     Token<ContainerTokenIdentifier> orphanContainerToken =
         containerTokenGenerator.generateToken(
-            ANY_USER, new ContainerID(orphanContainerID));
+            ANY_USER, ContainerID.valueOf(orphanContainerID));
 
     // Close the container by closing the pipeline
-    scm.getPipelineManager().closePipeline(orphanPipeline, false);
+    scm.getPipelineManager().closePipeline(orphanPipeline.getId());
 
     // Find the datanode hosting Replica index = 2
     HddsDatanodeService dn2Service = null;
@@ -314,8 +318,10 @@ public class TestContainerCommandsEC {
                 .setTxID(1L)
                 .setCount(10)
                 .build()));
-    dn2Service.getDatanodeStateMachine().getContext()
-        .addCommand(deleteBlocksCommand);
+    StateContext context = dn2Service.getDatanodeStateMachine().getContext();
+    deleteBlocksCommand.setTerm(context.getTermOfLeaderSCM().isPresent() ?
+            context.getTermOfLeaderSCM().getAsLong() : 0);
+    context.addCommand(deleteBlocksCommand);
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(
         createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
@@ -423,17 +429,17 @@ public class TestContainerCommandsEC {
       ListBlockResponseProto response = ContainerProtocolCalls
           .listBlock(clients.get(i), containerID, null, Integer.MAX_VALUE,
               containerToken);
-      assertTrue(
-          minNumExpectedBlocks <= response.getBlockDataList().stream().filter(
+      assertThat(minNumExpectedBlocks)
+          .withFailMessage("blocks count should be same or more than min expected" +
+               " blocks count on DN " + i)
+          .isLessThanOrEqualTo(response.getBlockDataList().stream().filter(
               k -> k.getChunksCount() > 0 && k.getChunks(0).getLen() > 0)
-              .collect(Collectors.toList()).size(),
-          "blocks count should be same or more than min expected" +
-              " blocks count on DN " + i);
-      assertTrue(
-          minNumExpectedChunks <= response.getBlockDataList().stream()
-              .mapToInt(BlockData::getChunksCount).sum(),
-          "chunks count should be same or more than min expected" +
-              " chunks count on DN " + i);
+              .collect(Collectors.toList()).size());
+      assertThat(minNumExpectedChunks)
+          .withFailMessage("chunks count should be same or more than min expected" +
+              " chunks count on DN " + i)
+          .isLessThanOrEqualTo(response.getBlockDataList().stream()
+              .mapToInt(BlockData::getChunksCount).sum());
     }
   }
 
@@ -451,7 +457,7 @@ public class TestContainerCommandsEC {
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
           .addContainer(container.getProtobuf());
-
+      int replicaIndex = 4;
       XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
           createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
               2));
@@ -469,7 +475,7 @@ public class TestContainerCommandsEC {
         String encodedToken = cToken.encodeToUrlString();
         ContainerProtocolCalls.createRecoveringContainer(dnClient,
             container.containerID().getProtobuf().getId(),
-            encodedToken, 4);
+            encodedToken, replicaIndex);
 
         BlockID blockID = ContainerTestHelper
             .getTestBlockID(container.containerID().getProtobuf().getId());
@@ -510,7 +516,8 @@ public class TestContainerCommandsEC {
             readContainerResponseProto.getContainerData().getState());
         ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
             ContainerProtocolCalls.readChunk(dnClient,
-                writeChunkRequest.getWriteChunk().getChunkData(), blockID, null,
+                writeChunkRequest.getWriteChunk().getChunkData(),
+                blockID.getDatanodeBlockIDProtobufBuilder().setReplicaIndex(replicaIndex).build(), null,
                 blockToken);
         ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
             .getReadOnlyByteBuffersArray(
@@ -610,23 +617,33 @@ public class TestContainerCommandsEC {
 
   @ParameterizedTest
   @MethodSource("recoverableMissingIndexes")
-  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
+  void testECReconstructionCoordinatorWith(List<Integer> missingIndexes, boolean triggerRetry)
       throws Exception {
-    testECReconstructionCoordinator(missingIndexes, 3);
+    testECReconstructionCoordinator(missingIndexes, 3, triggerRetry);
   }
 
-  @Test
-  void testECReconstructionWithPartialStripe()
-          throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes,
+      boolean triggerRetry) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 1, triggerRetry);
   }
 
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes,
+      boolean triggerRetry) throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 4, triggerRetry);
+  }
 
-  static Stream<List<Integer>> recoverableMissingIndexes() {
-    return Stream
-        .concat(IntStream.rangeClosed(1, 5).mapToObj(ImmutableList::of), Stream
-            .of(ImmutableList.of(2, 3), ImmutableList.of(2, 4),
-                ImmutableList.of(3, 5), ImmutableList.of(4, 5)));
+  static Stream<Arguments> recoverableMissingIndexes() {
+    Stream<Arguments> args = IntStream.rangeClosed(1, 5).mapToObj(i -> arguments(ImmutableList.of(i), true));
+    Stream<Arguments> args1 = IntStream.rangeClosed(1, 5).mapToObj(i -> arguments(ImmutableList.of(i), false));
+    Stream<Arguments> args2 =  Stream.of(arguments(ImmutableList.of(2, 3), true),
+        arguments(ImmutableList.of(2, 4), true), arguments(ImmutableList.of(3, 5), true));
+    Stream<Arguments> args3 =  Stream.of(arguments(ImmutableList.of(2, 3), false),
+        arguments(ImmutableList.of(2, 4), false), arguments(ImmutableList.of(3, 5), false));
+    return Stream.concat(Stream.concat(args, args1), Stream.concat(args2, args3));
   }
 
   /**
@@ -637,7 +654,7 @@ public class TestContainerCommandsEC {
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
         assertThrows(InsufficientLocationsException.class, () -> {
-          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3, false);
         });
 
     String expectedMessage =
@@ -648,7 +665,7 @@ public class TestContainerCommandsEC {
   }
 
   private void testECReconstructionCoordinator(List<Integer> missingIndexes,
-      int numInputChunks) throws Exception {
+      int numInputChunks, boolean triggerRetry) throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
@@ -657,7 +674,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket, numInputChunks);
+    createKeyAndWriteData(keyString, bucket, numInputChunks, triggerRetry);
 
     try (
         XceiverClientManager xceiverClientManager =
@@ -671,7 +688,7 @@ public class TestContainerCommandsEC {
       OzoneKeyDetails key = bucket.getKey(keyString);
       long conID = key.getOzoneKeyLocations().get(0).getContainerID();
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-          .generateToken(ANY_USER, new ContainerID(conID));
+          .generateToken(ANY_USER, ContainerID.valueOf(conID));
 
       //Close the container first.
       closeContainer(conID);
@@ -712,19 +729,19 @@ public class TestContainerCommandsEC {
 
       List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
           blockDataArrList = new ArrayList<>();
-      try (ECContainerOperationClient ecContainerOperationClient =
-               new ECContainerOperationClient(config, certClient)) {
-        for (int j = 0; j < containerToDeletePipeline.size(); j++) {
-          Pipeline p = containerToDeletePipeline.get(j);
-          org.apache.hadoop.ozone.container.common.helpers.BlockData[]
-              blockData = ecContainerOperationClient.listBlock(
-                  conID, p.getFirstNode(),
-                  (ECReplicationConfig) p.getReplicationConfig(),
-                  cToken);
+      try (ECContainerOperationClient ecContainerOperationClient = new ECContainerOperationClient(config, certClient)) {
+        for (Pipeline deletePipeline : containerToDeletePipeline) {
+          org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
+              ecContainerOperationClient.listBlock(
+                  conID,
+                  deletePipeline.getFirstNode(),
+                  (ECReplicationConfig) deletePipeline.getReplicationConfig(),
+                  cToken
+              );
+
           blockDataArrList.add(blockData);
           // Delete the first index container
-          XceiverClientSpi client = xceiverClientManager.acquireClient(
-              p);
+          XceiverClientSpi client = xceiverClientManager.acquireClient(deletePipeline);
           try {
             ContainerProtocolCalls.deleteContainer(
                 client,
@@ -769,7 +786,7 @@ public class TestContainerCommandsEC {
                           .getReplicationConfig(), cToken);
           assertEquals(blockDataArrList.get(i).length,
               reconstructedBlockData.length);
-          checkBlockData(blockDataArrList.get(i), reconstructedBlockData);
+          checkBlockDataWithRetry(blockDataArrList.get(i), reconstructedBlockData, triggerRetry);
           XceiverClientSpi client = xceiverClientManager.acquireClient(
               newTargetPipeline);
           try {
@@ -790,18 +807,55 @@ public class TestContainerCommandsEC {
   }
 
   private void createKeyAndWriteData(String keyString, OzoneBucket bucket,
-      int numChunks) throws IOException {
+      int numChunks, boolean triggerRetry) throws IOException {
     for (int i = 0; i < numChunks; i++) {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, EC_CHUNK_SIZE),
         new HashMap<>())) {
-      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       for (int i = 0; i < numChunks; i++) {
+        // We generally wait until the data is written to the last chunk
+        // before attempting to trigger CloseContainer.
+        // We use an asynchronous approach for this trigger,
+        // aiming to ensure that closing the container does not interfere with the write operation.
+        // However, this process often needs to be executed multiple times before it takes effect.
+        if (i == numChunks - 1 && triggerRetry) {
+          triggerRetryByCloseContainer(out);
+        }
         out.write(inputChunks[i]);
       }
     }
+  }
+
+  private void triggerRetryByCloseContainer(OzoneOutputStream out) {
+    CompletableFuture.runAsync(() -> {
+      BlockOutputStreamEntry blockOutputStreamEntry = out.getKeyOutputStream().getStreamEntries().get(0);
+      BlockID entryBlockID = blockOutputStreamEntry.getBlockID();
+      long entryContainerID = entryBlockID.getContainerID();
+      Pipeline entryPipeline = blockOutputStreamEntry.getPipeline();
+      Map<DatanodeDetails, Integer> replicaIndexes = entryPipeline.getReplicaIndexes();
+      try {
+        for (Map.Entry<DatanodeDetails, Integer> entry : replicaIndexes.entrySet()) {
+          DatanodeDetails key = entry.getKey();
+          Integer value = entry.getValue();
+          XceiverClientManager xceiverClientManager = new XceiverClientManager(config);
+          Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
+              .generateToken(ANY_USER, ContainerID.valueOf(entryContainerID));
+          XceiverClientSpi client = xceiverClientManager.acquireClient(
+              createSingleNodePipeline(entryPipeline, key, value));
+          try {
+            ContainerProtocolCalls.closeContainer(client, entryContainerID, cToken.encodeToUrlString());
+          } finally {
+            xceiverClientManager.releaseClient(client, false);
+          }
+          break;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
   }
 
   @Test
@@ -816,12 +870,12 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket, 3);
+    createKeyAndWriteData(keyString, bucket, 3, false);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
     Token<ContainerTokenIdentifier> cToken =
-        containerTokenGenerator.generateToken(ANY_USER, new ContainerID(conID));
+        containerTokenGenerator.generateToken(ANY_USER, ContainerID.valueOf(conID));
     closeContainer(conID);
 
     Pipeline containerPipeline = scm.getPipelineManager().getPipeline(
@@ -890,24 +944,44 @@ public class TestContainerCommandsEC {
         HddsProtos.LifeCycleEvent.CLOSE);
   }
 
+  private void checkBlockDataWithRetry(
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData,
+      org.apache.hadoop.ozone.container.common.helpers.BlockData[]
+      reconstructedBlockData, boolean triggerRetry) {
+    if (triggerRetry) {
+      for (int i = 0; i < reconstructedBlockData.length; i++) {
+        assertEquals(blockData[i].getBlockID(), reconstructedBlockData[i].getBlockID());
+        List<ContainerProtos.ChunkInfo> oldBlockDataChunks = blockData[i].getChunks();
+        List<ContainerProtos.ChunkInfo> newBlockDataChunks = reconstructedBlockData[i].getChunks();
+        for (int j = 0; j < newBlockDataChunks.size(); j++) {
+          ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
+          assertEquals(chunkInfo, newBlockDataChunks.get(j));
+        }
+      }
+      return;
+    }
+    checkBlockData(blockData, reconstructedBlockData);
+  }
+
   private void checkBlockData(
       org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData,
       org.apache.hadoop.ozone.container.common.helpers.BlockData[]
           reconstructedBlockData) {
 
     for (int i = 0; i < blockData.length; i++) {
+      assertEquals(blockData[i].getBlockID(), reconstructedBlockData[i].getBlockID());
+      assertEquals(blockData[i].getSize(), reconstructedBlockData[i].getSize());
+      assertEquals(blockData[i].getMetadata(), reconstructedBlockData[i].getMetadata());
       List<ContainerProtos.ChunkInfo> oldBlockDataChunks =
           blockData[i].getChunks();
       List<ContainerProtos.ChunkInfo> newBlockDataChunks =
           reconstructedBlockData[i].getChunks();
       for (int j = 0; j < oldBlockDataChunks.size(); j++) {
         ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
-        if (chunkInfo.getLen() == 0) {
-          // let's ignore the empty chunks
-          continue;
-        }
         assertEquals(chunkInfo, newBlockDataChunks.get(j));
       }
+      // Ensure there are no extra chunks in the reconstructed block
+      assertEquals(oldBlockDataChunks.size(), newBlockDataChunks.size());
     }
   }
 
@@ -925,7 +999,6 @@ public class TestContainerCommandsEC {
     secretKeyClient = new SecretKeyTestClient();
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
-        .setScmId(SCM_ID).setClusterId(CLUSTER_ID)
         .setCertificateClient(certClient)
         .setSecretKeyClient(secretKeyClient)
         .build();
@@ -942,23 +1015,22 @@ public class TestContainerCommandsEC {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    classVolume = store.getVolume(volumeName);
+    OzoneVolume classVolume = store.getVolume(volumeName);
     classVolume.createBucket(bucketName);
     classBucket = classVolume.getBucket(bucketName);
     repConfig =
         new ECReplicationConfig(EC_DATA, EC_PARITY, EC_CODEC, EC_CHUNK_SIZE);
     values = new byte[ranges.length][];
     for (int i = 0; i < ranges.length; i++) {
-      int keySize = RandomUtils.nextInt(ranges[i][0], ranges[i][1]);
-      values[i] = RandomUtils.nextBytes(keySize);
+      int keySize = RandomUtils.secure().randomInt(ranges[i][0], ranges[i][1]);
+      values[i] = RandomUtils.secure().randomBytes(keySize);
       final String keyName = UUID.randomUUID().toString();
       try (OutputStream out = classBucket
           .createKey(keyName, values[i].length, repConfig, new HashMap<>())) {
         out.write(values[i]);
       }
     }
-//    List<ContainerID> containerIDs =
-//        new ArrayList<>(scm.getContainerManager().getContainerIDs());
+
     List<ContainerID> containerIDs =
             scm.getContainerManager().getContainers()
                     .stream()
@@ -977,7 +1049,7 @@ public class TestContainerCommandsEC {
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
         tokenLifetime, secretKeyClient);
     containerToken = containerTokenGenerator
-        .generateToken(ANY_USER, new ContainerID(containerID));
+        .generateToken(ANY_USER, ContainerID.valueOf(containerID));
   }
 
   public static void stopCluster() throws IOException {

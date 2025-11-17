@@ -44,6 +44,7 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - checkstyle: [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
 - docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
 - findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
+- pmd: [Runs](../hadoop-ozone/dev-support/checks/pmd.sh) PMD static analysis on project's source code
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
 
 
@@ -72,16 +73,13 @@ If they don't match, it describes how to make the updates to include the changes
 - basic
 - integration
 
-### close-prs Workflow
-[This](./workflows/close-pending.yaml) workflow is scheduled each night at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.
+### close-stale-prs Workflow
+[This](./workflows/close-stale-prs.yml) workflow is scheduled each night at midnight and uses the [actions/stale](https://github.com/actions/stale) to automatically manage inactive PRs. It marks PRs as stale after 21 days of inactivity and closes them 7 days later. If a stale PR receives any updates or comments, the stale label is automatically removed.
 
 ### comment-commands Workflow
 [This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if the body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
-- /close : [Close](./comment-commands/close.sh) pending pull request (with message saying author is free to reopen.)
 - /help : [Show](./comment-commands/help.sh) all the available comment commands
 - /label : [Add](./comment-commands/label.sh) new label to the issue: /label "label"
-- /pending : [Add](./comment-commands/pending.sh) a REQUESTED_CHANGE type review to mark issue non-mergeable: /pending "reason"
-- /ready : [Dismiss](./comment-commands/ready.sh) all the blocking reviews
 - /retest : [Provide](./comment-commands/retest.sh) help on how to trigger new CI build
 
 

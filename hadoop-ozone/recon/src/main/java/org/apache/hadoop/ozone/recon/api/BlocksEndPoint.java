@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,15 +17,16 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -36,16 +36,13 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 
 /**
  * Endpoint to get following information about blocks metadata.
@@ -103,39 +100,24 @@ public class BlocksEndPoint {
     }
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap = new HashMap<>();
-    try (
-        Table<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            deletedBlocksTXTable = DELETED_BLOCKS.getTable(this.scmDBStore);
-        TableIterator<Long, ? extends Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
-            deletedBlocksTableIterator = deletedBlocksTXTable.iterator()) {
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> i = DELETED_BLOCKS.getTable(scmDBStore).iterator()) {
       boolean skipPrevKey = false;
-      Long seekKey = prevKey;
       if (prevKey > 0) {
         skipPrevKey = true;
-        Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            seekKeyValue =
-            deletedBlocksTableIterator.seek(seekKey);
+        final Table.KeyValue<Long, DeletedBlocksTransaction> seekKeyValue = i.seek(prevKey);
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
         if (seekKeyValue == null) {
           return Response.ok(containerStateBlockInfoListMap).build();
         }
       }
-      while (deletedBlocksTableIterator.hasNext()) {
-        Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            kv = deletedBlocksTableIterator.next();
-        Long key = kv.getKey();
-        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-            deletedBlocksTransaction =
-            kv.getValue();
+      while (i.hasNext()) {
+        final Table.KeyValue<Long, DeletedBlocksTransaction> kv = i.next();
         // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKey)) {
+        if (skipPrevKey && kv.getKey().equals(prevKey)) {
           continue;
         }
+        final DeletedBlocksTransaction deletedBlocksTransaction = kv.getValue();
         long containerID = deletedBlocksTransaction.getContainerID();
         String containerState =
             containerManager.getContainer(ContainerID.valueOf(containerID))

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,36 @@
 
 package org.apache.hadoop.hdds.scm.security;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.security.KeyPair;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -40,47 +66,16 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateCli
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.bouncycastle.cert.X509CertificateHolder;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.security.KeyPair;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
  * Root CA Rotation Service is a service in SCM to control the CA rotation.
  */
 public class RootCARotationManager extends StatefulService {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
 
   private static final String SERVICE_NAME =
@@ -120,6 +115,8 @@ public class RootCARotationManager extends StatefulService {
    *
    * @param scm the storage container manager
    *
+   * <pre>
+   * {@code
    *                         (1)   (3)(4)
    *                   --------------------------->
    *                         (2)                        scm2(Follower)
@@ -132,8 +129,8 @@ public class RootCARotationManager extends StatefulService {
    *                   --------------------------->
    *                          (2)                       scm3(Follower)
    *                   <---------------------------
-   *
-   *
+   * }
+   * </pre>
    *   (1) Rotation Prepare
    *   (2) Rotation Prepare Ack
    *   (3) Rotation Commit
@@ -188,7 +185,7 @@ public class RootCARotationManager extends StatefulService {
           waitAckTask.cancel(true);
         }
         if (waitAckTimeoutTask != null) {
-          waitAckTask.cancel(true);
+          waitAckTimeoutTask.cancel(true);
         }
         if (clearPostProcessingTask != null) {
           clearPostProcessingTask.cancel(true);
@@ -406,7 +403,7 @@ public class RootCARotationManager extends StatefulService {
           }
 
           String newRootCertId = "";
-          X509CertificateHolder newRootCertificate;
+          X509Certificate newRootCertificate;
           try {
             // prevent findbugs false alert
             if (newRootCAServer == null) {
@@ -488,6 +485,7 @@ public class RootCARotationManager extends StatefulService {
     isProcessing.set(false);
     processStartTime.set(null);
   }
+
   /**
    * Calculate time before root certificate will enter 2 * expiry grace period.
    * @return Duration, time before certificate enters the 2 * grace
@@ -562,15 +560,13 @@ public class RootCARotationManager extends StatefulService {
           }
 
           // Generate key
-          Path keyDir = securityConfig.getKeyLocation(progressComponent);
-          KeyCodec keyCodec = new KeyCodec(securityConfig, keyDir);
+          KeyStorage keyStorage = new KeyStorage(securityConfig, progressComponent);
           KeyPair newKeyPair = null;
           try {
             HDDSKeyGenerator keyGenerator =
                 new HDDSKeyGenerator(securityConfig);
             newKeyPair = keyGenerator.generateKey();
-            keyCodec.writePublicKey(newKeyPair.getPublic());
-            keyCodec.writePrivateKey(newKeyPair.getPrivate());
+            keyStorage.storeKeyPair(newKeyPair);
             LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
                 "scm key generated.", rootCACertId);
           } catch (Exception e) {
@@ -586,7 +582,7 @@ public class RootCARotationManager extends StatefulService {
           String newCertSerialId = "";
           try {
             CertificateSignRequest.Builder csrBuilder =
-                scmCertClient.getCSRBuilder();
+                scmCertClient.configureCSRBuilder();
             csrBuilder.setKey(newKeyPair);
             newCertSerialId = scmCertClient.signAndStoreCertificate(
                 csrBuilder.build(),
@@ -651,12 +647,11 @@ public class RootCARotationManager extends StatefulService {
    */
   public class WaitSubCARotationPrepareAckTask implements Runnable {
     private String rootCACertId;
-    private X509CertificateHolder rootCACertHolder;
+    private X509Certificate rootCACertificate;
 
-    public WaitSubCARotationPrepareAckTask(
-        X509CertificateHolder rootCertHolder) {
-      this.rootCACertHolder = rootCertHolder;
-      this.rootCACertId = rootCertHolder.getSerialNumber().toString();
+    public WaitSubCARotationPrepareAckTask(X509Certificate rootCACertificate) {
+      this.rootCACertificate = rootCACertificate;
+      this.rootCACertId = rootCACertificate.getSerialNumber().toString();
     }
 
     @Override
@@ -688,20 +683,16 @@ public class RootCARotationManager extends StatefulService {
             metrics.setSuccessTimeInNs(timeTaken);
             processStartTime.set(null);
 
-            // save root certificate to certStore
-            X509Certificate rootCACert = null;
             try {
               if (scm.getCertificateStore().getCertificateByID(
-                  rootCACertHolder.getSerialNumber(), VALID_CERTS) == null) {
+                  rootCACertificate.getSerialNumber()) == null) {
                 LOG.info("Persist root certificate {} to cert store",
                     rootCACertId);
-                rootCACert =
-                    CertificateCodec.getX509Certificate(rootCACertHolder);
                 scm.getCertificateStore().storeValidCertificate(
-                    rootCACertHolder.getSerialNumber(), rootCACert,
+                    rootCACertificate.getSerialNumber(), rootCACertificate,
                     HddsProtos.NodeType.SCM);
               }
-            } catch (CertificateException | IOException e) {
+            } catch (IOException e) {
               LOG.error("Failed to save root certificate {} to cert store",
                   rootCACertId);
               scm.shutDown("Failed to save root certificate to cert store");
@@ -717,12 +708,13 @@ public class RootCARotationManager extends StatefulService {
             // signing in this period.
             enterPostProcessing(rootCertPollInterval.toMillis());
             // save the new root certificate to rocksdb through ratis
-            if (rootCACert != null) {
-              saveConfiguration(new CertInfo.Builder()
-                  .setX509Certificate(rootCACert)
-                  .setTimestamp(rootCACert.getNotBefore().getTime())
-                  .build().getProtobuf());
-            }
+            saveConfiguration(
+                new CertInfo.Builder()
+                    .setX509Certificate(rootCACertificate)
+                    .setTimestamp(rootCACertificate.getNotBefore().getTime())
+                    .build()
+                    .getProtobuf()
+            );
           } catch (Throwable e) {
             LOG.error("Execution error", e);
             handler.resetRotationPrepareAcks();

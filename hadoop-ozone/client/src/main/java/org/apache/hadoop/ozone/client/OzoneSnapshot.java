@@ -1,25 +1,26 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client;
 
+import java.util.Objects;
+import java.util.UUID;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-
-import java.util.UUID;
 
 /**
  * A class that encapsulates OzoneSnapshot.
@@ -191,11 +192,52 @@ public class OzoneSnapshot {
         snapshotInfo.getSnapshotStatus(),
         snapshotInfo.getSnapshotId(),
         snapshotInfo.getSnapshotPath(),
-        snapshotInfo.getCheckpointDir(),
+        snapshotInfo.getCheckpointDirName(0),
         snapshotInfo.getReferencedSize(),
         snapshotInfo.getReferencedReplicatedSize(),
-        snapshotInfo.getExclusiveSize(),
-        snapshotInfo.getExclusiveReplicatedSize()
+        snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning(),
+        snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning()
     );
+  }
+
+  @Override
+  public final boolean equals(Object o) {
+    if (!(o instanceof OzoneSnapshot)) {
+      return false;
+    }
+
+    OzoneSnapshot that = (OzoneSnapshot) o;
+    return creationTime == that.creationTime && referencedSize == that.referencedSize &&
+        referencedReplicatedSize == that.referencedReplicatedSize && exclusiveSize == that.exclusiveSize &&
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
+        Objects.equals(volumeName, that.volumeName) && Objects.equals(bucketName, that.bucketName) &&
+        Objects.equals(name, that.name) && snapshotStatus == that.snapshotStatus &&
+        Objects.equals(snapshotId, that.snapshotId) &&
+        Objects.equals(snapshotPath, that.snapshotPath) &&
+        Objects.equals(checkpointDir, that.checkpointDir);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(volumeName, bucketName, name, creationTime, snapshotStatus, snapshotId, snapshotPath,
+        checkpointDir, referencedSize, referencedReplicatedSize, exclusiveSize, exclusiveReplicatedSize);
+  }
+
+  @Override
+  public String toString() {
+    return "OzoneSnapshot{" +
+        "bucketName='" + bucketName + '\'' +
+        ", volumeName='" + volumeName + '\'' +
+        ", name='" + name + '\'' +
+        ", creationTime=" + creationTime +
+        ", snapshotStatus=" + snapshotStatus +
+        ", snapshotId=" + snapshotId +
+        ", snapshotPath='" + snapshotPath + '\'' +
+        ", checkpointDir='" + checkpointDir + '\'' +
+        ", referencedSize=" + referencedSize +
+        ", referencedReplicatedSize=" + referencedReplicatedSize +
+        ", exclusiveSize=" + exclusiveSize +
+        ", exclusiveReplicatedSize=" + exclusiveReplicatedSize +
+        '}';
   }
 }

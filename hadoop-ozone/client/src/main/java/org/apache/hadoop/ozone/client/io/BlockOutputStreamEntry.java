@@ -1,27 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.function.Supplier;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,9 +38,11 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.security.token.Token;
-
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.util.JavaUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A BlockOutputStreamEntry manages the data writes into the DataNodes.
@@ -47,9 +53,9 @@ import com.google.common.annotations.VisibleForTesting;
  * but there can be other implementations that are using a different way.
  */
 public class BlockOutputStreamEntry extends OutputStream {
-
+  private static final Logger LOG = LoggerFactory.getLogger(BlockOutputStreamEntry.class);
   private final OzoneClientConfig config;
-  private OutputStream outputStream;
+  private BlockOutputStream outputStream;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
@@ -60,33 +66,42 @@ public class BlockOutputStreamEntry extends OutputStream {
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
 
-  private BufferPool bufferPool;
-  private ContainerClientMetrics clientMetrics;
-  private StreamBufferArgs streamBufferArgs;
+  private final BufferPool bufferPool;
+  private final ContainerClientMetrics clientMetrics;
+  private final StreamBufferArgs streamBufferArgs;
+  private final Supplier<ExecutorService> executorServiceSupplier;
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  BlockOutputStreamEntry(
-      BlockID blockID, String key,
-      XceiverClientFactory xceiverClientManager,
-      Pipeline pipeline,
-      long length,
-      BufferPool bufferPool,
-      Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
-  ) {
-    this.config = config;
+  /**
+   * An indicator that this BlockOutputStream is created to handoff writes from another faulty BlockOutputStream.
+   * Once this flag is on, this BlockOutputStream can only handle writeOnRetry.
+   */
+  private volatile boolean isHandlingRetry;
+
+  /**
+   * To record how many calls(write, flush) are being handled by this block.
+   */
+  private AtomicInteger inflightCalls = new AtomicInteger();
+
+  BlockOutputStreamEntry(Builder b) {
+    this.config = b.config;
     this.outputStream = null;
-    this.blockID = blockID;
-    this.key = key;
-    this.xceiverClientManager = xceiverClientManager;
-    this.pipeline = pipeline;
-    this.token = token;
-    this.length = length;
+    this.blockID = b.blockID;
+    this.key = b.key;
+    this.xceiverClientManager = b.xceiverClientManager;
+    this.pipeline = b.pipeline;
+    this.token = b.token;
+    this.length = b.length;
     this.currentPosition = 0;
-    this.bufferPool = bufferPool;
-    this.clientMetrics = clientMetrics;
-    this.streamBufferArgs = streamBufferArgs;
+    this.bufferPool = b.bufferPool;
+    this.clientMetrics = b.clientMetrics;
+    this.streamBufferArgs = b.streamBufferArgs;
+    this.executorServiceSupplier = b.executorServiceSupplier;
+    this.isHandlingRetry = b.forRetry;
+  }
+
+  @Override
+  public String toString() {
+    return JavaUtils.getClassSimpleName(getClass()) + ":" + key + " " + blockID;
   }
 
   /**
@@ -101,18 +116,54 @@ public class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
+  /** Register when a call (write or flush) is received on this block. */
+  void registerCallReceived() {
+    inflightCalls.incrementAndGet();
+  }
+
+  /**
+   * Register when a call (write or flush) is finished on this block.
+   * @return true if all the calls are done.
+   */
+  boolean registerCallFinished() {
+    return inflightCalls.decrementAndGet() == 0;
+  }
+
+  void waitForRetryHandling(Condition retryHandlingCond) throws InterruptedException {
+    while (isHandlingRetry) {
+      LOG.info("{} : Block to wait for retry handling.", this);
+      retryHandlingCond.await();
+      LOG.info("{} : Done waiting for retry handling.", this);
+    }
+  }
+
+  void finishRetryHandling(Condition retryHandlingCond) {
+    LOG.info("{}: Exiting retry handling mode", this);
+    isHandlingRetry = false;
+    retryHandlingCond.signalAll();
+  }
+
+  void waitForAllPendingFlushes() throws IOException {
+    outputStream.waitForAllPendingFlushes();
+  }
+
   /**
    * Creates the outputStreams that are necessary to start the write.
    * Implementors can override this to instantiate multiple streams instead.
    * @throws IOException
    */
   void createOutputStream() throws IOException {
-    outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs);
+    outputStream = new RatisBlockOutputStream(blockID, length, xceiverClientManager,
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
+        executorServiceSupplier);
   }
 
   ContainerClientMetrics getClientMetrics() {
     return clientMetrics;
+  }
+
+  Supplier<ExecutorService> getExecutorServiceSupplier() {
+    return executorServiceSupplier;
   }
 
   StreamBufferArgs getStreamBufferArgs() {
@@ -138,6 +189,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     BlockOutputStream out = (BlockOutputStream) getOutputStream();
     out.writeOnRetry(len);
     incCurrentPosition(len);
+    LOG.info("{}: Finish retrying with len {}, currentPosition {}", this, len, currentPosition);
   }
 
   @Override
@@ -155,7 +207,7 @@ public class BlockOutputStreamEntry extends OutputStream {
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
-      ((Syncable)out).hsync();
+      MetricUtil.captureLatencyNs(clientMetrics::addDataNodeHsyncLatency, () -> ((Syncable)out).hsync());
     }
   }
 
@@ -361,6 +413,16 @@ public class BlockOutputStreamEntry extends OutputStream {
     private OzoneClientConfig config;
     private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
+    private Supplier<ExecutorService> executorServiceSupplier;
+    private boolean forRetry;
+
+    public Pipeline getPipeline() {
+      return pipeline;
+    }
+
+    public long getLength() {
+      return length;
+    }
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -402,23 +464,29 @@ public class BlockOutputStreamEntry extends OutputStream {
       this.token = bToken;
       return this;
     }
+
     public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
       this.clientMetrics = clientMetrics;
       return this;
     }
+
     public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
       this.streamBufferArgs = streamBufferArgs;
       return this;
     }
 
+    public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
+      this.executorServiceSupplier = executorServiceSupplier;
+      return this;
+    }
+
+    public Builder setForRetry(boolean forRetry) {
+      this.forRetry = forRetry;
+      return this;
+    }
+
     public BlockOutputStreamEntry build() {
-      return new BlockOutputStreamEntry(blockID,
-          key,
-          xceiverClientManager,
-          pipeline,
-          length,
-          bufferPool,
-          token, config, clientMetrics, streamBufferArgs);
+      return new BlockOutputStreamEntry(this);
     }
   }
 }

@@ -1,42 +1,47 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Test;
-
-import java.io.ByteArrayInputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import jakarta.annotation.Nonnull;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class tests KeyInputStream and KeyOutputStream.
  */
 public class TestChunkStreams {
 
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
   @Test
   public void testReadGroupInputStream() throws Exception {
-    String dataString = RandomStringUtils.randomAscii(500);
+    String dataString = RandomStringUtils.secure().nextAscii(500);
     try (KeyInputStream groupInputStream =
              new KeyInputStream("key", createInputStreams(dataString))) {
 
@@ -50,7 +55,7 @@ public class TestChunkStreams {
 
   @Test
   public void testErrorReadGroupInputStream() throws Exception {
-    String dataString = RandomStringUtils.randomAscii(500);
+    String dataString = RandomStringUtils.secure().nextAscii(500);
     try (KeyInputStream groupInputStream =
              new KeyInputStream("key", createInputStreams(dataString))) {
       byte[] resBuf = new byte[600];
@@ -76,8 +81,8 @@ public class TestChunkStreams {
     }
   }
 
-  @NotNull
-  private List<BlockInputStream> createInputStreams(String dataString) {
+  @Nonnull
+  private List<BlockInputStream> createInputStreams(String dataString) throws IOException {
     byte[] buf = dataString.getBytes(UTF_8);
     List<BlockInputStream> streams = new ArrayList<>();
     int offset = 0;
@@ -89,8 +94,11 @@ public class TestChunkStreams {
     return streams;
   }
 
-  private BlockInputStream createStream(byte[] buf, int offset) {
-    return new BlockInputStream(null, 100, null, null, true, null) {
+  private BlockInputStream createStream(byte[] buf, int offset) throws IOException {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new BlockInputStream(null, 100L, null, null, null,
+        clientConfig) {
       private long pos;
       private final ByteArrayInputStream in =
           new ByteArrayInputStream(buf, offset, 100);

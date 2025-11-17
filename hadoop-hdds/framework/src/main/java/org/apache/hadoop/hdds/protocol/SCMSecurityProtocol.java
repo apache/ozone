@@ -1,32 +1,31 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
 import java.util.List;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -113,15 +112,12 @@ public interface SCMSecurityProtocol {
    * @param type            - node type: OM/SCM/DN.
    * @param startSerialId   - start certificate serial id.
    * @param count           - max number of certificates returned in a batch.
-   * @param isRevoked       - whether list for revoked certs only.
    * @return list of PEM encoded certificate strings.
    */
-  List<String> listCertificate(HddsProtos.NodeType type, long startSerialId,
-      int count, boolean isRevoked) throws IOException;
+  List<String> listCertificate(HddsProtos.NodeType type, long startSerialId, int count) throws IOException;
 
   /**
    * Get Root CA certificate.
-   * @return
    * @throws IOException
    */
   String getRootCACertificate() throws IOException;
@@ -145,32 +141,6 @@ public interface SCMSecurityProtocol {
    * @throws IOException
    */
   List<String> listCACertificate() throws IOException;
-
-  /**
-   * Get the CRLInfo based on the CRL Id.
-   * @param crlIds - crl ids
-   * @return list of CRLInfo
-   * @throws IOException
-   */
-  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
-
-  /**
-   * Get the latest CRL id.
-   * @return latest CRL id.
-   */
-  long getLatestCrlId() throws IOException;
-
-
-  /**
-   * Revoke a list of certificates at specified time.
-   * @param certIds - cert ids
-   * @param reason - reason code: refer @org.bouncycastle.asn1.x509.CRLReason.
-   * @param revocationTime - revocation time.
-   * @return
-   * @throws IOException
-   */
-  long revokeCertificates(List<String> certIds, int reason, long revocationTime)
-      throws IOException;
 
   /**
    * Get SCM signed certificate.

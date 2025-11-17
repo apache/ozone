@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,17 +16,6 @@
  */
 
 package org.apache.ozone.lib.server;
-
-import org.apache.hadoop.conf.ConfigRedactor;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.lib.util.Check;
-import org.apache.ozone.lib.util.ConfigurationUtils;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.PropertyConfigurator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,6 +28,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.hadoop.conf.ConfigRedactor;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.PropertyConfigurator;
+import org.apache.ozone.lib.util.Check;
+import org.apache.ozone.lib.util.ConfigurationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A Server class provides standard configuration, logging and {@link Service}
@@ -96,44 +94,6 @@ public class Server {
    * Server property name that defines server startup status.
    */
   public static final String CONF_STARTUP_STATUS = "startup.status";
-
-  /**
-   * Enumeration that defines the server status.
-   */
-  @InterfaceAudience.Private
-  public enum Status {
-    UNDEF(false, false),
-    BOOTING(false, true),
-    HALTED(true, true),
-    ADMIN(true, true),
-    NORMAL(true, true),
-    SHUTTING_DOWN(false, true),
-    SHUTDOWN(false, false);
-
-    private boolean settable;
-    private boolean operational;
-
-    /**
-     * Status constructor.
-     *
-     * @param settable indicates if the status is settable.
-     * @param operational indicates if the server is operational
-     * when in this status.
-     */
-    Status(boolean settable, boolean operational) {
-      this.settable = settable;
-      this.operational = operational;
-    }
-
-    /**
-     * Returns if this server status is operational.
-     *
-     * @return if this server status is operational.
-     */
-    public boolean isOperational() {
-      return operational;
-    }
-  }
 
   /**
    * Name of the log4j configuration file the Server will load from the
@@ -838,4 +798,41 @@ public class Server {
     }
   }
 
+  /**
+   * Enumeration that defines the server status.
+   */
+  @InterfaceAudience.Private
+  public enum Status {
+    UNDEF(false, false),
+    BOOTING(false, true),
+    HALTED(true, true),
+    ADMIN(true, true),
+    NORMAL(true, true),
+    SHUTTING_DOWN(false, true),
+    SHUTDOWN(false, false);
+
+    private boolean settable;
+    private boolean operational;
+
+    /**
+     * Status constructor.
+     *
+     * @param settable indicates if the status is settable.
+     * @param operational indicates if the server is operational
+     * when in this status.
+     */
+    Status(boolean settable, boolean operational) {
+      this.settable = settable;
+      this.operational = operational;
+    }
+
+    /**
+     * Returns if this server status is operational.
+     *
+     * @return if this server status is operational.
+     */
+    public boolean isOperational() {
+      return operational;
+    }
+  }
 }

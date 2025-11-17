@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,12 +23,14 @@ import java.util.List;
 /**
  * Wrapper class to hold multiple OM DB update events.
  */
-public class OMUpdateEventBatch {
+public class OMUpdateEventBatch implements ReconEvent {
 
   private final List<OMDBUpdateEvent> events;
+  private final long batchSequenceNumber;
 
-  public OMUpdateEventBatch(List<OMDBUpdateEvent> e) {
+  public OMUpdateEventBatch(List<OMDBUpdateEvent> e, long batchSequenceNumber) {
     events = e;
+    this.batchSequenceNumber = batchSequenceNumber;
   }
 
   /**
@@ -37,11 +38,7 @@ public class OMUpdateEventBatch {
    * @return Event Info instance.
    */
   long getLastSequenceNumber() {
-    if (events.isEmpty()) {
-      return -1;
-    } else {
-      return events.get(events.size() - 1).getSequenceNumber();
-    }
+    return this.batchSequenceNumber;
   }
 
   /**
@@ -58,5 +55,19 @@ public class OMUpdateEventBatch {
    */
   public boolean isEmpty() {
     return !getIterator().hasNext();
+  }
+
+  public List<OMDBUpdateEvent> getEvents() {
+    return events;
+  }
+  
+  @Override
+  public EventType getEventType() {
+    return EventType.OM_UPDATE_BATCH;
+  }
+  
+  @Override
+  public int getEventCount() {
+    return events.size();
   }
 }

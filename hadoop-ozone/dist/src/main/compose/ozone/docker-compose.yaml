@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
@@ -75,9 +73,11 @@ services:
       <<: *replication
     ports:
       - 9878:9878
+      - 19878:19878
     command: ["ozone","s3g"]
   recon:
     <<: *common-config
+    hostname: recon
     ports:
       - 9888:9888
     environment:

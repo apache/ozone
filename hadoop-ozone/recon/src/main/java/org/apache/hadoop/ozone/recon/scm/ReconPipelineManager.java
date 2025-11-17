@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,12 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -34,18 +35,13 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-
-import com.google.common.annotations.VisibleForTesting;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
@@ -104,12 +100,11 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
       for (Pipeline pipeline : pipelinesFromScm) {
-        if (!containsPipeline(pipeline.getId())) {
-          // New pipeline got from SCM. Recon does not know anything about it,
-          // so let's add it.
-          LOG.info("Adding new pipeline {} from SCM.", pipeline.getId());
-          addPipeline(pipeline);
+        // New pipeline got from SCM. Validate If it doesn't exist at Recon, try adding it.
+        if (addPipeline(pipeline)) {
+          LOG.info("Added new pipeline {} from SCM.", pipeline.getId());
         } else {
+          LOG.warn("Pipeline {} already exists in Recon pipeline metadata.", pipeline.getId());
           // Recon already has this pipeline. Just update state and creation
           // time.
           getStateManager().updatePipelineState(
@@ -118,60 +113,60 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
           getPipeline(pipeline.getId()).setCreationTimestamp(
               pipeline.getCreationTimestamp());
         }
-        removeInvalidPipelines(pipelinesFromScm);
       }
+      removeInvalidPipelines(pipelinesFromScm);
     } finally {
       releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    acquireWriteLock();
-    try {
-      List<Pipeline> pipelinesInHouse = getPipelines();
-      // Removing pipelines in Recon that are no longer in SCM.
-      // TODO Recon may need to track inactive pipelines as well. So this can be
-      // removed in a followup JIRA.
-      List<Pipeline> invalidPipelines = pipelinesInHouse
-          .stream()
-          .filter(p -> !pipelinesFromScm.contains(p))
-          .collect(Collectors.toList());
-      invalidPipelines.forEach(p -> {
-        PipelineID pipelineID = p.getId();
-        if (!p.getPipelineState().equals(CLOSED)) {
-          try {
-            getStateManager().updatePipelineState(
-                pipelineID.getProtobuf(),
-                HddsProtos.PipelineState.PIPELINE_CLOSED);
-          } catch (IOException e) {
-            LOG.warn("Pipeline {} not found while updating state. ",
-                p.getId(), e);
-          }
-        }
+    List<Pipeline> pipelinesInHouse = getPipelines();
+    // Removing pipelines in Recon that are no longer in SCM.
+    // TODO Recon may need to track inactive pipelines as well. So this can be
+    // removed in a followup JIRA.
+    List<Pipeline> invalidPipelines = pipelinesInHouse
+        .stream()
+        .filter(p -> !pipelinesFromScm.contains(p))
+        .collect(Collectors.toList());
+    invalidPipelines.forEach(p -> {
+      PipelineID pipelineID = p.getId();
+      if (!p.getPipelineState().equals(CLOSED)) {
         try {
-          LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          closePipeline(p.getId());
-          deletePipeline(p.getId());
+          getStateManager().updatePipelineState(
+              pipelineID.getProtobuf(),
+              HddsProtos.PipelineState.PIPELINE_CLOSED);
         } catch (IOException e) {
-          LOG.warn("Unable to remove pipeline {}", pipelineID, e);
+          LOG.warn("Pipeline {} not found while updating state. ",
+              p.getId(), e);
         }
-      });
-    } finally {
-      releaseWriteLock();
-    }
+      }
+      try {
+        LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
+        closePipeline(p.getId());
+        deletePipeline(p.getId());
+      } catch (IOException e) {
+        LOG.warn("Unable to remove pipeline {}", pipelineID, e);
+      }
+    });
   }
+
   /**
    * Add a new pipeline to the pipeline metadata.
    * @param pipeline pipeline
+   * @return true if the pipeline was added, false if it already existed
    * @throws IOException
    */
   @VisibleForTesting
-  public void addPipeline(Pipeline pipeline)
-      throws IOException {
+  public boolean addPipeline(Pipeline pipeline) throws IOException {
     acquireWriteLock();
     try {
-      getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      // Check if the pipeline already exists
+      if (containsPipeline(pipeline.getId())) {
+        return false;
+      }
+      getStateManager().addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      return true;
     } finally {
       releaseWriteLock();
     }

@@ -1,25 +1,27 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
+
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 
 import java.io.IOException;
 import java.util.Objects;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
@@ -28,29 +30,46 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 /**
  * Lightweight OmKeyInfo class.
  */
-public class BasicOmKeyInfo {
+public final class BasicOmKeyInfo {
 
-  private String volumeName;
-  private String bucketName;
-  private String keyName;
-  private long dataSize;
-  private long creationTime;
-  private long modificationTime;
-  private ReplicationConfig replicationConfig;
-  private boolean isFile;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long dataSize;
+  private final long creationTime;
+  private final long modificationTime;
+  private final ReplicationConfig replicationConfig;
+  private final boolean isFile;
+  private final String eTag;
+  private String ownerName;
+  private final boolean isEncrypted;
 
-  @SuppressWarnings("parameternumber")
-  public BasicOmKeyInfo(String volumeName, String bucketName, String keyName,
-                        long dataSize, long creationTime, long modificationTime,
-                        ReplicationConfig replicationConfig, boolean isFile) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.replicationConfig = replicationConfig;
-    this.isFile = isFile;
+  private BasicOmKeyInfo(Builder b) {
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.dataSize = b.dataSize;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.replicationConfig = b.replicationConfig;
+    this.isFile = b.isFile;
+    this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
+    this.ownerName = b.ownerName;
+    this.isEncrypted = b.isEncrypted;
+  }
+
+  private BasicOmKeyInfo(OmKeyInfo b) {
+    this.volumeName = b.getVolumeName();
+    this.bucketName = b.getBucketName();
+    this.keyName = b.getKeyName();
+    this.dataSize = b.getDataSize();
+    this.creationTime = b.getCreationTime();
+    this.modificationTime = b.getModificationTime();
+    this.replicationConfig = b.getReplicationConfig();
+    this.isFile = b.isFile();
+    this.eTag = b.getMetadata().get(ETAG);
+    this.ownerName = b.getOwnerName();
+    this.isEncrypted = b.getFileEncryptionInfo() != null;
   }
 
   public String getVolumeName() {
@@ -85,6 +104,22 @@ public class BasicOmKeyInfo {
     return isFile;
   }
 
+  public String getETag() {
+    return eTag;
+  }
+
+  public String getOwnerName() {
+    return ownerName;
+  }
+
+  public boolean isEncrypted() {
+    return isEncrypted;
+  }
+
+  public long getReplicatedSize() {
+    return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
+  }
+
   /**
    * Builder of BasicOmKeyInfo.
    */
@@ -97,6 +132,9 @@ public class BasicOmKeyInfo {
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private boolean isFile;
+    private String eTag;
+    private String ownerName;
+    private boolean isEncrypted;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -138,9 +176,23 @@ public class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setETag(String etag) {
+      this.eTag = etag;
+      return this;
+    }
+
+    public Builder setOwnerName(String ownerName) {
+      this.ownerName = ownerName;
+      return this;
+    }
+
+    public Builder setIsEncrypted(boolean isEncrypted) {
+      this.isEncrypted = isEncrypted;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
-      return new BasicOmKeyInfo(volumeName, bucketName, keyName, dataSize,
-          creationTime, modificationTime, replicationConfig, isFile);
+      return new BasicOmKeyInfo(this);
     }
   }
 
@@ -150,12 +202,19 @@ public class BasicOmKeyInfo {
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setType(replicationConfig.getReplicationType());
+        .setType(replicationConfig.getReplicationType())
+        .setIsEncrypted(isEncrypted);
+    if (ownerName != null) {
+      builder.setOwnerName(ownerName);
+    }
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(
           ((ECReplicationConfig) replicationConfig).toProto());
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    if (StringUtils.isNotEmpty(eTag)) {
+      builder.setETag(eTag);
     }
 
     return builder.build();
@@ -181,7 +240,10 @@ public class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
-        .setIsFile(!keyName.endsWith("/"));
+        .setETag(basicKeyInfo.getETag())
+        .setIsFile(!keyName.endsWith("/"))
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setIsEncrypted(basicKeyInfo.getIsEncrypted());
 
     return builder.build();
   }
@@ -205,11 +267,15 @@ public class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
-        .setIsFile(!keyName.endsWith("/"));
+        .setETag(basicKeyInfo.getETag())
+        .setIsFile(!keyName.endsWith("/"))
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setIsEncrypted(basicKeyInfo.getIsEncrypted());
 
     return builder.build();
   }
 
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -225,22 +291,18 @@ public class BasicOmKeyInfo {
         creationTime == basicOmKeyInfo.creationTime &&
         modificationTime == basicOmKeyInfo.modificationTime &&
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
-        isFile == basicOmKeyInfo.isFile;
+        Objects.equals(eTag, basicOmKeyInfo.eTag) &&
+        isFile == basicOmKeyInfo.isFile &&
+        ownerName.equals(basicOmKeyInfo.ownerName) &&
+        isEncrypted == basicOmKeyInfo.isEncrypted;
   }
 
+  @Override
   public int hashCode() {
     return Objects.hash(volumeName, bucketName, keyName);
   }
 
   public static BasicOmKeyInfo fromOmKeyInfo(OmKeyInfo omKeyInfo) {
-    return new BasicOmKeyInfo(
-        omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(),
-        omKeyInfo.getKeyName(),
-        omKeyInfo.getDataSize(),
-        omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime(),
-        omKeyInfo.getReplicationConfig(),
-        omKeyInfo.isFile());
+    return new BasicOmKeyInfo(omKeyInfo);
   }
 }

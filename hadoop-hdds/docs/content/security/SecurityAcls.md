@@ -1,6 +1,6 @@
 ---
 title: "Ozone ACLs"
-date: "2019-April-03"
+date: "2019-04-03"
 weight: 6
 menu:
    main:
@@ -32,7 +32,7 @@ Add the following properties to the ozone-site.xml to enable native ACLs.
 Property|Value
 --------|------------------------------------------------------------
 ozone.acl.enabled         | true
-ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.OzoneNativeAuthorizer
+ozone.acl.authorizer.class| org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 
@@ -172,3 +172,16 @@ $ ozone sh bucket removeacl -a user:testuser:r[DEFAULT] /vol1/bucket2
 ACL user:testuser:r[DEFAULT] removed successfully.
 ```
 
+## Differences Between Ozone ACL and S3 ACL
+
+Ozone ACLs and S3 ACLs differ primarily in their scope and support.
+
+- **S3 ACLs**: Currently, only S3 Bucket ACL is implemented in Ozone (a beta feature). S3 Object ACL is not yet implemented. Any `PutObjectAcl` request will result in a `501: Not Implemented` response code.
+- **Ozone ACLs**: Ozone ACLs provide a more comprehensive and flexible access control mechanism. They are designed to work seamlessly with Ozone's native architecture and support various rights and scopes as mentioned above.
+
+## Ozone File System ACL API
+
+- ACL-related APIs in Ozone file system implementation (`ofs` and `o3fs`), such as `getAclStatus`, `setAcl`, `modifyAclEntries`, `removeAclEntries`, `removeDefaultAcl`, and `removeAcl` are not supported. These operations will throw an UnsupportedOperationException.
+- Similarly, HttpFS ACL-related APIs.
+
+These limitations should be taken into account when integrating Ozone with applications that rely on S3 or file system ACL operations.

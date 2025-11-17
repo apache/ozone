@@ -1,50 +1,33 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
+
+import static com.google.common.base.Preconditions.checkState;
+import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamBufferArgs;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +36,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static com.google.common.base.Preconditions.checkState;
-import static org.apache.ratis.util.Preconditions.assertInstanceOf;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ECBlockOutputStreamEntry manages write into EC keys' data block groups.
@@ -75,19 +66,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   private int currentStreamIdx = 0;
   private long successfulBlkGrpAckedLen;
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  ECBlockOutputStreamEntry(BlockID blockID, String key,
-      XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
-      BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, ContainerClientMetrics clientMetrics,
-      StreamBufferArgs streamBufferArgs) {
-    super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
-        token, config, clientMetrics, streamBufferArgs);
-    assertInstanceOf(
-        pipeline.getReplicationConfig(), ECReplicationConfig.class);
-    this.replicationConfig =
-        (ECReplicationConfig) pipeline.getReplicationConfig();
-    this.length = replicationConfig.getData() * length;
+  ECBlockOutputStreamEntry(Builder b) {
+    super(b);
+    this.replicationConfig = assertInstanceOf(b.getPipeline().getReplicationConfig(), ECReplicationConfig.class);
+    this.length = replicationConfig.getData() * b.getLength();
   }
 
   @Override
@@ -101,7 +83,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs());
+                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs(),
+                getExecutorServiceSupplier());
       }
       blockOutputStreams = streams;
     }
@@ -263,8 +246,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   @VisibleForTesting
   Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
       DatanodeDetails node, int replicaIndex) {
-    Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
-    indiciesForSinglePipeline.put(node, replicaIndex);
+    Map<DatanodeDetails, Integer> indiciesForSinglePipeline = Collections.singletonMap(node, replicaIndex);
     return Pipeline.newBuilder()
         .setId(ecPipeline.getId())
         .setReplicationConfig(ecPipeline.getReplicationConfig())
@@ -433,82 +415,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
-  public static class Builder {
-    private BlockID blockID;
-    private String key;
-    private XceiverClientFactory xceiverClientManager;
-    private Pipeline pipeline;
-    private long length;
-    private BufferPool bufferPool;
-    private Token<OzoneBlockTokenIdentifier> token;
-    private OzoneClientConfig config;
-    private ContainerClientMetrics clientMetrics;
-    private StreamBufferArgs streamBufferArgs;
-
-    public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
-      this.blockID = bID;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setKey(String keys) {
-      this.key = keys;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setXceiverClientManager(
-        XceiverClientFactory
-            xClientManager) {
-      this.xceiverClientManager = xClientManager;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setPipeline(Pipeline ppln) {
-      this.pipeline = ppln;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setLength(long len) {
-      this.length = len;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setBufferPool(BufferPool pool) {
-      this.bufferPool = pool;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setConfig(
-        OzoneClientConfig clientConfig) {
-      this.config = clientConfig;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setToken(
-        Token<OzoneBlockTokenIdentifier> bToken) {
-      this.token = bToken;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setClientMetrics(
-        ContainerClientMetrics containerClientMetrics) {
-      this.clientMetrics = containerClientMetrics;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setStreamBufferArgs(
-        StreamBufferArgs args) {
-      this.streamBufferArgs = args;
-      return this;
-    }
-
+  public static class Builder extends BlockOutputStreamEntry.Builder {
+    @Override
     public ECBlockOutputStreamEntry build() {
-      return new ECBlockOutputStreamEntry(blockID,
-          key,
-          xceiverClientManager,
-          pipeline,
-          length,
-          bufferPool,
-          token, config, clientMetrics, streamBufferArgs);
+      return new ECBlockOutputStreamEntry(this);
     }
   }
 }

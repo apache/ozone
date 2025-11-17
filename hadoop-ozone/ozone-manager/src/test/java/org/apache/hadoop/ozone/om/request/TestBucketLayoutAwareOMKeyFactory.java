@@ -1,41 +1,41 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.request;
 
+import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.OM_KEY_REQUEST_CLASSES;
+import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.addRequestClass;
+import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getKey;
+import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getRequestInstanceFromMap;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getKey;
-import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getRequestInstanceFromMap;
-import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.OM_KEY_REQUEST_CLASSES;
-import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.addRequestClass;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Validates functionality of {@link BucketLayoutAwareOMKeyRequestFactory}.
@@ -109,9 +109,9 @@ public class TestBucketLayoutAwareOMKeyFactory {
           LOG.info("Validated request class instantiation for cmdType " + k);
         });
 
-    assertEquals(13, omKeyReqsFSO.size());
-    assertEquals(14, omKeyReqsLegacy.size());
-    assertEquals(14, omKeyReqsOBS.size());
+    assertEquals(15, omKeyReqsFSO.size());
+    assertEquals(16, omKeyReqsLegacy.size());
+    assertEquals(16, omKeyReqsOBS.size());
     // Check if the number of instantiated OMKeyRequest classes is equal to
     // the number of keys in the mapping.
     assertEquals(
@@ -135,21 +135,17 @@ public class TestBucketLayoutAwareOMKeyFactory {
     addRequestClass(Type.PurgeDirectories,
             OMDirectoriesPurgeRequestWithFSO.class,
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    try {
-      // This should fail, since this class does not have a valid constructor -
-      // one that takes an OMRequest and a BucketLayout as parameters.
-      getRequestInstanceFromMap(
-          OMRequest.newBuilder()
-              .setCmdType(Type.PurgeKeys)
-              .setClientId("xyz")
-              .build(),
-          getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
-          BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      fail("No exception thrown for invalid OMKeyRequest class");
-    } catch (NoSuchMethodException ex) {
-      // expected exception.
-      LOG.info("Expected exception thrown for invalid OMKeyRequest class", ex);
-    }
+    // This should fail, since this class does not have a valid constructor -
+    // one that takes an OMRequest and a BucketLayout as parameters.
+    assertThrows(NoSuchMethodException.class,
+        () -> getRequestInstanceFromMap(
+            OMRequest.newBuilder()
+                .setCmdType(Type.PurgeKeys)
+                .setClientId("xyz")
+                .build(),
+            getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
+            BucketLayout.FILE_SYSTEM_OPTIMIZED),
+        "No exception thrown for invalid OMKeyRequest class");
   }
 
   /**

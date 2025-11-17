@@ -1,67 +1,47 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.hdds.NodeDetails;
-import org.apache.ratis.protocol.RaftGroup;
-import org.apache.ratis.protocol.RaftPeerId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.InetSocketAddress;
+import org.apache.hadoop.hdds.NodeDetails;
+import org.apache.hadoop.net.NetUtils;
 
 /**
  * Construct SCM node details.
  */
 public final class SCMNodeDetails extends NodeDetails {
-  private InetSocketAddress blockProtocolServerAddress;
-  private String blockProtocolServerAddressKey;
-  private InetSocketAddress clientProtocolServerAddress;
-  private String clientProtocolServerAddressKey;
-  private InetSocketAddress datanodeProtocolServerAddress;
-  private String datanodeAddressKey;
-  private int grpcPort;
-  public static final Logger LOG =
-      LoggerFactory.getLogger(SCMNodeDetails.class);
+  private final InetSocketAddress blockProtocolServerAddress;
+  private final String blockProtocolServerAddressKey;
+  private final InetSocketAddress clientProtocolServerAddress;
+  private final String clientProtocolServerAddressKey;
+  private final InetSocketAddress datanodeProtocolServerAddress;
+  private final String datanodeAddressKey;
+  private final int grpcPort;
 
-  /**
-   * Constructs SCMNodeDetails object.
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private SCMNodeDetails(String serviceId, String nodeId,
-      InetSocketAddress rpcAddr, int ratisPort, int grpcPort,
-      String httpAddress, String httpsAddress,
-      InetSocketAddress blockProtocolServerAddress,
-      InetSocketAddress clientProtocolServerAddress,
-      InetSocketAddress datanodeProtocolServerAddress, RaftGroup group,
-      RaftPeerId selfPeerId, String datanodeAddressKey,
-      String blockProtocolServerAddressKey,
-      String clientProtocolServerAddressAddressKey) {
-    super(serviceId, nodeId, rpcAddr, ratisPort,
-        httpAddress, httpsAddress);
-    this.grpcPort = grpcPort;
-    this.blockProtocolServerAddress = blockProtocolServerAddress;
-    this.clientProtocolServerAddress = clientProtocolServerAddress;
-    this.datanodeProtocolServerAddress = datanodeProtocolServerAddress;
-    this.datanodeAddressKey = datanodeAddressKey;
-    this.blockProtocolServerAddressKey = blockProtocolServerAddressKey;
-    this.clientProtocolServerAddressKey = clientProtocolServerAddressAddressKey;
+  private SCMNodeDetails(Builder b) {
+    super(b.scmServiceId, b.scmNodeId, b.rpcAddress, b.ratisPort, b.httpAddr, b.httpsAddr);
+    grpcPort = b.grpcPort;
+    blockProtocolServerAddress = b.blockProtocolServerAddress;
+    clientProtocolServerAddress = b.clientProtocolServerAddress;
+    datanodeProtocolServerAddress = b.datanodeProtocolServerAddress;
+    datanodeAddressKey = b.datanodeAddressKey;
+    blockProtocolServerAddressKey = b.blockProtocolServerAddressKey;
+    clientProtocolServerAddressKey = b.clientProtocolServerAddressKey;
   }
 
   @Override
@@ -96,8 +76,6 @@ public final class SCMNodeDetails extends NodeDetails {
     private String clientProtocolServerAddressKey;
     private InetSocketAddress datanodeProtocolServerAddress;
     private String datanodeAddressKey;
-    private RaftGroup raftGroup;
-    private RaftPeerId selfPeerId;
 
     public Builder setDatanodeAddressKey(String addressKey) {
       this.datanodeAddressKey = addressKey;
@@ -126,16 +104,6 @@ public final class SCMNodeDetails extends NodeDetails {
 
     public Builder setDatanodeProtocolServerAddress(InetSocketAddress address) {
       this.datanodeProtocolServerAddress = address;
-      return this;
-    }
-
-    public Builder setRaftGroup(RaftGroup group) {
-      this.raftGroup = group;
-      return this;
-    }
-
-    public Builder setSelfPeerId(RaftPeerId peerId) {
-      this.selfPeerId = peerId;
       return this;
     }
 
@@ -175,14 +143,11 @@ public final class SCMNodeDetails extends NodeDetails {
     }
 
     public SCMNodeDetails build() {
-      return new SCMNodeDetails(scmServiceId, scmNodeId, rpcAddress,
-          ratisPort, grpcPort, httpAddr, httpsAddr, blockProtocolServerAddress,
-          clientProtocolServerAddress, datanodeProtocolServerAddress,
-          raftGroup, selfPeerId, datanodeAddressKey,
-          blockProtocolServerAddressKey, clientProtocolServerAddressKey);
+      return new SCMNodeDetails(this);
     }
   }
 
+  @Override
   public String getRpcAddressString() {
     return NetUtils.getHostPortString(getRpcAddress());
   }

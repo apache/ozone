@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,39 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om.service;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT;
@@ -68,11 +34,45 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
+
 /**
  * Tests SnapshotDiffCleanupService.
  */
 public class TestSnapshotDiffCleanupService {
-  private static File file;
+  @TempDir
+  private static Path tempDir;
   private static ManagedRocksDB db;
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
@@ -102,7 +102,7 @@ public class TestSnapshotDiffCleanupService {
     dbOptions.setCreateIfMissing(true);
     columnFamilyOptions = new ManagedColumnFamilyOptions();
 
-    file = new File("./test-snap-diff-clean-up");
+    File file = tempDir.resolve("./test-snap-diff-clean-up").toFile();
     if (!file.mkdirs() && !file.exists()) {
       throw new IllegalArgumentException("Unable to create directory " +
           file);
@@ -133,8 +133,6 @@ public class TestSnapshotDiffCleanupService {
     if (db != null) {
       db.close();
     }
-
-    GenericTestUtils.deleteDirectory(file);
   }
 
   @BeforeEach
@@ -290,16 +288,17 @@ public class TestSnapshotDiffCleanupService {
                                           long noOfEntries)
       throws IOException, RocksDBException {
 
-    String jobId = "jobId-" + RandomStringUtils.randomAlphanumeric(10);
-    String volume = "volume-" + RandomStringUtils.randomAlphanumeric(10);
-    String bucket = "bucket-" + RandomStringUtils.randomAlphanumeric(10);
+    String jobId = "jobId-" + RandomStringUtils.secure().nextAlphanumeric(10);
+    String volume = "volume-" + RandomStringUtils.secure().nextAlphanumeric(10);
+    String bucket = "bucket-" + RandomStringUtils.secure().nextAlphanumeric(10);
     String fromSnapshot = "fromSnap-" +
-        RandomStringUtils.randomAlphanumeric(10);
-    String toSnapshot = "toSnap-" + RandomStringUtils.randomAlphanumeric(10);
+        RandomStringUtils.secure().nextAlphanumeric(10);
+    String toSnapshot = "toSnap-" + RandomStringUtils.secure().nextAlphanumeric(10);
     String jobKey = fromSnapshot + DELIMITER + toSnapshot;
 
     SnapshotDiffJob job = new SnapshotDiffJob(creationTime, jobId, jobStatus,
-        volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries);
+        volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries,
+        null, 0.0);
 
     db.get().put(jobTableCfh, codecRegistry.asRawData(jobKey),
         codecRegistry.asRawData(job));
@@ -364,7 +363,6 @@ public class TestSnapshotDiffCleanupService {
     long actualEntriesCount = codecRegistry.asObject(bytes, Long.class);
     assertEquals(expectedEntriesCount, actualEntriesCount);
   }
-
 
   private void assertNumberOfEntriesInTable(ColumnFamilyHandle table,
                                             long expectedCount) {

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,16 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,6 +25,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class handles Ratis containers that are over replicated. It should
@@ -44,7 +43,7 @@ import java.util.stream.Collectors;
  */
 public class RatisOverReplicationHandler
     extends AbstractOverReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RatisOverReplicationHandler.class);
 
   private final ReplicationManager replicationManager;
@@ -121,7 +120,7 @@ public class RatisOverReplicationHandler
     // get replicas that can be deleted, in sorted order
     List<ContainerReplica> eligibleReplicas =
         getEligibleReplicas(replicaCount, pendingOps);
-    if (eligibleReplicas.size() == 0) {
+    if (eligibleReplicas.isEmpty()) {
       LOG.info("Did not find any replicas that are eligible to be deleted for" +
           " container {}.", containerInfo);
       return 0;
@@ -288,18 +287,18 @@ public class RatisOverReplicationHandler
      */
     Set<ContainerReplica> replicaSet = new HashSet<>(replicas);
     // iterate through replicas in deterministic order
+    ContainerPlacementStatus originalPlacementStatus = getPlacementStatus(replicaSet,
+        containerInfo.getReplicationFactor().getNumber());
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
         break;
       }
-
-      if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
+      if (super.isPlacementStatusActuallyEqualAfterRemove(originalPlacementStatus, replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
         try {
           replicationManager.sendThrottledDeleteCommand(containerInfo,
               replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
           commandsSent++;
-          excess--;
         } catch (CommandTargetOverloadedException e) {
           LOG.debug("Unable to send delete command for container {} to {} as " +
               "it has too many pending delete commands",
@@ -308,6 +307,11 @@ public class RatisOverReplicationHandler
             firstOverloadedException = e;
           }
         }
+        // Even if the command fails to send, we still mark the replica as if the command was sent to ensure a
+        // deterministic selection order. Then we adjust the replicaSet so it appears as if this replica was deleted
+        // to allow subsequent placement checks to be accurate.
+        excess--;
+        replicaSet.remove(replica);
       }
     }
     // If we encountered an overloaded exception, and then did not send as many

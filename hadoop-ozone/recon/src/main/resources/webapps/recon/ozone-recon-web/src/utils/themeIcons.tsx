@@ -17,17 +17,17 @@
  */
 
 import * as React from 'react';
-import {Tooltip} from 'antd';
+import { Tooltip } from 'antd';
 
 export class FilledIcon extends React.Component {
   render() {
     const path =
-        'M864 64H160C107 64 64 107 64 160v' +
-        '704c0 53 43 96 96 96h704c53 0 96-43 96-96V16' +
-        '0c0-53-43-96-96-96z';
+      'M864 64H160C107 64 64 107 64 160v' +
+      '704c0 53 43 96 96 96h704c53 0 96-43 96-96V16' +
+      '0c0-53-43-96-96-96z';
     return (
       <svg {...(this.props as Record<string, object>)} viewBox='0 0 1024 1024'>
-        <path d={path}/>
+        <path d={path} />
       </svg>
     );
   }
@@ -47,7 +47,7 @@ interface IReplicationIconProps {
 
 export class RatisIcon extends React.PureComponent<IRatisIconProps> {
   render() {
-    const {replicationFactor, isLeader} = this.props;
+    const { replicationFactor, isLeader } = this.props;
     const threeFactorClass = isLeader ? 'icon-text-three-dots-leader' : 'icon-text-three-dots';
     const textClass = replicationFactor === "THREE" ? threeFactorClass : 'icon-text-one-dot';
     return (
@@ -70,13 +70,13 @@ export class StandaloneIcon extends React.PureComponent {
 
 export class ReplicationIcon extends React.PureComponent<IReplicationIconProps> {
   render() {
-    const {replicationType, replicationFactor, isLeader, leaderNode} = this.props;
+    const { replicationType, replicationFactor, isLeader, leaderNode } = this.props;
     // Assign icons only for RATIS and STAND_ALONE types
     let icon = null;
     if (replicationType === 'RATIS') {
-      icon = <RatisIcon replicationFactor={replicationFactor} isLeader={isLeader}/>;
+      icon = <RatisIcon replicationFactor={replicationFactor} isLeader={isLeader} />;
     } else if (replicationType === 'STAND_ALONE') {
-      icon = <StandaloneIcon/>;
+      icon = <StandaloneIcon />;
     }
 
     // Wrap the icon in a tooltip

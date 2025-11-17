@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.rawcoder.util.DumpUtil;
 import org.apache.ozone.erasurecode.rawcoder.util.GF256;
 import org.apache.ozone.erasurecode.rawcoder.util.RSUtil;
-
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 /**
  * A raw erasure decoder in RS code scheme in pure Java in case native one
@@ -52,6 +50,8 @@ public class RSRawDecoder extends RawErasureDecoder {
   private int[] cachedErasedIndexes;
   private int[] validIndexes;
   private int numErasedDataUnits;
+
+  @SuppressWarnings("PMD.SingularField")
   private boolean[] erasureFlags;
 
   public RSRawDecoder(ECReplicationConfig ecReplicationConfig) {
@@ -59,7 +59,7 @@ public class RSRawDecoder extends RawErasureDecoder {
 
     int numAllUnits = getNumAllUnits();
     if (getNumAllUnits() >= RSUtil.GF.getFieldSize()) {
-      throw new HadoopIllegalArgumentException(
+      throw new IllegalArgumentException(
               "Invalid getNumDataUnits() and numParityUnits");
     }
 
@@ -122,8 +122,7 @@ public class RSRawDecoder extends RawErasureDecoder {
     this.erasureFlags = new boolean[getNumAllUnits()];
     this.numErasedDataUnits = 0;
 
-    for (int i = 0; i < erasedIndexes.length; i++) {
-      int index = erasedIndexes[i];
+    for (int index : erasedIndexes) {
       erasureFlags[index] = true;
       if (index < getNumDataUnits()) {
         numErasedDataUnits++;

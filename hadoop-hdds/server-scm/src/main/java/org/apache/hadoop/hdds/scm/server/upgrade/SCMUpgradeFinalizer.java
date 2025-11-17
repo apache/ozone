@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +20,6 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 import java.io.IOException;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -108,6 +106,7 @@ public class SCMUpgradeFinalizer extends
         context.getStorage());
   }
 
+  @Override
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
     // If we reached this phase of finalization, all layout features should
@@ -151,7 +150,7 @@ public class SCMUpgradeFinalizer extends
 
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       if (pipeline.getPipelineState() != CLOSED) {
-        pipelineManager.closePipeline(pipeline, true);
+        pipelineManager.closePipeline(pipeline.getId());
       }
     }
 

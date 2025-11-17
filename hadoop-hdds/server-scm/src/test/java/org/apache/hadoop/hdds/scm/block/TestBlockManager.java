@@ -1,37 +1,45 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
-import java.nio.file.Path;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -39,30 +47,30 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -76,52 +84,33 @@ import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.ozone.test.GenericTestUtils;
-
-import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.OzoneConsts.MB;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for SCM Block Manager.
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private ContainerManager mapping;
   private MockNodeManager nodeManager;
   private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
-  private SCMHAManager scmHAManager;
-  private SequenceIdGenerator sequenceIdGen;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private EventQueue eventQueue;
-  private SCMContext scmContext;
-  private SCMServiceManager serviceManager;
   private int numContainerPerOwnerInPipeline;
-  private OzoneConfiguration conf;
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
   @BeforeEach
-  public void setUp(@TempDir Path tempDir) throws Exception {
-    conf = SCMTestUtils.getConf();
+  void setUp(@TempDir File tempDir) throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     numContainerPerOwnerInPipeline = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
-
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
+    conf.setBoolean(HDDS_SCM_SAFEMODE_ENABLED, false);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
@@ -129,16 +118,16 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();
-    scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    sequenceIdGen = new SequenceIdGenerator(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
@@ -164,15 +153,9 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable(),
             new ContainerReplicaPendingOps(
-                Clock.system(ZoneId.systemDefault())));
+                Clock.system(ZoneId.systemDefault()), null));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager.getContainers(), containerManager,
-        pipelineManager, eventQueue, serviceManager, scmContext) {
-      @Override
-      public void emitSafeModeStatus() {
-        // skip
-      }
-    };
+        nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setPipelineManager(pipelineManager);
@@ -186,7 +169,7 @@ public class TestBlockManager {
     configurator.getLeaseManager().start();
 
     // Initialize these fields so that the tests can pass.
-    mapping = scm.getContainerManager();
+    ContainerManager mapping = scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
@@ -197,7 +180,7 @@ public class TestBlockManager {
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
 
-    scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
   }
 
   @AfterEach
@@ -249,7 +232,7 @@ public class TestBlockManager {
   }
 
   @Test
-  public void testAllocateBlockInParallel() {
+  void testAllocateBlockInParallel() throws Exception {
     int threadCount = 20;
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
@@ -273,17 +256,14 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-          .allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
-          .get();
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+
+    CompletableFuture
+        .allOf(futureList.toArray(new CompletableFuture[0]))
+        .get();
   }
 
   @Test
-  public void testBlockDistribution() throws Exception {
+  void testBlockDistribution() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumPipelinePerDatanode(1);
@@ -323,24 +303,18 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture.allOf(futureList.toArray(
-          new CompletableFuture[0])).get();
+    CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0])).get();
 
-      assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
-      assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.size());
-      assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.values().size());
-      allocatedBlockMap.values().forEach(v -> {
-        assertEquals(numContainerPerOwnerInPipeline, v.size());
-      });
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
+    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.size());
+    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.values().size());
+    allocatedBlockMap.values().forEach(v -> {
+      assertEquals(numContainerPerOwnerInPipeline, v.size());
+    });
   }
 
-
   @Test
-  public void testBlockDistributionWithMultipleDisks() throws Exception {
+  void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
@@ -381,35 +355,30 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-              .allOf(futureList.toArray(
-                      new CompletableFuture[futureList.size()])).get();
-      assertEquals(1,
-          pipelineManager.getPipelines(replicationConfig).size());
-      Pipeline pipeline =
-          pipelineManager.getPipelines(replicationConfig).get(0);
-      // total no of containers to be created will be number of healthy
-      // volumes * number of numContainerPerOwnerInPipeline which is equal to
-      // the thread count
-      assertEquals(threadCount, pipelineManager.getNumberOfContainers(pipeline.getId()));
-      assertEquals(threadCount, allocatedBlockMap.size());
-      assertEquals(threadCount, allocatedBlockMap.values().size());
-      allocatedBlockMap.values().forEach(v -> {
-        assertEquals(1, v.size());
-      });
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    CompletableFuture
+        .allOf(futureList.toArray(
+            new CompletableFuture[futureList.size()])).get();
+    assertEquals(1,
+        pipelineManager.getPipelines(replicationConfig).size());
+    Pipeline pipeline =
+        pipelineManager.getPipelines(replicationConfig).get(0);
+    // total no of containers to be created will be number of healthy
+    // volumes * number of numContainerPerOwnerInPipeline which is equal to
+    // the thread count
+    assertEquals(threadCount, pipelineManager.getNumberOfContainers(pipeline.getId()));
+    assertEquals(threadCount, allocatedBlockMap.size());
+    assertEquals(threadCount, allocatedBlockMap.values().size());
+    allocatedBlockMap.values().forEach(v -> {
+      assertEquals(1, v.size());
+    });
   }
 
   @Test
-  public void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
+  void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
         numContainerPerOwnerInPipeline;
     int numMetaDataVolumes = 2;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
-    nodeManager.setNumMetaDataVolumes(numMetaDataVolumes);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -446,25 +415,20 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-          .allOf(futureList.toArray(
-              new CompletableFuture[futureList.size()])).get();
-      assertEquals(1,
-          pipelineManager.getPipelines(replicationConfig).size());
-      Pipeline pipeline =
-          pipelineManager.getPipelines(replicationConfig).get(0);
-      // the pipeline per raft log disk config is set to 1 by default
-      int numContainers = (int)Math.ceil((double)
-              (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline) / numMetaDataVolumes);
-      assertEquals(numContainers, pipelineManager.
-          getNumberOfContainers(pipeline.getId()));
-      assertEquals(numContainers, allocatedBlockMap.size());
-      assertEquals(numContainers, allocatedBlockMap.values().size());
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    CompletableFuture
+        .allOf(futureList.toArray(
+            new CompletableFuture[futureList.size()])).get();
+    assertEquals(1,
+        pipelineManager.getPipelines(replicationConfig).size());
+    Pipeline pipeline =
+        pipelineManager.getPipelines(replicationConfig).get(0);
+    // the pipeline per raft log disk config is set to 1 by default
+    int numContainers = (int)Math.ceil((double)
+        (numContainerPerOwnerInPipeline *
+            numContainerPerOwnerInPipeline) / numMetaDataVolumes);
+    assertEquals(numContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
+    assertEquals(numContainers, allocatedBlockMap.size());
+    assertEquals(numContainers, allocatedBlockMap.values().size());
   }
 
   @Test
@@ -477,11 +441,9 @@ public class TestBlockManager {
         t.getMessage());
   }
 
-
   @Test
   public void testAllocateBlockFailureInSafeMode() {
-    scm.getScmContext().updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
@@ -498,7 +460,6 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testMultipleBlockAllocation()
       throws IOException, TimeoutException, InterruptedException {
 
@@ -541,7 +502,6 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testMultipleBlockAllocationWithClosedContainer()
       throws IOException, TimeoutException, InterruptedException {
     nodeManager.setNumPipelinePerDatanode(1);
@@ -596,11 +556,10 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
     assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
     assertNotNull(blockManager

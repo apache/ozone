@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.multitenant;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
-import org.apache.kerby.util.Base64;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT;
 
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -36,12 +31,14 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-
-import static java.net.HttpURLConnection.HTTP_OK;
-// TODO: MOVE THIS HERE.
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.kerby.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper class to create and delete users in Ranger because RangerClient
@@ -83,12 +80,17 @@ public class RangerUserRequest {
     // Create a trust manager that does not validate certificate chains
     TrustManager[] trustAllCerts = new TrustManager[]{
         new X509TrustManager() {
+          @Override
           public java.security.cert.X509Certificate[] getAcceptedIssuers() {
             return null;
           }
+
+          @Override
           public void checkClientTrusted(
               java.security.cert.X509Certificate[] certs, String authType) {
           }
+
+          @Override
           public void checkServerTrusted(
               java.security.cert.X509Certificate[] certs, String authType) {
           }
@@ -191,7 +193,7 @@ public class RangerUserRequest {
   }
 
   private HttpURLConnection makeHttpGetCall(String urlString,
-      String method, boolean isSpnego) throws IOException {
+                                            String method, boolean isSpnego) throws IOException {
 
     URL url = new URL(urlString);
     final HttpURLConnection urlConnection = openURLConnection(url);
@@ -215,14 +217,16 @@ public class RangerUserRequest {
     String response = getResponseData(conn);
     String userIDCreated = null;
     try {
-      JsonObject jResonse = JsonParser.parseString(response).getAsJsonObject();
-      JsonArray userinfo = jResonse.get("vXUsers").getAsJsonArray();
+      JsonNode jResponse =
+          JsonUtils.readTree(response);
+      JsonNode userinfo = jResponse.path("vXUsers");
       int numIndex = userinfo.size();
+
       for (int i = 0; i < numIndex; ++i) {
-        if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(userPrincipal)) {
-          userIDCreated =
-              userinfo.get(i).getAsJsonObject().get("id").getAsString();
+        JsonNode userNode = userinfo.get(i);
+        String name = userNode.path("name").asText();
+        if (name.equals(userPrincipal)) {
+          userIDCreated = userNode.path("id").asText();
           break;
         }
       }
@@ -231,6 +235,7 @@ public class RangerUserRequest {
       e.printStackTrace();
       throw e;
     }
+
     return userIDCreated;
   }
 
@@ -253,8 +258,8 @@ public class RangerUserRequest {
     String userId;
     try {
       assert userInfo != null;
-      JsonObject jObject = JsonParser.parseString(userInfo).getAsJsonObject();
-      userId = jObject.get("id").getAsString();
+      JsonNode jNode = JsonUtils.readTree(userInfo);
+      userId = jNode.get("id").asText();
       LOG.debug("Ranger returned userId: {}", userId);
     } catch (JsonParseException e) {
       e.printStackTrace();

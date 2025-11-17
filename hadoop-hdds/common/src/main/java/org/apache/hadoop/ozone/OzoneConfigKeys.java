@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,17 +17,14 @@
 
 package org.apache.hadoop.ozone;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.http.HttpConfig;
-
-import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class contains constants for configuration keys used in Ozone.
@@ -36,9 +32,9 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
-  public static final String DFS_CONTAINER_IPC_PORT =
-      "dfs.container.ipc";
-  public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
+  public static final String HDDS_CONTAINER_IPC_PORT =
+      "hdds.container.ipc.port";
+  public static final int HDDS_CONTAINER_IPC_PORT_DEFAULT = 9859;
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
@@ -46,7 +42,6 @@ public final class OzoneConfigKeys {
       "ozone.metadata.dirs.permissions";
   public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
       "ozone.om.db.dirs.permissions";
-
 
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
 
@@ -56,52 +51,52 @@ public final class OzoneConfigKeys {
    * so that a mini cluster is able to launch multiple containers on a node.
    *
    * When set to false (default), the container port will be specified as
-   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
-   * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
+   * {@link #HDDS_CONTAINER_IPC_PORT} and the default value will be specified
+   * as {@link #HDDS_CONTAINER_IPC_PORT_DEFAULT}.
    */
-  public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
-      "dfs.container.ipc.random.port";
-  public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
+  public static final String HDDS_CONTAINER_IPC_RANDOM_PORT =
+      "hdds.container.ipc.random.port";
+  public static final boolean HDDS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
-      "dfs.container.ratis.datastream.random.port";
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
+      "hdds.container.ratis.datastream.random.port";
   public static final boolean
-      DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
+      HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
-  public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
-      "dfs.container.chunk.write.sync";
-  public static final boolean DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
+  public static final String HDDS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
+      "hdds.container.chunk.write.sync";
+  public static final boolean HDDS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
   /**
    * Ratis Port where containers listen to.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_PORT =
-      "dfs.container.ratis.ipc";
-  public static final int DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
+  public static final String HDDS_CONTAINER_RATIS_IPC_PORT =
+      "hdds.container.ratis.ipc.port";
+  public static final int HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
   /**
    * Ratis Port where containers listen to admin requests.
    */
-  public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
-      "dfs.container.ratis.admin.port";
-  public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
+  public static final String HDDS_CONTAINER_RATIS_ADMIN_PORT =
+      "hdds.container.ratis.admin.port";
+  public static final int HDDS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
   /**
    * Ratis Port where containers listen to server-to-server requests.
    */
-  public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
-      "dfs.container.ratis.server.port";
-  public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
+  public static final String HDDS_CONTAINER_RATIS_SERVER_PORT =
+      "hdds.container.ratis.server.port";
+  public static final int HDDS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * Ratis Port where containers listen to datastream requests.
    */
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
-      = "dfs.container.ratis.datastream.enabled";
-  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED
+      = "hdds.container.ratis.datastream.enabled";
+  public static final boolean HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
       = false;
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
-      = "dfs.container.ratis.datastream.port";
-  public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_PORT
+      = "hdds.container.ratis.datastream.port";
+  public static final int HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
       = 9855;
 
   /**
@@ -121,6 +116,14 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
+   */
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
+      = false;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
@@ -128,18 +131,22 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
       = false;
 
+  /**
+   * hsync lease soft limit.
+   */
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT
+      = "ozone.om.lease.soft.limit";
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
+      = "60s";
 
   /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_RANDOM_PORT =
-      "dfs.container.ratis.ipc.random.port";
-  public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
+  public static final String HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT =
+      "hdds.container.ratis.ipc.random.port";
+  public static final boolean HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
-  public static final String OZONE_TRACE_ENABLED_KEY =
-      "ozone.trace.enabled";
-  public static final boolean OZONE_TRACE_ENABLED_DEFAULT = false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
       "ozone.metastore.rocksdb.statistics";
@@ -187,10 +194,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
-
-  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
-      "ozone.ec.grpc.zerocopy.enabled";
-  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
 
   /**
    * Ozone administrator users delimited by comma.
@@ -274,6 +277,15 @@ public final class OzoneConfigKeys {
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
 
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT =
+      "ozone.snapshot.defrag.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT = "300s";
+  // TODO: Adjust timeout as needed.
+  //  One concern would be that snapdiff can take a long time.
+  //  If snapdiff wait time is included in the timeout it can make it indeterministic.
+  //  -- So don't wait? Trigger and check later?
+
   public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
       "ozone.snapshot.deleting.service.interval";
   public static final String
@@ -312,113 +324,98 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
 
-
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
       = 64;
-
-  public static final String OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER =
-      "ozone.block.deleting.limit.per.task";
-  public static final int OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT
-      = 1000;
-
-  public static final String OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL
-      = "ozone.block.deleting.container.limit.per.interval";
-  public static final int
-      OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT = 10;
-
-  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
-  public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_ENABLED_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
+  public static final boolean HDDS_CONTAINER_RATIS_ENABLED_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_RPC_TYPE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY;
+  public static final String HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
   public static final int
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = ScmConfigKeys.
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
-  public static final ReplicationLevel
-      DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
-  public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
+  public static final int HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
   public static final String
-      DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT;
+      HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT;
 
   // config settings to enable stateMachineData write timeout
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
   public static final TimeDuration
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
 
-  public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
-      "dfs.container.ratis.datanode.storage.dir";
+  public static final String HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
+      "hdds.container.ratis.datanode.storage.dir";
 
-  public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
+  public static final String HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
+      ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
-      DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT;
+      HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
-  public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
+  public static final int HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
   public static final int
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
   public static final String
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_PURGE_GAP =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP;
-  public static final int DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_PURGE_GAP =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP;
+  public static final int HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
   public static final String
-      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
+      HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
   public static final String
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+      HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      ScmConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT;
-  public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
-      ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY;
-  public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+      HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT;
+  public static final String HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY =
+      ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY;
+  public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+  public static final String HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      "hdds.raft.server.rpc.first-election.timeout";
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";
@@ -457,8 +454,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
 
-
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
@@ -517,7 +513,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.freon.http.auth.";
 
-
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";
   public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = true;
@@ -529,10 +524,6 @@ public final class OzoneConfigKeys {
       "ozone.om.lock.stripes.";
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
-
-  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
-      "ozone.client.list.trash.keys.max";
-  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
 
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
@@ -562,11 +553,6 @@ public final class OzoneConfigKeys {
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-      "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-      false;
-
   public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
       "ozone.client.key.provider.cache.expiry";
@@ -577,6 +563,13 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
+      "ozone.client.server-defaults.validity.period.ms";
+
+  public static final long
+      OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1); // 1 hour
 
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
           "ozone.network.flexible.fqdn.resolution.enabled";
@@ -600,7 +593,6 @@ public final class OzoneConfigKeys {
   public static final long
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
-
 
   // Values for bucket layout configurations.
   public static final String OZONE_BUCKET_LAYOUT_LEGACY =
@@ -636,10 +628,9 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
 
-
   public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
-      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+      "org.apache.hadoop.fs.ozone.OzoneTrashPolicy";
 
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
@@ -655,7 +646,18 @@ public final class OzoneConfigKeys {
 
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
+      TimeUnit.MINUTES.toMillis(10);
+
+  public static final String
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
+      "ozone.om.snapshot.prune.compaction.backup.batch.size";
+
+  public static final int
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT = 2000;
+
+  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
+      "ozone.om.snapshot.load.native.lib";
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
 
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
       "ozone.om.delta.update.data.size.max.limit";
@@ -675,6 +677,22 @@ public final class OzoneConfigKeys {
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
 
+  public static final String OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.xceiver.client.metrics.percentiles.intervals.seconds";
+
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION =
+      "ozone.om.network.topology.refresh.duration";
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
+
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
+      "ozone.security.crypto.compliance.mode";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
+
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
+      "ozone.client.elastic.byte.buffer.pool.max.size";
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
 
   /**
    * There is no need to instantiate this class.
