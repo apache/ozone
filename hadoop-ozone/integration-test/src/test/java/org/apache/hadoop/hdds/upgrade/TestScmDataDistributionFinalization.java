@@ -241,7 +241,7 @@ public class TestScmDataDistributionFinalization {
     GenericTestUtils.waitFor(() -> {
       try {
         flushDBTransactionBuffer(activeSCM);
-        return getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable()).size() == 0;
+        return getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable()).isEmpty();
       } catch (IOException e) {
         fail("Failed to get keys from DeletedBlocksTXTable", e);
         return false;
