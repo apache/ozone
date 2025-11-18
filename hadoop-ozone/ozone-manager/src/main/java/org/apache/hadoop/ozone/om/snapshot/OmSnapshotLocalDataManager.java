@@ -278,6 +278,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           }
           OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapshotId, sstList,
               snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
+          // Set needsDefrag to true to indicate that the snapshot needs to be defragmented, since the snapshot has
+          // never been defragmented before.
+          snapshotLocalData.setNeedsDefrag(true);
           snapshotLocalDataSerializer.save(snapshotLocalDataFile, snapshotLocalData);
         }
       }
