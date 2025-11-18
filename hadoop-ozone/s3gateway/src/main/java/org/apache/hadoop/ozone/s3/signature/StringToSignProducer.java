@@ -19,17 +19,10 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -42,16 +35,13 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
@@ -80,19 +70,6 @@ public final class StringToSignProducer {
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
           .withZone(ZoneOffset.UTC);
 
-  private static final Set<String> VALID_UNSIGNED_PAYLOADS;
-
-  static {
-    Set<String> set = new HashSet<>();
-    set.add(UNSIGNED_PAYLOAD);
-    set.add(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
-    set.add(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
-    set.add(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
-    set.add(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD);
-    set.add(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER);
-    VALID_UNSIGNED_PAYLOADS = Collections.unmodifiableSet(set);
-  }
-
   private StringToSignProducer() {
   }
 
@@ -100,27 +77,12 @@ public final class StringToSignProducer {
       SignatureInfo signatureInfo,
       ContainerRequestContext context
   ) throws Exception {
-    LowerCaseKeyStringMap lowerCaseKeyStringMap = LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders());
-    String signatureBase = createSignatureBase(signatureInfo,
+    return createSignatureBase(signatureInfo,
         context.getUriInfo().getRequestUri().getScheme(),
         context.getMethod(),
-        lowerCaseKeyStringMap,
+        LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
         fromMultiValueToSingleValueMap(
             context.getUriInfo().getQueryParameters()));
-
-    // validate x-amz-content-sha256
-    String payloadHash = getPayloadHash(lowerCaseKeyStringMap, !signatureInfo.isSignPayload());
-    if (!VALID_UNSIGNED_PAYLOADS.contains(payloadHash)) {
-      byte[] payload = IOUtils.toByteArray(context.getEntityStream());
-      context.setEntityStream(new ByteArrayInputStream(payload));
-      final String actualSha256 = hash(payload);
-      if (!payloadHash.equals(actualSha256)) {
-        LOG.error("Payload hash does not match. Expected: {}, Actual: {}", payloadHash, actualSha256);
-        throw X_AMZ_CONTENT_SHA256_MISMATCH;
-      }
-    }
-
-    return signatureBase;
   }
 
   @VisibleForTesting
@@ -165,7 +127,7 @@ public final class StringToSignProducer {
         headers,
         queryParams,
         !signatureInfo.isSignPayload());
-    strToSign.append(hash(canonicalRequest.getBytes(UTF_8)));
+    strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
       LOG.debug("StringToSign:[{}]", strToSign);
@@ -184,9 +146,9 @@ public final class StringToSignProducer {
     return result;
   }
 
-  public static String hash(byte[] payload) throws NoSuchAlgorithmException {
+  public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(payload);
+    md.update(payload.getBytes(UTF_8));
     return Hex.encode(md.digest()).toLowerCase();
   }
 
@@ -250,18 +212,17 @@ public final class StringToSignProducer {
 
   private static String getPayloadHash(Map<String, String> headers, boolean isUsingQueryParameter)
       throws OS3Exception {
-
+    if (isUsingQueryParameter) {
+      // According to AWS Signature V4 documentation using Query Parameters
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+      return UNSIGNED_PAYLOAD;
+    }
     String contentSignatureHeaderValue = headers.get(X_AMZ_CONTENT_SHA256);
     // According to AWS Signature V4 documentation using Authorization Header
     // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
     // The x-amz-content-sha256 header is required
     // for all AWS Signature Version 4 requests using Authorization header.
     if (contentSignatureHeaderValue == null) {
-      if (isUsingQueryParameter) {
-        // According to AWS Signature V4 documentation using Query Parameters
-        // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
-        return UNSIGNED_PAYLOAD;
-      }
       LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
           + " header for signed payload");
       throw S3_AUTHINFO_CREATION_ERROR;
@@ -370,7 +331,7 @@ public final class StringToSignProducer {
           || date.isAfter(now.plus(PRESIGN_URL_MAX_EXPIRATION_SECONDS,
           SECONDS))) {
         LOG.error("AWS date not in valid range. Request timestamp:{} should "
-                + "not be older than {} seconds.",
+            + "not be older than {} seconds.",
             headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
         throw S3_AUTHINFO_CREATION_ERROR;
       }

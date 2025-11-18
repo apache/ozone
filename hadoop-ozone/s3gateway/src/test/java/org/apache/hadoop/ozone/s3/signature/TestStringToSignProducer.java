@@ -24,7 +24,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -51,10 +50,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestStringToSignProducer {
 
-  private static final String EMPTY_CONTENT_SHA_256 =
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
-          format(LocalDateTime.now());
+      format(LocalDateTime.now());
 
   @Test
   public void test() throws Exception {
@@ -62,7 +59,7 @@ public class TestStringToSignProducer {
     LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
     headers.put("Content-Length", "123");
     headers.put("Host", "0.0.0.0:9878");
-    headers.put("X-AMZ-Content-Sha256", EMPTY_CONTENT_SHA_256);
+    headers.put("X-AMZ-Content-Sha256", "Content-SHA");
     headers.put("X-AMZ-Date", DATETIME);
     headers.put("Content-Type", "ozone/mpu");
     headers.put(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "streaming");
@@ -70,11 +67,11 @@ public class TestStringToSignProducer {
     String canonicalRequest = "GET\n"
         + "/buckets\n"
         + "\n"
-        + "host:0.0.0.0:9878\nx-amz-content-sha256:" + EMPTY_CONTENT_SHA_256 + "\n"
+        + "host:0.0.0.0:9878\nx-amz-content-sha256:Content-SHA\n"
         + "x-amz-date:" + DATETIME + "\ncontent-type:streaming\n"
         + "\n"
         + "host;x-amz-content-sha256;x-amz-date;content-type\n"
-        + EMPTY_CONTENT_SHA_256;
+        + "Content-SHA";
 
     String authHeader =
         "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
@@ -134,7 +131,6 @@ public class TestStringToSignProducer {
     when(context.getUriInfo()).thenReturn(uriInfo);
     when(context.getMethod()).thenReturn(method);
     when(context.getHeaders()).thenReturn(headerMap);
-    when(context.getEntityStream()).thenReturn(new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8)));
 
     return context;
   }
@@ -153,7 +149,7 @@ public class TestStringToSignProducer {
     headersMap1.putSingle("Authorization", authHeader);
     headersMap1.putSingle("Content-Type", "application/octet-stream");
     headersMap1.putSingle("Host", "0.0.0.0:9878");
-    headersMap1.putSingle("X-Amz-Content-Sha256", EMPTY_CONTENT_SHA_256);
+    headersMap1.putSingle("X-Amz-Content-Sha256", "Content-SHA");
     headersMap1.putSingle("X-Amz-Date", DATETIME);
     //Missing X-Amz-Date Header
     MultivaluedMap<String, String> headersMap2 =
@@ -252,7 +248,7 @@ public class TestStringToSignProducer {
     headerMap.putSingle("Content-Length", "123");
     headerMap.putSingle("content-type", "application/octet-stream");
     headerMap.putSingle("host", "0.0.0.0:9878");
-    headerMap.putSingle("x-amz-content-sha256", EMPTY_CONTENT_SHA_256);
+    headerMap.putSingle("x-amz-content-sha256", "Content-SHA");
     headerMap.putSingle("x-amz-date", DATETIME);
     headerMap.putSingle("x-amz-security-token", "dummy");
     ContainerRequestContext context = setupContext(
@@ -267,63 +263,6 @@ public class TestStringToSignProducer {
 
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);
-    } catch (OS3Exception e) {
-      actualResult = e.getCode();
-    }
-
-    assertEquals(expectedResult, actualResult);
-  }
-
-  private static Stream<Arguments> testPayloadHashMismatchInput() {
-    String validHash = EMPTY_CONTENT_SHA_256;
-    String invalidHash = "0000000000000000000000000000000000000000000000000000000000000000";
-
-    return Stream.of(
-        arguments(validHash, "", "success"),
-        arguments(invalidHash, "", "XAmzContentSHA256Mismatch"),
-        arguments(EMPTY_CONTENT_SHA_256, "test content", "XAmzContentSHA256Mismatch"),
-        // ignore payload hash check for these special values
-        arguments("UNSIGNED-PAYLOAD", "test content", "success"),
-        // ignore payload hash check for these special values
-        arguments("STREAMING-AWS4-HMAC-SHA256-PAYLOAD", "test content", "success")
-    );
-  }
-
-  @ParameterizedTest
-  @MethodSource("testPayloadHashMismatchInput")
-  public void testPayloadHashMismatch(
-      String contentSha256,
-      String payload,
-      String expectedResult) throws Exception {
-    String actualResult = "success";
-
-    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
-    headerMap.putSingle("Content-Type", "application/octet-stream");
-    headerMap.putSingle("Host", "0.0.0.0:9878");
-    headerMap.putSingle("X-Amz-Date", DATETIME);
-    headerMap.putSingle("X-Amz-Content-Sha256", contentSha256);
-
-    LowerCaseKeyStringMap queryParams = new LowerCaseKeyStringMap();
-    queryParams.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
-    queryParams.put("X-Amz-Credential", "ozone/"
-        + DATE_FORMATTER.format(LocalDate.now())
-        + "/us-east-1/s3/aws4_request");
-    queryParams.put("X-Amz-Date", DATETIME);
-    queryParams.put("X-Amz-Expires", "86400");
-    queryParams.put("X-Amz-SignedHeaders", "host;x-amz-date");
-    queryParams.put("X-Amz-Signature", "db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2");
-
-    ContainerRequestContext context = mock(ContainerRequestContext.class);
-    UriInfo uriInfo = mock(UriInfo.class);
-    when(uriInfo.getRequestUri()).thenReturn(new URI("https://0.0.0.0:9878/bucket/key"));
-    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
-    when(context.getUriInfo()).thenReturn(uriInfo);
-    when(context.getMethod()).thenReturn("PUT");
-    when(context.getHeaders()).thenReturn(headerMap);
-    when(context.getEntityStream()).thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
-
-    try {
-      StringToSignProducer.createSignatureBase(new AuthorizationV4QueryParser(queryParams).parseSignature(), context);
     } catch (OS3Exception e) {
       actualResult = e.getCode();
     }
