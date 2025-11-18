@@ -28,8 +28,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test streaming client.
@@ -114,37 +118,30 @@ public class TestDirstreamClientHandler {
     assertEquals("yyy", getContent("bsd.txt"));
   }
 
-  @Test
-  public void testInvalidFormatMissingSpace() {
+  @ParameterizedTest(name = "Invalid format: {0}")
+  @MethodSource("provideInvalidFormatTestCases")
+  public void testInvalidFormat(String testCaseName, String invalidInput) {
     final DirstreamClientHandler handler = new DirstreamClientHandler(
         new DirectoryServerDestination(tmpDir));
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      handler.doRead(null, wrap("123\n"));
+      handler.doRead(null, wrap(invalidInput));
     });
-    assertTrue(exception.getMessage().contains("Invalid file name format"));
+    assertTrue(exception.getMessage().contains("Invalid file name format"),
+        "Exception message should contain 'Invalid file name format' for input: " + invalidInput);
   }
 
-  @Test
-  public void testInvalidFormatEmptyFileName() {
-    final DirstreamClientHandler handler = new DirstreamClientHandler(
-        new DirectoryServerDestination(tmpDir));
-
-    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      handler.doRead(null, wrap("123 \n"));
-    });
-    assertTrue(exception.getMessage().contains("Invalid file name format"));
-  }
-
-  @Test
-  public void testInvalidFormatOnlySize() {
-    final DirstreamClientHandler handler = new DirstreamClientHandler(
-        new DirectoryServerDestination(tmpDir));
-
-    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      handler.doRead(null, wrap("12345\n"));
-    });
-    assertTrue(exception.getMessage().contains("Invalid file name format"));
+  private static Stream<Arguments> provideInvalidFormatTestCases() {
+    return Stream.of(
+        // Test case: Missing space between size and filename
+        Arguments.of("Missing space", "123File.txt\n"),
+        // Test case: Empty filename after space
+        Arguments.of("Empty filename", "123 \n"),
+        // Test case: Only size number, no filename
+        Arguments.of("Only size", "12345\n"),
+        // Test case: Size is not a number
+        Arguments.of("Invalid size (non-numeric)", "oops filename.txt\n")
+    );
   }
 
   @Nonnull
