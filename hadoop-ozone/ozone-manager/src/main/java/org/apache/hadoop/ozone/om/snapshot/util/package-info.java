@@ -15,35 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
-
-import java.util.Map;
-import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
-
 /**
- * In memory test table for String keys.
- * @param <V> Value type.
+ * Package containing utility classes for snapshot management.
  */
-public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
-
-  public StringInMemoryTestTable() {
-    super();
-  }
-
-  public StringInMemoryTestTable(Map<String, V> map) {
-    super(map);
-  }
-
-  public StringInMemoryTestTable(Map<String, V> map, String name) {
-    super(map, name);
-  }
-
-  public StringInMemoryTestTable(String name) {
-    super(name);
-  }
-
-  @Override
-  public KeyValueIterator<String, V> iterator(String prefix, KeyValueIterator.Type type) {
-    return new MapBackedTableIterator<>(getMap(), prefix);
-  }
-}
+package org.apache.hadoop.ozone.om.snapshot.util;
