@@ -41,6 +41,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -74,6 +75,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconTaskControllerImpl.class);
   private static final String REPROCESS_STAGING = "REPROCESS_STAGING";
+  private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
   private final ReconDBProvider reconDBProvider;
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
@@ -362,11 +364,28 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
-    if (this.executorService != null) {
-      this.executorService.shutdownNow();
+    shutdownExecutorGracefully(this.executorService, "main task executor");
+    shutdownExecutorGracefully(this.eventProcessingExecutor, "event processing executor");
+  }
+
+  private void shutdownExecutorGracefully(ExecutorService executor, String name) {
+    if (executor == null) {
+      return;
     }
-    if (this.eventProcessingExecutor != null) {
-      this.eventProcessingExecutor.shutdownNow();
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        LOG.warn("Executor {} did not terminate within {} seconds, forcing shutdown",
+            name, SHUTDOWN_TIMEOUT_SECONDS);
+        executor.shutdownNow();
+        if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+          LOG.error("Executor {} did not terminate after forced shutdown", name);
+        }
+      }
+    } catch (InterruptedException e) {
+      LOG.warn("Interrupted while waiting for {} to terminate", name);
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
     }
   }
 
