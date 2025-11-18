@@ -53,7 +53,7 @@ Test OM Metrics Retrieval
     Should Not Have Connection Errors    ${output}
 
 Test SCM Log Streaming
-    ${output} =    Execute And Ignore Error    timeout 30 ozone insight log scm.node-manager 2>&1 || true
+    ${output} =    Execute And Ignore Error    timeout 10 ozone insight log scm.node-manager 2>&1 || true
     
     Should Contain Any    ${output}    [SCM]    SCMNodeManager
     Should Not Have Connection Errors    ${output}
