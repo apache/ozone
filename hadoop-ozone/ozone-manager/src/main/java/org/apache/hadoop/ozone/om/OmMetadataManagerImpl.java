@@ -113,6 +113,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -1830,7 +1831,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           info.getKeyLocationVersions()) {
         List<DeletedBlock> item = keyLocations.getLocationList().stream()
             .map(b -> new DeletedBlock(
-                new BlockID(b.getContainerID(), b.getLocalID()), info.getDataSize(), info.getReplicatedSize()))
+                new BlockID(b.getContainerID(),
+                      b.getLocalID()),
+                      b.getLength(),
+                      QuotaUtil.getReplicatedSize(b.getLength(),
+                      info.getReplicationConfig())))
             .collect(Collectors.toList());
         BlockGroup keyBlocks = BlockGroup.newBuilder()
             .setKeyName(deletedKey)
