@@ -63,7 +63,6 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
-import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -523,7 +522,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * which contains information about the datanode used for the read, and the request observer that can be used to
    * manage the stream (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent
    * streaming reads so upon successful return of this method, the caller must ensure to call
-   * {@link #completeStreamRead(StreamingReadResponse)} to release the semaphore once the streaming read is complete.
+   * {@link #completeStreamRead()} to release the semaphore once the streaming read is complete.
    * @param request The container command request to initiate the streaming read.
    * @param streamObserver The observer that will handle the streamed responses.=
    * @throws IOException
@@ -545,13 +544,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Executing command {} on datanode {}", processForDebug(request), dn);
         }
-        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
-            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(streamObserver);
-        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
-            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
-        requestObserver.onNext(request);
-        requestObserver.onCompleted();
+        stub.withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .streamBlock(request, streamObserver);
+        streamObserver.setStreamingDatanode(dn);
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
@@ -572,7 +567,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * needed.
    */
   @Override
-  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+  public void completeStreamRead() {
     semaphore.release();
   }
 

@@ -600,7 +600,7 @@ service XceiverClientProtocolService {
   // A client-to-datanode RPC to send container commands
   rpc send(stream ContainerCommandRequestProto) returns
     (stream ContainerCommandResponseProto) {};
-
+  rpc streamBlock(ContainerCommandRequestProto) returns (stream ContainerCommandResponseProto);
 }
 
 service IntraDatanodeProtocolService {

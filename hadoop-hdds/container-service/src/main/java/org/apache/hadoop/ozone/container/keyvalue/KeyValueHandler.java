@@ -169,6 +169,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.ServerCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2091,40 +2092,79 @@ public class KeyValueHandler extends Handler {
       // The bytes per checksum is stored in the checksum data of each chunk, so check the first chunk as they all
       // must be the same.
       ContainerProtos.ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
-      ChecksumData checksumData = null;
+      ChecksumData noChecksumChecksumData;
       int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
       if (checksumType == ContainerProtos.ChecksumType.NONE) {
-        checksumData = new ChecksumData(checksumType, 0);
+        noChecksumChecksumData = new ChecksumData(checksumType, 0);
       } else {
+        noChecksumChecksumData = null;
         bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
       }
+      final int finalBytesPerChecksum = bytesPerChecksum;
       // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
       // previous checksum boundary.
       // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
       // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
       // it simplifies the code to always do this.
-      long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % bytesPerChecksum;
-      try (RandomAccessFile file = new RandomAccessFile(blockFile, "r");
-           FileChannel channel = file.getChannel()) {
-        ByteBuffer buffer = ByteBuffer.allocate(bytesPerChecksum);
-        channel.position(adjustedOffset);
-        while (channel.read(buffer) != -1) {
-          buffer.flip();
-          if (checksumType != ContainerProtos.ChecksumType.NONE) {
-            // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
-            // and its offset to pull out the correct checksum bytes for each read.
-            int chunkIndex = (int) (adjustedOffset / bytesPerChunk);
-            int chunkOffset = (int) (adjustedOffset % bytesPerChunk);
-            int checksumIndex = chunkOffset / bytesPerChecksum;
-            ByteString checksum = blockData.getChunks().get(chunkIndex).getChecksumData().getChecksums(checksumIndex);
-            checksumData = new ChecksumData(checksumType, bytesPerChecksum, Collections.singletonList(checksum));
-          }
-          streamObserver.onNext(getReadBlockResponse(request, checksumData, buffer, adjustedOffset));
-          buffer.clear();
 
-          adjustedOffset += bytesPerChecksum;
+      ServerCallStreamObserver<ContainerCommandResponseProto> serverCallStreamObserver =
+          ((ServerCallStreamObserver<ContainerCommandResponseProto>) streamObserver);
+      Runnable dataStream = new Runnable() {
+
+        private final RandomAccessFile file = new RandomAccessFile(blockFile, "r");
+        private final FileChannel channel = file.getChannel();
+        private final ByteBuffer buffer = ByteBuffer.allocate(finalBytesPerChecksum);
+        private long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % finalBytesPerChecksum;
+
+        @Override
+        public void run() {
+          try {
+            channel.position(adjustedOffset);
+            while (serverCallStreamObserver.isReady() && !serverCallStreamObserver.isCancelled()) {
+              int read = channel.read(buffer);
+              if (read == -1) {
+                serverCallStreamObserver.onCompleted();
+                channel.close();
+                file.close();
+                break;
+              }
+              buffer.flip();
+              ChecksumData checksumData;
+              if (checksumType != ContainerProtos.ChecksumType.NONE) {
+                // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from
+                // and its offset to pull out the correct checksum bytes for each read.
+                int chunkIndex = (int) (adjustedOffset / bytesPerChunk);
+                int chunkOffset = (int) (adjustedOffset % bytesPerChunk);
+                int checksumIndex = chunkOffset / finalBytesPerChecksum;
+                ByteString checksum =
+                    blockData.getChunks().get(chunkIndex).getChecksumData().getChecksums(checksumIndex);
+                checksumData =
+                    new ChecksumData(checksumType, finalBytesPerChecksum, Collections.singletonList(checksum));
+              } else {
+                checksumData = noChecksumChecksumData;
+              }
+              serverCallStreamObserver.onNext(getReadBlockResponse(request, checksumData, buffer, adjustedOffset));
+              adjustedOffset += finalBytesPerChecksum;
+              buffer.clear();
+            }
+            if (serverCallStreamObserver.isCancelled()) {
+              channel.close();
+              file.close();
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reading block file {}", blockFile, e);
+            serverCallStreamObserver.onError(e);
+            try {
+              channel.close();
+              file.close();
+            } catch (IOException ioException) {
+              LOG.error("Error while closing file/channel for block file {}", blockFile, ioException);
+            }
+          }
         }
-      }
+      };
+      serverCallStreamObserver.setOnReadyHandler(dataStream);
+      dataStream.run();
       // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);

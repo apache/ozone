@@ -31,10 +31,10 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -277,9 +278,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
-  private synchronized void releaseStreamResources(StreamingReadResponse response) {
+  private synchronized void releaseStreamResources() {
     if (xceiverClient != null) {
-      xceiverClient.completeStreamRead(response);
+      xceiverClient.completeStreamRead();
     }
   }
 
@@ -293,7 +294,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final AtomicBoolean failed = new AtomicBoolean(false);
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<Throwable> error = new AtomicReference<>();
-    private volatile StreamingReadResponse response;
+    private volatile ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
+    private volatile DatanodeDetails streamingDatanodeDetails;
 
     public boolean hasNext() {
       return !responseQueue.isEmpty() || !completed.get();
@@ -347,7 +349,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private void releaseResources() {
       boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
       if (wasNotYetComplete) {
-        releaseStreamResources(response);
+        releaseStreamResources();
       }
     }
 
@@ -363,7 +365,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         offerToQueue(readBlock);
       } catch (OzoneChecksumException e) {
         LOG.warn("Checksum verification failed for block {} from datanode {}",
-            getBlockID(), response.getDatanodeDetails(), e);
+            getBlockID(), streamingDatanodeDetails, e);
         cancelDueToError(e);
       }
     }
@@ -392,16 +394,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
      * cause the onError() to be called in this observer with a CANCELLED exception.
      */
     public void cancel() {
-      if (response != null && response.getRequestObserver() != null) {
-        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
+      if (requestObserver != null) {
+        requestObserver.cancel("Cancelled by client", CANCELLED_EXCEPTION);
         setCompleted();
         releaseResources();
       }
     }
 
     public void cancelDueToError(Throwable exception) {
-      if (response != null && response.getRequestObserver() != null) {
-        response.getRequestObserver().onError(exception);
+      if (requestObserver != null) {
+        requestObserver.cancel("Cancelled by client due to error", CANCELLED_EXCEPTION);
         setFailed(exception);
         releaseResources();
       }
@@ -435,8 +437,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     @Override
-    public void setStreamingReadResponse(StreamingReadResponse streamingReadResponse) {
-      response = streamingReadResponse;
+    public void setStreamingDatanode(DatanodeDetails datanodeDetails) {
+      streamingDatanodeDetails = datanodeDetails;
+    }
+
+    @Override
+    public void beforeStart(
+        ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> clientCallStreamObserver) {
+      this.requestObserver = clientCallStreamObserver;
     }
   }
 

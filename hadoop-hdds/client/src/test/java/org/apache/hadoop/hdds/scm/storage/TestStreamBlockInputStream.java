@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
@@ -143,7 +142,7 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
   }
 
   @Test
@@ -156,7 +155,7 @@ public class TestStreamBlockInputStream {
     verify(requestObserver).cancel(any(), any());
     // Verify that release() was called on the xceiverClient mock
     verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
     // The next read should "rebuffer" and continue from the last position
     assertEquals(data[1], blockStream.read());
     assertEquals(2, blockStream.getPos());
@@ -170,7 +169,7 @@ public class TestStreamBlockInputStream {
     assertEquals(100, blockStream.getPos());
     // Verify that cancel() was called on the requestObserver mock
     verify(requestObserver).cancel(any(), any());
-    verify(xceiverClient, times(1)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead();
     // The xceiverClient should not be released
     verify(xceiverClientFactory, never())
         .releaseClientForReadData(xceiverClient, false);
@@ -186,14 +185,13 @@ public class TestStreamBlockInputStream {
     // buffer is exhausted before seeing the error.
     doAnswer((InvocationOnMock invocation) -> {
       StreamingReaderSpi streamObserver = invocation.getArgument(1);
-      StreamingReadResponse resp =
-          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.setStreamingDatanode(MockDatanodeDetails.randomDatanodeDetails());
+      streamObserver.beforeStart(requestObserver);
       streamObserver.onError(new IOException("Test induced error"));
       return null;
     }).when(xceiverClient).streamRead(any(), any());
     assertThrows(IOException.class, () -> blockStream.read());
-    verify(xceiverClient, times(0)).completeStreamRead(any());
+    verify(xceiverClient, times(0)).completeStreamRead();
   }
 
   @Test
@@ -238,9 +236,8 @@ public class TestStreamBlockInputStream {
       throw thrown;
     }).doAnswer((InvocationOnMock invocation) -> {
       StreamingReaderSpi streamObserver = invocation.getArgument(1);
-      StreamingReadResponse resp =
-          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.setStreamingDatanode(MockDatanodeDetails.randomDatanodeDetails());
+      streamObserver.beforeStart(requestObserver);
       streamObserver.onNext(createChunkResponse(false));
       streamObserver.onCompleted();
       return null;
@@ -276,9 +273,8 @@ public class TestStreamBlockInputStream {
   public void testInvalidChecksumThrowsException() throws IOException, InterruptedException {
     doAnswer((InvocationOnMock invocation) -> {
       StreamingReaderSpi streamObserver = invocation.getArgument(1);
-      StreamingReadResponse resp =
-          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.setStreamingDatanode(MockDatanodeDetails.randomDatanodeDetails());
+      streamObserver.beforeStart(requestObserver);
       streamObserver.onNext(createChunkResponse(true));
       streamObserver.onCompleted();
       return null;
@@ -295,9 +291,8 @@ public class TestStreamBlockInputStream {
   private void setupSuccessfulRead() throws IOException, InterruptedException {
     doAnswer((InvocationOnMock invocation) -> {
       StreamingReaderSpi streamObserver = invocation.getArgument(1);
-      StreamingReadResponse resp =
-          new StreamingReadResponse(MockDatanodeDetails.randomDatanodeDetails(), requestObserver);
-      streamObserver.setStreamingReadResponse(resp);
+      streamObserver.setStreamingDatanode(MockDatanodeDetails.randomDatanodeDetails());
+      streamObserver.beforeStart(requestObserver);
       streamObserver.onNext(createChunkResponse(false));
       streamObserver.onCompleted();
       return null;

@@ -17,14 +17,16 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientResponseObserver;
 
 /**
  * SPI for streaming reader to set the streaming read response.
  */
-public interface StreamingReaderSpi extends StreamObserver<ContainerProtos.ContainerCommandResponseProto> {
+public interface StreamingReaderSpi extends ClientResponseObserver
+    <ContainerProtos.ContainerCommandRequestProto, ContainerProtos.ContainerCommandResponseProto> {
 
-  void setStreamingReadResponse(StreamingReadResponse streamingReadResponse);
+  void setStreamingDatanode(DatanodeDetails datanodeDetails);
 
 }

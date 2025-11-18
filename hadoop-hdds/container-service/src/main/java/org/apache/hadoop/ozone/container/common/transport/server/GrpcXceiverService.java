@@ -91,6 +91,12 @@ public class GrpcXceiverService extends
   }
 
   @Override
+  public void streamBlock(ContainerCommandRequestProto request,
+      StreamObserver<ContainerCommandResponseProto> responseObserver) {
+    dispatcher.streamDataReadOnly(request, responseObserver, null);
+  }
+
+  @Override
   public StreamObserver<ContainerCommandRequestProto> send(
       StreamObserver<ContainerCommandResponseProto> responseObserver) {
     return new StreamObserver<ContainerCommandRequestProto>() {
