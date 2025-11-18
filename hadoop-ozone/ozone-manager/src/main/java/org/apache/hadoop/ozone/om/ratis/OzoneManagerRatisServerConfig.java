@@ -53,7 +53,7 @@ public class OzoneManagerRatisServerConfig {
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
 
   @Config(key = "read.option",
-      defaultValue = "DEFAUTL",
+      defaultValue = "DEFAULT",
       type = ConfigType.STRING,
       tags = {OZONE, OM, RATIS, PERFORMANCE},
       description = "Select the Ratis server read option." +
