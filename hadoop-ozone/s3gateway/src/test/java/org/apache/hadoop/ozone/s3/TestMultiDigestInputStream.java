@@ -35,7 +35,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Test {@link MultiMessageDigestInputStream}.
+ * Test {@link MultiDigestInputStream}.
  */
 public class TestMultiDigestInputStream {
 
@@ -62,12 +62,12 @@ public class TestMultiDigestInputStream {
     );
   }
 
-  @ParameterizedTest(name = "{0}")
+  @ParameterizedTest
   @MethodSource("algorithmAndDataTestCases")
   void testRead(String testName, MessageDigest[] digests, String data) throws Exception {
     byte[] dataBytes = data.getBytes(UTF_8);
 
-    try (MultiMessageDigestInputStream mdis = new MultiMessageDigestInputStream(
+    try (MultiDigestInputStream mdis = new MultiDigestInputStream(
         new ByteArrayInputStream(dataBytes), digests)) {
       String result = IOUtils.toString(mdis, UTF_8);
       assertEquals(data, result);
@@ -75,7 +75,7 @@ public class TestMultiDigestInputStream {
       for (MessageDigest digest : digests) {
         String algorithm = digest.getAlgorithm();
         byte[] expectedDigest = MessageDigest.getInstance(algorithm).digest(dataBytes);
-        assertArrayEquals(expectedDigest, mdis.getDigest(algorithm).digest());
+        assertArrayEquals(expectedDigest, mdis.getMessageDigest(algorithm).digest());
       }
     }
   }
@@ -84,7 +84,7 @@ public class TestMultiDigestInputStream {
   void testOnOffFunctionality() throws Exception {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
-    try (MultiMessageDigestInputStream mdis = new MultiMessageDigestInputStream(new ByteArrayInputStream(data),
+    try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
         MessageDigest.getInstance("MD5"))) {
 
       mdis.on(false);
@@ -93,7 +93,7 @@ public class TestMultiDigestInputStream {
       assertEquals(TEST_DATA, result);
 
       // Digest should be empty since it was turned off
-      MessageDigest md5 = mdis.getDigest("MD5");
+      MessageDigest md5 = mdis.getMessageDigest("MD5");
       assertNotNull(md5);
       byte[] emptyDigest = MessageDigest.getInstance("MD5").digest();
       assertArrayEquals(emptyDigest, md5.digest());
@@ -106,7 +106,7 @@ public class TestMultiDigestInputStream {
     String secondPart = "67890";
     byte[] data = (firstPart + secondPart).getBytes(UTF_8);
 
-    try (MultiMessageDigestInputStream mdis = new MultiMessageDigestInputStream(new ByteArrayInputStream(data),
+    try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
         MessageDigest.getInstance("MD5"))) {
       // Read first part with digest on
       byte[] buffer1 = new byte[firstPart.length()];
@@ -114,7 +114,6 @@ public class TestMultiDigestInputStream {
       assertEquals(firstPart.length(), bytesRead1);
       assertEquals(firstPart, new String(buffer1, UTF_8));
 
-      // Turn off and read second part
       mdis.on(false);
       byte[] buffer2 = new byte[secondPart.length()];
       int bytesRead2 = mdis.read(buffer2, 0, buffer2.length);
@@ -122,7 +121,7 @@ public class TestMultiDigestInputStream {
       assertEquals(secondPart, new String(buffer2, UTF_8));
 
       // Digest should only contain first part
-      MessageDigest md5 = mdis.getDigest("MD5");
+      MessageDigest md5 = mdis.getMessageDigest("MD5");
       byte[] expectedDigest = MessageDigest.getInstance("MD5").digest(firstPart.getBytes(UTF_8));
       assertArrayEquals(expectedDigest, md5.digest());
     }
@@ -132,17 +131,16 @@ public class TestMultiDigestInputStream {
   void testResetDigests() throws Exception {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
-    try (MultiMessageDigestInputStream mdis = new MultiMessageDigestInputStream(new ByteArrayInputStream(data),
+    try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
         MessageDigest.getInstance("MD5"))) {
-      // Read some data
+
       int byte1 = mdis.read();
       int byte2 = mdis.read();
       assertTrue(byte1 != -1 && byte2 != -1);
 
       mdis.resetDigests();
 
-      // Digest should be empty after reset
-      MessageDigest md5 = mdis.getDigest("MD5");
+      MessageDigest md5 = mdis.getMessageDigest("MD5");
       byte[] emptyDigest = MessageDigest.getInstance("MD5").digest();
       assertArrayEquals(emptyDigest, md5.digest());
     }
@@ -152,7 +150,7 @@ public class TestMultiDigestInputStream {
   void testDigestManagement() throws Exception {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
-    try (MultiMessageDigestInputStream mdis = new MultiMessageDigestInputStream(new ByteArrayInputStream(data),
+    try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
         MessageDigest.getInstance("MD5"), MessageDigest.getInstance("SHA-1"))) {
 
       // Test initial state - getAllDigests
@@ -163,32 +161,32 @@ public class TestMultiDigestInputStream {
 
       // Test add
       mdis.addMessageDigest("SHA-256");
-      assertNotNull(mdis.getDigest("SHA-256"));
+      assertNotNull(mdis.getMessageDigest("SHA-256"));
       assertEquals(3, mdis.getAllDigests().size());
 
       // Test set - replace with new instance
       MessageDigest newMd5 = MessageDigest.getInstance("MD5");
       mdis.setMessageDigest("MD5", newMd5);
-      assertNotNull(mdis.getDigest("MD5"));
+      assertNotNull(mdis.getMessageDigest("MD5"));
 
       // Test remove
       MessageDigest removed = mdis.removeMessageDigest("SHA-1");
       assertNotNull(removed);
-      assertNull(mdis.getDigest("SHA-1"));
+      assertNull(mdis.getMessageDigest("SHA-1"));
       assertEquals(2, mdis.getAllDigests().size());
 
       // Test get non-existent
-      assertNull(mdis.getDigest("SHA-512"));
+      assertNull(mdis.getMessageDigest("SHA-512"));
 
       // Read data and verify remaining digests work correctly
       String result = IOUtils.toString(mdis, UTF_8);
       assertEquals(TEST_DATA, result);
 
       byte[] expectedMd5 = MessageDigest.getInstance("MD5").digest(data);
-      assertArrayEquals(expectedMd5, mdis.getDigest("MD5").digest());
+      assertArrayEquals(expectedMd5, mdis.getMessageDigest("MD5").digest());
 
       byte[] expectedSha256 = MessageDigest.getInstance("SHA-256").digest(data);
-      assertArrayEquals(expectedSha256, mdis.getDigest("SHA-256").digest());
+      assertArrayEquals(expectedSha256, mdis.getMessageDigest("SHA-256").digest());
     }
   }
 

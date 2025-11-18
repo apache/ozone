@@ -46,7 +46,7 @@ import java.util.Map;
  * </pre>
  * </p>
  */
-public class MultiMessageDigestInputStream extends FilterInputStream {
+public class MultiDigestInputStream extends FilterInputStream {
 
   private final Map<String, MessageDigest> digests;
   private boolean on = true;
@@ -57,7 +57,7 @@ public class MultiMessageDigestInputStream extends FilterInputStream {
    * @param in the underlying input stream
    * @param inputDigests the message digest instances to compute
    */
-  public MultiMessageDigestInputStream(InputStream in, MessageDigest... inputDigests) {
+  public MultiDigestInputStream(InputStream in, MessageDigest... inputDigests) {
     super(in);
     this.digests = new HashMap<>();
     for (MessageDigest digest : inputDigests) {
@@ -108,7 +108,7 @@ public class MultiMessageDigestInputStream extends FilterInputStream {
    * @return the MessageDigest instance for the specified algorithm,
    *         or null if the algorithm was not registered
    */
-  public MessageDigest getDigest(String algorithm) {
+  public MessageDigest getMessageDigest(String algorithm) {
     return digests.get(algorithm);
   }
 
