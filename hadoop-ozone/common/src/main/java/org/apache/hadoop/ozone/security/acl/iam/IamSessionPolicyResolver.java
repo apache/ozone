@@ -113,7 +113,9 @@ public final class IamSessionPolicyResolver {
 
     validateInputParameters(policyJson, volumeName, authorizerType);
 
-    final Set<AssumeRoleRequest.OzoneGrant> result = new LinkedHashSet<>();
+    // Accumulate ACLs across ALL statements using a single map to allow
+    // cross-statement deduplication and ALL-permission collapsing.
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
 
     // Parse JSON into set of statements
     final Set<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
@@ -138,13 +140,11 @@ public final class IamSessionPolicyResolver {
       final Set<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
 
       // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
-      final Set<AssumeRoleRequest.OzoneGrant> stmtResults = createPathsAndPermissions(
-          volumeName, authorizerType, mappedS3Actions, resourceSpecs, prefixes);
-
-      result.addAll(stmtResults);
+      createPathsAndPermissions(volumeName, authorizerType, mappedS3Actions, resourceSpecs, prefixes, objToAclsMap);
     }
 
-    return result;
+    // Group accumulated objects by their ACL sets to create final result
+    return groupObjectsByAcls(objToAclsMap);
   }
 
   /**
@@ -404,24 +404,19 @@ public final class IamSessionPolicyResolver {
    * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
    */
   @VisibleForTesting
-  static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName, AuthorizerType authorizerType,
-      Set<S3Action> mappedS3Actions, Set<ResourceSpec> resourceSpecs, Set<String> prefixes) {
-    // Create map to collect IOzoneObj to ACLType mappings
-    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
-
+  static void createPathsAndPermissions(String volumeName, AuthorizerType authorizerType, Set<S3Action> mappedS3Actions,
+      Set<ResourceSpec> resourceSpecs, Set<String> prefixes, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     // Process each resource spec with the given actions
     for (ResourceSpec resourceSpec : resourceSpecs) {
       processResourceSpecWithActions(volumeName, authorizerType, mappedS3Actions, resourceSpec, prefixes, objToAclsMap);
     }
-
-    // Group objects by their ACL sets to create proper entries
-    return groupObjectsByAcls(objToAclsMap);
   }
 
   /**
    * Groups objects by their ACL sets.
    */
-  private static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAcls(Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+  @VisibleForTesting
+  static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAcls(Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     final Map<Set<ACLType>, Set<IOzoneObj>> groupMap = new LinkedHashMap<>();
 
     // Group objects by their ACL sets only (across resource types)
@@ -603,11 +598,26 @@ public final class IamSessionPolicyResolver {
 
   /**
    * Helper method to add ACLs for an IOzoneObj, merging with existing ACLs if present.
+   * If ALL permission is present, no other permissions are added.
    */
   private static void addAclsForObj(Map<IOzoneObj, Set<ACLType>> objToAclsMap, IOzoneObj obj, Set<ACLType> acls) {
     if (acls != null && !acls.isEmpty()) {
       final OzoneObj ozoneObj = (OzoneObj) obj;
-      objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class)).addAll(acls);
+      final Set<ACLType> existingAcls = objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class));
+
+      // If ALL is already present, don't add other permissions
+      if (existingAcls.contains(ACLType.ALL)) {
+        return;
+      }
+
+      // If we're about to add ALL, remove all other permissions first
+      if (acls.contains(ACLType.ALL)) {
+        existingAcls.clear();
+        existingAcls.add(ACLType.ALL);
+      } else {
+        // Only add permissions if ALL is not already present
+        existingAcls.addAll(acls);
+      }
     }
   }
 
