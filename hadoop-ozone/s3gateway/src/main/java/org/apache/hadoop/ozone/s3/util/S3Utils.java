@@ -31,7 +31,6 @@ import jakarta.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
@@ -43,7 +42,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 
 /**
  * Utilities.

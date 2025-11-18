@@ -135,10 +135,10 @@ public class MultiDigestInputStream extends FilterInputStream {
    * a call to one of the read methods results in an update on all message
    * digests. When it is off, the message digests are not updated.
    *
-   * @param on true to turn the digest function on, false to turn it off
+   * @param enabled true to turn the digest function on, false to turn it off
    */
-  public void on(boolean on) {
-    this.on = on;
+  public void on(boolean enabled) {
+    this.on = enabled;
   }
 
   /**

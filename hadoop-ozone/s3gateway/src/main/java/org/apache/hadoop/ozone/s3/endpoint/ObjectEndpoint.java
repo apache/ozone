@@ -1589,8 +1589,8 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     // DigestInputStream is used for ETag calculation
-    MultiDigestInputStream
-        multiDigestInputStream = new MultiDigestInputStream(chunkInputStream, getMessageDigestInstance(), getSha256DigestInstance());
+    MultiDigestInputStream multiDigestInputStream =
+        new MultiDigestInputStream(chunkInputStream, getMessageDigestInstance(), getSha256DigestInstance());
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
   }
 

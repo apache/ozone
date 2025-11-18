@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -173,7 +173,8 @@ public class TestS3Utils {
 
   @ParameterizedTest
   @MethodSource("validXAmzContentSHA256Headers")
-  public void testValidateXAmzContentSHA256HeaderValid(String testName, String headerValue, String actualSha256, boolean isSignedPayload) {
+  public void testValidateXAmzContentSHA256HeaderValid(String testName, String headerValue, String actualSha256,
+                                                       boolean isSignedPayload) {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
     String resource = "/bucket/key";
@@ -197,7 +198,8 @@ public class TestS3Utils {
 
   @ParameterizedTest
   @MethodSource("invalidXAmzContentSHA256Headers")
-  public void testValidateXAmzContentSHA256HeaderInvalid(String testName, String headerValue, String actualSha256, boolean isSignedPayload, String expectedErrorCode) {
+  public void testValidateXAmzContentSHA256HeaderInvalid(String testName, String headerValue, String actualSha256,
+                                                         boolean isSignedPayload, String expectedErrorCode) {
 
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
