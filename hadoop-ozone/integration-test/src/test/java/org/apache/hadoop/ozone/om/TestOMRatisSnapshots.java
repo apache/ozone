@@ -152,6 +152,7 @@ public class TestOMRatisSnapshots {
         conf.getObject(OzoneManagerRatisServerConfig.class);
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
+    conf.set("ozone.om.client.rpc.timeout", "1m");
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")

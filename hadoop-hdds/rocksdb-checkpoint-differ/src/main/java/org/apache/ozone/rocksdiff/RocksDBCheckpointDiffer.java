@@ -790,6 +790,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     DifferSnapshotVersion srcSnapshotVersion = new DifferSnapshotVersion(src, src.getMaxVersion(), tablesToLookup);
     DifferSnapshotVersion destSnapshotVersion = new DifferSnapshotVersion(dest, destVersion, tablesToLookup);
 
+    // If the source snapshot version is 0, use the compaction DAG path otherwise performs a full diff on the basis
+    // of the sst file names.
     Optional<List<SstFileInfo>> sstDiffList = getSSTDiffList(srcSnapshotVersion, destSnapshotVersion, prefixInfo,
         tablesToLookup, srcVersion == 0);
 
@@ -816,6 +818,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param prefixInfo TablePrefixInfo to filter irrelevant SST files; can be null.
    * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
    *                       must be non-null.
+   * @param useCompactionDag If true, the method uses the compaction history to produce the incremental diff,
+   *                         otherwise a full diff would be performed on the basis of the sst file names.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized Optional<List<SstFileInfo>> getSSTDiffList(DifferSnapshotVersion src,

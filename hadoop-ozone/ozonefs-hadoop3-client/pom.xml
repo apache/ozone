@@ -93,6 +93,12 @@
                   <groupId>org.apache.ozone</groupId>
                   <artifactId>ozone-filesystem-shaded</artifactId>
                   <version>${project.version}</version>
+                  <fileMappers>
+                    <org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
+                      <pattern>META-INF/license/</pattern>
+                      <replacement>META-INF/licenses/</replacement>
+                    </org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
+                  </fileMappers>
                 </artifactItem>
               </artifactItems>
               <outputDirectory>target/classes</outputDirectory>

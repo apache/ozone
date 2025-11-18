@@ -2928,6 +2928,46 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  public void testListKeyDirectoriesAreNotFiles()
+      throws IOException {
+    // Test that directories in multilevel keys are not marked as files
+
+    String volumeA = "volume-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "bucket-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    OzoneVolume volA = store.getVolume(volumeA);
+    volA.createBucket(bucketA);
+    OzoneBucket volAbucketA = volA.getBucket(bucketA);
+
+    String keyBaseA = "key-a/";
+    for (int i = 0; i < 10; i++) {
+      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      OzoneOutputStream one = volAbucketA.createKey(
+          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      one.write(value);
+      one.close();
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter1 = volAbucketA.listKeys(null);
+    while (volABucketAIter1.hasNext()) {
+      OzoneKey key = volABucketAIter1.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter2 = volAbucketA.listKeys("key-");
+    while (volABucketAIter2.hasNext()) {
+      OzoneKey key = volABucketAIter2.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+  }
+
+  @Test
   public void testListKeyOnEmptyBucket()
       throws IOException {
     String volume = "vol-" + RandomStringUtils.secure().nextNumeric(5);
@@ -4454,7 +4494,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
+    omKeyInfo = omKeyInfo.withMetadataMutations(
+        metadata -> metadata.remove(OzoneConsts.GDPR_FLAG));
 
     omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),

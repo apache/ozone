@@ -173,7 +173,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 parentId, processed.keyInfo.getFileName(), hsyncClientId);
             OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
             if (openKeyInfo != null) {
-              openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+              openKeyInfo = openKeyInfo.withMetadataMutations(
+                  metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
               openKeyInfoMap.put(dbOpenKey, openKeyInfo);
             }
           }
