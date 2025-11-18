@@ -80,7 +80,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         name.release();
         buffer.skipBytes(1);
         String[] parts = currentFileName.split(" ", 2);
-        if (parts.length < 2 || parts[1] == null || parts[1].isEmpty()) {
+        if (parts.length < 2 || parts[1].isEmpty()) {
           throw new IllegalArgumentException("Invalid file name format: " + currentFileName + ". "
               + "Expected format: <size> <filename> where <size> is a number and <filename> "
               + "is a string separated by a single space. Example: '1024 myfile.txt'");
