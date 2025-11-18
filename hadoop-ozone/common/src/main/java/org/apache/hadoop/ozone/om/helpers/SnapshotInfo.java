@@ -443,11 +443,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   }
 
   /**
-   * Parses SnapshotInfo protobuf and creates SnapshotInfo.
+   * Parses SnapshotInfo protobuf and creates SnapshotInfo Builder.
    * @param snapshotInfoProto protobuf
-   * @return instance of SnapshotInfo
+   * @return Builder instance
    */
-  public static SnapshotInfo getFromProtobuf(
+  public static Builder builderFromProtobuf(
       OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto) {
 
     SnapshotInfo.Builder osib = SnapshotInfo.newBuilder()
@@ -523,7 +523,17 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
         .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
 
-    return osib.build();
+    return osib;
+  }
+
+  /**
+   * Parses SnapshotInfo protobuf and creates SnapshotInfo.
+   * @param snapshotInfoProto protobuf
+   * @return instance of SnapshotInfo
+   */
+  public static SnapshotInfo getFromProtobuf(
+      OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto) {
+    return builderFromProtobuf(snapshotInfoProto).build();
   }
 
   @Override

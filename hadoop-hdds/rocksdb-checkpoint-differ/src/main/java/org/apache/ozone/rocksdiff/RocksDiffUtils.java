@@ -49,31 +49,40 @@ public final class RocksDiffUtils {
   }
 
   /**
-   * Filter sst files based on prefixes.
+   * Filter sst files based on prefixes. The map of sst files to be filtered would be mutated.
+   * @param <T> Type of the key in the map.
+   * @param filesMapToBeFiltered Map of sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
    */
-  public static <T> Map<T, SstFileInfo> filterRelevantSstFiles(Map<T, SstFileInfo> inputFiles,
+  public static <T> Map<T, SstFileInfo> filterRelevantSstFiles(Map<T, SstFileInfo> filesMapToBeFiltered,
       Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
-    for (Iterator<Map.Entry<T, SstFileInfo>> fileIterator = inputFiles.entrySet().iterator(); fileIterator.hasNext();) {
+    for (Iterator<Map.Entry<T, SstFileInfo>> fileIterator = filesMapToBeFiltered.entrySet().iterator();
+         fileIterator.hasNext();) {
       SstFileInfo sstFileInfo = fileIterator.next().getValue();
       if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
         fileIterator.remove();
       }
     }
-    return inputFiles;
+    return filesMapToBeFiltered;
   }
 
   /**
-   * Filter sst files based on prefixes.
+   * Filter sst files based on prefixes. The set of sst files to be filtered would be mutated.
+   * @param <T> Type of the key in the map.
+   * @param filesToBeFiltered sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
    */
-  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> inputFiles,
+  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> filesToBeFiltered,
       Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
-    for (Iterator<SstFileInfo> fileIterator = inputFiles.iterator(); fileIterator.hasNext();) {
+    for (Iterator<SstFileInfo> fileIterator = filesToBeFiltered.iterator(); fileIterator.hasNext();) {
       SstFileInfo sstFileInfo = fileIterator.next();
       if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
         fileIterator.remove();
       }
     }
-    return inputFiles;
+    return filesToBeFiltered;
   }
 
   @VisibleForTesting
