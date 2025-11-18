@@ -39,7 +39,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.38.2</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.38.7</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.82</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -183,7 +183,11 @@
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Katmai</ozone.release>
     <ozone.version>2.2.0-SNAPSHOT</ozone.version>
-    <picocli.version>4.7.7</picocli.version>
+    <!--
+      4.7.6: https://github.com/remkop/picocli/issues/2309
+      4.7.7: https://github.com/remkop/picocli/issues/2407
+    -->
+    <picocli.version>4.7.5</picocli.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->

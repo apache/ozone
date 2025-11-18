@@ -161,8 +161,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             openKey + "entry is not found in the openKey table",
             KEY_NOT_FOUND);
       }
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          keyArgs.getMetadataList()));
+      omKeyInfo = omKeyInfo.toBuilder()
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+              keyArgs.getMetadataList()))
+          .build();
 
       // set the data size and location info list
       omKeyInfo.setDataSize(keyArgs.getDataSize());
