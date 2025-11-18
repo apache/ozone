@@ -71,9 +71,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private UUID pathPreviousSnapshotId;
   private UUID globalPreviousSnapshotId;
   private String snapshotPath; // snapshot mask
-  /**
-   * RocksDB's transaction sequence number at the time of checkpoint creation.
-   */
   private boolean deepClean;
   private boolean sstFiltered;
   private long referencedSize;
@@ -246,7 +243,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private UUID pathPreviousSnapshotId;
     private UUID globalPreviousSnapshotId;
     private String snapshotPath;
-    private long dbTxSequenceNumber;
     private boolean deepClean;
     private boolean sstFiltered;
     private long referencedSize;
@@ -321,12 +317,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     /** @param snapshotPath - Snapshot path, bucket .snapshot path. */
     public Builder setSnapshotPath(String snapshotPath) {
       this.snapshotPath = snapshotPath;
-      return this;
-    }
-
-    /** @param dbTxSequenceNumber - RDB latest transaction sequence number. */
-    public Builder setDbTxSequenceNumber(long dbTxSequenceNumber) {
-      this.dbTxSequenceNumber = dbTxSequenceNumber;
       return this;
     }
 
@@ -519,9 +509,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasCreateTransactionInfo()) {
       osib.setCreateTransactionInfo(snapshotInfoProto.getCreateTransactionInfo());
     }
-
-    osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
-        .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
 
     return osib;
   }
