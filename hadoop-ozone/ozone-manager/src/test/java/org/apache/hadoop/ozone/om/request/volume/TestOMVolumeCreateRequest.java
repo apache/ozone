@@ -55,7 +55,9 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("v1", adminName, ownerName));
-    assertEquals("Invalid volume name: v1", omException.getMessage());
+    assertEquals(
+        "volume name 'v1' is too short, valid length is 3-63 characters",
+        omException.getMessage());
   }
 
   @Test
@@ -302,7 +304,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute(volumeName, adminName, ownerName));
-    assertEquals("Invalid volume name: " + volumeName,
+    assertEquals("volume name has an unsupported character : _",
         omException.getMessage());
   }
 
