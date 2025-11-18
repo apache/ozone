@@ -262,10 +262,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     this.ozoneManager = ozoneManager;
-    RocksDBCheckpointDiffer differ = ozoneManager
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer();
 
     // Soft-limit of lru cache size
     this.softCacheSize = ozoneManager.getConfiguration().getInt(
