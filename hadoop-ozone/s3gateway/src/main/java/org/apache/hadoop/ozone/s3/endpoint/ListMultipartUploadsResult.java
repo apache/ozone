@@ -192,8 +192,9 @@ public class ListMultipartUploadsResult {
   @XmlRootElement(name = "Upload")
   public static class Upload {
 
+    @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
     @XmlElement(name = "Key")
-    private String key;
+    private EncodingTypeObject key;
 
     @XmlElement(name = "UploadId")
     private String uploadId;
@@ -214,13 +215,13 @@ public class ListMultipartUploadsResult {
     public Upload() {
     }
 
-    public Upload(String key, String uploadId, Instant initiated) {
+    public Upload(EncodingTypeObject key, String uploadId, Instant initiated) {
       this.key = key;
       this.uploadId = uploadId;
       this.initiated = initiated;
     }
 
-    public Upload(String key, String uploadId, Instant initiated,
+    public Upload(EncodingTypeObject key, String uploadId, Instant initiated,
         S3StorageType storageClass) {
       this.key = key;
       this.uploadId = uploadId;
@@ -228,11 +229,11 @@ public class ListMultipartUploadsResult {
       this.storageClass = storageClass.toString();
     }
 
-    public String getKey() {
+    public EncodingTypeObject getKey() {
       return key;
     }
 
-    public void setKey(String key) {
+    public void setKey(EncodingTypeObject key) {
       this.key = key;
     }
 

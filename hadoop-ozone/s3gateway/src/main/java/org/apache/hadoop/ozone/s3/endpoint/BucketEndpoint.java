@@ -425,7 +425,7 @@ public class BucketEndpoint extends EndpointBase {
         
         if (!addedAsPrefix) {
           result.addUpload(new ListMultipartUploadsResult.Upload(
-              upload.getKeyName(),
+              EncodingTypeObject.createNullable(upload.getKeyName(), encodingType),
               upload.getUploadId(),
               upload.getCreationTime(),
               S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
