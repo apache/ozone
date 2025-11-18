@@ -127,8 +127,8 @@ public class TestDirstreamClientHandler {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
       handler.doRead(null, wrap(invalidInput));
     });
-    assertTrue(exception.getMessage().contains("Invalid file name format"),
-        "Exception message should contain 'Invalid file name format' for input: " + invalidInput);
+    assertThat(exception)
+        .hasMessageContaining("Invalid file name format");
   }
 
   private static Stream<Arguments> provideInvalidFormatTestCases() {
