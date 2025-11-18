@@ -70,7 +70,7 @@ public class TestStreamRead {
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
 
   static final int BLOCK_SIZE = 128 << 20;
-  static final int BYTES_PER_CHECKSUM = 256 << 10;
+  static final int BYTES_PER_CHECKSUM = 16 << 10;
 
   static MiniOzoneCluster newCluster() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -116,7 +116,12 @@ public class TestStreamRead {
       copy.setFromObject(clientConfig);
 
       final int n = 10;
-      final SizeInBytes bufferSize = SizeInBytes.valueOf("8M");
+      final SizeInBytes writeBufferSize = SizeInBytes.valueOf("1MB");
+      final SizeInBytes[] readBufferSizes = {
+          SizeInBytes.valueOf("4k"),
+          SizeInBytes.valueOf("256k"),
+          SizeInBytes.valueOf("1M"),
+      };
       final SizeInBytes keySize = SizeInBytes.valueOf("1G");
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
@@ -125,12 +130,13 @@ public class TestStreamRead {
         for(int i = 0; i < n; i++) {
           final String keyName = "key" + i;
           System.out.println("XXX ---------------------------------------------------------");
-          System.out.printf("XXX create %s with %s bytes using %s buffer%n",
-              keyName, keySize, bufferSize);
+          System.out.printf("XXX %s with %s bytes%n", keyName, keySize);
 
-          final String md5 = createKey(bucket.delegate(), keyName, keySize, bufferSize);
-          runTestReadKey(keyName, keySize, bufferSize, null);
-          runTestReadKey(keyName, keySize, bufferSize, md5);
+          final String md5 = createKey(bucket.delegate(), keyName, keySize, writeBufferSize);
+          for(SizeInBytes readBufferSize : readBufferSizes) {
+            runTestReadKey(keyName, keySize, readBufferSize, null);
+            runTestReadKey(keyName, keySize, readBufferSize, md5);
+          }
         }
       }
     }
@@ -157,8 +163,8 @@ public class TestStreamRead {
     final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
     final String computedMD5 = StringUtils.bytes2Hex(md5.digest());
     final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
-    System.out.printf("XXX createStreamKey: %9.3f MB/s (processed %9.2f MB in %9.3f s with md5=%s)%n",
-        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, computedMD5);
+    System.out.printf("XXX createStreamKey: %9.3f MB/s (%9.2f MB in %9.3f s with %20s buffer, md5=%s)%n",
+        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, bufferSize, computedMD5);
     return computedMD5;
   }
 
@@ -191,7 +197,7 @@ public class TestStreamRead {
       assertEquals(expectedMD5, computedMD5);
     }
     final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
-    System.out.printf("XXX readStreamKey  : %9.3f MB/s (processed %9.2f MB in %9.3f s with md5=%s)%n",
-        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, computedMD5);
+    System.out.printf("XXX readStreamKey  : %9.3f MB/s (%9.2f MB in %9.3f s with %20s buffer, md5=%s)%n",
+        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, bufferSize, computedMD5);
   }
 }

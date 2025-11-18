@@ -91,7 +91,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           ecBlockStreamFactory, config);
     } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
       return new StreamBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
-          config.getBytesPerChecksum(), pipeline, token, xceiverFactory,
+          256 << 10, config.getBytesPerChecksum(), pipeline, token, xceiverFactory,
           refreshFunction, config);
     } else {
       return new BlockInputStream(blockInfo,

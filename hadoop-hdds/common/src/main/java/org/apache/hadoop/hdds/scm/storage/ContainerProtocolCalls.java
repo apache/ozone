@@ -914,13 +914,14 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   public static ContainerCommandRequestProto getReadBlockCommand(
-      BlockID blockID, long offset, long length, Token<? extends TokenIdentifier> token, Pipeline pipeline)
+      BlockID blockID, long offset, long length, int responseDataSize, Token<? extends TokenIdentifier> token, Pipeline pipeline)
       throws IOException {
     final DatanodeDetails datanode = pipeline.getClosestNode();
     final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());
     final ReadBlockRequestProto.Builder readBlockRequest = ReadBlockRequestProto.newBuilder()
         .setOffset(offset)
         .setLength(length)
+        .setResponseDataSize(responseDataSize)
         .setBlockID(datanodeBlockID);
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)

@@ -47,7 +47,7 @@ abstract class TestInputStreamBase {
   static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
   static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
-  static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
+  static final int BYTES_PER_CHECKSUM = 16 * 1024;
 
   private MiniOzoneCluster cluster;
 

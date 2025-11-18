@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
@@ -48,6 +49,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -66,7 +68,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   private final BlockID blockID;
   private final long blockLength;
-  private final int packetSize;
+  private final int responseDataSize;
+  private final int bytesPerChecksum;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -83,14 +86,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private int retries = 0;
 
   public StreamBlockInputStream(
-      BlockID blockID, long blockLength, int packetSize, Pipeline pipeline,
+      BlockID blockID, long blockLength, int responseDataSize, int bytePerChecksum, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
     this.blockLength = blockLength;
-    this.packetSize = packetSize;
+    this.responseDataSize = responseDataSize;
+    this.bytesPerChecksum = bytePerChecksum;
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -249,7 +253,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.getReadBlockCommand(
-        blockID, position, length, tokenRef.get(), pipelineRef.get()), r);
+        blockID, position, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -352,7 +356,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
       final long diff = position + length - requestedLength;
       if (diff > 0) {
-        final long rounded = roundUp(diff, packetSize);
+        final long rounded = roundUp(diff, responseDataSize) + 8L*responseDataSize;
 //        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}", position, length, requestedLength, diff, rounded);
         readBlock(rounded);
         requestedLength += rounded;
@@ -388,8 +392,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
     @Override
     public void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
+      final ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
       try {
-        ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
@@ -397,8 +401,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
+        final ByteString data = readBlock.getData();
+        final long offset = readBlock.getOffset();
         final StreamingReadResponse r = getResponse();
-        LOG.warn("Failed to process block {} response from {}", getBlockID(), r, e);
+        LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
+            getBlockID().getContainerBlockID(),
+            offset, data.size(), StringUtils.bytes2Hex(data.substring(0, 10).asReadOnlyByteBuffer()),
+            readBlock.getChecksumData(), e);
         setFailed(e);
         r.getRequestObserver().onError(e);
         releaseResources();

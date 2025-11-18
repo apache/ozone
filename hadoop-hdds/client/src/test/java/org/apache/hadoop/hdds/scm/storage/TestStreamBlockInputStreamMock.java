@@ -120,8 +120,8 @@ public class TestStreamBlockInputStreamMock {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
     createDataAndChecksum();
-    blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, PACKET_SIZE, pipeline,
-        token, xceiverClientFactory, refreshFunction, clientConfig);
+    blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, PACKET_SIZE, BYTES_PER_CHECKSUM,
+        pipeline, token, xceiverClientFactory, refreshFunction, clientConfig);
   }
 
   @AfterEach
