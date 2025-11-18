@@ -131,6 +131,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
@@ -158,11 +159,20 @@ public class ObjectEndpoint extends EndpointBase {
       LoggerFactory.getLogger(ObjectEndpoint.class);
 
   private static final ThreadLocal<MessageDigest> E_TAG_PROVIDER;
+  private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
 
   static {
     E_TAG_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
         return MessageDigest.getInstance(OzoneConsts.MD5_HASH);
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    SHA_256_PROVIDER = ThreadLocal.withInitial(() -> {
+      try {
+        return MessageDigest.getInstance("SHA-256");
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }
@@ -238,7 +248,7 @@ public class ObjectEndpoint extends EndpointBase {
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
     String copyHeader = null, storageType = null, storageConfig = null;
-    DigestInputStream digestInputStream = null;
+    MultiDigestInputStream multiDigestInputStream = null;
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_ACL;
@@ -314,7 +324,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
           length, amzDecodedLength, keyPath);
-      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
 
       Map<String, String> customMetadata =
@@ -327,7 +337,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, tags, digestInputStream, perf);
+                customMetadata, tags, multiDigestInputStream, perf);
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -337,14 +347,19 @@ public class ObjectEndpoint extends EndpointBase {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          putLength = IOUtils.copyLarge(digestInputStream, output, 0, length,
+          putLength = IOUtils.copyLarge(multiDigestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
           eTag = DatatypeConverter.printHexBinary(
-                  digestInputStream.getMessageDigest().digest())
+                  multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
         }
       }
+      // validate "X-AMZ-CONTENT-SHA256"
+      String sha256 = DatatypeConverter.printHexBinary(
+              multiDigestInputStream.getMessageDigest("SHA-256").digest())
+          .toLowerCase();
+      S3Utils.validateXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload(), keyPath);
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
@@ -395,8 +410,9 @@ public class ObjectEndpoint extends EndpointBase {
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
-      if (digestInputStream != null) {
-        digestInputStream.getMessageDigest().reset();
+      if (multiDigestInputStream != null) {
+        multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
+        multiDigestInputStream.getMessageDigest("SHA-256").reset();
       }
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -969,13 +985,13 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String copyHeader = null;
-    DigestInputStream digestInputStream = null;
+    MultiDigestInputStream multiDigestInputStream = null;
     final String bucketName = ozoneBucket.getName();
     try {
       String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(
           body, length, amzDecodedLength, key);
-      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
@@ -995,7 +1011,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, chunkSize, digestInputStream, perf);
+                uploadID, chunkSize, multiDigestInputStream, perf);
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1072,9 +1088,9 @@ public class ObjectEndpoint extends EndpointBase {
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream, 0, length,
+          putLength = IOUtils.copyLarge(multiDigestInputStream, ozoneOutputStream, 0, length,
               new byte[getIOBufferSize(length)]);
-          byte[] digest = digestInputStream.getMessageDigest().digest();
+          byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           ozoneOutputStream.getMetadata()
               .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
           outputStream = ozoneOutputStream;
@@ -1123,8 +1139,9 @@ public class ObjectEndpoint extends EndpointBase {
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
-      if (digestInputStream != null) {
-        digestInputStream.getMessageDigest().reset();
+      if (multiDigestInputStream != null) {
+        multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
+        multiDigestInputStream.getMessageDigest("SHA-256").reset();
       }
     }
   }
@@ -1518,6 +1535,10 @@ public class ObjectEndpoint extends EndpointBase {
     return E_TAG_PROVIDER.get();
   }
 
+  public MessageDigest getSha256DigestInstance() {
+    return SHA_256_PROVIDER.get();
+  }
+
   private String extractPartsCount(String eTag) {
     if (eTag.contains("-")) {
       String[] parts = eTag.replace("\"", "").split("-");
@@ -1568,22 +1589,23 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     // DigestInputStream is used for ETag calculation
-    DigestInputStream digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
-    return new S3ChunkInputStreamInfo(digestInputStream, effectiveLength);
+    MultiDigestInputStream
+        multiDigestInputStream = new MultiDigestInputStream(chunkInputStream, getMessageDigestInstance(), getSha256DigestInstance());
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
   }
 
   @Immutable
   static final class S3ChunkInputStreamInfo {
-    private final DigestInputStream digestInputStream;
+    private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
 
-    S3ChunkInputStreamInfo(DigestInputStream digestInputStream, long effectiveLength) {
-      this.digestInputStream = digestInputStream;
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
+      this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
     }
 
-    public DigestInputStream getDigestInputStream() {
-      return digestInputStream;
+    public MultiDigestInputStream getMultiDigestInputStream() {
+      return multiDigestInputStream;
     }
 
     public long getEffectiveLength() {

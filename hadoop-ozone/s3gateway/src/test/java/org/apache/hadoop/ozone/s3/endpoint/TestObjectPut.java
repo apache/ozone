@@ -128,7 +128,7 @@ class TestObjectPut {
     clientStub.getObjectStore().createS3Bucket(DEST_BUCKET_NAME);
 
     headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
 
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -210,7 +210,7 @@ class TestObjectPut {
   @Test
   public void testPutObjectWithTags() throws IOException, OS3Exception {
     HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
-    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headersWithTags.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
 
     ByteArrayInputStream body =
@@ -375,12 +375,16 @@ class TestObjectPut {
   @Test
   public void testPutObjectMessageDigestResetDuringException() throws OS3Exception {
     MessageDigest messageDigest = mock(MessageDigest.class);
+    when(messageDigest.getAlgorithm()).thenReturn("MD5");
+    MessageDigest sha256Digeset = mock(MessageDigest.class);
+    when(sha256Digeset.getAlgorithm()).thenReturn("SHA-256");
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getSha256DigestInstance()).thenReturn(sha256Digeset);
 
       ByteArrayInputStream body =
           new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -392,6 +396,7 @@ class TestObjectPut {
         // Verify that the message digest is reset so that the instance can be reused for the
         // next request in the same thread
         verify(messageDigest, times(1)).reset();
+        verify(sha256Digeset, times(1)).reset();
       }
     }
   }
@@ -587,7 +592,7 @@ class TestObjectPut {
   public void testCopyObjectWithTags() throws IOException, OS3Exception {
     // Put object in to source bucket
     HttpHeaders headersForPut = Mockito.mock(HttpHeaders.class);
-    when(headersForPut.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersForPut.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headersForPut.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -748,7 +753,7 @@ class TestObjectPut {
   @Test
   public void testPutEmptyObject() throws IOException, OS3Exception {
     HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
-    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     String emptyString = "";
     ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
     objectEndpoint.setHeaders(headersWithTags);

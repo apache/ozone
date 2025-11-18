@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,7 @@ final class ObjectEndpointStreaming {
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
       Map<String, String> tags,
-      DigestInputStream body, PerformanceStringBuilder perf)
+      MultiDigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     try {
@@ -99,7 +100,7 @@ final class ObjectEndpointStreaming {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
       Map<String, String> tags,
-      DigestInputStream body, PerformanceStringBuilder perf)
+      MultiDigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
     long startNanos = Time.monotonicNowNanos();
     long writeLen;
@@ -108,7 +109,7 @@ final class ObjectEndpointStreaming {
         length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
@@ -162,7 +163,7 @@ final class ObjectEndpointStreaming {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static Response createMultipartKey(OzoneBucket ozoneBucket, String key,
       long length, int partNumber, String uploadID, int chunkSize,
-      DigestInputStream body, PerformanceStringBuilder perf)
+      MultiDigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
@@ -173,7 +174,7 @@ final class ObjectEndpointStreaming {
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
-            body.getMessageDigest().digest()).toLowerCase();
+            body.getMessageDigest(OzoneConsts.MD5_HASH).digest()).toLowerCase();
         ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
