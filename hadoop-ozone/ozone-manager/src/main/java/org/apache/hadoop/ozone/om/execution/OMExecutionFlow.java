@@ -49,12 +49,12 @@ public class OMExecutionFlow {
    * @return OMResponse the response of execution
    * @throws ServiceException the exception on execution
    */
-  public OMResponse submit(OMRequest omRequest) throws ServiceException {
+  public OMResponse submit(OMRequest omRequest, boolean isWrite) throws ServiceException {
     // TODO: currently have only execution after ratis submission, but with new flow can have switch later
-    return submitExecutionToRatis(omRequest);
+    return submitExecutionToRatis(omRequest, isWrite);
   }
 
-  private OMResponse submitExecutionToRatis(OMRequest request) throws ServiceException {
+  private OMResponse submitExecutionToRatis(OMRequest request, boolean isWrite) throws ServiceException {
     // 1. create client request and preExecute
     OMClientRequest omClientRequest = null;
     final OMRequest requestToSubmit;
@@ -73,7 +73,7 @@ public class OMExecutionFlow {
     }
 
     // 2. submit request to ratis
-    OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit);
+    OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
     if (!response.getSuccess()) {
       omClientRequest.handleRequestFailure(ozoneManager);
     }

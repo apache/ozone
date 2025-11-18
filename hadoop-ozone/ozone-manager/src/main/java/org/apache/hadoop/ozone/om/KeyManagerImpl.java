@@ -163,6 +163,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -836,8 +837,12 @@ public class KeyManagerImpl implements KeyManager {
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new DeletedBlock(new BlockID(b.getContainerID(),
-                          b.getLocalID()), info.getDataSize(), info.getReplicatedSize()))).collect(Collectors.toList());
+                      .map(b -> new DeletedBlock(
+                          new BlockID(b.getContainerID(),
+                            b.getLocalID()),
+                            b.getLength(),
+                            QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig())
+                      ))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
 
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
