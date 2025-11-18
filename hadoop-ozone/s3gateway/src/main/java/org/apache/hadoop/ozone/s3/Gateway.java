@@ -114,7 +114,6 @@ public class Gateway extends GenericCli implements Callable<Void> {
     httpServer.stop();
     contentServer.stop();
     jvmPauseMonitor.stop();
-    metrics.close();
     S3GatewayMetrics.unRegister();
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
