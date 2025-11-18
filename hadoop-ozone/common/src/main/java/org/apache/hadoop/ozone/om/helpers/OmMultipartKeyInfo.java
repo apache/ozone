@@ -222,6 +222,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   /**
    * Builder of OmMultipartKeyInfo.
    */
@@ -234,6 +238,18 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
 
     public Builder() {
       this.partKeyInfoList = new TreeMap<>();
+    }
+
+    public Builder(OmMultipartKeyInfo multipartKeyInfo) {
+      super(multipartKeyInfo);
+      this.uploadID = multipartKeyInfo.uploadID;
+      this.creationTime = multipartKeyInfo.creationTime;
+      this.replicationConfig = multipartKeyInfo.replicationConfig;
+      this.partKeyInfoList = new TreeMap<>();
+      for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
+        this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
+      }
+      this.parentID = multipartKeyInfo.parentID;
     }
 
     public Builder setUploadID(String uploadId) {
@@ -274,6 +290,12 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
+      return this;
+    }
+
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
       return this;
     }
 

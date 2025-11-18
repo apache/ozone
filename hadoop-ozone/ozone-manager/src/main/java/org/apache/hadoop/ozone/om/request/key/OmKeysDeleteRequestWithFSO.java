@@ -106,7 +106,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               .getOzonePathKey(volumeId, bucketId, parentId, fileName)),
           CacheValue.get(trxnLogIndex));
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .withUpdateID(trxnLogIndex)
+          .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
@@ -139,7 +141,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
                   omKeyInfo.getFileName())),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .withUpdateID(trxnLogIndex)
+          .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
     }
     return Pair.of(quotaReleased, emptyKeys);

@@ -175,7 +175,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder().withUpdateID(trxnLogIndex).build();
 
       int partNumber = keyArgs.getMultipartNumber();
       partName = getPartName(ozoneKey, uploadID, partNumber);
@@ -206,7 +206,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
-      multipartKeyInfo.setUpdateID(trxnLogIndex);
+      multipartKeyInfo = multipartKeyInfo.toBuilder()
+          .withUpdateID(trxnLogIndex)
+          .build();
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in
       // S3MultipartUploadCommitPartResponse before being added to

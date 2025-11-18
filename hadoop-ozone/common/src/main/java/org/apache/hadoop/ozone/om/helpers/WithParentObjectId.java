@@ -62,6 +62,10 @@ public class WithParentObjectId extends WithObjectID {
     this.parentObjectID = parentObjectID;
   }
 
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   /** Builder for {@link WithParentObjectId}. */
   public static class Builder extends WithObjectID.Builder {
     private long parentObjectID;
@@ -82,6 +86,16 @@ public class WithParentObjectId extends WithObjectID {
 
     protected long getParentObjectID() {
       return parentObjectID;
+    }
+
+    @Override
+    public Builder withObjectID(long obId) {
+      super.withObjectID(obId);
+      return this;
+    }
+
+    public WithParentObjectId build() {
+      return new WithParentObjectId(this);
     }
   }
 }

@@ -531,7 +531,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         omKeyInfo.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    omKeyInfo.setUpdateID(trxnLogIndex);
+    omKeyInfo = omKeyInfo.toBuilder()
+        .withUpdateID(trxnLogIndex)
+        .build();
     return omKeyInfo;
   }
 

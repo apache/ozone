@@ -557,10 +557,9 @@ public final class OmUtils {
     }
 
     // Set the updateID
-    sanitizedKeyInfo.setUpdateID(trxnLogIndex);
-    if (sanitizedKeyInfo != keyInfo) {
-      keyInfo.setUpdateID(trxnLogIndex);
-    }
+    sanitizedKeyInfo = sanitizedKeyInfo.toBuilder()
+        .withUpdateID(trxnLogIndex)
+        .build();
 
     //The key doesn't exist in deletedTable, so create a new instance.
     return new RepeatedOmKeyInfo(sanitizedKeyInfo, bucketId);

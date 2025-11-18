@@ -624,6 +624,18 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
+    public Builder withObjectID(long obId) {
+      super.withObjectID(obId);
+      return this;
+    }
+
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
+      return this;
+    }
+
     public Builder setFileEncryptionInfo(FileEncryptionInfo feInfo) {
       this.encInfo = feInfo;
       return this;
@@ -691,6 +703,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -942,6 +955,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Return a new copy of the object.
    */
+  @Override
   public Builder toBuilder() {
     return new Builder(this);
   }

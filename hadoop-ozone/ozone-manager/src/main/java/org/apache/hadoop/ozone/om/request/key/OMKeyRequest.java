@@ -977,7 +977,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex);
+      dbKeyInfo = dbKeyInfo.toBuilder()
+          .withUpdateID(transactionLogIndex)
+          .build();
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
@@ -1167,7 +1169,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
     // This is a special marker to indicate that SnapshotDeletingService
     // can reclaim this key's blocks unconditionally.
-    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
+    pseudoKeyInfo = pseudoKeyInfo.toBuilder()
+        .withObjectID(OBJECT_ID_RECLAIM_BLOCKS)
+        .build();
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

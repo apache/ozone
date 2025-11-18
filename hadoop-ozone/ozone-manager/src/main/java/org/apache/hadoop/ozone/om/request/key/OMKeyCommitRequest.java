@@ -278,7 +278,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex);
+        openKeyToDelete = openKeyToDelete.toBuilder()
+            .withUpdateID(trxnLogIndex)
+            .build();
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
       }
@@ -312,7 +314,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .withUpdateID(trxnLogIndex)
+          .build();
 
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();

@@ -156,7 +156,9 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           newOwner, bucketName, volumeName);
 
       // Set the updateID to current transaction log index
-      newOmBucketInfo.setUpdateID(transactionLogIndex);
+      newOmBucketInfo = newOmBucketInfo.toBuilder()
+          .withUpdateID(transactionLogIndex)
+          .build();
 
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
