@@ -44,6 +44,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -234,6 +235,7 @@ public class SCMConnectionManager
       }
 
       EndpointStateMachine endPoint = scmMachines.get(address);
+      endPoint.setState(EndPointStates.SHUTDOWN);
       endPoint.close();
       scmMachines.remove(address);
     } finally {
@@ -270,6 +272,18 @@ public class SCMConnectionManager
     readLock();
     try {
       return unmodifiableList(new ArrayList<>(scmMachines.values()));
+    } finally {
+      readUnlock();
+    }
+  }
+
+  /**
+   * @return the number of connections (both SCM and Recon)
+   */
+  public int getNumOfConnections() {
+    readLock();
+    try {
+      return scmMachines.size();
     } finally {
       readUnlock();
     }
