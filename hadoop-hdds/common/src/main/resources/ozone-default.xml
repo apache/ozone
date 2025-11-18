@@ -2267,6 +2267,33 @@
   </property>
 
   <property>
+    <name>ozone.om.follower.read.local.lease.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description> If we enabled the local lease for Follower Read.
+      If enabled, follower OM will decide if return local data directly
+      based on lag log and time.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.follower.read.local.lease.lag.limit</name>
+    <value>30000</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description> If the lag between leader OM and follower OM is larger
+      than this number, the follower OM is not up-to-date.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.follower.read.local.lease.time.ms</name>
+    <value>15000</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description> If the lag time Ms between leader OM and follower OM is larger
+      than this number, the follower OM is not up-to-date.
+      By default, it's set to 3 * Ratis RPC timeout value.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
