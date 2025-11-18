@@ -86,11 +86,17 @@ public class StreamingClient implements AutoCloseable {
   }
 
   public void stream(String id, long timeout, TimeUnit unit) {
+    Channel channel = null;
     try {
-      Channel channel = bootstrap.connect(host, port).sync().channel();
-      channel.writeAndFlush(id + "\n")
-          .await(timeout, unit);
-      channel.closeFuture().await(timeout, unit);
+      channel = bootstrap.connect(host, port).sync().channel();
+      boolean writeSuccess = channel.writeAndFlush(id + "\n").await(timeout, unit);
+      if (!writeSuccess) {
+        throw new StreamingException("Failed to write id " + id + ": timed out " + timeout + " " + unit);
+      }
+      boolean closeSuccess = channel.closeFuture().await(timeout, unit);
+      if (!closeSuccess) {
+        throw new StreamingException("Failed to close channel for id " + id + ": timed out " + timeout + " " + unit);
+      }
       if (!dirstreamClientHandler.isAtTheEnd()) {
         throw new StreamingException("Streaming is failed. Not all files " +
             "are streamed. Please check the log of the server." +
@@ -100,6 +106,10 @@ public class StreamingClient implements AutoCloseable {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new StreamingException(e);
+    } finally {
+      if (channel != null && channel.isActive()) {
+        channel.close();
+      }
     }
   }
 

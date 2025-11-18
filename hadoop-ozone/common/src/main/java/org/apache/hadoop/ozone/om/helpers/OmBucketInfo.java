@@ -653,20 +653,21 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
-    return getFromProtobuf(bucketInfo, null);
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo, null);
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @param buckLayout
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo,
       BucketLayout buckLayout) {
     Builder obib = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
@@ -717,7 +718,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
     }
-    return obib.build();
+    return obib;
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo).build();
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @param buckLayout
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+      BucketLayout buckLayout) {
+    return builderFromProtobuf(bucketInfo, buckLayout).build();
   }
 
   @Override
