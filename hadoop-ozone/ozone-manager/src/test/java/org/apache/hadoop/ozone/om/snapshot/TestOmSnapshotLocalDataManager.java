@@ -1012,6 +1012,8 @@ public class TestOmSnapshotLocalDataManager {
           assertEquals(snapshotId, snapshotLocalData.getSnapshotId());
           assertEquals(previousMap.get(snapshotId), snapshotLocalData.getPreviousSnapshotId());
           assertEquals(expectedSstFile.get(snapshotId), snapshotLocalData.getVersionSstFileInfos());
+          assertTrue(readableOmSnapshotLocalDataProvider.needsDefrag());
+          assertTrue(snapshotLocalData.getNeedsDefrag());
         }
       }
     } else {
