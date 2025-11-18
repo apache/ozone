@@ -43,7 +43,6 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -213,74 +212,57 @@ public class TestScmDataDistributionFinalization {
 
     // generate old format deletion tx, summary should keep empty, total DB tx 4
     int txCount = 4;
-    activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, false));
+    DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateDeletedBlocks(txCount, false));
     flushDBTransactionBuffer(activeSCM);
     ArrayList<Long> txIdList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount, txIdList.size());
-    DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
+
     SCMDeletedBlockTransactionStatusManager statusManager =
         deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
     HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
     assertEquals(EMPTY_SUMMARY, summary);
     statusManager.removeTransactions(txIdList);
 
-    activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, true));
+    // generate 4 new format deletion tx
+    Map<Long, List<DeletedBlock>> txList = generateDeletedBlocks(txCount, true);
+    deletedBlockLog.addTransactions(txList);
     flushDBTransactionBuffer(activeSCM);
+
     ArrayList<Long> txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount, txWithSizeList.size());
-
     summary = statusManager.getTransactionSummary();
     assertEquals(txCount, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX, summary.getTotalBlockCount());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3, summary.getTotalBlockReplicatedSize());
 
-    // delete first half of txs and verify summary, total DB tx 2
-    txIdList = txWithSizeList.stream().limit(txCount / 2).collect(Collectors.toCollection(ArrayList::new));
-    assertEquals(txCount / 2, txIdList.size());
-    statusManager.removeTransactions(txIdList);
-    flushDBTransactionBuffer(activeSCM);
-    txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
-    assertEquals(txCount / 2, txWithSizeList.size());
-    summary = statusManager.getTransactionSummary();
-    assertEquals(txCount / 2, summary.getTotalTransactionCount());
-    assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3 / 2, summary.getTotalBlockReplicatedSize());
+    // wait for all transactions deleted by SCMBlockDeletingService
+    GenericTestUtils.waitFor(() -> {
+      try {
+        flushDBTransactionBuffer(activeSCM);
+        return getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable()).size() == 0;
+      } catch (IOException e) {
+        fail("Failed to get keys from DeletedBlocksTXTable", e);
+        return false;
+      }
+    }, 100, 5000);
 
-    // generate old format deletion tx, summary should keep the same, total DB tx 6
-    activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, false));
+    // generate old format deletion tx, summary should keep the same
+    deletedBlockLog.addTransactions(generateDeletedBlocks(txCount, false));
     flushDBTransactionBuffer(activeSCM);
-    txIdList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
-    assertEquals(txCount + txCount / 2, txIdList.size());
-    txIdList.removeAll(txWithSizeList);
-    ArrayList<Long> txWithoutSizeList = txIdList;
-
+    ArrayList<Long> txWithoutSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
+    assertEquals(txCount, txWithoutSizeList.size());
     summary = statusManager.getTransactionSummary();
-    assertEquals(txCount / 2, summary.getTotalTransactionCount());
-    assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3 / 2, summary.getTotalBlockReplicatedSize());
+    assertEquals(EMPTY_SUMMARY, summary);
 
     // delete old format deletion tx, summary should keep the same
     statusManager.removeTransactions(txWithoutSizeList);
     flushDBTransactionBuffer(activeSCM);
     summary = statusManager.getTransactionSummary();
-    assertEquals(txCount / 2, summary.getTotalTransactionCount());
-    assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE / 2, summary.getTotalBlockSize());
-    assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3 / 2, summary.getTotalBlockReplicatedSize());
+    assertEquals(EMPTY_SUMMARY, summary);
 
-    // delete remaining txs, summary should become nearly empty
-    statusManager.removeTransactions(txWithSizeList);
-    flushDBTransactionBuffer(activeSCM);
-    summary = statusManager.getTransactionSummary();
-    assertEquals(0, summary.getTotalTransactionCount());
-    assertEquals(0, summary.getTotalBlockCount());
-    assertEquals(0, summary.getTotalBlockSize());
-    assertEquals(0, summary.getTotalBlockReplicatedSize());
-
-    // delete remaining txs twice, summary should keep the same
+    // delete already deleted new format txs again, summary should become nearly empty
     statusManager.removeTransactions(txWithSizeList);
     flushDBTransactionBuffer(activeSCM);
     summary = statusManager.getTransactionSummary();

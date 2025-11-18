@@ -281,6 +281,7 @@ public class DeletedBlockLogImpl
       if (!transactionStatusManager.isDuplication(
           datanodeID, tx.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(datanodeID, tx);
+        addTxToTxSizeMap(tx);
         flag = true;
       }
     }
@@ -319,6 +320,14 @@ public class DeletedBlockLogImpl
     }
 
     return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
+  }
+
+  private void addTxToTxSizeMap(DeletedBlocksTransaction tx) {
+    if (tx.hasTotalBlockReplicatedSize()) {
+      transactionStatusManager.getTxSizeMap().put(tx.getTxID(),
+          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getLocalIDCount(),
+              tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
+    }
   }
 
   @Override
@@ -387,11 +396,6 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
-          if (txn.hasTotalBlockReplicatedSize()) {
-            transactionStatusManager.getTxSizeMap().put(txn.getTxID(),
-                new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(txn.getLocalIDCount(),
-                    txn.getTotalBlockSize(), txn.getTotalBlockReplicatedSize()));
-          }
           try {
             final ContainerInfo container = containerManager.getContainer(id);
             // HDDS-7126. When container is under replicated, it is possible
@@ -399,6 +403,7 @@ public class DeletedBlockLogImpl
             if (container.isDeleted()) {
               LOG.warn("Container: {} was deleted for the transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
+              addTxToTxSizeMap(txn);
             } else if (!container.isOpen()) {
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
@@ -414,6 +419,7 @@ public class DeletedBlockLogImpl
           } catch (ContainerNotFoundException ex) {
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
+            addTxToTxSizeMap(txn);
           }
 
           if (lastProcessedTransactionId == keyValue.getKey()) {
