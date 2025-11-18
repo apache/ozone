@@ -31,6 +31,7 @@ import jakarta.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 
 /**
  * Utilities.
@@ -222,4 +224,40 @@ public final class S3Utils {
     return StringUtils.wrap(value, '\"');
   }
 
+  /**
+   * Validates that the x-amz-content-sha256 header matches the actual SHA-256 hash.
+   *
+   * @param headers the HTTP headers containing the x-amz-content-sha256 header
+   * @param actualSha256 the actual SHA-256 hash computed from the content
+   * @param isSignedPayload whether the payload is signed
+   * @param resource the resource path for error reporting
+   * @throws OS3Exception if the header is missing (for signed payloads) or mismatched
+   */
+  public static void validateXAmzContentSHA256Header(HttpHeaders headers, String actualSha256,
+                                                      boolean isSignedPayload, String resource)
+      throws OS3Exception {
+    final String expectedSha256 = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
+
+    // If header is missing
+    if (expectedSha256 == null) {
+      // Allow missing header only for unsigned payloads
+      if (isSignedPayload) {
+        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
+        ex.setErrorMessage("An error occurred (InvalidArgument): " +
+            "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");
+        throw ex;
+      }
+      return;
+    }
+
+    // Skip validation for unsigned or multi-chunks payloads
+    if (hasUnsignedPayload(expectedSha256) || hasMultiChunksPayload(expectedSha256)) {
+      return;
+    }
+
+    // Validate that expected and actual SHA-256 match
+    if (!expectedSha256.equals(actualSha256)) {
+      throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, resource);
+    }
+  }
 }
