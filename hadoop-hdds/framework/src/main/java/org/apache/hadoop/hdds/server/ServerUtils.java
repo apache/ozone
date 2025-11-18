@@ -346,7 +346,7 @@ public final class ServerUtils {
    * @return Path to existing old Ratis directory if found, null otherwise
    */
   private static String findExistingRatisDirectory(File metaDirPath,
-                                                   String componentName) {
+      String componentName) {
     // Check old shared Ratis location first (used by version 2.0.0 and earlier)
     // All components (OM, SCM) shared /data/metadata/ratis
     File oldSharedRatisDir = new File(metaDirPath, "ratis");

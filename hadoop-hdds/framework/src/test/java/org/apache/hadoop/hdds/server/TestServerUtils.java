@@ -302,4 +302,35 @@ public class TestServerUtils {
     }
   }
 
+  /**
+   * Test backward compatibility: old shared /ratis directory should be used
+   * when it exists and is non-empty (simulating upgrade from version 2.0.0).
+   */
+  @Test
+  public void testBackwardCompatibilityWithOldSharedRatisDir() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create old shared ratis directory with some files (simulating existing data)
+      assertTrue(oldSharedRatisDir.mkdirs());
+      File testFile = new File(oldSharedRatisDir, "test-file");
+      assertTrue(testFile.createNewFile());
+
+      // Test that all components use the old shared location
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+
+      // All should use the old shared location
+      assertEquals(oldSharedRatisDir.getPath(), scmRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), omRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), dnRatisDir);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
 }
