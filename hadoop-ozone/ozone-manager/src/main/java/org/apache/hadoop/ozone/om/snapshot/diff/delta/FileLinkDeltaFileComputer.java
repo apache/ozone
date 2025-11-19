@@ -49,7 +49,8 @@ import org.slf4j.LoggerFactory;
 /**
  * The {@code FileLinkDeltaFileComputer} is an abstract class that provides a
  * base implementation for the {@code DeltaFileComputer} interface. It is
- * responsible for computing delta files by creating hard links to the
+ * responsible for computing delta files (a list of files if read completely would be able to completely
+ * compute all the key changes between two snapshots). Hard links to the
  * relevant source files in a specified delta directory, enabling a compact
  * representation of changes between snapshots.
  *
@@ -63,16 +64,16 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
   private final OmSnapshotManager omSnapshotManager;
   private final OMMetadataManager activeMetadataManager;
   private final Consumer<SubStatus> activityReporter;
-  private Path deltaDir;
-  private AtomicInteger linkFileCounter = new AtomicInteger(0);
+  private final Path tmpDeltaFileLinkDir;
+  private final AtomicInteger linkFileCounter = new AtomicInteger(0);
 
   FileLinkDeltaFileComputer(OmSnapshotManager snapshotManager, OMMetadataManager activeMetadataManager,
       Path deltaDirPath, Consumer<SubStatus> activityReporter) throws IOException {
-    this.deltaDir = deltaDirPath.toAbsolutePath();
+    this.tmpDeltaFileLinkDir = deltaDirPath.toAbsolutePath();
     this.omSnapshotManager = snapshotManager;
     this.activityReporter = activityReporter;
     this.activeMetadataManager = activeMetadataManager;
-    createDirectories(deltaDir);
+    createDirectories(tmpDeltaFileLinkDir);
   }
 
   /**
@@ -100,7 +101,7 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
         fromSnapshot.getBucketName());
     return computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup,
         tablePrefixInfo).map(Map::values).orElseThrow(() -> new IOException(String.format(
-            "Failed to compute delta files for snapshots %s and %s tablesToLookup : %s", fromSnapshot, toSnapshot,
+            "Failed to compute delta files for snapshots %s and %s tablesToLookup: %s", fromSnapshot, toSnapshot,
         tablesToLookup)));
   }
 
@@ -119,11 +120,11 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
     String extension = getExtension(fileName.toString());
     extension = StringUtils.isBlank(extension) ? "" : ("." + extension);
     do {
-      link = deltaDir.resolve(linkFileCounter.incrementAndGet() + extension);
+      link = tmpDeltaFileLinkDir.resolve(linkFileCounter.incrementAndGet() + extension);
       try {
         Files.createLink(link, source);
         createdLink = true;
-      }  catch (FileAlreadyExistsException ignored) {
+      } catch (FileAlreadyExistsException ignored) {
         LOG.info("File for source {} already exists: at {}. Will attempt to create link with a different path", source,
             link);
       }
@@ -147,9 +148,9 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
 
   @Override
   public void close() throws IOException {
-    if (deltaDir == null || Files.notExists(deltaDir)) {
+    if (tmpDeltaFileLinkDir == null || Files.notExists(tmpDeltaFileLinkDir)) {
       return;
     }
-    deleteDirectory(deltaDir);
+    deleteDirectory(tmpDeltaFileLinkDir);
   }
 }
