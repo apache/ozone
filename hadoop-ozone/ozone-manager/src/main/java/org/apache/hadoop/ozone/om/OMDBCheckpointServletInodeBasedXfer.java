@@ -139,7 +139,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-    Set<String> receivedSstFiles = extractFilesToExclude(sstParam);
+    Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       tmpdir = Files.createTempDirectory(getBootstrapTempData().toPath(),
