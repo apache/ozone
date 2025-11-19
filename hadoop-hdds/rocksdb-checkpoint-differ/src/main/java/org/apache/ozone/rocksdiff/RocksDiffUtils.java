@@ -69,7 +69,6 @@ public final class RocksDiffUtils {
 
   /**
    * Filter sst files based on prefixes. The set of sst files to be filtered would be mutated.
-   * @param <T> Type of the key in the map.
    * @param filesToBeFiltered sst files to be filtered.
    * @param tablesToLookup Set of column families to be included in the diff.
    * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
