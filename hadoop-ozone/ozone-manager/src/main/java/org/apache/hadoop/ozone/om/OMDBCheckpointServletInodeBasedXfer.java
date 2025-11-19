@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCo
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
@@ -33,7 +32,6 @@ import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimat
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -226,18 +224,18 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             break;
           }
           shouldContinue = writeDBToArchive(sstFilesToExclude, snapshotDbPath,
-              maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
         }
 
 
         if (shouldContinue) {
           shouldContinue = writeDBToArchive(sstFilesToExclude, getSstBackupDir(),
-              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap);
         }
 
         if (shouldContinue) {
           shouldContinue = writeDBToArchive(sstFilesToExclude, getCompactionLogDir(),
-              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap);
         }
       }
 
@@ -249,14 +247,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         maxTotalSstSize.set(Long.MAX_VALUE);
         Path checkpointDir = checkpoint.getCheckpointLocation();
         writeDBToArchive(sstFilesToExclude, checkpointDir,
-            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
+            maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
         if (includeSnapshotData) {
           Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
           Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
           writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-              hardLinkFileMap, getCompactionLogDir(), false);
+              hardLinkFileMap, getCompactionLogDir());
           writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-              hardLinkFileMap, getSstBackupDir(), false);
+              hardLinkFileMap, getSstBackupDir());
           // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
           transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
               archiveOutputStream, hardLinkFileMap);
@@ -296,27 +294,18 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       try {
         // invalidate closes the snapshot DB
         om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
-        writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
-            hardLinkFileMap, false);
-        Path snapshotLocalPropertyYaml = Paths.get(
-            OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
-        if (Files.exists(snapshotLocalPropertyYaml)) {
-          File yamlFile = snapshotLocalPropertyYaml.toFile();
-          hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
-          linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
-        }
+        writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
       } finally {
         omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
       }
     }
   }
 
-  @VisibleForTesting
-  boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dir,
+  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dir,
       AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
-      Path tmpdir, Map<String, String> hardLinkFileMap, boolean onlySstFile) throws IOException {
+      Path tmpdir, Map<String, String> hardLinkFileMap) throws IOException {
     return writeDBToArchive(sstFilesToExclude, dir, maxTotalSstSize,
-        archiveOutputStream, tmpdir, hardLinkFileMap, null, onlySstFile);
+        archiveOutputStream, tmpdir, hardLinkFileMap, null);
   }
 
   private static void cleanupCheckpoint(DBCheckpoint checkpoint) {
@@ -406,21 +395,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param maxTotalSstSize Maximum total size of SST files to include
    * @param archiveOutputStream Archive output stream
    * @param tmpDir Temporary directory for processing
-   * @param hardLinkFileMap Map of hardlink file paths to their unique identifiers for deduplication
-   * @param destDir Destination directory for the archived files. If null,
-   * the archived files are not moved to this directory.
-   * @param onlySstFile If true, only SST files are processed. If false, all files are processed.
-   * <p>
-   * This parameter is typically set to {@code true} for initial iterations to
-   * prioritize SST file transfer, and then set to {@code false} only for the
-   * final iteration to ensure all remaining file types are transferred.
    * @return true if processing should continue, false if size limit reached
    * @throws IOException if an I/O error occurs
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean writeDBToArchive(Set<String> sstFilesToExclude, Path dbDir, AtomicLong maxTotalSstSize,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
-      Map<String, String> hardLinkFileMap, Path destDir, boolean onlySstFile) throws IOException {
+      Map<String, String> hardLinkFileMap, Path destDir) throws IOException {
     if (!Files.exists(dbDir)) {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
@@ -432,9 +412,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       Iterable<Path> iterable = files::iterator;
       for (Path dbFile : iterable) {
         if (!Files.isDirectory(dbFile)) {
-          if (onlySstFile && !dbFile.toString().endsWith(ROCKSDB_SST_SUFFIX)) {
-            continue;
-          }
           String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
           String path = dbFile.toFile().getAbsolutePath();
           if (destDir != null) {
