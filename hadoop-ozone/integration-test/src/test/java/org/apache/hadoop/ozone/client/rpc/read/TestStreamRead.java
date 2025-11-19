@@ -70,13 +70,12 @@ public class TestStreamRead {
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
 
   static final int BLOCK_SIZE = 128 << 20;
-  static final int BYTES_PER_CHECKSUM = 16 << 10;
 
-  static MiniOzoneCluster newCluster() throws Exception {
+  static MiniOzoneCluster newCluster(int bytesPerChecksum) throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
-    config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
+    config.setBytesPerChecksum(bytesPerChecksum);
     conf.setFromObject(config);
 
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
@@ -104,7 +103,8 @@ public class TestStreamRead {
 
   @Test
   void testReadKey() throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
+    try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
       cluster.waitForClusterToBeReady();
 
       System.out.println("XXX cluster ready");
@@ -130,7 +130,8 @@ public class TestStreamRead {
         for(int i = 0; i < n; i++) {
           final String keyName = "key" + i;
           System.out.println("XXX ---------------------------------------------------------");
-          System.out.printf("XXX %s with %s bytes%n", keyName, keySize);
+          System.out.printf("XXX %s with %s bytes and %s bytesPerChecksum%n",
+              keyName, keySize, bytesPerChecksum);
 
           final String md5 = createKey(bucket.delegate(), keyName, keySize, writeBufferSize);
           for(SizeInBytes readBufferSize : readBufferSizes) {
@@ -140,6 +141,13 @@ public class TestStreamRead {
         }
       }
     }
+  }
+
+  static void print(String name, long keySizeByte, long elapsedNanos, SizeInBytes bufferSize, String computedMD5) {
+    final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
+    final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
+    System.out.printf("XXX %16s: %8.2f MB/s (%7.3f s, buffer %16s, keySize %8.2f MB, md5=%s)%n",
+        name, keySizeMb/elapsedSeconds, elapsedSeconds, bufferSize, keySizeMb, computedMD5);
   }
 
   static String createKey(OzoneBucket bucket, String keyName, SizeInBytes keySize, SizeInBytes bufferSize) throws Exception {
@@ -160,18 +168,15 @@ public class TestStreamRead {
       }
     }
     final long elapsedNanos = System.nanoTime() - startTime;
-    final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
+
     final String computedMD5 = StringUtils.bytes2Hex(md5.digest());
-    final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
-    System.out.printf("XXX createStreamKey: %9.3f MB/s (%9.2f MB in %9.3f s with %20s buffer, md5=%s)%n",
-        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, bufferSize, computedMD5);
+    print("createStreamKey", keySizeByte, elapsedNanos, bufferSize, computedMD5);
     return computedMD5;
   }
 
   private void runTestReadKey(String keyName, SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5) throws Exception {
     final long keySizeByte = keySize.getSize();
     final MessageDigest md5 = MessageDigest.getInstance("MD5");
-    String computedMD5 = null;
     // Read the data fully into a large enough byte array
     final byte[] buffer = new byte[bufferSize.getSizeInt()];
     final long startTime = System.nanoTime();
@@ -191,13 +196,14 @@ public class TestStreamRead {
       assertEquals(keySizeByte, pos);
     }
     final long elapsedNanos = System.nanoTime() - startTime;
-    final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
-    if (expectedMD5 != null) {
+
+    final String computedMD5;
+    if (expectedMD5 == null) {
+      computedMD5 = null;
+    } else {
       computedMD5 = StringUtils.bytes2Hex(md5.digest());
       assertEquals(expectedMD5, computedMD5);
     }
-    final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
-    System.out.printf("XXX readStreamKey  : %9.3f MB/s (%9.2f MB in %9.3f s with %20s buffer, md5=%s)%n",
-        keySizeMb / elapsedSeconds, keySizeMb, elapsedSeconds, bufferSize, computedMD5);
+    print("readStreamKey", keySizeByte, elapsedNanos, bufferSize, computedMD5);
   }
 }

@@ -69,6 +69,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private final BlockID blockID;
   private final long blockLength;
   private final int responseDataSize;
+  private final long numPreReadResponses = 8L;
   private final int bytesPerChecksum;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
@@ -253,7 +254,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.getReadBlockCommand(
-        blockID, position, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+        blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -356,10 +357,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
       final long diff = position + length - requestedLength;
       if (diff > 0) {
-        final long rounded = roundUp(diff, responseDataSize) + 8L*responseDataSize;
-//        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}", position, length, requestedLength, diff, rounded);
-        readBlock(rounded);
-        requestedLength += rounded;
+        final long rounded = roundUp(diff, responseDataSize);
+        final long withPreRead = rounded + numPreReadResponses * responseDataSize;
+//        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}, withPreRead={}",
+//            position, length, requestedLength, diff, rounded, withPreRead);
+        readBlock(withPreRead);
+        requestedLength += withPreRead;
       }
 
       final ReadBlockResponseProto readBlock = poll();
@@ -457,7 +460,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       releaseResources();
     }
 
+//    private int i = 0;
     private void offerToQueue(ReadBlockResponseProto item) {
+//      LOG.info("XXX {} offerToQueue {} bytes, numChecksums {}, bytesPerChecksum={}",
+//          i++, item.getData().size(), item.getChecksumData().getChecksumsList().size(), item.getChecksumData().getBytesPerChecksum());
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);
     }

@@ -80,11 +80,13 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
         inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
         LOG.info("XXX writeRandomBytes {} bytes", inputData.length);
 
-        runTestReadKey(keyName, DATA_LENGTH);
+        for (int i = 1; i <= 10; i++) {
+          runTestReadKey(keyName, DATA_LENGTH/i);
+        }
 
-        runTestReadKey(keyName, DATA_LENGTH/5);
-
-        runTestReadKey(keyName, 4 << 10); // 4kB
+        for (int n = 4; n <= 16 << 10; n <<= 2) {
+          runTestReadKey(keyName, n << 10); // 4kB
+        }
       }
     }
   }
@@ -92,7 +94,6 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   private void runTestReadKey(String key, int bufferSize) throws Exception {
     LOG.info("XXX ---------------------------------------------------------");
     LOG.info("XXX read {} bytes with bufferSize {}", DATA_LENGTH, bufferSize);
-    LOG.info("XXX ---------------------------------------------------------");
     // Read the data fully into a large enough byte array
     final byte[] buffer = new byte[bufferSize];
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
