@@ -445,12 +445,22 @@ public class SnapshotDefragService extends BackgroundService
     }
   }
 
+  /**
+   * Atomically switches the snapshot database to a new version by moving the
+   * checkpoint directory to the next version directory and updating relevant
+   * metadata. Ensures data consistency and manages cleanup of older versions.
+   *
+   * @param snapshotId Unique identifier of the snapshot to switch.
+   * @param checkpointPath Path to the checkpoint directory that will be moved
+   *                       to the new version directory.
+   * @throws IOException If an error occurs during directory operations,
+   *                     metadata management, lock acquisition, or database access.
+   */
   private void atomicSwitchSnapshotDB(UUID snapshotId, Path checkpointPath) throws IOException {
+    int previousVersion;
     try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
              snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
       OmSnapshotLocalData localData = snapshotLocalDataProvider.getSnapshotLocalData();
-      Path currentVersionPath = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId,
-          localData.getVersion());
       Path nextVersionPath = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId,
           localData.getVersion() + 1);
       // Remove the directory if it exists.
@@ -467,16 +477,35 @@ public class SnapshotDefragService extends BackgroundService
         snapshotLocalDataProvider.addSnapshotVersion(newVersionCheckpointStore);
         snapshotLocalDataProvider.commit();
       }
+      previousVersion = localData.getVersion() - 1;
+    }
 
-      // Acquire Snapshot DBHandle lock before removing the older version to ensure all readers are done with the
-      // snapshot db use.
-      try (UncheckedAutoCloseableSupplier<OMLockDetails> lock =
-               ozoneManager.getOmSnapshotManager().getSnapshotCache().lock(snapshotId)) {
-        if (!lock.get().isLockAcquired()) {
-          throw new IOException("Failed to acquire dbHandlelock on snapshot: " + snapshotId);
-        }
-        // Delete the previous version directory since the direcory has been switched successfully.
-        deleteDirectory(currentVersionPath);
+    // Binary search smallest existing version and delete the older versions starting from the smallest version. This
+    // is to ensure efficient crash recovery.
+    int smallestExistingVersion = 0;
+    int largestExistingVersion = previousVersion;
+    while (smallestExistingVersion <= largestExistingVersion) {
+      int midVersion = smallestExistingVersion + (largestExistingVersion - smallestExistingVersion) / 2;
+      Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, midVersion);
+      if (path.toFile().exists()) {
+        largestExistingVersion = midVersion - 1;
+      } else {
+        smallestExistingVersion = midVersion + 1;
+      }
+    }
+
+    // Acquire Snapshot DBHandle lock before removing the older version to ensure all readers are done with the
+    // snapshot db use.
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lock =
+             ozoneManager.getOmSnapshotManager().getSnapshotCache().lock(snapshotId)) {
+      if (!lock.get().isLockAcquired()) {
+        throw new IOException("Failed to acquire dbHandlelock on snapshot: " + snapshotId);
+      }
+      // Delete the older version directories. Always starting deletes from smallest version to largest version to
+      // ensure binary search works correctly on a later basis.
+      for (int version = smallestExistingVersion; version <= previousVersion; version++) {
+        Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, version);
+        deleteDirectory(path);
       }
     }
   }
@@ -524,6 +553,7 @@ public class SnapshotDefragService extends BackgroundService
       } catch (Exception e) {
         throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
       }
+      // This will recreate the column families in the checkpoint.
       return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint, false);
     }
   }
