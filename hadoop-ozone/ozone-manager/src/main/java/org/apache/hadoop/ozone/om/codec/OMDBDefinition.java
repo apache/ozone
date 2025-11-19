@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -359,14 +357,6 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  public static List<String> getAllColumnFamilies() {
-    List<String> columnFamilies = new ArrayList<>();
-    COLUMN_FAMILIES.values().forEach(cf -> {
-      columnFamilies.add(cf.getName());
-    });
-    return columnFamilies;
   }
 }
 
