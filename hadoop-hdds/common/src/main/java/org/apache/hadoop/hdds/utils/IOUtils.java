@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -129,7 +128,6 @@ public final class IOUtils {
    * @param file File whose INode is to be retrieved.
    * @return INode for file.
    */
-  @VisibleForTesting
   public static Object getINode(Path file) throws IOException {
     return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }

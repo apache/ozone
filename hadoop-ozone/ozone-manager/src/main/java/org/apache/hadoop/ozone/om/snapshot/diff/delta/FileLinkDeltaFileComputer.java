@@ -63,8 +63,8 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
   private final OmSnapshotManager omSnapshotManager;
   private final OMMetadataManager activeMetadataManager;
   private final Consumer<SubStatus> activityReporter;
-  private Path deltaDir;
-  private AtomicInteger linkFileCounter = new AtomicInteger(0);
+  private final Path deltaDir;
+  private final AtomicInteger linkFileCounter = new AtomicInteger(0);
 
   FileLinkDeltaFileComputer(OmSnapshotManager snapshotManager, OMMetadataManager activeMetadataManager,
       Path deltaDirPath, Consumer<SubStatus> activityReporter) throws IOException {
@@ -100,7 +100,7 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
         fromSnapshot.getBucketName());
     return computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup,
         tablePrefixInfo).map(Map::values).orElseThrow(() -> new IOException(String.format(
-            "Failed to compute delta files for snapshots %s and %s tablesToLookup : %s", fromSnapshot, toSnapshot,
+            "Failed to compute delta files for snapshots %s and %s tablesToLookup: %s", fromSnapshot, toSnapshot,
         tablesToLookup)));
   }
 
@@ -123,7 +123,7 @@ public abstract class FileLinkDeltaFileComputer implements DeltaFileComputer {
       try {
         Files.createLink(link, source);
         createdLink = true;
-      }  catch (FileAlreadyExistsException ignored) {
+      } catch (FileAlreadyExistsException ignored) {
         LOG.info("File for source {} already exists: at {}. Will attempt to create link with a different path", source,
             link);
       }
