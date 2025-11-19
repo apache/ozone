@@ -307,6 +307,7 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslat
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -381,6 +382,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final ReconfigurationHandler reconfigurationHandler;
   private OzoneDelegationTokenSecretManager delegationTokenMgr;
+  private STSTokenSecretManager stsTokenSecretManager;
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private SecretKeyClient secretKeyClient;
@@ -965,6 +967,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
       try {
         delegationTokenMgr = createDelegationTokenSecretManager(configuration);
+        stsTokenSecretManager = createSTSTokenSecretManager();
       } catch (IllegalArgumentException e) {
         if (metadataManager != null) {
           // to avoid the unit test leak report failure
@@ -1240,6 +1243,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new OzoneBlockTokenSecretManager(expiryTime, secretKeyClient);
   }
 
+  private STSTokenSecretManager createSTSTokenSecretManager() {
+    return new STSTokenSecretManager(secretKeyClient);
+  }
+
   private void stopSecretManager() {
     if (secretKeyClient != null) {
       LOG.info("Stopping secret key client.");
@@ -1253,6 +1260,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } catch (IOException e) {
         LOG.error("Failed to stop delegation token manager", e);
       }
+    }
+
+    if (stsTokenSecretManager != null) {
+      // STS token secret manager doesn't need explicit stop method
+      // as it uses the shared secret key client
+      LOG.info("Stopping OM STS token secret manager.");
     }
   }
 
@@ -1331,6 +1344,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     if (delegationTokenMgr != null) {
       delegationTokenMgr.setSecretKeyClient(secretKeyClient);
+    }
+    if (stsTokenSecretManager != null) {
+      stsTokenSecretManager.setSecretKeyClient(secretKeyClient);
     }
   }
 
@@ -4500,6 +4516,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OzoneDelegationTokenSecretManager getDelegationTokenMgr() {
     return delegationTokenMgr;
+  }
+
+  public STSTokenSecretManager getSTSTokenSecretManager() {
+    return stsTokenSecretManager;
   }
 
   /**

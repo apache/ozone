@@ -46,6 +46,9 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   private String secretAccessKey;
   private String sessionPolicy;
 
+  // Encryption key derived from ManagedSecretKey for this token
+  private transient byte[] encryptionKey;
+
   // Service name for STS tokens
   public static final String STS_SERVICE = "STS";
 
@@ -66,14 +69,16 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * @param secretAccessKey     the secret access key associated with the temporary access key ID
    * @param sessionPolicy       an optional opaque identifier that further limits the scope of
    *                            the permissions granted by the role
+   * @param encryptionKey       the key bytes for encrypting sensitive fields
    */
   public STSTokenIdentifier(String tempAccessKeyId, String originalAccessKeyId, String roleArn, Instant expiry,
-      String secretAccessKey, String sessionPolicy) {
+      String secretAccessKey, String sessionPolicy, byte[] encryptionKey) {
     super(tempAccessKeyId, expiry);
     this.originalAccessKeyId = originalAccessKeyId;
     this.roleArn = roleArn;
     this.secretAccessKey = secretAccessKey;
     this.sessionPolicy = sessionPolicy;
+    this.encryptionKey = encryptionKey != null ? encryptionKey.clone() : null;
   }
 
   @Override

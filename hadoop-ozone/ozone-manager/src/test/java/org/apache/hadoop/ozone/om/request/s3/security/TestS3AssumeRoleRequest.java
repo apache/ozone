@@ -18,12 +18,20 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.UUID;
 import java.util.regex.Pattern;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -34,6 +42,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.security.STSTokenSecretManager;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -50,10 +60,26 @@ public class TestS3AssumeRoleRequest {
   private ExecutionContext context;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class);
+
+    final SecretKeySignerClient secretKeyClient = mock(SecretKeySignerClient.class);
+    final ManagedSecretKey managedSecretKey = mock(ManagedSecretKey.class);
+    final SecretKey secretKey = new SecretKeySpec(
+        "testSecretKey".getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+    final UUID secretKeyId = UUID.randomUUID();
+
+    when(secretKeyClient.getCurrentSecretKey()).thenReturn(managedSecretKey);
+    when(managedSecretKey.getSecretKey()).thenReturn(secretKey);
+    when(managedSecretKey.getId()).thenReturn(secretKeyId);
+    when(managedSecretKey.sign(any(TokenIdentifier.class))).thenReturn(
+        "signature".getBytes(StandardCharsets.UTF_8));
+
+    final STSTokenSecretManager stsTokenSecretManager = new STSTokenSecretManager(secretKeyClient);
+
     when(ozoneManager.getOmRpcServerAddr()).thenReturn(
         new InetSocketAddress("localhost", 9876));
+    when(ozoneManager.getSTSTokenSecretManager()).thenReturn(stsTokenSecretManager);
     context = ExecutionContext.of(1L, null);
   }
 

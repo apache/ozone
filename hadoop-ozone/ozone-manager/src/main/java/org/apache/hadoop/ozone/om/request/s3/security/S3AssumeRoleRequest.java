@@ -103,7 +103,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       final String secretAccessKey = generateSecureRandomStringUsingChars(
           CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
       final String sessionToken = generateSessionToken(
-          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey);
+          targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId);
 
       // Generate AssumedRoleId for response
       final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
@@ -159,15 +159,15 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    * Generates session token using components from the AssumeRoleRequest.
    */
   private String generateSessionToken(String targetRoleName, OMRequest omRequest,
-      OzoneManager ozoneManager, AssumeRoleRequest assumeRoleRequest, String secretAccessKey) throws IOException {
+      OzoneManager ozoneManager, AssumeRoleRequest assumeRoleRequest, String secretAccessKey,
+      String tempAccessKeyId) throws IOException {
 
     InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
     if (remoteIp == null) {
       remoteIp = ozoneManager.getOmRpcServerAddr().getAddress();
     }
 
-    final String hostName = remoteIp != null ? remoteIp.getHostName() :
-        ozoneManager.getOmRpcServerAddr().getHostName();
+    final String hostName = remoteIp != null ? remoteIp.getHostName() : ozoneManager.getOmRpcServerAddr().getHostName();
 
     // Determine the caller's access key ID - this will be referred to as the original
     // access key id.  When STS tokens are used, the tokens will be authorized as
@@ -183,18 +183,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
         ozoneManager, originalAccessKeyId, assumeRoleRequest.getAwsIamSessionPolicy(), hostName, remoteIp, ugi,
         targetRoleName);
 
-    // TODO sts - generate a real STS token in a future PR that incorporates the components above
-    final StringBuilder builder = new StringBuilder();
-    builder.append(originalAccessKeyId);
-    builder.append(':');
-    builder.append(roleArn);
-    builder.append(':');
-    builder.append(assumeRoleRequest.getDurationSeconds());
-    builder.append(':');
-    builder.append(secretAccessKey);
-    builder.append(':');
-    builder.append(sessionPolicy);
-    return builder.toString();
+    return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
+        tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
+        sessionPolicy);
   }
 
   /**
