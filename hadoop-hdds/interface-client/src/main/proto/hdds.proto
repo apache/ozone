@@ -514,6 +514,13 @@ message DeletedBlocksTransactionInfo {
     optional int32 count = 4;
 }
 
+message DeletedBlocksTransactionSummary {
+    optional uint64 totalTransactionCount = 1;
+    optional uint64 totalBlockCount = 2;
+    optional uint64 totalBlockSize = 3;
+    optional uint64 totalBlockReplicatedSize = 4;
+}
+
 message CompactionFileInfoProto {
     optional string fileName = 1;
     optional string startKey = 2;
