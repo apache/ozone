@@ -810,15 +810,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-      SnapshotInfo snapshotInfo) {
-    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
-  }
-
-  public static String getSnapshotPath(OzoneConfiguration conf,
-      String checkpointDirName) {
+                                       SnapshotInfo snapshotInfo) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + checkpointDirName;
+        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
