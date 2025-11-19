@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -163,10 +164,18 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
               .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotMoveTableKeys).build(),
           snapshotInfo1, nextSnapshotExists ? snapshotInfo2 : null, omBucketInfo.getObjectID(), deletedTable,
           deletedDirTable, renamedTable);
-      try (BatchOperation batchOperation = getOmMetadataManager().getStore().initBatchOperation()) {
-        response.addToDBBatch(getOmMetadataManager(), batchOperation);
-        getOmMetadataManager().getStore().commitBatchOperation(batchOperation);
-      }
+      CompletableFuture<Void> future = new CompletableFuture<>();
+      CompletableFuture.runAsync(() -> {
+        try (BatchOperation batchOperation = getOmMetadataManager().getStore().initBatchOperation()) {
+          response.addToDBBatch(getOmMetadataManager(), batchOperation);
+          getOmMetadataManager().getStore().commitBatchOperation(batchOperation);
+        } catch (IOException e) {
+          future.completeExceptionally(e);
+          return;
+        }
+        future.complete(null);
+      });
+      future.get();
       assertEquals(expectedSnapshotIdLocks, locks);
       Assertions.assertTrue(snapshot.getMetadataManager().getDeletedTable().isEmpty());
       Assertions.assertTrue(snapshot.getMetadataManager().getDeletedDirTable().isEmpty());

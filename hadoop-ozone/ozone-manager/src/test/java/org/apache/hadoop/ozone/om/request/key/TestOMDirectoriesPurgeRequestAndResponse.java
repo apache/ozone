@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -617,13 +618,21 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     validateDeletedKeys(omMetadataManager, deletedKeyNames);
   }
 
-  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse) throws IOException {
-    try (BatchOperation batchOperation =
-             omMetadataManager.getStore().initBatchOperation()) {
-      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-      // Do manual commit and see whether addToBatch is successful or not.
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
+  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse)
+      throws ExecutionException, InterruptedException {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture.runAsync(() -> {
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+        // Do manual commit and see whether addToBatch is successful or not.
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      } catch (IOException e) {
+        future.completeExceptionally(e);
+        return;
+      }
+      future.complete(null);
+    });
+    future.get();
   }
 
   @Nonnull

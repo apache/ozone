@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -165,18 +166,23 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setCmdType(Type.PurgeKeys)
         .setStatus(Status.OK)
         .build();
+    CompletableFuture<OMResponse> future = new CompletableFuture<>();
+    CompletableFuture.runAsync(() -> {
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
+            omResponse, deleteKeysAndRenamedEntry.getKey(), deleteKeysAndRenamedEntry.getValue(), null,
+            null, null);
+        omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
-    try (BatchOperation batchOperation =
-        omMetadataManager.getStore().initBatchOperation()) {
-
-      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-          omResponse, deleteKeysAndRenamedEntry.getKey(), deleteKeysAndRenamedEntry.getValue(), null,
-          null, null);
-      omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-      // Do manual commit and see whether addToBatch is successful or not.
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
+        // Do manual commit and see whether addToBatch is successful or not.
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      } catch (IOException e) {
+        future.completeExceptionally(e);
+        return;
+      }
+      future.complete(null);
+    });
+    future.get();
 
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deleteKeysAndRenamedEntry.getKey()) {
