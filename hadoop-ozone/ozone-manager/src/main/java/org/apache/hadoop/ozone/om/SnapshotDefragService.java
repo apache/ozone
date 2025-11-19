@@ -480,8 +480,8 @@ public class SnapshotDefragService extends BackgroundService
       previousVersion = localData.getVersion() - 1;
     }
 
-    // Binary search smallest existing version and delete the older versions starting from the smallest version. This
-    // is to ensure efficient crash recovery.
+    // Binary search smallest existing version and delete the older versions starting from the smallest version.
+    // This is to ensure efficient crash recovery.
     int smallestExistingVersion = 0;
     int largestExistingVersion = previousVersion;
     while (smallestExistingVersion <= largestExistingVersion) {
