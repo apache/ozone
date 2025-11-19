@@ -216,8 +216,10 @@ public class TestOMTenantCreateRequest {
 
       OMException omException = assertThrows(OMException.class,
           () -> doPreExecute(tenantId));
-      assertEquals("Invalid volume name: " + tenantId,
-          omException.getMessage());
+      assertEquals(
+          "volume name has an unsupported character : _",
+          omException.getMessage()
+      );
     }
   }
 

@@ -184,6 +184,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
@@ -679,6 +680,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getLayoutVersion());
+    VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         finalizationExecutor;
@@ -1805,6 +1807,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SCMHAManager.
    */
+  @Override
   public SCMHAManager getScmHAManager() {
     return scmHAManager;
   }
@@ -1957,6 +1960,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SequenceIdGen.
    */
+  @Override
   public SequenceIdGenerator getSequenceIdGen() {
     return sequenceIdGen;
   }
@@ -1995,6 +1999,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Returns the SCM metadata Store.
    * @return SCMMetadataStore
    */
+  @Override
   public SCMMetadataStore getScmMetadataStore() {
     return scmMetadataStore;
   }

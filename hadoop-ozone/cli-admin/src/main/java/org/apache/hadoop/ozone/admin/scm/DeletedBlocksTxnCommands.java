@@ -17,36 +17,20 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.admin.OzoneAdmin;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
- * Subcommand for admin operations related to SCM.
+ * Subcommand to group container related operations.
  */
 @CommandLine.Command(
-    name = "scm",
-    description = "Ozone Storage Container Manager specific admin operations",
+    name = "deletedBlocksTxn",
+    description = "SCM deleted blocks transaction specific operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        GetScmRatisRolesSubcommand.class,
-        FinalizeScmUpgradeSubcommand.class,
-        FinalizationScmStatusSubcommand.class,
-        TransferScmLeaderSubCommand.class,
-        DecommissionScmSubcommand.class,
-        RotateKeySubCommand.class,
-        DeletedBlocksTxnCommands.class
+        GetDeletedBlockSummarySubcommand.class,
     })
-@MetaInfServices(AdminSubcommand.class)
-public class ScmAdmin implements AdminSubcommand {
+public class DeletedBlocksTxnCommands {
 
-  @CommandLine.ParentCommand
-  private OzoneAdmin parent;
-
-  public OzoneAdmin getParent() {
-    return parent;
-  }
 }

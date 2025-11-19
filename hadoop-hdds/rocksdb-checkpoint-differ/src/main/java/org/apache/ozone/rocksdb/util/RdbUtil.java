@@ -17,11 +17,11 @@
 
 package org.apache.ozone.rocksdb.util;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +57,7 @@ public final class RdbUtil {
     Map<Object, SstFileInfo> inodeToSstMap = new HashMap<>();
     for (LiveFileMetaData lfm : liveSSTFilesForCFs) {
       Path sstFilePath = Paths.get(lfm.path(), lfm.fileName());
-      Object inode = Files.readAttributes(sstFilePath, BasicFileAttributes.class).fileKey();
+      Object inode = getINode(sstFilePath);
       inodeToSstMap.put(inode, new SstFileInfo(lfm));
     }
     return inodeToSstMap;

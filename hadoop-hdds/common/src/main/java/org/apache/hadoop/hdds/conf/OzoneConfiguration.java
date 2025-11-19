@@ -209,11 +209,16 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
     }
   }
 
-  /** Add default resources. */
-  public static void activate() {
-    // core-default and core-site are added by parent class
-    addDefaultResource("hdfs-default.xml");
-    addDefaultResource("hdfs-site.xml");
+  public static List<String> getConfigurationResourceFiles() {
+    List<String> resourceFiles = new ArrayList<>();
+
+    // even though core-default and core-site are added by the parent Configuration class,
+    // we add it here for them to be a part of the resourceFiles list.
+    // addDefaultResource is idempotent so any duplicate items in this list will be handled accordingly
+    resourceFiles.add("hdfs-default.xml");
+    resourceFiles.add("hdfs-site.xml");
+    resourceFiles.add("core-default.xml");
+    resourceFiles.add("core-site.xml");
 
     // Modules with @Config annotations.  If new one is introduced, add it to this list.
     String[] modules = new String[] {
@@ -228,12 +233,21 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
         "ozone-recon",
     };
     for (String module : modules) {
-      addDefaultResource(module + "-default.xml");
+      resourceFiles.add(module + "-default.xml");
     }
 
     // Non-generated configs
-    addDefaultResource("ozone-default.xml");
-    addDefaultResource("ozone-site.xml");
+    resourceFiles.add("ozone-default.xml");
+    resourceFiles.add("ozone-site.xml");
+
+    return resourceFiles;
+  }
+
+  /** Add default resources. */
+  public static void activate() {
+    for (String resourceFile : getConfigurationResourceFiles()) {
+      addDefaultResource(resourceFile);
+    }
   }
 
   /**

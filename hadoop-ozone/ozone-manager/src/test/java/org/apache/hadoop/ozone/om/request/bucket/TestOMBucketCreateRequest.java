@@ -66,7 +66,9 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     // Verify invalid bucket name throws exception
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("volume1", "b1"));
-    assertEquals("Invalid bucket name: b1", omException.getMessage());
+    assertEquals(
+        "bucket name 'b1' is too short, valid length is 3-63 characters",
+        omException.getMessage());
   }
 
   @Test
@@ -330,7 +332,10 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         String bucketName) {
     Throwable e = assertThrows(OMException.class, () ->
         doPreExecute(volumeName, bucketName));
-    assertEquals(e.getMessage(), "Invalid bucket name: " + bucketName);
+    assertEquals(
+        "bucket name has an unsupported character : _",
+        e.getMessage()
+    );
   }
 
   protected OMBucketCreateRequest doPreExecute(String volumeName,

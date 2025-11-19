@@ -21,8 +21,7 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +36,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClientBuilder;
 import picocli.CommandLine;
 
 /**
@@ -120,14 +115,18 @@ public class LogSubcommand extends BaseInsightSubCommand
 
   private void streamLog(OzoneConfiguration conf, Component logComponent,
       List<LoggerSource> loggers, Predicate<String> filter) {
-    HttpClient client = HttpClientBuilder.create().build();
-
-    HttpGet get = new HttpGet(getHost(conf, logComponent) + "/logstream");
+    String url = getHost(conf, logComponent) + "/logstream";
     try {
-      HttpResponse execute = client.execute(get);
-      try (BufferedReader bufferedReader = new BufferedReader(
-          new InputStreamReader(execute.getEntity().getContent(),
-              StandardCharsets.UTF_8))) {
+      HttpURLConnection httpURLConnection = InsightHttpUtils.openConnection(url, conf);
+      if (httpURLConnection == null) {
+        throw new RuntimeException("Failed to connect to " + url);
+      }
+      
+      try (BufferedReader bufferedReader = 
+          InsightHttpUtils.getResponseReader(httpURLConnection)) {
+        if (bufferedReader == null) {
+          throw new RuntimeException("Failed to get response from " + url);
+        }
         bufferedReader.lines()
             .filter(line -> {
               for (LoggerSource logger : loggers) {
@@ -168,19 +167,21 @@ public class LogSubcommand extends BaseInsightSubCommand
 
   private void setLogLevel(OzoneConfiguration conf, String name,
       Component component, LoggerSource.Level level) {
-    HttpClient client = HttpClientBuilder.create().build();
-
     String request = String
         .format("/logLevel?log=%s&level=%s", name,
             level);
     String hostName = getHost(conf, component);
-    HttpGet get = new HttpGet(hostName + request);
+    String url = hostName + request;
     try {
-      HttpResponse execute = client.execute(get);
-      if (execute.getStatusLine().getStatusCode() != 200) {
+      HttpURLConnection httpURLConnection = InsightHttpUtils.openConnection(url, conf);
+      if (httpURLConnection == null) {
+        throw new RuntimeException("Failed to connect to " + url);
+      }
+      
+      int responseCode = httpURLConnection.getResponseCode();
+      if (responseCode != 200) {
         throw new RuntimeException(
-            "Can't set the log level: " + hostName + " -> HTTP " + execute
-                .getStatusLine().getStatusCode());
+            "Can't set the log level: " + hostName + " -> HTTP " + responseCode);
       }
     } catch (IOException e) {
       throw new RuntimeException(e);

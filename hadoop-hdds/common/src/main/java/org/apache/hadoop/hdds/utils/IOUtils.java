@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
@@ -118,5 +120,15 @@ public final class IOUtils {
       props.load(in);
     }
     return props;
+  }
+
+  /**
+   * Get the INode for file.
+   *
+   * @param file File whose INode is to be retrieved.
+   * @return INode for file.
+   */
+  public static Object getINode(Path file) throws IOException {
+    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }
 }
