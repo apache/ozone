@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.container.common.transport.server.GrpcXceiverService;
 import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
     GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
     GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
+    GenericTestUtils.setLogLevel( GrpcXceiverService.class, Level.ERROR);
   }
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster

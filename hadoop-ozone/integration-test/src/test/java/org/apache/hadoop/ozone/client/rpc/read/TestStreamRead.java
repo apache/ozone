@@ -102,8 +102,24 @@ public class TestStreamRead {
   private TestBucket bucket;
 
   @Test
-  void testReadKey() throws Exception {
+  void testReadKey512() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
+    runTestReadKey(bytesPerChecksum);
+  }
+
+  @Test
+  void testReadKey16k() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
+    runTestReadKey(bytesPerChecksum);
+  }
+
+  @Test
+  void testReadKey256k() throws Exception {
+    final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
+    runTestReadKey(bytesPerChecksum);
+  }
+
+  void runTestReadKey(SizeInBytes bytesPerChecksum) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
       cluster.waitForClusterToBeReady();
 
@@ -116,11 +132,12 @@ public class TestStreamRead {
       copy.setFromObject(clientConfig);
 
       final int n = 10;
-      final SizeInBytes writeBufferSize = SizeInBytes.valueOf("1MB");
+      final SizeInBytes writeBufferSize = SizeInBytes.valueOf("8MB");
       final SizeInBytes[] readBufferSizes = {
           SizeInBytes.valueOf("4k"),
-          SizeInBytes.valueOf("256k"),
           SizeInBytes.valueOf("1M"),
+          SizeInBytes.valueOf("8M"),
+          SizeInBytes.valueOf("32M"),
       };
       final SizeInBytes keySize = SizeInBytes.valueOf("1G");
 
@@ -151,23 +168,27 @@ public class TestStreamRead {
   }
 
   static String createKey(OzoneBucket bucket, String keyName, SizeInBytes keySize, SizeInBytes bufferSize) throws Exception {
-    final long keySizeByte = keySize.getSize();
-    final ThreadLocalRandom random = ThreadLocalRandom.current();
-    final MessageDigest md5 = MessageDigest.getInstance("MD5");
-
     final byte[] buffer = new byte[bufferSize.getSizeInt()];
+    ThreadLocalRandom.current().nextBytes(buffer);
+
+    final long keySizeByte = keySize.getSize();
     final long startTime = System.nanoTime();
     try (OutputStream stream = bucket.createStreamKey(keyName, keySizeByte,
         RatisReplicationConfig.getInstance(THREE), Collections.emptyMap())) {
       for(long pos = 0; pos < keySizeByte; ) {
-        random.nextBytes(buffer);
         final int writeSize = Math.toIntExact(Math.min(buffer.length, keySizeByte - pos));
         stream.write(buffer, 0, writeSize);
-        md5.update(buffer, 0, writeSize);
         pos += writeSize;
       }
     }
     final long elapsedNanos = System.nanoTime() - startTime;
+
+    final MessageDigest md5 = MessageDigest.getInstance("MD5");
+    for(long pos = 0; pos < keySizeByte; ) {
+      final int writeSize = Math.toIntExact(Math.min(buffer.length, keySizeByte - pos));
+      md5.update(buffer, 0, writeSize);
+      pos += writeSize;
+    }
 
     final String computedMD5 = StringUtils.bytes2Hex(md5.digest());
     print("createStreamKey", keySizeByte, elapsedNanos, bufferSize, computedMD5);

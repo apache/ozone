@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
@@ -98,6 +99,15 @@ public class GrpcXceiverService extends
       StreamObserver<ContainerCommandResponseProto> responseObserver) {
     return new StreamObserver<ContainerCommandRequestProto>() {
       private final AtomicBoolean isClosed = new AtomicBoolean(false);
+      private final RandomAccessBlockFile blockFile = new RandomAccessBlockFile();
+
+      boolean close() {
+        if (isClosed.compareAndSet(false, true)) {
+          blockFile.close();
+          return true;
+        }
+        return false;
+      }
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
@@ -108,8 +118,8 @@ public class GrpcXceiverService extends
 
         try {
           if (request.getCmdType() == Type.ReadBlock) {
-            LOG.info("XXX server received onNext request {}", TextFormat.shortDebugString(request.getReadBlock()));
-            dispatcher.streamDataReadOnly(request, responseObserver, null);
+//            LOG.info("XXX server received onNext request {}", TextFormat.shortDebugString(request.getReadBlock()));
+            dispatcher.streamDataReadOnly(request, responseObserver, blockFile, context);
           } else {
             final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
             responseObserver.onNext(resp);
@@ -117,7 +127,7 @@ public class GrpcXceiverService extends
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
                     + " ContainerCommandRequestProto {}", request, e);
-          isClosed.set(true);
+          close();
           responseObserver.onError(e);
         } finally {
           zeroCopyMessageMarshaller.release(request);
@@ -129,10 +139,11 @@ public class GrpcXceiverService extends
 
       @Override
       public void onError(Throwable t) {
+        close();
         if (t instanceof StatusRuntimeException) {
           if (((StatusRuntimeException) t).getStatus().getCode() == Status.Code.CANCELLED) {
             return;
-          };
+          }
         }
 
         // for now we just log a msg
@@ -141,7 +152,7 @@ public class GrpcXceiverService extends
 
       @Override
       public void onCompleted() {
-        if (isClosed.compareAndSet(false, true)) {
+        if (close()) {
           LOG.debug("ContainerCommand send completed");
           responseObserver.onCompleted();
         }

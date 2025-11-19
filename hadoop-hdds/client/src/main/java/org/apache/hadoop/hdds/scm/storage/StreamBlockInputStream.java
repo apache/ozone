@@ -69,7 +69,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private final BlockID blockID;
   private final long blockLength;
   private final int responseDataSize;
-  private final long numPreReadResponses = 8L;
+  private final long preReadSize = 32 << 20;
   private final int bytesPerChecksum;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
@@ -357,12 +357,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
       final long diff = position + length - requestedLength;
       if (diff > 0) {
-        final long rounded = roundUp(diff, responseDataSize);
-        final long withPreRead = rounded + numPreReadResponses * responseDataSize;
+        final long rounded = roundUp(diff + preReadSize, responseDataSize);
 //        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}, withPreRead={}",
 //            position, length, requestedLength, diff, rounded, withPreRead);
-        readBlock(withPreRead);
-        requestedLength += withPreRead;
+        readBlock(rounded);
+        requestedLength += rounded;
       }
 
       final ReadBlockResponseProto readBlock = poll();

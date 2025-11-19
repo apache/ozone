@@ -70,9 +70,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,7 +78,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -148,6 +145,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
@@ -170,7 +168,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2060,7 +2057,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
-      DispatcherContext dispatcherContext,
+      RandomAccessBlockFile blockFile,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
@@ -2077,18 +2074,21 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final ReadBlockRequestProto readBlock = request.getReadBlock();
-      int responseDataSize =  readBlock.getResponseDataSize();
+      int responseDataSize = readBlock.getResponseDataSize();
       if (responseDataSize == 0) {
         responseDataSize = 256 << 10;
       }
 //      LOG.info("XXX server readBlock {}", TextFormat.shortDebugString(readBlock));
 
       BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+      if (!blockFile.isOpen()) {
+        final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
+        blockFile.open(file);
+      }
+
       // This is a new api the block should always be checked.
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
-
-      File blockFile = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
 
       BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
       List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
@@ -2111,14 +2111,13 @@ public class KeyValueHandler extends Handler {
       // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
       // it simplifies the code to always do this.
       long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % bytesPerChecksum;
-      try (RandomAccessFile file = new RandomAccessFile(blockFile, "r");
-           FileChannel channel = file.getChannel()) {
+      {
         final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
-        channel.position(adjustedOffset);
+        blockFile.position(adjustedOffset);
         int totalDataLength = 0;
         int numResponses = 0;
-        final int numChecksums = responseDataSize /  bytesPerChecksum;
-        while (totalDataLength < readBlock.getLength() && channel.read(buffer) != -1) {
+        final int numChecksums = responseDataSize / bytesPerChecksum;
+        while (totalDataLength < readBlock.getLength() && blockFile.read(buffer) != -1) {
           buffer.flip();
           if (checksumType != ContainerProtos.ChecksumType.NONE) {
             final List<ByteString> checksums = new ArrayList<>(numChecksums);
@@ -2133,18 +2132,6 @@ public class KeyValueHandler extends Handler {
               final ContainerProtos.ChunkInfo chunk = blockData.getChunks().get(chunkIndex);
               Preconditions.checkState(chunk.getChecksumData().getBytesPerChecksum() == bytesPerChecksum);
               final ByteString checksum = chunk.getChecksumData().getChecksums(checksumIndex);
-//              final ByteBuffer duplicated = buffer.duplicate();
-//              duplicated.position(n);
-//              duplicated.limit(n + bytesPerChecksum);
-//              checksumData = new ChecksumData(checksumType, bytesPerChecksum, Collections.singletonList(checksum));
-//              try {
-//                Checksum.verifyChecksum(duplicated, checksumData, 0);
-//              } catch (Exception e) {
-//                LOG.info("i={}, n={}, offset={}, chunkIndex={}, chunkOffset={}, checksumIndex={}, checksum={}",
-//                    i, n, offset, chunkIndex, chunkOffset, checksumIndex, checksum, e);
-//                throw e;
-//              }
-
               checksums.add(checksum);
             }
             checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
@@ -2161,8 +2148,8 @@ public class KeyValueHandler extends Handler {
           totalDataLength += dataLength;
           numResponses++;
         }
-//        LOG.info("XXX server response ended: totalDataLength={}, numResponses={}", totalDataLength, numResponses);
       }
+//        LOG.info("XXX server response ended: totalDataLength={}, numResponses={}", totalDataLength, numResponses);
       // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);

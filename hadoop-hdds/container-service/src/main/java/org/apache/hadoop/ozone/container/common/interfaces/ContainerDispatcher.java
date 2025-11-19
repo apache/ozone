@@ -21,6 +21,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.statemachine.StateMachine;
@@ -97,6 +98,7 @@ public interface ContainerDispatcher {
   default void streamDataReadOnly(
        ContainerCommandRequestProto msg,
        StreamObserver<ContainerCommandResponseProto> streamObserver,
+       RandomAccessBlockFile blockFile,
        DispatcherContext dispatcherContext) {
     throw new UnsupportedOperationException("streamDataReadOnly not supported.");
   }
