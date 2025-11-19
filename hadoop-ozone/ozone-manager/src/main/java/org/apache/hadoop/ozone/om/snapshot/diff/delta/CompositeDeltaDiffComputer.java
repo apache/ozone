@@ -88,7 +88,7 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
             tablePrefixInfo).orElse(null);
       }
     } catch (Exception e) {
-      LOG.error("Falling back to full diff.", e);
+      LOG.warn("Falling back to full diff.", e);
     }
     if (deltaFiles == null) {
       updateActivity(SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_FULL_DIFF);
