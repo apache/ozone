@@ -41,11 +41,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -125,6 +127,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   @Override
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
+    List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
@@ -145,7 +148,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-      logSstFileList(receivedSstFiles,
+      logSstFileList(excludedSstList,
           "Excluded {} SST files from the latest checkpoint{}: {}", 5);
     } catch (Exception e) {
       LOG.error(

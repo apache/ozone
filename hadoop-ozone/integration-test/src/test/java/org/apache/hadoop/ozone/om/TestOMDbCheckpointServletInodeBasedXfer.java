@@ -228,6 +228,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
     Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
+    Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -237,6 +238,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         String inode = getInode(file.getName());
         inodesFromTarball.add(inode);
+        allPathsInTarball.add(p);
       }
     }
     Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
@@ -272,23 +274,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         "Number of generated YAML files should match the number of snapshots.");
 
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-
-    if (includeSnapshot) {
-      List<String> yamlRelativePaths = snapshotPaths.stream().map(path -> {
-        int startIndex = path.indexOf("db.snapshots");
-        if (startIndex != -1) {
-          return path.substring(startIndex) + ".yaml";
-        }
-        return path + ".yaml";
-      }).collect(Collectors.toList());
-
-      for (String yamlRelativePath : yamlRelativePaths) {
-        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
-        assertTrue(Files.exists(Paths.get(yamlFileName)));
-      }
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    for (Path old : allPathsInTarball) {
+      assertTrue(old.toFile().delete());
     }
-
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
@@ -317,7 +306,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     FileUtil.unTar(tempFile, newDbDir);
     Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }

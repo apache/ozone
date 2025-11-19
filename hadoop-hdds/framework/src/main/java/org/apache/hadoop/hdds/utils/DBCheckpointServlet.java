@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -281,7 +282,7 @@ public class DBCheckpointServlet extends HttpServlet
     Set<String> receivedSstFiles = new HashSet<>();
     if (sstParam != null) {
       receivedSstFiles.addAll(
-          Arrays.stream(sstParam).distinct().collect(Collectors.toList()));
+          Arrays.stream(sstParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX)).distinct().collect(Collectors.toList()));
       logSstFileList(receivedSstFiles, "Received list of {} SST files to be excluded{}: {}", 5);
     }
     return receivedSstFiles;
