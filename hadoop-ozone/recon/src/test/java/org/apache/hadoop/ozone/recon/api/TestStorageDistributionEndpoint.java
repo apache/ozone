@@ -20,17 +20,11 @@ package org.apache.hadoop.ozone.recon.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,8 +46,8 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -64,10 +58,10 @@ import org.junit.jupiter.api.Test;
 class TestStorageDistributionEndpoint {
 
   private ReconNodeManager mockNodeManager;
-  private OMDBInsightEndpoint mockOmdbInsightEndpoint;
   private NSSummaryEndpoint mockNsSummaryEndpoint;
   private StorageContainerLocationProtocol mockScmClient;
-  private GlobalStatsDao globalStatsDao;
+  private ReconGlobalMetricsService mockReconGlobalMetricsService;
+  private ReconGlobalStatsManager globalStatsManager;
   private OzoneStorageContainerManager mockReconScm;
   private DatanodeInfo datanodeDetails;
   private SCMNodeStat globalStats;
@@ -85,8 +79,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionSuccessfulResponse() throws IOException {
     setupMockDependencies();
     setupSuccessfulScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
 
     assertNotNull(response);
@@ -116,8 +110,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithSCMExceptionResponse() throws IOException {
     setupMockDependencies();
     setupScmExceptionScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -144,8 +138,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithEmptyNodeList() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.emptyList());
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -157,8 +151,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithNullNodeStats() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getNodeStat(datanodeDetails)).thenReturn(null);
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -170,8 +164,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithNullGlobalStats() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getStats()).thenReturn(null);
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -183,8 +177,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithUnreachableNodes() throws IOException {
     setupMockDependencies();
     setupUnreachableNodesScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -196,28 +190,27 @@ class TestStorageDistributionEndpoint {
   @Test
   void testGetStorageDistributionWithJmxMetricsFailure() throws IOException {
     setupMockDependencies();
-    setupJmxMetricsFailureScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     StorageCapacityDistributionResponse payload = (StorageCapacityDistributionResponse) response.getEntity();
-    assertEquals(0L, payload.getUsedSpaceBreakDown().getOpenKeysBytes());
+    assertEquals(OPEN_KEYS_SIZE, payload.getUsedSpaceBreakDown().getOpenKeysBytes());
   }
 
   private void setupMockDependencies() throws IOException {
     DUResponse mockDuResponse = mock(DUResponse.class);
     SCMNodeStat mockNodeStat = mock(SCMNodeStat.class);
     mockNodeManager = mock(ReconNodeManager.class);
-    mockOmdbInsightEndpoint = mock(OMDBInsightEndpoint.class);
     mockNsSummaryEndpoint = mock(NSSummaryEndpoint.class);
     mockScmClient = mock(StorageContainerLocationProtocol.class);
     mockReconScm = mock(OzoneStorageContainerManager.class);
     when(mockReconScm.getScmNodeManager()).thenReturn(mockNodeManager);
     datanodeDetails = mock(DatanodeInfo.class);
-    globalStatsDao = mock(GlobalStatsDao.class);
-    when(globalStatsDao.findById(any())).thenReturn(new GlobalStats("test", 0L, new Timestamp(10000L)));
+    globalStatsManager = mock(ReconGlobalStatsManager.class);
+    mockReconGlobalMetricsService = mock(ReconGlobalMetricsService.class);
+    when(globalStatsManager.getGlobalStatsValue(any())).thenReturn(new GlobalStatsValue(0L));
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.singletonList(datanodeDetails));
     when(mockNodeManager.getNodeStat(datanodeDetails)).thenReturn(new SCMNodeMetric(mockNodeStat));
     when(mockNodeStat.getCapacity()).thenReturn(new LongMetric(NODE_CAPACITY));
@@ -232,15 +225,10 @@ class TestStorageDistributionEndpoint {
     when(globalStats.getRemaining()).thenReturn(new LongMetric(NODE_FREE));
     KeyInsightInfoResponse mockKeyInsightResponse = new KeyInsightInfoResponse();
     mockKeyInsightResponse.setReplicatedDataSize(OM_PENDING_TOTAL);
-    Response mockResponse = Response.ok(mockKeyInsightResponse).build();
-    when(mockOmdbInsightEndpoint.getDeletedDirInfo(-1, ""))
-        .thenReturn(mockResponse);
     Map<String, Long> openKeySummary = new HashMap<>();
     openKeySummary.put("totalReplicatedDataSize", OPEN_KEYS_SIZE);
-    doAnswer(invocation -> {
-      ((Map<String, Long>) invocation.getArgument(0)).putAll(openKeySummary);
-      return null;
-    }).when(mockOmdbInsightEndpoint).createKeysSummaryForOpenKey(anyMap());
+    when(mockReconGlobalMetricsService.getOpenKeySummary()).thenReturn(openKeySummary);
+    when(mockReconGlobalMetricsService.getPendingForDeletionDirInfo(-1, "")).thenReturn(mockKeyInsightResponse);
     when(mockDuResponse.getSizeWithReplica()).thenReturn(COMMITTED_SIZE);
     when(mockNsSummaryEndpoint.getDiskUsage(eq("/"), eq(false), eq(true), eq(false)))
         .thenReturn(Response.ok(mockDuResponse).build());
@@ -278,14 +266,6 @@ class TestStorageDistributionEndpoint {
     when(successNodeStat.getRemaining()).thenReturn(new LongMetric(NODE_FREE));
     when(successNodeStat.getCommitted()).thenReturn(new LongMetric(COMMITTED_SIZE));
 
-    // Simulate partial JMX timeout in namespace metrics collection
-    doAnswer(invocation -> {
-      Map<String, Long> metricsMap = invocation.getArgument(0);
-      // Simulate that only partial metrics are available due to timeouts
-      metricsMap.put("totalReplicatedDataSize", OPEN_KEYS_SIZE / 2); // Reduced due to timeout
-      return null;
-    }).when(mockOmdbInsightEndpoint).createKeysSummaryForOpenKey(anyMap());
-
     // Setup SCM client to work normally
     DeletedBlocksTransactionSummary scmSummary = mock(DeletedBlocksTransactionSummary.class);
     when(scmSummary.getTotalBlockReplicatedSize()).thenReturn(SCM_PENDING);
@@ -293,9 +273,8 @@ class TestStorageDistributionEndpoint {
     when(mockScmClient.getDeletedBlockSummary()).thenReturn(scmSummary);
 
     // Execute the test
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(
-        mockReconScm, mockOmdbInsightEndpoint, mockNsSummaryEndpoint,
-        globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
 
     // Verify response is successful despite timeouts
@@ -315,8 +294,7 @@ class TestStorageDistributionEndpoint {
 
     // Verify namespace metrics are partially available
     UsedSpaceBreakDown usedSpaceBreakDown = payload.getUsedSpaceBreakDown();
-    // Should be reduced due to timeout affecting some nodes
-    assertEquals(OPEN_KEYS_SIZE / 2, usedSpaceBreakDown.getOpenKeysBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
     assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedBytes());
 
     // Verify deletion metrics are still available (SCM didn't timeout)
@@ -346,19 +324,12 @@ class TestStorageDistributionEndpoint {
     when(mockNodeManager.getNodeStat(timeoutNode2))
         .thenThrow(new RuntimeException("JMX timeout"));
 
-    // Namespace metrics also timeout
-    doThrow(new RuntimeException("JMX namespace timeout"))
-        .when(mockOmdbInsightEndpoint).createKeysSummaryForOpenKey(anyMap());
-    doThrow(new RuntimeException("JMX directory timeout"))
-        .when(mockOmdbInsightEndpoint).getDeletedDirInfo(anyInt(), anyString());
-
     // SCM also times out
     when(mockScmClient.getDeletedBlockSummary())
         .thenThrow(new IOException("JMX SCM timeout"));
 
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(
-        mockReconScm, mockOmdbInsightEndpoint, mockNsSummaryEndpoint,
-        globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
     Response response = endpoint.getStorageDistribution();
 
     // Should still return OK with default/fallback values
@@ -375,7 +346,7 @@ class TestStorageDistributionEndpoint {
 
     // Namespace and breakdown metrics should have default values
     UsedSpaceBreakDown usedSpaceBreakDown = payload.getUsedSpaceBreakDown();
-    assertEquals(0L, usedSpaceBreakDown.getOpenKeysBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
 
     DeletionPendingBytesByComponent deletionBreakdown =
         usedSpaceBreakDown.getDeletionPendingBytesByStage();
@@ -405,9 +376,8 @@ class TestStorageDistributionEndpoint {
     when(slowNodeStat.getRemaining()).thenReturn(new LongMetric(NODE_FREE));
     when(slowNodeStat.getCommitted()).thenReturn(new LongMetric(COMMITTED_SIZE));
 
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(
-        mockReconScm, mockOmdbInsightEndpoint, mockNsSummaryEndpoint,
-        globalStatsDao, mockScmClient);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
+        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
 
     Response response = endpoint.getStorageDistribution();
 
@@ -443,10 +413,5 @@ class TestStorageDistributionEndpoint {
     when(mockNodeManager.getAllNodes()).thenReturn(allNodes);
     when(mockNodeManager.getNodeStat(unreachableNode)).thenReturn(null);
     when(globalStats.getCapacity()).thenReturn(new LongMetric(NODE_CAPACITY /   2));
-  }
-
-  private void setupJmxMetricsFailureScenario() {
-    doThrow(new RuntimeException("JMX Metrics Failure"))
-        .when(mockOmdbInsightEndpoint).createKeysSummaryForOpenKey(anyMap());
   }
 }

@@ -35,6 +35,7 @@ import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
@@ -51,10 +52,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -83,13 +84,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -106,11 +100,8 @@ public class ReconUtils {
       ReconUtils.class);
   
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static CloseableHttpClient httpClient;
-  private static final int MAX_CONNECTIONS_PER_ROUTE = 20;
-  private static final int MAX_TOTAL_CONNECTIONS = 100;
-  private static final int CONNECTION_TIMEOUT_MS = 5000;
-  private static final int SOCKET_TIMEOUT_MS = 10000;
+  private static final int HTTP_CONNECT_TIMEOUT_MS = 5000;
+  private static final int HTTP_SOCKET_TIMEOUT_MS = 10000;
 
   public ReconUtils() {
   }
@@ -123,40 +114,6 @@ public class ReconUtils {
    */
   public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
     return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
-  }
-
-  static {
-    initializeHttpClient();
-  }
-
-  private static void initializeHttpClient() {
-    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
-    connectionManager.setMaxTotal(MAX_TOTAL_CONNECTIONS);
-    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
-    connectionManager.setValidateAfterInactivity(30000); // 30 seconds
-
-    RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectionRequestTimeout(CONNECTION_TIMEOUT_MS)
-        .setConnectTimeout(CONNECTION_TIMEOUT_MS)
-        .setSocketTimeout(SOCKET_TIMEOUT_MS)
-        .build();
-
-    httpClient = HttpClientBuilder.create()
-        .setConnectionManager(connectionManager)
-        .setDefaultRequestConfig(requestConfig)
-        .setConnectionTimeToLive(60, TimeUnit.SECONDS)
-        .evictIdleConnections(30, TimeUnit.SECONDS)
-        .build();
-
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      try {
-        if (httpClient != null) {
-          httpClient.close();
-        }
-      } catch (IOException e) {
-        log.warn("Error closing HTTP client", e);
-      }
-    }));
   }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
@@ -900,51 +857,124 @@ public class ReconUtils {
     return pathBuilder.toString();
   }
 
-  public static long getMetricsFromDatanode(DatanodeDetails datanode, String service, String name, String keyName)
+  /**
+   * Retrieve metrics from a DataNode's JMX endpoint.
+   * Uses standard Java HttpURLConnection for simplicity and compatibility.
+   *
+   * @param datanode The DataNode to query
+   * @param service JMX service name (e.g., "HddsDatanode")
+   * @param name JMX bean name (e.g., "BlockDeletingService")
+   * @param keyName The metric key name (e.g., "TotalPendingBlockBytes")
+   * @return The metric value, or -1 if unavailable
+   * @throws IOException if connection fails
+   */
+  public static long getMetricsFromDatanode(DatanodeDetails datanode, 
+                                            String service, 
+                                            String name, 
+                                            String keyName)
       throws IOException {
+    
+    if (datanode == null) {
+      log.warn("DataNode is null, cannot fetch metrics");
+      throw new IOException("DataNode details are null");
+    }
+
     // Construct metrics URL for DataNode JMX endpoint
     String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=%s,name=%s",
         datanode.getIpAddress(),
         datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
         service,
         name);
-    HttpGet request = new HttpGet(metricsUrl);
-    try (CloseableHttpResponse response = httpClient.execute(request)) {
-      if (response.getStatusLine().getStatusCode() != 200) {
-        throw new IOException("HTTP request failed with status: " +
-            response.getStatusLine().getStatusCode());
+    HttpURLConnection connection = null;
+    try {
+      // Use standard Java HttpURLConnection (compatible with all HTTP implementations)
+      URL url = new URL(metricsUrl);
+      connection = (HttpURLConnection) url.openConnection();
+      
+      // Set timeouts to prevent indefinite blocking
+      connection.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);
+      connection.setReadTimeout(HTTP_SOCKET_TIMEOUT_MS);
+      connection.setRequestMethod("GET");
+      
+      // Check HTTP response code
+      int responseCode = connection.getResponseCode();
+      if (responseCode != HttpURLConnection.HTTP_OK) {
+        throw new IOException(String.format(
+            "Failed to fetch metrics from %s: HTTP %d", 
+            datanode.getIpAddress(), responseCode));
       }
-
-      String jsonResponse = EntityUtils.toString(response.getEntity());
+      // Read response body
+      String jsonResponse;
+      try (InputStream in = connection.getInputStream()) {
+        // Use Apache Commons IO for Java compatibility (works with Java 8+)
+        byte[] responseBytes = IOUtils.toByteArray(in);
+        jsonResponse = new String(responseBytes, "UTF-8");
+      }
+      // Parse and extract metric value
       return parseMetrics(jsonResponse, name, keyName);
     } catch (IOException e) {
-      log.error("Error getting metrics from datanode: {}", datanode.getIpAddress(), e);
+      log.error("Error getting metrics from datanode {}: {}", 
+          datanode.getIpAddress(), e.getMessage());
+      // Return -1 to indicate error (caller should handle gracefully)
+      return -1L;
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
     }
-    return 0;
   }
 
+  /**
+   * Parse JMX response JSON and extract a specific metric value.
+   * Expected JSON format from DataNode JMX endpoint:
+   * {
+   *   "beans": [
+   *     {
+   *       "name": "Hadoop:service=HddsDatanode,name=BlockDeletingService",
+   *       "TotalPendingBlockBytes": 1024000,
+   *       ...
+   *     }
+   *   ]
+   * }
+   *
+   * @param jsonResponse The JSON response from JMX endpoint
+   * @param serviceName The service name to match in bean names
+   * @param keyName The key to extract from the matching bean
+   * @return The metric value, or -1 if not found
+   */
   private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
     if (jsonResponse == null || jsonResponse.isEmpty()) {
+      log.debug("Empty response received for metrics");
       return -1L;
     }
     try {
       JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
       JsonNode beans = root.get("beans");
       if (beans != null && beans.isArray()) {
+        // Find the bean matching the service name
         for (JsonNode bean : beans) {
-          String name = bean.path("name").asText("");
-          if (name.contains(serviceName)) {
+          String beanName = bean.path("name").asText("");
+          if (beanName.contains(serviceName)) {
+            // Extract and return the metric value from the bean
             return extractMetrics(bean, keyName);
           }
         }
       }
+      log.debug("Could not find service {} in JMX response", serviceName);
+      return -1L;
     } catch (Exception e) {
-      log.warn("Failed to parse block deletion metrics JSON: {}", e.toString());
+      log.warn("Failed to parse metrics JSON response: {}", e.getMessage());
+      return -1L;
     }
-    return 0L;
   }
 
-  /** Extract block deletion metrics from JMX bean node. */
+  /**
+   * Extract a specific metric value from a JMX bean node.
+   *
+   * @param beanNode The JSON node representing a JMX bean
+   * @param keyName The metric key to extract
+   * @return The metric value, or 0L if not found
+   */
   private static long extractMetrics(JsonNode beanNode, String keyName) {
     return beanNode.path(keyName).asLong(0L);
   }

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -47,9 +48,9 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,24 +72,24 @@ import org.slf4j.LoggerFactory;
 @AdminOnly
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
-  private final OMDBInsightEndpoint omdbInsightEndpoint;
   private final NSSummaryEndpoint nsSummaryEndpoint;
   private final StorageContainerLocationProtocol scmClient;
-  private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
-  private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
-  private GlobalStatsDao globalStatsDao;
+  private static final Logger LOG = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
+  private final Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
+  private final ReconGlobalStatsManager reconGlobalStatsManager;
+  private final ReconGlobalMetricsService reconGlobalMetricsService;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
-                                     OMDBInsightEndpoint omDbInsightEndpoint,
                                      NSSummaryEndpoint nsSummaryEndpoint,
-                                     GlobalStatsDao globalStatsDao,
-                                     StorageContainerLocationProtocol scmClient) {
+                                     ReconGlobalStatsManager reconGlobalStatsManager,
+                                     StorageContainerLocationProtocol scmClient,
+                                     ReconGlobalMetricsService reconGlobalMetricsService) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
-    this.omdbInsightEndpoint = omDbInsightEndpoint;
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.scmClient = scmClient;
-    this.globalStatsDao = globalStatsDao;
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
+    this.reconGlobalMetricsService = reconGlobalMetricsService;
   }
 
   @GET
@@ -102,7 +103,7 @@ public class StorageDistributionEndpoint {
       try {
         namespaceMetrics = calculateNamespaceMetrics();
       } catch (Exception e) {
-        log.error("Error calculating namespace metrics", e);
+        LOG.error("Error calculating namespace metrics", e);
         // Initialize with default values
         namespaceMetrics.put("totalUsedNamespace", 0L);
         namespaceMetrics.put("totalOpenKeySize", 0L);
@@ -116,7 +117,7 @@ public class StorageDistributionEndpoint {
               nodeStorageReports, globalStorageReport, namespaceMetrics);
       return Response.ok(response).build();
     } catch (Exception e) {
-      log.error("Error getting storage distribution", e);
+      LOG.error("Error getting storage distribution", e);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
               .entity("Error retrieving storage distribution: " + e.getMessage())
               .build();
@@ -127,7 +128,7 @@ public class StorageDistributionEndpoint {
     try {
       SCMNodeStat stats = nodeManager.getStats();
       if (stats == null) {
-        log.warn("Node manager stats are null, returning default values");
+        LOG.warn("Node manager stats are null, returning default values");
         return new GlobalStorageReport(0L, 0L, 0L);
       }
 
@@ -137,12 +138,12 @@ public class StorageDistributionEndpoint {
 
       return new GlobalStorageReport(scmUsed, remaining, capacity);
     } catch (Exception e) {
-      log.error("Error calculating global storage report", e);
+      LOG.error("Error calculating global storage report", e);
       return new GlobalStorageReport(0L, 0L, 0L);
     }
   }
 
-  private Map<String, Long> calculateNamespaceMetrics() {
+  private Map<String, Long> calculateNamespaceMetrics() throws IOException {
     Map<String, Long> metrics = new HashMap<>();
     Map<String, Long> totalPendingAtOmSide = calculatePendingSizes();
     long totalOpenKeySize = calculateOpenKeySizes();
@@ -153,10 +154,10 @@ public class StorageDistributionEndpoint {
 
     long totalKeys = 0L;
     // Keys from OBJECT_STORE buckets.
-    GlobalStats keyRecord = globalStatsDao.findById(
+    GlobalStatsValue keyRecord = reconGlobalStatsManager.getGlobalStatsValue(
             OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
-    GlobalStats fileRecord = globalStatsDao.findById(
+    GlobalStatsValue fileRecord = reconGlobalStatsManager.getGlobalStatsValue(
             OmTableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
     if (keyRecord != null) {
       totalKeys += keyRecord.getValue();
@@ -182,14 +183,14 @@ public class StorageDistributionEndpoint {
     try {
       scmSummary = scmClient.getDeletedBlockSummary();
     } catch (IOException e) {
-      log.error("Failed to get deleted block summary from SCM", e);
+      LOG.error("Failed to get deleted block summary from SCM", e);
     }
 
     long totalPendingAtDnSide = 0L;
     try {
       totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
     } catch (Exception e) {
-      log.error("Error calculating pending deletion metrics", e);
+      LOG.error("Error calculating pending deletion metrics", e);
     }
 
     DeletionPendingBytesByComponent deletionPendingBytesByStage =
@@ -205,7 +206,7 @@ public class StorageDistributionEndpoint {
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
     Long totalKeys = namespaceMetrics.get("totalKeys");
     Long totalContainerPreAllocated = nodeStorageReports.stream()
-        .map(report -> report.getCommitted())
+        .map(DatanodeStorageReport::getCommitted)
         .reduce(0L, Long::sum);
 
     return StorageCapacityDistributionResponse.newBuilder()
@@ -216,8 +217,7 @@ public class StorageDistributionEndpoint {
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
                     totalOpenKeySize != null ? totalOpenKeySize : 0L,
-                    totalCommittedSize != null ? totalCommittedSize : 0L,
-                    totalContainerPreAllocated != null ? totalContainerPreAllocated : 0L,
+                    totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated,
                     deletionPendingBytesByStage))
             .build();
   }
@@ -225,27 +225,22 @@ public class StorageDistributionEndpoint {
   private List<DatanodeStorageReport> collectDatanodeReports() {
     return nodeManager.getAllNodes().stream()
         .map(this::getStorageReport)
-        .filter(report -> report != null) // Filter out null reports
+        .filter(Objects::nonNull) // Filter out null reports
         .collect(Collectors.toList());
   }
 
   private Map<String, Long> calculatePendingSizes() {
     Map<String, Long> result = new HashMap<>();
-    KeyInsightInfoResponse response = (KeyInsightInfoResponse)
-        omdbInsightEndpoint.getDeletedDirInfo(-1, "").getEntity();
-
-    Map<String, Long> pendingKeySize = new HashMap<>();
-    omdbInsightEndpoint.createKeysSummaryForDeletedKey(pendingKeySize);
+    KeyInsightInfoResponse response = reconGlobalMetricsService.getPendingForDeletionDirInfo(-1, "");
+    Map<String, Long> pendingKeySize = reconGlobalMetricsService.getDeletedKeySummary();
     result.put("pendingDirectorySize", response.getReplicatedDataSize());
     result.put("pendingKeySize", pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L));
     return result;
   }
 
   private long calculateOpenKeySizes() {
-    Map<String, Long> openKeySummary = new HashMap<>();
-    omdbInsightEndpoint.createKeysSummaryForOpenKey(openKeySummary);
-    Map<String, Long> openKeyMPUSummary = new HashMap<>();
-    omdbInsightEndpoint.createKeysSummaryForOpenMPUKey(openKeyMPUSummary);
+    Map<String, Long> openKeySummary = reconGlobalMetricsService.getOpenKeySummary();
+    Map<String, Long> openKeyMPUSummary = reconGlobalMetricsService.getMPUKeySummary();
     long openKeyDataSize = openKeySummary.getOrDefault("totalReplicatedDataSize", 0L);
     long totalMPUKeySize = openKeyMPUSummary.getOrDefault("totalReplicatedDataSize", 0L);
     return openKeyDataSize + totalMPUKeySize;
@@ -255,13 +250,13 @@ public class StorageDistributionEndpoint {
     try {
       Response rootResponse = nsSummaryEndpoint.getDiskUsage("/", false, true, false);
       if (rootResponse.getStatus() != Response.Status.OK.getStatusCode()) {
-        log.warn("Failed to get disk usage, status: {}", rootResponse.getStatus());
+        LOG.warn("Failed to get disk usage, status: {}", rootResponse.getStatus());
         return 0L;
       }
       DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
       return duRootRes != null ? duRootRes.getSizeWithReplica() : 0L;
     } catch (IOException e) {
-      log.error("IOException while calculating committed size", e);
+      LOG.error("IOException while calculating committed size", e);
       return 0L;
     }
   }
@@ -304,13 +299,13 @@ public class StorageDistributionEndpoint {
     try {
       SCMNodeMetric nodeMetric = nodeManager.getNodeStat(datanode);
       if (nodeMetric == null) {
-        log.warn("Node statistics not available for datanode: {}", datanode);
+        LOG.warn("Node statistics not available for datanode: {}", datanode);
         return null; // Return null for unavailable nodes
       }
 
       SCMNodeStat nodeStat = nodeMetric.get();
       if (nodeStat == null) {
-        log.warn("Node stat is null for datanode: {}", datanode);
+        LOG.warn("Node stat is null for datanode: {}", datanode);
         return null; // Return null for unavailable stats
       }
 
@@ -321,10 +316,10 @@ public class StorageDistributionEndpoint {
       long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
       long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
       if (pendingDeletion < 0) {
-        log.warn("Block deletion metrics unavailable for datanode: {}", datanode);
+        LOG.warn("Block deletion metrics unavailable for datanode: {}", datanode);
         pendingDeletion = 0L;
       }
-      DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+      return DatanodeStorageReport.newBuilder()
           .setCapacity(capacity)
           .setUsed(used)
           .setRemaining(remaining)
@@ -334,9 +329,8 @@ public class StorageDistributionEndpoint {
           .setDatanodeUuid(datanode.getUuidString())
           .setHostName(datanode.getHostName())
           .build();
-      return storageReport;
     } catch (Exception e) {
-      log.error("Error getting storage report for datanode: {}", datanode, e);
+      LOG.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error
     }
   }
