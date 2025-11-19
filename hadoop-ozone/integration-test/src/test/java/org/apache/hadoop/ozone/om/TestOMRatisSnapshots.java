@@ -1165,7 +1165,7 @@ public class TestOMRatisSnapshots {
       // max size config.  That way next time through, we get multiple
       // tarballs.
       if (count == 1) {
-        long sstSize = getSizeOfSstFiles(tarball);
+        long sstSize = getSizeOfFiles(tarball);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
@@ -1179,16 +1179,13 @@ public class TestOMRatisSnapshots {
     }
 
     // Get Size of sstfiles in tarball.
-    private long getSizeOfSstFiles(File tarball) throws IOException {
+    private long getSizeOfFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      OmSnapshotUtils.createHardLinks(tempDir, true);
-      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
+      List<Path> sstPaths = Files.walk(tempDir).
+          collect(Collectors.toList());
       long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
-        File file = sstPath.toFile();
-        if (file.isFile() && file.getName().endsWith(".sst")) {
-          totalFileSize += Files.size(sstPath);
-        }
+        totalFileSize += Files.size(sstPath);
       }
       return totalFileSize;
     }
