@@ -700,6 +700,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
           connection.disconnect();
         }
       }
+
+      // Verify the object was not uploaded
+      assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
     }
 
     @Test

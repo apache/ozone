@@ -1190,7 +1190,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     }
 
     @Test
-    public void testPresignedUrlPutObjectWithWrongSha256() throws Exception {
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
       final String keyName = getKeyName();
 
       // Test PutObjectRequest presigned URL
@@ -1214,6 +1214,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           connection.disconnect();
         }
       }
+
+      // Verify the object was not uploaded
+      AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+          () -> s3Client.getObject(BUCKET_NAME, keyName));
+
+      assertEquals(ErrorType.Client, ase.getErrorType());
+      assertEquals(404, ase.getStatusCode());
+      assertEquals("NoSuchKey", ase.getErrorCode());
     }
 
     @Test
