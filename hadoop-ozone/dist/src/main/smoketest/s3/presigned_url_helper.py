@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+
+
 def generate_presigned_put_object_url(
     aws_access_key_id=None,
     aws_secret_access_key=None,
@@ -62,3 +65,38 @@ def generate_presigned_put_object_url(
 
   except Exception as e:
     raise Exception(f"Failed to generate presigned URL: {str(e)}")
+
+
+def compute_sha256_file(path):
+  """Compute SHA256 hex digest for the entire file content at path."""
+  with open(path, 'rb') as f:
+    return hashlib.sha256(f.read()).hexdigest()
+
+
+def _main():
+    # import argparse
+    # parser = argparse.ArgumentParser(description='Print presigned PUT URL for S3 object')
+    # parser.add_argument('--access-key', dest='aws_access_key_id', default=None)
+    # parser.add_argument('--secret-key', dest='aws_secret_access_key', default=None)
+    # parser.add_argument('--bucket', required=True, dest='bucket_name')
+    # parser.add_argument('--key', required=True, dest='object_key')
+    # parser.add_argument('--region', default='us-east-1', dest='region_name')
+    # parser.add_argument('--expiration', type=int, default=3600, dest='expiration')
+    # parser.add_argument('--content-type', dest='content_type', default=None)
+    # parser.add_argument('--endpoint-url', dest='endpoint_url', default=None)
+    # args = parser.parse_args()
+
+    url = generate_presigned_put_object_url(
+        aws_access_key_id='id',
+        aws_secret_access_key='pwd',
+        bucket_name='bucket',
+        object_key='key',
+        region_name='us-east-1',
+        expiration=3600,
+        content_type=None,
+        endpoint_url='http://localhost:9878',
+    )
+    print(url)
+
+if __name__ == '__main__':
+    _main()

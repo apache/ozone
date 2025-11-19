@@ -28,12 +28,6 @@ ${ENDPOINT_URL}       http://s3g:9878
 ${OZONE_TEST}         true
 ${BUCKET}             generated
 
-*** Keywords ***
-Generate Presigned URL
-    [Arguments]    ${bucket}    ${key}    ${expiry}=3600
-    ${result} =    Execute    aws s3 presign s3://${bucket}/${key} --endpoint-url ${ENDPOINT_URL} --expires-in ${expiry}
-    [Return]    ${result}
-
 *** Test Cases ***
 Presigned URL PUT Object
     [Documentation]    Test presigned URL PUT object
@@ -41,14 +35,19 @@ Presigned URL PUT Object
     ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
     ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
     ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
-    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" "${presigned_url}"
+    ${SHA256} =              Compute Sha256 File    /tmp/testfile
+    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: ${SHA256}" "${presigned_url}"
     Should Not Contain       ${result}    Error
     ${head_result} =         Execute AWSS3ApiCli    head-object --bucket ${BUCKET} --key test-presigned-put
     Should Not Contain       ${head_result}    Error
 
 Presigned URL PUT Object using wrong x-amz-content-sha256
     [Documentation]    Test presigned URL PUT object with wrong x-amz-content-sha256
-    Execute                   echo "Randomtext" > /tmp/testfile
-    ${presigned_url} =        Generate Presigned URL    ${BUCKET}    test-presigned-put-wrong-sha
-    ${result} =               Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
-    Should Contain            ${result}    The provided 'x-amz-content-sha256' header does not match the computed hash.
+    Execute                  echo "Randomtext" > /tmp/testfile
+    ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
+    ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
+    ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put-wrong-sha    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
+    ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
+    Should Contain           ${result}    The provided 'x-amz-content-sha256' header does not match the computed hash.
+    ${head_result} =         Execute AWSS3ApiCli    head-object --bucket ${BUCKET} --key test-presigned-put
+    Should Contain           ${head_result}    Error
