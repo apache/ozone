@@ -147,7 +147,7 @@ public class SnapshotDefragService extends BackgroundService
     Path tmpDefragDirPath = ozoneManager.getMetadataManager().getSnapshotParentDir().toAbsolutePath()
         .resolve("tmp_defrag");
     // Delete and recreate tmp dir if it exists
-    if (!tmpDefragDirPath.toFile().exists()) {
+    if (tmpDefragDirPath.toFile().exists()) {
       deleteDirectory(tmpDefragDirPath);
     }
     createDirectories(tmpDefragDirPath);
