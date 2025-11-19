@@ -672,8 +672,8 @@ public abstract class ContainerData {
       writeBytes += length;
     }
 
-    public synchronized void decDeletion(long deletedBytes, long processedBytes,
-                                            long deletedBlockCount, long processedBlockCount) {
+    public synchronized void decDeletion(long deletedBytes, long processedBytes, long deletedBlockCount,
+        long processedBlockCount) {
       blockBytes -= deletedBytes;
       blockCount -= deletedBlockCount;
       blockPendingDeletion -= processedBlockCount;
