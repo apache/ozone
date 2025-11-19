@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -193,12 +194,38 @@ public final class OmKeyInfo extends WithParentObjectId
     return ownerName;
   }
 
-  public void setCommittedKeyDeletedFlag(boolean val) {
+  public OmKeyInfo withCommittedKeyDeletedFlag(boolean val) {
     if (val) {
-      this.getMetadata().put(COMMITTED_KEY_DELETED_FLAG, "true");
-    } else {
-      this.getMetadata().remove(COMMITTED_KEY_DELETED_FLAG);
+      return withMetadataMutations(
+          metadata -> metadata.put(COMMITTED_KEY_DELETED_FLAG, "true"));
     }
+    return withMetadataMutations(
+        metadata -> metadata.remove(COMMITTED_KEY_DELETED_FLAG));
+  }
+
+  /**
+   * Returns a new {@link OmKeyInfo} instance with metadata updated by the
+   * provided mutator.
+   *
+   * @param metadataUpdater a function that applies mutations to a copy of the metadata
+   * @return a new {@link OmKeyInfo} instance with updated metadata
+   */
+  public OmKeyInfo withMetadataMutations(
+      Consumer<Map<String, String>> metadataUpdater) {
+    Objects.requireNonNull(metadataUpdater, "metadataUpdater == null");
+    Map<String, String> metadataCopy = new HashMap<>(getMetadata());
+    metadataUpdater.accept(metadataCopy);
+    return toBuilder().setMetadata(metadataCopy).build();
+  }
+
+  /**
+   * Returns a new {@link OmKeyInfo} with metadata replaced by the provided
+   * map.
+   * @param metadata the metadata to set
+   * @return a new {@link OmKeyInfo}
+   */
+  public OmKeyInfo withMetadata(Map<String, String> metadata) {
+    return toBuilder().setMetadata(metadata).build();
   }
 
   public boolean isDeletedKeyCommitted() {
@@ -499,6 +526,28 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder(OmKeyInfo obj) {
       super(obj);
+      this.volumeName = obj.volumeName;
+      this.bucketName = obj.bucketName;
+      this.keyName = obj.keyName;
+      this.ownerName = obj.ownerName;
+      this.dataSize = obj.dataSize;
+      this.creationTime = obj.creationTime;
+      this.modificationTime = obj.modificationTime;
+      this.replicationConfig = obj.replicationConfig;
+      this.encInfo = obj.encInfo;
+      this.fileName = obj.fileName;
+      this.fileChecksum = obj.fileChecksum;
+      this.isFile = obj.isFile;
+      this.expectedDataGeneration = obj.expectedDataGeneration;
+      if (obj.getTags() != null) {
+        this.tags.putAll(obj.getTags());
+      }
+      this.acls.addAll(obj.getAcls());
+      obj.keyLocationVersions.forEach(keyLocationVersion ->
+          this.omKeyLocationInfoGroups.add(
+              new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
+                  keyLocationVersion.getLocationList(),
+                  keyLocationVersion.isMultipartKey())));
     }
 
     public Builder setVolumeName(String volume) {
@@ -566,6 +615,12 @@ public final class OmKeyInfo extends WithParentObjectId
     @Override
     public Builder addAllMetadata(Map<String, String> newMetadata) {
       super.addAllMetadata(newMetadata);
+      return this;
+    }
+
+    @Override
+    public Builder setMetadata(Map<String, String> map) {
+      super.setMetadata(map);
       return this;
     }
 
@@ -750,7 +805,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static Builder builderFromProtobuf(KeyInfo keyInfo) {
     if (keyInfo == null) {
       return null;
     }
@@ -803,7 +858,12 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
-    return builder.build();
+    return builder;
+  }
+
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+    Builder builder = builderFromProtobuf(keyInfo);
+    return builder == null ? null : builder.build();
   }
 
   @Override
@@ -882,44 +942,13 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Return a new copy of the object.
    */
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   @Override
   public OmKeyInfo copyObject() {
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder(this)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOwnerName(ownerName)
-        .setCreationTime(creationTime)
-        .setModificationTime(modificationTime)
-        .setDataSize(dataSize)
-        .setReplicationConfig(replicationConfig)
-        .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
-        .setFileName(fileName)
-        .setFile(isFile);
-
-    keyLocationVersions.forEach(keyLocationVersion ->
-        builder.addOmKeyLocationInfoGroup(
-            new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                keyLocationVersion.getLocationList(),
-                keyLocationVersion.isMultipartKey())));
-
-    if (getMetadata() != null) {
-      getMetadata().forEach(builder::addMetadata);
-    }
-
-    if (getTags() != null) {
-      getTags().forEach(builder::addTag);
-    }
-
-    if (fileChecksum != null) {
-      builder.setFileChecksum(fileChecksum);
-    }
-    if (expectedDataGeneration != null) {
-      builder.setExpectedDataGeneration(expectedDataGeneration);
-    }
-
-    return builder.build();
+    return new Builder(this).build();
   }
 
   /**

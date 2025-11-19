@@ -79,13 +79,6 @@ public class TestSCMDbCheckpointServlet {
   private String method;
   private SCMDBCheckpointServlet scmDbCheckpointServletMock;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws Exception
-   */
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -129,9 +122,6 @@ public class TestSCMDbCheckpointServlet {
         .thenReturn(cluster.getStorageContainerManager());
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {
@@ -181,7 +171,7 @@ public class TestSCMDbCheckpointServlet {
         });
 
     when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(
-        new DBCheckpointServlet.Lock());
+        new DBCheckpointServlet.NoOpLock());
     scmDbCheckpointServletMock.init();
     long initialCheckpointCount =
         scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();

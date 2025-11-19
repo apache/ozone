@@ -288,11 +288,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   }
 
   /**
-   * Construct OmMultipartInfo from MultipartKeyInfo proto object.
+   * Construct OmMultipartInfo Builder from MultipartKeyInfo proto object.
    * @param multipartKeyInfo
-   * @return OmMultipartKeyInfo
+   * @return Builder instance
    */
-  public static OmMultipartKeyInfo getFromProto(
+  public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
     multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
@@ -311,8 +311,17 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
         .setPartKeyInfoList(list)
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
-        .setParentID(multipartKeyInfo.getParentID())
-        .build();
+        .setParentID(multipartKeyInfo.getParentID());
+  }
+
+  /**
+   * Construct OmMultipartInfo from MultipartKeyInfo proto object.
+   * @param multipartKeyInfo
+   * @return OmMultipartKeyInfo
+   */
+  public static OmMultipartKeyInfo getFromProto(
+      MultipartKeyInfo multipartKeyInfo) {
+    return builderFromProto(multipartKeyInfo).build();
   }
 
   /**

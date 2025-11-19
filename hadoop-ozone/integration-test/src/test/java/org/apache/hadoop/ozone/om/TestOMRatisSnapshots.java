@@ -126,13 +126,6 @@ public class TestOMRatisSnapshots {
   private OzoneClient client;
   private GenericTestUtils.PrintStreamCapturer output;
 
-  /**
-   * Create a MiniOzoneCluster for testing. The cluster initially has one
-   * inactive OM. So at the start of the cluster, there will be 2 active and 1
-   * inactive OM.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
@@ -158,6 +151,7 @@ public class TestOMRatisSnapshots {
         conf.getObject(OzoneManagerRatisServerConfig.class);
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
+    conf.set("ozone.om.client.rpc.timeout", "1m");
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
@@ -184,9 +178,6 @@ public class TestOMRatisSnapshots {
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

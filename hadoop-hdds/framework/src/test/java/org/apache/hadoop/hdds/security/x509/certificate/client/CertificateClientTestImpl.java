@@ -41,6 +41,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -101,10 +102,10 @@ public class CertificateClientTestImpl implements CertificateClient {
     keyGen = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGen.generateKey();
     rootKeyPair = keyGen.generateKey();
-    LocalDateTime start = LocalDateTime.now();
+    ZonedDateTime start = ZonedDateTime.now();
     String rootCACertDuration = conf.get(HDDS_X509_MAX_DURATION,
         HDDS_X509_MAX_DURATION_DEFAULT);
-    LocalDateTime end = start.plus(Duration.parse(rootCACertDuration));
+    ZonedDateTime end = start.plus(Duration.parse(rootCACertDuration));
 
     // Generate RootCA certificate
     rootCert = SelfSignedCertificate.newBuilder()
@@ -134,15 +135,14 @@ public class CertificateClientTestImpl implements CertificateClient {
         .setDigitalSignature(true)
         .setDigitalEncryption(true);
 
-    start = LocalDateTime.now();
+    start = ZonedDateTime.now();
     String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
         HDDS_X509_DEFAULT_DURATION_DEFAULT);
     //TODO: generateCSR should not be called...
     x509Certificate = approver.sign(securityConfig, rootKeyPair.getPrivate(),
             rootCert,
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(Duration.parse(certDuration))
-                .atZone(ZoneId.systemDefault()).toInstant()),
+            Date.from(start.toInstant()),
+            Date.from(start.plus(Duration.parse(certDuration)).toInstant()),
             csrBuilder.build().generateCSR(), "scm1", "cluster1",
             String.valueOf(System.nanoTime()));
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
@@ -259,9 +259,9 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   public void renewRootCA() throws Exception {
-    LocalDateTime start = LocalDateTime.now();
+    ZonedDateTime start = ZonedDateTime.now();
     Duration rootCACertDuration = securityConfig.getMaxCertificateDuration();
-    LocalDateTime end = start.plus(rootCACertDuration);
+    ZonedDateTime end = start.plus(rootCACertDuration);
     rootKeyPair = keyGen.generateKey();
     rootCert = SelfSignedCertificate.newBuilder()
         .setBeginDate(start)

@@ -478,4 +478,8 @@ public class SCMBlockProtocolServer implements
   public void close() throws IOException {
     stop();
   }
+
+  public SCMPerformanceMetrics getMetrics() {
+    return perfMetrics;
+  }
 }
