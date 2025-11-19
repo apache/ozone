@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -123,10 +122,6 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  public File getBootstrapTempData() {
-    return bootstrapTempData;
-  }
-
   private boolean hasPermission(UserGroupInformation user) {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
@@ -137,7 +132,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  protected static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
+  private static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
     int count = sstList.size();
     if (LOG.isDebugEnabled()) {
       LOG.debug(msg, count, "", sstList);
@@ -204,8 +199,7 @@ public class DBCheckpointServlet extends HttpServlet
     processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
-  @VisibleForTesting
-  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+  private void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
@@ -298,7 +292,7 @@ public class DBCheckpointServlet extends HttpServlet
    * @param request the HTTP servlet request
    * @return array of parsed sst form data parameters for exclusion
    */
-  protected static String[] parseFormDataParameters(HttpServletRequest request) {
+  private static String[] parseFormDataParameters(HttpServletRequest request) {
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 
