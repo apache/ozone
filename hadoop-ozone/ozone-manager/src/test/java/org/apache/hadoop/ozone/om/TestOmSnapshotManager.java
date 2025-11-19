@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
-import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
+import static org.apache.hadoop.hdds.utils.HAUtils.getExistingSstFiles;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -456,7 +457,7 @@ class TestOmSnapshotManager {
     File s1FileLink = new File(followerSnapDir2, "s1.sst");
 
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
+    OmSnapshotUtils.createHardLinks(candidateDir.toPath());
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
@@ -499,16 +500,44 @@ class TestOmSnapshotManager {
   @Test
   public void testExcludeUtilities() throws IOException {
     File noLinkFile = new File(followerSnapDir2, "noLink.sst");
-    File nonSstFile = new File(followerSnapDir2, "nonSstFile");
+
     // Confirm that the list of existing sst files is as expected.
-    List<String> existingSstList = getExistingFiles(candidateDir);
+    List<String> existingSstList = getExistingSstFiles(candidateDir);
     Set<String> existingSstFiles = new HashSet<>(existingSstList);
-    Set<String> expectedSstFileNames = new HashSet<>(Arrays.asList(
-        s1File.getName(),
-        noLinkFile.getName(),
-        f1File.getName(),
-        nonSstFile.getName()));
-    assertEquals(expectedSstFileNames, existingSstFiles);
+    int truncateLength = candidateDir.toString().length() + 1;
+    Set<String> expectedSstFiles = new HashSet<>(Arrays.asList(
+        s1File.toString().substring(truncateLength),
+        noLinkFile.toString().substring(truncateLength),
+        f1File.toString().substring(truncateLength)));
+    assertEquals(expectedSstFiles, existingSstFiles);
+
+    // Confirm that the excluded list is normalized as expected.
+    //  (Normalizing means matches the layout on the leader.)
+    File leaderSstBackupDir = new File(leaderDir.toString(), "sstBackup");
+    assertTrue(leaderSstBackupDir.mkdirs());
+    File leaderTmpDir = new File(leaderDir.toString(), "tmp");
+    assertTrue(leaderTmpDir.mkdirs());
+    OMDBCheckpointServlet.DirectoryData sstBackupDir =
+        new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
+        leaderSstBackupDir.toString());
+    Path srcSstBackup = Paths.get(sstBackupDir.getTmpDir().toString(),
+        "backup.sst");
+    Path destSstBackup = Paths.get(sstBackupDir.getOriginalDir().toString(),
+        "backup.sst");
+    truncateLength = leaderDir.toString().length() + 1;
+    existingSstList.add(truncateFileName(truncateLength, destSstBackup));
+    Map<String, Map<Path, Path>> normalizedMap =
+        OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
+        leaderCheckpointDir.toPath(), sstBackupDir);
+    Map<String, Map<Path, Path>> expectedMap = new TreeMap<>();
+    Path s1 = Paths.get(leaderSnapDir1.toString(), "s1.sst");
+    Path noLink = Paths.get(leaderSnapDir2.toString(), "noLink.sst");
+    Path f1 = Paths.get(leaderCheckpointDir.toString(), "f1.sst");
+    expectedMap.put("s1.sst", ImmutableMap.of(s1, s1));
+    expectedMap.put("noLink.sst", ImmutableMap.of(noLink, noLink));
+    expectedMap.put("f1.sst", ImmutableMap.of(f1, f1));
+    expectedMap.put("backup.sst", ImmutableMap.of(srcSstBackup, destSstBackup));
+    assertEquals(expectedMap, new TreeMap<>(normalizedMap));
   }
 
   /*

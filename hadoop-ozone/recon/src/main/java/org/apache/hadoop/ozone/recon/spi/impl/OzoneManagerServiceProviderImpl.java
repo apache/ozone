@@ -84,7 +84,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
 import org.apache.hadoop.ozone.recon.ReconContext;
@@ -471,7 +470,6 @@ public class OzoneManagerServiceProviderImpl
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
           tarExtractor.extractTar(inputStream, untarredDbDir);
-          OmSnapshotUtils.createHardLinks(untarredDbDir, true);
         } catch (IOException | InterruptedException e) {
           reconContext.updateHealthStatus(new AtomicBoolean(false));
           reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
