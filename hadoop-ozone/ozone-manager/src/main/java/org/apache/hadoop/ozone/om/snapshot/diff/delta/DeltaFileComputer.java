@@ -40,7 +40,7 @@ public interface DeltaFileComputer extends Closeable {
    * @param fromSnapshot the baseline snapshot from which changes are computed
    * @param toSnapshot the target snapshot to which changes are compared
    * @param tablesToLookup the set of table names to consider when determining changes
-   * @return an {@code Optional} containing a collection of pairs, where each pair consists of a
+   * @return a collection of pairs, where each pair consists of a
    *         {@code Path} representing the delta file and an associated {@code SstFileInfo}, or
    *         an empty {@code Optional} if no changes are found
    * @throws IOException if an I/O error occurs while retrieving delta files
