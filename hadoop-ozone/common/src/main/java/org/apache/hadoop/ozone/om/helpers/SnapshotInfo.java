@@ -509,6 +509,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasCreateTransactionInfo()) {
       osib.setCreateTransactionInfo(snapshotInfoProto.getCreateTransactionInfo());
     }
+    osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath());
 
     return osib;
   }
