@@ -104,6 +104,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
+  private final OzoneManagerSuccessfulRequestHandler successfulRequestHandler;
 
   /** The last {@link TermIndex} received from {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
@@ -133,6 +134,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
     this.nettyMetrics = NettyMetrics.create();
+    this.successfulRequestHandler = new OzoneManagerSuccessfulRequestHandler(ozoneManager);
   }
 
   /**
@@ -413,13 +415,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
-          .thenApply(this::processResponse);
+          .thenApply(resp -> processResponse(request, resp, termIndex));
     } catch (Exception e) {
       return completeExceptionally(e);
     }
   }
 
-  private Message processResponse(OMResponse omResponse) {
+  private Message processResponse(OMRequest request, OMResponse omResponse, TermIndex termIndex) {
     if (!omResponse.getSuccess()) {
       // INTERNAL_ERROR or METADATA_ERROR are considered as critical errors.
       // In such cases, OM must be terminated instead of completing the future exceptionally,
@@ -429,6 +431,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       } else if (omResponse.getStatus() == METADATA_ERROR) {
         terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
       }
+    } else {
+      // The operation completed successfully - hand off the request
+      // so we can perform some post-actions
+      successfulRequestHandler.handle(termIndex.getIndex(), request);
     }
 
     // For successful response and non-critical errors, convert the response.
