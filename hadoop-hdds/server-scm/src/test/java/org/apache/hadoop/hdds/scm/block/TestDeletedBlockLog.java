@@ -891,7 +891,6 @@ public class TestDeletedBlockLog {
     }
 
     ArrayList txIdList = data.keySet().stream().collect(Collectors.toCollection(ArrayList::new));
-    long initialHitFromCacheCount = metrics.getNumBlockDeletionTransactionSizeFromCache();
 
     if (dataDistributionFinalized) {
       Map<Long, TxBlockInfo> txSizeMap = statusManager.getTxSizeMap();
@@ -925,10 +924,6 @@ public class TestDeletedBlockLog {
      */
     System.out.println((System.nanoTime() - startTime) / 100000 + " ms to remove " + txCount + " txs from DB, " +
         "dataDistributionFinalized " + dataDistributionFinalized);
-    if (dataDistributionFinalized) {
-      GenericTestUtils.waitFor(() ->
-          metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount == txCount, 100, 5000);
-    }
   }
 
   private void mockStandAloneContainerInfo(long containerID, DatanodeDetails dd)

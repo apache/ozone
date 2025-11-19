@@ -483,7 +483,6 @@ public class SCMDeletedBlockTransactionStatusManager {
         TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
         if (txBlockInfo != null) {
           descDeletedBlocksSummary(txBlockInfo);
-          metrics.incrBlockDeletionTransactionSizeFromCache();
         }
       }
       deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());

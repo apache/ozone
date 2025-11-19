@@ -102,9 +102,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   private final Map<DatanodeID, DatanodeCommandDetails> numCommandsDatanode = new ConcurrentHashMap<>();
 
-  @Metric(about = "The number of transactions whose totalBlockSize is fetched from in memory cache")
-  private MutableGaugeLong numBlockDeletionTransactionSizeFromCache;
-
   private static final MetricsInfo NUM_BLOCK_DELETION_TRANSACTIONS = Interns.info(
       "numBlockDeletionTransactions",
       "The number of transactions in DB.");
@@ -185,10 +182,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     this.numProcessedTransactions.incr();
   }
 
-  public void incrBlockDeletionTransactionSizeFromCache() {
-    this.numBlockDeletionTransactionSizeFromCache.incr();
-  }
-
   public void setNumBlockDeletionTransactionDataNodes(long dataNodes) {
     this.numBlockDeletionTransactionDataNodes.set(dataNodes);
   }
@@ -266,10 +259,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
-  public long getNumBlockDeletionTransactionSizeFromCache() {
-    return numBlockDeletionTransactionSizeFromCache.value();
-  }
-
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean all) {
     MetricsRecordBuilder builder = metricsCollector.addRecord(SOURCE_NAME);
@@ -289,7 +278,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     // add metrics for deleted block transaction summary
     HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
     if (summary != null) {
-      numBlockDeletionTransactionSizeFromCache.snapshot(builder, all);
       builder = builder.endRecord().addRecord(SOURCE_NAME)
           .addGauge(NUM_BLOCK_DELETION_TRANSACTIONS, summary.getTotalTransactionCount());
       builder = builder.endRecord().addRecord(SOURCE_NAME)
@@ -443,9 +431,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append(numBlockDeletionTransactionFailureOnDatanodes.value()).append('\t')
         .append("numBlockAddedForDeletionToDN = ")
         .append(numBlockAddedForDeletionToDN.value()).append('\t')
-        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode)
-        .append("numBlockDeletionTransactionSizeReFetch = ")
-        .append(numBlockDeletionTransactionSizeFromCache.value()).append('\t');
+        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }
 }
