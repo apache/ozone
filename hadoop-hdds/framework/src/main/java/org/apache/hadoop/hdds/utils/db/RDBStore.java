@@ -189,6 +189,7 @@ public class RDBStore implements DBStore {
     return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
   }
 
+  @Override
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
@@ -330,6 +331,29 @@ public class RDBStore implements DBStore {
   @Override
   public Map<Integer, String> getTableNames() {
     return db.getColumnFamilyNames();
+  }
+
+  /**
+  /**
+   * Drops a table from the database by removing its associated column family.
+   * <p>
+   * <b>Warning:</b> This operation should be used with extreme caution. If the table needs to be used again,
+   * it is recommended to reinitialize the entire DB store, as the column family will be permanently
+   * removed from the database. This method is suitable for truncating a RocksDB column family in a single operation.
+   *
+   * @param tableName the name of the table to be dropped
+   * @throws RocksDatabaseException if an error occurs while attempting to drop the table
+   */
+  @Override
+  public void dropTable(String tableName) throws RocksDatabaseException {
+    ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily != null) {
+      try {
+        db.getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+      } catch (RocksDBException e) {
+        throw new RocksDatabaseException("Failed to drop " + tableName, e);
+      }  
+    }
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
