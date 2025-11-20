@@ -256,16 +256,24 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       return i.callRealMethod();
     }).when(lock).acquireReadLock(eq(SNAPSHOT_DB_CONTENT_LOCK), anyString());
     List<String> snapshotIds = Collections.singletonList(snapInfo.getSnapshotId().toString());
-    try (BatchOperation batchOperation =
-        omMetadataManager.getStore().initBatchOperation()) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture.runAsync(() -> {
+      try (BatchOperation batchOperation =
+               omMetadataManager.getStore().initBatchOperation()) {
 
-      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deleteKeysAndRenamedEntry.getKey(),
-          deleteKeysAndRenamedEntry.getValue(), snapInfo, null, null);
-      omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
+        OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deleteKeysAndRenamedEntry.getKey(),
+            deleteKeysAndRenamedEntry.getValue(), snapInfo, null, null);
+        omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
-      // Do manual commit and see whether addToBatch is successful or not.
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
+        // Do manual commit and see whether addToBatch is successful or not.
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      } catch (IOException e) {
+        future.completeExceptionally(e);
+        return;
+      }
+      future.complete(null);
+    });
+    future.get();
     assertEquals(snapshotIds, locks);
     snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapInfo.getTableKey());
     assertEquals(snapshotInfoOnDisk, snapInfo);
