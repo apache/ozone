@@ -33,16 +33,11 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHE
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * HTTP server for the S3 Gateway STS endpoint.
  */
 public class S3STSHttpServer extends BaseHttpServer {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3STSHttpServer.class);
 
   S3STSHttpServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
