@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -29,7 +31,14 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public interface DeletedBlockLogStateManager {
   @Replicate
-  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+      DeletedBlocksTransactionSummary summary) throws IOException;
+
+  @Replicate
+  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException;
+
+  @Replicate
+  void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException;
 
   @Replicate
@@ -49,7 +58,10 @@ public interface DeletedBlockLogStateManager {
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
 
+  ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException;
+
   void onFlush();
 
-  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable);
+  void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
+      Table<String, ByteString> statefulConfigTable);
 }
