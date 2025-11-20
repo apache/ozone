@@ -23,16 +23,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 
 /**
  * JmxMetricsCollectorTask is a Callable implementation that retrieves specific
  * JMX metrics from a given DataNode's HTTP JMX endpoint. It fetches the metrics
  * for a given service and metric name, parses the response JSON, and extracts
  * the desired metric value.
- *
  * This task is primarily designed to collect metrics in a concurrent manner and
  * return the results wrapped in a JmxMetricsCollectorTaskResult object, which
  * contains the DataNode details and the fetched metric value.
@@ -40,20 +42,20 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 public class JmxMetricsCollectorTask implements Callable<JmxMetricsCollectorTaskResult> {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final int HTTP_CONNECT_TIMEOUT_MS = 5000;
-  private static final int HTTP_SOCKET_TIMEOUT_MS = 10000;
 
+  private final OzoneConfiguration configuration;
   private final DatanodeDetails datanodeDetails;
   private final String componentName;
   private final String serviceName;
   private final String keyName;
 
-  public JmxMetricsCollectorTask(DatanodeDetails datanodeDetails,
+  public JmxMetricsCollectorTask(OzoneConfiguration configuration, DatanodeDetails datanodeDetails,
                                  String componentName, String serviceName, String keyName) {
     this.datanodeDetails = datanodeDetails;
     this.componentName = componentName;
     this.serviceName = serviceName;
     this.keyName = keyName;
+    this.configuration = configuration;
   }
 
   @Override
@@ -65,21 +67,21 @@ public class JmxMetricsCollectorTask implements Callable<JmxMetricsCollectorTask
     if (datanodeDetails == null) {
       throw new IOException("DataNode details are null");
     }
-    // Construct metrics URL for DataNode JMX endpoint
-    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=%s,name=%s",
-        datanodeDetails.getIpAddress(),
-        datanodeDetails.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
-        componentName,
-        serviceName);
     HttpURLConnection connection = null;
     try {
       // Use standard Java HttpURLConnection (compatible with all HTTP implementations)
-      URL url = new URL(metricsUrl);
+      URL url = new URL(getJmxMetricsUrl());
       connection = (HttpURLConnection) url.openConnection();
-
       // Set timeouts to prevent indefinite blocking
-      connection.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);
-      connection.setReadTimeout(HTTP_SOCKET_TIMEOUT_MS);
+      int httpSocketTimeout = configuration.getInt(
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_SOCKET_TIMEOUT_MS,
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_SOCKET_TIMEOUT_MS_DEFAULT);
+      int httpConnectTimeout = configuration.getInt(
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_CONNECT_TIMEOUT_MS,
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_CONNECT_TIMEOUT_MS_DEFAULT);
+
+      connection.setConnectTimeout(httpConnectTimeout);
+      connection.setReadTimeout(httpSocketTimeout);
       connection.setRequestMethod("GET");
 
       // Check HTTP response code
@@ -94,7 +96,7 @@ public class JmxMetricsCollectorTask implements Callable<JmxMetricsCollectorTask
       try (InputStream in = connection.getInputStream()) {
         // Use Apache Commons IO for Java compatibility (works with Java 8+)
         byte[] responseBytes = IOUtils.toByteArray(in);
-        jsonResponse = new String(responseBytes, "UTF-8");
+        jsonResponse = new String(responseBytes, StandardCharsets.UTF_8);
       }
       // Parse and extract metric value
       return new JmxMetricsCollectorTaskResult(datanodeDetails, parseMetrics(jsonResponse, serviceName, keyName));
@@ -137,5 +139,16 @@ public class JmxMetricsCollectorTask implements Callable<JmxMetricsCollectorTask
    */
   private static long extractMetrics(JsonNode beanNode, String keyName) {
     return beanNode.path(keyName).asLong(0L);
+  }
+
+  private String getJmxMetricsUrl() {
+    datanodeDetails.validateDatanodeIpAddress();
+    boolean useHttps = datanodeDetails.getPort(DatanodeDetails.Port.Name.HTTPS) != null;
+    DatanodeDetails.Port.Name portName = useHttps ?
+        DatanodeDetails.Port.Name.HTTPS : DatanodeDetails.Port.Name.HTTP;
+    int port = datanodeDetails.getPort(portName).getValue();
+    String protocol = useHttps ? "https" : "http";
+    return String.format("%s://%s:%d/jmx?qry=Hadoop:service=%s,name=%s", protocol,
+        datanodeDetails.getIpAddress(), port, componentName, serviceName);
   }
 }

@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.LongMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -79,8 +80,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionSuccessfulResponse() throws IOException {
     setupMockDependencies();
     setupSuccessfulScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
 
     assertNotNull(response);
@@ -110,8 +111,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithSCMExceptionResponse() throws IOException {
     setupMockDependencies();
     setupScmExceptionScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -138,8 +139,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithEmptyNodeList() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.emptyList());
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -151,8 +152,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithNullNodeStats() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getNodeStat(datanodeDetails)).thenReturn(null);
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -164,8 +165,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithNullGlobalStats() throws IOException {
     setupMockDependencies();
     when(mockNodeManager.getStats()).thenReturn(null);
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -177,8 +178,8 @@ class TestStorageDistributionEndpoint {
   void testGetStorageDistributionWithUnreachableNodes() throws IOException {
     setupMockDependencies();
     setupUnreachableNodesScenario();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -190,8 +191,8 @@ class TestStorageDistributionEndpoint {
   @Test
   void testGetStorageDistributionWithJmxMetricsFailure() throws IOException {
     setupMockDependencies();
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -273,8 +274,8 @@ class TestStorageDistributionEndpoint {
     when(mockScmClient.getDeletedBlockSummary()).thenReturn(scmSummary);
 
     // Execute the test
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
 
     // Verify response is successful despite timeouts
@@ -328,8 +329,8 @@ class TestStorageDistributionEndpoint {
     when(mockScmClient.getDeletedBlockSummary())
         .thenThrow(new IOException("JMX SCM timeout"));
 
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
     Response response = endpoint.getStorageDistribution();
 
     // Should still return OK with default/fallback values
@@ -367,8 +368,7 @@ class TestStorageDistributionEndpoint {
     when(mockNodeManager.getNodeStat(slowNode)).thenAnswer(invocation -> {
       // Simulate slow response
       Thread.sleep(100); // Short delay to simulate slow response
-      SCMNodeMetric nodeMetric = new SCMNodeMetric(slowNodeStat);
-      return nodeMetric;
+      return new SCMNodeMetric(slowNodeStat);
     });
 
     when(slowNodeStat.getCapacity()).thenReturn(new LongMetric(NODE_CAPACITY));
@@ -376,8 +376,8 @@ class TestStorageDistributionEndpoint {
     when(slowNodeStat.getRemaining()).thenReturn(new LongMetric(NODE_FREE));
     when(slowNodeStat.getCommitted()).thenReturn(new LongMetric(COMMITTED_SIZE));
 
-    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm,
-        mockNsSummaryEndpoint, globalStatsManager, mockScmClient, mockReconGlobalMetricsService);
+    StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockNsSummaryEndpoint,
+        globalStatsManager, mockScmClient, mockReconGlobalMetricsService, new OzoneConfiguration());
 
     Response response = endpoint.getStorageDistribution();
 

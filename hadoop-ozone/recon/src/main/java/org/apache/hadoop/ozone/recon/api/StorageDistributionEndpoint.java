@@ -36,8 +36,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -83,19 +85,21 @@ public class StorageDistributionEndpoint {
   private final Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
-  private static final int THREAD_POOL_SIZE = 10;
+  private final OzoneConfiguration conf;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
                                      StorageContainerLocationProtocol scmClient,
-                                     ReconGlobalMetricsService reconGlobalMetricsService) {
+                                     ReconGlobalMetricsService reconGlobalMetricsService,
+                                     OzoneConfiguration conf) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.scmClient = scmClient;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
+    this.conf = conf;
   }
 
   @GET
@@ -289,11 +293,14 @@ public class StorageDistributionEndpoint {
 
   private void initializeBlockDeletionMetricsMap() {
     List<JmxMetricsCollectorTask> tasks = nodeManager.getNodeStats().keySet().stream().map(dn ->
-      new JmxMetricsCollectorTask(dn, "HddsDatanode",
+      new JmxMetricsCollectorTask(conf, dn, "HddsDatanode",
           "BlockDeletingService", "TotalPendingBlockBytes"))
         .collect(Collectors.toList());
     try {
-      ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+      int threadPoolSize = conf.getInt(
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE,
+          ReconConfigKeys.OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE_DEFAULT);
+      ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
       List<Future<JmxMetricsCollectorTaskResult>> results = executor.invokeAll(tasks);
 
       for (Future<JmxMetricsCollectorTaskResult> result : results) {
