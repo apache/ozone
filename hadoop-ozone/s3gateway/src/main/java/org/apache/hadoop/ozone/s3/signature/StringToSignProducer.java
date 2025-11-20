@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -118,7 +117,6 @@ public final class StringToSignProducer {
     }
     strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
     strToSign.append(credentialScope).append(NEWLINE);
-
     String canonicalRequest = buildCanonicalRequest(
         scheme,
         method,
@@ -126,7 +124,7 @@ public final class StringToSignProducer {
         signatureInfo.getSignedHeaders(),
         headers,
         queryParams,
-        !signatureInfo.isSignPayload());
+        signatureInfo.getPayloadHash());
     strToSign.append(hash(canonicalRequest));
     if (LOG.isDebugEnabled()) {
       LOG.debug("canonicalRequest:[{}]", canonicalRequest);
@@ -160,7 +158,7 @@ public final class StringToSignProducer {
       String signedHeaders,
       Map<String, String> headers,
       Map<String, String> queryParams,
-      boolean unsignedPayload
+      String payloadHash
   ) throws OS3Exception {
 
     Iterable<String> parts = split("/", uri);
@@ -179,6 +177,9 @@ public final class StringToSignProducer {
       canonicalHeaders.append(':');
       if (headers.containsKey(header)) {
         String headerValue = headers.get(header);
+        if (header.equals("content-type")) {
+          headerValue = headerValue.toLowerCase();
+        }
         canonicalHeaders.append(headerValue);
         canonicalHeaders.append(NEWLINE);
 
@@ -197,10 +198,7 @@ public final class StringToSignProducer {
       }
     }
 
-    validateCanonicalHeaders(canonicalHeaders.toString(), headers,
-        unsignedPayload);
-
-    String payloadHash = getPayloadHash(headers, unsignedPayload);
+    validateCanonicalHeaders(canonicalHeaders.toString(), headers);
 
     return method + NEWLINE
         + canonicalUri + NEWLINE
@@ -208,37 +206,6 @@ public final class StringToSignProducer {
         + canonicalHeaders + NEWLINE
         + signedHeaders + NEWLINE
         + payloadHash;
-  }
-
-  private static String getPayloadHash(Map<String, String> headers, boolean isUsingQueryParameter)
-      throws OS3Exception {
-    if (isUsingQueryParameter) {
-      // According to AWS Signature V4 documentation using Query Parameters
-      // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
-      return UNSIGNED_PAYLOAD;
-    }
-    String contentSignatureHeaderValue = headers.get(X_AMZ_CONTENT_SHA256);
-    // According to AWS Signature V4 documentation using Authorization Header
-    // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-    // The x-amz-content-sha256 header is required
-    // for all AWS Signature Version 4 requests using Authorization header.
-    if (contentSignatureHeaderValue == null) {
-      LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
-          + " header for signed payload");
-      throw S3_AUTHINFO_CREATION_ERROR;
-    }
-    // Simply return the header value of x-amz-content-sha256 as the payload hash
-    // These are the possible cases:
-    // 1. Actual payload checksum for single chunk upload
-    // 2. Unsigned payloads for multiple chunks upload
-    //    - UNSIGNED-PAYLOAD
-    //    - STREAMING-UNSIGNED-PAYLOAD-TRAILER
-    // 3. Signed payloads for multiple chunks upload
-    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
-    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
-    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
-    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
-    return contentSignatureHeaderValue;
   }
 
   /**
@@ -357,9 +324,8 @@ public final class StringToSignProducer {
    */
   private static void validateCanonicalHeaders(
       String canonicalHeaders,
-      Map<String, String> headers,
-      Boolean unsignedPaylod
-  ) throws OS3Exception {
+      Map<String, String> headers)
+      throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw S3_AUTHINFO_CREATION_ERROR;
