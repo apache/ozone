@@ -30,9 +30,10 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.util.WithChecksum;
-import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
 
@@ -63,6 +64,9 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Previous snapshotId based on which the snapshot local data is built.
   private UUID previousSnapshotId;
 
+  // Stores the transactionInfo corresponding to OM when the snaphot is purged.
+  private TransactionInfo transactionInfo;
+
   // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
   // checksum computation.
   private final LinkedHashMap<Integer, VersionMeta> versionSstFileInfos;
@@ -73,7 +77,8 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId,
+      TransactionInfo transactionInfo) {
     this.snapshotId = snapshotId;
     this.isSSTFiltered = false;
     this.lastDefragTime = 0L;
@@ -83,6 +88,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
         new VersionMeta(0, notDefraggedSSTFileList.stream().map(SstFileInfo::new).collect(Collectors.toList())));
     this.version = 0;
     this.previousSnapshotId = previousSnapshotId;
+    this.transactionInfo = transactionInfo;
     setChecksumTo0ByteArray();
   }
 
@@ -101,6 +107,15 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
     this.previousSnapshotId = source.previousSnapshotId;
     this.versionSstFileInfos = new LinkedHashMap<>();
     setVersionSstFileInfos(source.versionSstFileInfos);
+    this.transactionInfo = source.transactionInfo;
+  }
+
+  public TransactionInfo getTransactionInfo() {
+    return transactionInfo;
+  }
+
+  public void setTransactionInfo(TransactionInfo transactionInfo) {
+    this.transactionInfo = transactionInfo;
   }
 
   /**
@@ -163,7 +178,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the defragged SST file list.
    * @param versionSstFileInfos Map of version to defragged SST file list
    */
-  public void setVersionSstFileInfos(Map<Integer, VersionMeta> versionSstFileInfos) {
+  void setVersionSstFileInfos(Map<Integer, VersionMeta> versionSstFileInfos) {
     this.versionSstFileInfos.clear();
     this.versionSstFileInfos.putAll(versionSstFileInfos);
   }
@@ -184,9 +199,14 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Adds an entry to the defragged SST file list.
    * @param sstFiles SST file name
    */
-  public void addVersionSSTFileInfos(List<SstFileInfo> sstFiles, int previousSnapshotVersion) {
+  public void addVersionSSTFileInfos(List<LiveFileMetaData> sstFiles, int previousSnapshotVersion) {
     version++;
-    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
+    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles.stream()
+        .map(SstFileInfo::new).collect(Collectors.toList())));
+  }
+
+  public void removeVersionSSTFileInfos(int snapshotVersion) {
+    this.versionSstFileInfos.remove(snapshotVersion);
   }
 
   /**
@@ -274,7 +294,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * maintain immutability.
    */
   public static class VersionMeta implements CopyObject<VersionMeta> {
-    private final int previousSnapshotVersion;
+    private int previousSnapshotVersion;
     private final List<SstFileInfo> sstFiles;
 
     public VersionMeta(int previousSnapshotVersion, List<SstFileInfo> sstFiles) {
@@ -284,6 +304,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
 
     public int getPreviousSnapshotVersion() {
       return previousSnapshotVersion;
+    }
+
+    public void setPreviousSnapshotVersion(int previousSnapshotVersion) {
+      this.previousSnapshotVersion = previousSnapshotVersion;
     }
 
     public List<SstFileInfo> getSstFiles() {

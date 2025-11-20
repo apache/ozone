@@ -685,6 +685,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT =
       "ozone.om.hierarchical.resource.locks.hard.limit";
   public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT = 10000;
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
+      "ozone.om.snapshot.local.data.manager.service.interval";
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
   /**
    * Never constructed.

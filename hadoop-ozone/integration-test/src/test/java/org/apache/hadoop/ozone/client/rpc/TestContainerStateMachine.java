@@ -75,11 +75,6 @@ public class TestContainerStateMachine {
   private String volumeName;
   private String bucketName;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
 
@@ -122,9 +117,6 @@ public class TestContainerStateMachine {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
