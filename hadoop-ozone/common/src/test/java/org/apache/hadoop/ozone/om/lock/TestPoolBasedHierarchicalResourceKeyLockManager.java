@@ -55,7 +55,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * including basic lock operations, concurrency scenarios, resource pool management,
  * and error conditions.
  */
-public class TestPoolBasedHierarchicalResourceLockManager {
+public class TestPoolBasedHierarchicalResourceKeyLockManager {
 
   private PoolBasedHierarchicalResourceLockManager lockManager;
 
