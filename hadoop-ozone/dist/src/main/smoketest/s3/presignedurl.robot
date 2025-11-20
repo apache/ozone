@@ -49,5 +49,6 @@ Presigned URL PUT Object using wrong x-amz-content-sha256
     ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put-wrong-sha    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
     ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
     Should Contain           ${result}    The provided 'x-amz-content-sha256' header does not match the computed hash.
-    ${head_result} =         Execute AWSS3ApiCli    head-object --bucket ${BUCKET} --key test-presigned-put
-    Should Contain           ${head_result}    Error
+    ${head_result} =         Execute AWSS3APICli and ignore error    head-object --bucket ${BUCKET} --key test-presigned-put-wrong-sha
+    Should contain           ${head_result}    404
+    Should contain           ${head_result}    Not Found
