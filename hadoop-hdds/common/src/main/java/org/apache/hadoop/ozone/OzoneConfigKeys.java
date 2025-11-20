@@ -525,11 +525,6 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
-  public static final String OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY =
-      "ozone.om.follower.read.local.lease.enabled";
-  public static final boolean OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT = false;
-
-
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   public static final String OZONE_HTTP_POLICY_KEY =
