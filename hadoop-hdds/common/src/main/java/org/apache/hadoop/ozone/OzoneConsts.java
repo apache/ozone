@@ -222,6 +222,7 @@ public final class OzoneConsts {
   public static final String OM_SST_FILE_INFO_END_KEY = "endKey";
   public static final String OM_SST_FILE_INFO_COL_FAMILY = "columnFamily";
   public static final String OM_SLD_TXN_INFO = "transactionInfo";
+  public static final String OM_SLD_DB_TXN_SEQ_NUMBER = "dbTxSequenceNumber";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
