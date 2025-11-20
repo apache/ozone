@@ -403,7 +403,7 @@ public final class OmVolumeArgs extends WithObjectID
         .build();
   }
 
-  public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo) {
+  public static Builder builderFromProtobuf(VolumeInfo volInfo) {
     return new Builder(OzoneAclUtil.fromProtobuf(volInfo.getVolumeAclsList()))
         .setAdminName(volInfo.getAdminName())
         .setOwnerName(volInfo.getOwnerName())
@@ -416,8 +416,11 @@ public final class OmVolumeArgs extends WithObjectID
         .setModificationTime(volInfo.getModificationTime())
         .setObjectID(volInfo.getObjectID())
         .setUpdateID(volInfo.getUpdateID())
-        .setRefCount(volInfo.getRefCount())
-        .build();
+        .setRefCount(volInfo.getRefCount());
+  }
+
+  public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo) {
+    return builderFromProtobuf(volInfo).build();
   }
 
   @Override
