@@ -741,26 +741,25 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * exist in backup directory before being involved in compactions),
    * and appends the extension '.sst'.
    */
-  private String getSSTFullPath(String sstFilenameWithoutExtension, Path... dbPaths) {
+  private Path getSSTFullPath(SstFileInfo sstFileInfo, Path... dbPaths) throws IOException {
 
     // Try to locate the SST in the backup dir first
-    final Path sstPathInBackupDir = Paths.get(sstBackupDir, sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+    final Path sstPathInBackupDir = sstFileInfo.getFilePath(Paths.get(sstBackupDir).toAbsolutePath());
     if (Files.exists(sstPathInBackupDir)) {
-      return sstPathInBackupDir.toString();
+      return sstPathInBackupDir.toAbsolutePath();
     }
 
     // SST file does not exist in the SST backup dir, this means the SST file
     // has not gone through any compactions yet and is only available in the
     // src DB directory or destDB directory
     for (Path dbPath : dbPaths) {
-      final Path sstPathInDBDir = dbPath.resolve(sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+      final Path sstPathInDBDir = sstFileInfo.getFilePath(dbPath);
       if (Files.exists(sstPathInDBDir)) {
-        return sstPathInDBDir.toString();
+        return sstPathInDBDir.toAbsolutePath();
       }
     }
 
-    // TODO: More graceful error handling?
-    throw new RuntimeException("Unable to locate SST file: " + sstFilenameWithoutExtension);
+    throw new IOException("Unable to locate SST file: " + sstFileInfo);
   }
 
   /**
@@ -772,15 +771,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param dest destination snapshot
    * @param versionMap version map containing the connection between source snapshot version and dest snapshot version.
    * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
-   * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
-   *                                 for snapDiff job.
    * @return A list of SST files without extension.
    *         e.g. ["/path/to/sstBackupDir/000050.sst",
    *               "/path/to/sstBackupDir/000060.sst"]
    */
-  public synchronized Optional<List<String>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
+  public synchronized Optional<Map<Path, SstFileInfo>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
       DifferSnapshotInfo dest, Map<Integer, Integer> versionMap, TablePrefixInfo prefixInfo,
-      Set<String> tablesToLookup, String sstFilesDirForSnapDiffJob) throws IOException {
+      Set<String> tablesToLookup) throws IOException {
     int srcVersion = src.getMaxVersion();
     if (!versionMap.containsKey(srcVersion)) {
       throw new IOException("No corresponding dest version corresponding srcVersion : " + srcVersion + " in " +
@@ -794,16 +791,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     // of the sst file names.
     Optional<List<SstFileInfo>> sstDiffList = getSSTDiffList(srcSnapshotVersion, destSnapshotVersion, prefixInfo,
         tablesToLookup, srcVersion == 0);
-
-    return sstDiffList.map(diffList -> diffList.stream()
-        .map(sst -> {
-          String sstFullPath = getSSTFullPath(sst.getFileName(), srcSnapshotVersion.getDbPath(),
-              destSnapshotVersion.getDbPath());
-          Path link = sst.getFilePath(Paths.get(sstFilesDirForSnapDiffJob));
-          Path srcFile = Paths.get(sstFullPath);
-          createLink(link, srcFile);
-          return link.toString();
-        }).collect(Collectors.toList()));
+    if (sstDiffList.isPresent()) {
+      Map<Path, SstFileInfo> sstFileInfoMap = new HashMap<>();
+      for (SstFileInfo sstFileInfo : sstDiffList.get()) {
+        Path sstPath = getSSTFullPath(sstFileInfo, srcSnapshotVersion.getDbPath());
+        sstFileInfoMap.put(sstPath, sstFileInfo);
+      }
+      return Optional.of(sstFileInfoMap);
+    }
+    return Optional.empty();
   }
 
   /**
