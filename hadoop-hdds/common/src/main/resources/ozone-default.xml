@@ -2022,6 +2022,66 @@
       will be used for http authentication.
     </description>
   </property>
+
+  <property>
+    <name>ozone.s3g.sts.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The boolean which enables the Ozone S3Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTP server.
+      If not set, the value of ozone.s3g.http-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http-address</name>
+    <value>0.0.0.0:9880</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTP address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      Whether the S3 Gateway STS HTTPS endpoint is enabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bind host for the S3 Gateway STS HTTPS server.
+      If not set, the value of ozone.s3g.https-bind-host is used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.https-address</name>
+    <value>0.0.0.0:9881</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The HTTPS address for the S3 Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.sts.http.auth.type</name>
+    <value>kerberos</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEGO
+      will be used for http authentication.
+    </description>
+  </property>
+
   <property>
     <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
