@@ -128,6 +128,8 @@ public class OMException extends IOException {
 
     KEY_NOT_FOUND,
 
+    KEY_GENERATION_MISMATCH,
+
     INVALID_KEY_NAME,
 
     ACCESS_DENIED,
@@ -208,7 +210,7 @@ public class OMException extends IOException {
     USER_MISMATCH, // Error code when requested user name passed is different
     // from remote user.
 
-    INVALID_PART, // When part name is not found or not matching with partname 
+    INVALID_PART, // When part name is not found or not matching with partname
     // in OM MPU partInfo.
 
     INVALID_PART_ORDER, // When list of parts mentioned to complete MPU are not
@@ -267,7 +269,7 @@ public class OMException extends IOException {
     UNAUTHORIZED,
 
     S3_SECRET_ALREADY_EXISTS,
-    
+
     INVALID_PATH,
     TOO_MANY_BUCKETS,
     KEY_UNDER_LEASE_RECOVERY,

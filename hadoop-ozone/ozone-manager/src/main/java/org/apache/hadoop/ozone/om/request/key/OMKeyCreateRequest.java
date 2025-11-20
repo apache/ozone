@@ -189,7 +189,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs.Builder finalNewKeyArgs = newKeyArgs;
     KeyArgs resolvedKeyArgs =
-        captureLatencyNs(perfMetrics.getCreateKeyResolveBucketAndAclCheckLatencyNs(), 
+        captureLatencyNs(perfMetrics.getCreateKeyResolveBucketAndAclCheckLatencyNs(),
             () -> resolveBucketAndCheckKeyAcls(finalNewKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.CREATE));
     newCreateKeyRequest =
@@ -369,7 +369,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       } else {
         perfMetrics.addCreateKeyFailureLatencyNs(createKeyLatency);
       }
-      
+
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
             .releaseWriteLock(omMetadataManager, volumeName,
@@ -471,12 +471,21 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
       throws OMException {
     if (keyArgs.hasExpectedDataGeneration()) {
-      // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
-      if (dbKeyInfo == null) {
-        throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
-      }
-      if (dbKeyInfo.getUpdateID() != keyArgs.getExpectedDataGeneration()) {
-        throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      long expectedGen = keyArgs.getExpectedDataGeneration();
+      // If expectedGen is -1, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == -1L) {
+        if (dbKeyInfo != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+        if (dbKeyInfo == null) {
+          throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+        if (dbKeyInfo.getUpdateID() != expectedGen) {
+          throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+        }
       }
     }
   }
