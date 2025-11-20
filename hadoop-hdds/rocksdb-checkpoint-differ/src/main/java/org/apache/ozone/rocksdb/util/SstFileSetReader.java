@@ -23,6 +23,7 @@ import jakarta.annotation.Nonnull;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.NoSuchElementException;
@@ -51,11 +52,11 @@ import org.rocksdb.RocksDBException;
  */
 public class SstFileSetReader {
 
-  private final Collection<String> sstFiles;
+  private final Collection<Path> sstFiles;
 
   private volatile long estimatedTotalKeys = -1;
 
-  public SstFileSetReader(final Collection<String> sstFiles) {
+  public SstFileSetReader(final Collection<Path> sstFiles) {
     this.sstFiles = sstFiles;
   }
 
@@ -77,9 +78,9 @@ public class SstFileSetReader {
       }
 
       try (ManagedOptions options = new ManagedOptions()) {
-        for (String sstFile : sstFiles) {
+        for (Path sstFile : sstFiles) {
           try (ManagedSstFileReader fileReader = new ManagedSstFileReader(options)) {
-            fileReader.open(sstFile);
+            fileReader.open(sstFile.toAbsolutePath().toString());
             estimatedSize += fileReader.getTableProperties().getNumEntries();
           }
         }
@@ -303,7 +304,7 @@ public class SstFileSetReader {
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
     private final PriorityQueue<HeapEntry<T>> minHeap;
 
-    private MultipleSstFileIterator(Collection<String> sstFiles) {
+    private MultipleSstFileIterator(Collection<Path> sstFiles) {
       this.minHeap = new PriorityQueue<>();
       init();
       initMinHeap(sstFiles);
@@ -313,10 +314,10 @@ public class SstFileSetReader {
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
 
-    private void initMinHeap(Collection<String> files) {
+    private void initMinHeap(Collection<Path> files) {
       try {
-        for (String file : files) {
-          ClosableIterator<T> iterator = getKeyIteratorForFile(file);
+        for (Path file : files) {
+          ClosableIterator<T> iterator = getKeyIteratorForFile(file.toAbsolutePath().toString());
           HeapEntry<T> entry = new HeapEntry<>(iterator);
 
           if (entry.getCurrentKey() != null) {

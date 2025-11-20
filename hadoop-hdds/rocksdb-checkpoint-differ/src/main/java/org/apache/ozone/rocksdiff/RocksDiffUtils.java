@@ -69,12 +69,11 @@ public final class RocksDiffUtils {
 
   /**
    * Filter sst files based on prefixes. The set of sst files to be filtered would be mutated.
-   * @param <T> Type of the key in the map.
    * @param filesToBeFiltered sst files to be filtered.
    * @param tablesToLookup Set of column families to be included in the diff.
    * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
    */
-  public static <T> Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> filesToBeFiltered,
+  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> filesToBeFiltered,
       Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
     for (Iterator<SstFileInfo> fileIterator = filesToBeFiltered.iterator(); fileIterator.hasNext();) {
       SstFileInfo sstFileInfo = fileIterator.next();

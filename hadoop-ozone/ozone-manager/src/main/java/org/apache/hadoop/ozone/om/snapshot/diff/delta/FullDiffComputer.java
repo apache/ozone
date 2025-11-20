@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
  * in files and generates corresponding links for easier processing of snapshot diffs.
  * This implementation handles cases of optimized inode-based comparisons as well as
  * fallback with full file list comparisons in case of exceptions.
+ * The delta files would be all files which are present in the source snapshot and not present in the target snapshot
+ * and vice versa.
  */
 class FullDiffComputer extends FileLinkDeltaFileComputer {
 
