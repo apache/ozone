@@ -210,6 +210,7 @@ public class SnapshotDefragService extends BackgroundService
              snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
       // Read snapshot local metadata from YAML
       // Check if snapshot needs compaction (defragmentation)
+      writableOmSnapshotLocalDataProvider.commit();
       boolean needsDefrag = writableOmSnapshotLocalDataProvider.needsDefrag();
       OmSnapshotLocalData localData = writableOmSnapshotLocalDataProvider.getSnapshotLocalData();
       if (!needsDefrag) {
