@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.util.Map;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.tuple.Pair;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,13 +64,13 @@ final class ObjectEndpointStreaming {
       OzoneBucket bucket, String keyPath,
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
-      Map<String, String> tags,
-      MultiDigestInputStream body, PerformanceStringBuilder perf)
-      throws IOException, OS3Exception {
+      Map<String, String> tags, MultiDigestInputStream body,
+      HttpHeaders headers, boolean isSignedPayload,
+      PerformanceStringBuilder perf) throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
-          length, chunkSize, replicationConfig, keyMetadata, tags, body, perf);
+          length, chunkSize, replicationConfig, keyMetadata, tags, body, headers, isSignedPayload, perf);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -100,19 +102,36 @@ final class ObjectEndpointStreaming {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
       Map<String, String> tags,
-      MultiDigestInputStream body, PerformanceStringBuilder perf)
-      throws IOException {
+      MultiDigestInputStream body, HttpHeaders headers,
+      boolean isSignedPayload, PerformanceStringBuilder perf) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
-    long writeLen;
-    String eTag;
-    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata, tags)) {
+    long writeLen = 0;
+    String eTag = null;
+    boolean hasValidSha256 = true;
+    OzoneDataStreamOutput streamOutput = null;
+    try {
+      streamOutput = bucket.createStreamKey(keyPath,
+        length, replicationConfig, keyMetadata, tags);
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
+      String sha256 = DatatypeConverter.printHexBinary(
+          body.getMessageDigest("SHA-256").digest()).toLowerCase();
+      hasValidSha256 = S3Utils.isValidXAmzContentSHA256Header(headers, sha256, isSignedPayload);
+      if (!hasValidSha256) {
+        throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+      }
+      streamOutput.close();
+    } catch (Exception ex) {
+      if (hasValidSha256) {
+        streamOutput.close();
+      } else {
+        streamOutput.getKeyDataStreamOutput().cleanup();
+      }
+      throw ex;
     }
     return Pair.of(eTag, writeLen);
   }
