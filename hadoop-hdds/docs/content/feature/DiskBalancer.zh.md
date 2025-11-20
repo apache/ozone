@@ -50,63 +50,120 @@ DiskBalancer 通过 `ozone admin datanode diskbalancer` 命令进行管理。
 **注意：**此命令在主帮助信息（`ozone admin datanode --help`）中隐藏。这是因为该功能目前处于实验阶段，默认禁用。隐藏该命令可防止意外使用，
 并为普通用户提供清晰的帮助输出。但是，对于希望启用和使用该功能的用户，该命令仍然完全可用。
 
-### **启动 DiskBalancer**
-要在所有 Datanode 上使用默认配置启动 DiskBalancer，请执行以下操作：
-
-```shell
-ozone admin datanode diskbalancer start -a
+### 命令语法
+**启动 DiskBalancer：**
+```bash
+ozone admin datanode diskbalancer start [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
-您还可以使用特定选项启动 DiskBalancer：
-```shell
-ozone admin datanode diskbalancer start [options]
+**停止 DiskBalancer：**
+```bash
+ozone admin datanode diskbalancer stop [<datanode-address> ...] [--in-service-datanodes]
 ```
 
-### **更新配置**
-要更新 DiskBalancer 配置，您可以使用以下命令：
-
-```shell
-ozone admin datanode diskbalancer update [options]
+**更新配置：**
+```bash
+ozone admin datanode diskbalancer update [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
 ```
-**选项包括：**
 
-| 选项                           | 描述                              |                                                                                                                                                             
-|------------------------------|---------------------------------|
-| `-t, --threshold`            | 与磁盘平均利用率的百分比偏差，超过此偏差，数据节点将重新平衡。 |
-| `-b, --bandwithInMB`         | DiskBalancer 每秒的最大带宽。           |
-| `-p, --parallelThread`       | DiskBalancer 的最大并行线程。           |
-| `-s, --stop-after-disk-even` | 磁盘利用率达到均匀后自动停止 DiskBalancer。    |
-| `-a, --all`                  | 在所有数据节点上运行命令。                   |
-| `-d, --datanodes`            | 在特定数据节点上运行命令                    |
-
-### **停止 DiskBalancer**
-要停止所有 Datanode 上的 DiskBalancer，请执行以下操作：
-
-```shell
-ozone admin datanode diskbalancer stop -a
+**获取状态：**
+```bash
+ozone admin datanode diskbalancer status [<datanode-address> ...] [--in-service-datanodes] [--json]
 ```
-您还可以停止特定 Datanode 上的 DiskBalancer：
 
-```shell
-ozone admin datanode diskbalancer stop -d <datanode1>
+**获取报告：**
+```bash
+ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-datanodes] [--json]
 ```
-### **磁盘平衡器状态**
-要检查所有数据节点上的磁盘平衡器状态，请执行以下操作：
 
-```shell
-ozone admin datanode diskbalancer status
-```
-您还可以检查特定 Datanode 上 DiskBalancer 的状态：
-```shell
-ozone admin datanode diskbalancer status -d <datanode1>
-```
-### **磁盘平衡器报告**
-要获取前**N**个数据节点（按降序显示）的磁盘平衡器**volumeDataDensity**，
-默认 N=25，如未指定：
+### 命令选项
 
-```shell
-ozone admin datanode diskbalancer report --count <N>
+| Option                              | Description                                                                                                                                                                                                      | Example                                        |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| `<datanode-address>`                | 一个或多个数据节点地址作为位置参数。地址可以是：<br>- 主机名（例如，`DN-1`）- 使用默认的 CLIENT_RPC 端口 (9858)<br>- 带端口的主机名（例如，`DN-1:9858`）<br>- IP 地址（例如，`192.168.1.10`）<br>- 带端口的 IP 地址（例如，`192.168.1.10:9858`）<br>- 标准输入 (`-`) - 从标准输入读取数据节点地址，每行一个 | `DN-1`<br>`DN-1:9858`<br>`192.168.1.10`<br>`-` |
+| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
+| `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
+| `-t/--threshold`                    | 体积密度阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold 5.0`                    |
+| `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
+| `-p/--parallel-thread`              | 并行线程数（默认值：1）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：false）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+
+### 示例
+**启动 DiskBalancer：**
+
+```bash
+# 在多个数据节点上启动 DiskBalancer
+ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
+
+# 在所有运行中的数据节点上启动 DiskBalancer
+ozone admin datanode diskbalancer start --in-service-datanodes
+
+# 使用配置参数启动 DiskBalancer
+ozone admin datanode diskbalancer start DN-1 -t 5 -b 20 -p 5
+
+# 从标准输入读取数据节点地址
+echo -e "DN-1\nDN-2" | ozone admin datanode diskbalancer start -
+
+# 使用 JSON 输出启动 DiskBalancer
+ozone admin datanode diskbalancer start DN-1 --json
 ```
+
+**停止 DiskBalancer：**
+
+```bash
+# 在多个数据节点上停止 DiskBalancer
+ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
+
+# 在所有运行中的数据节点上停止 DiskBalancer
+ozone admin datanode diskbalancer stop --in-service-datanodes
+
+# 停止 DiskBalancer 并输出 JSON 信息
+ozone admin datanode diskbalancer stop DN-1 --json
+```
+**更新配置：**
+
+```bash
+# 更新多个参数
+ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
+
+# 更新所有 IN_SERVICE 数据节点
+ozone admin datanode diskbalancer update --in-service-datanodes -t 5
+
+# 更新并输出 JSON 格式
+ozone admin datanode diskbalancer update DN-1 -b 50 --json
+```
+
+**获取状态：**
+
+```bash
+# 从多个数据节点获取状态
+ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
+
+# 从所有处于服务状态的数据节点获取状态
+ozone admin datanode diskbalancer status --in-service-datanodes
+
+# 以 JSON 格式获取状态
+ozone admin datanode diskbalancer status --in-service-datanodes --json
+```
+**获取报告：**
+
+```bash
+# 从多个数据节点获取报告
+ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
+
+# 从所有处于服务状态的数据节点获取报告
+ozone admin datanode diskbalancer report --in-service-datanodes
+
+# 以 JSON 格式获取报告
+ozone admin datanode diskbalancer report --in-service-datanodes --json
+```
+### 身份验证和授权
+
+* **身份验证**：需要 RPC 身份验证（例如，在安全集群中通过 `kinit`）。客户端的身份由数据节点的 RPC 层验证。
+
+* **授权**：每个数据节点都使用 `OzoneAdmins` 根据 `ozone.administrators` 配置执行授权检查：
+- **管理操作**（启动、停止、更新）：要求用户位于 `ozone.administrators` 成员中
+- **只读操作**（状态、报告）：不需要管理员权限
 
 ## DiskBalancer Configurations
 

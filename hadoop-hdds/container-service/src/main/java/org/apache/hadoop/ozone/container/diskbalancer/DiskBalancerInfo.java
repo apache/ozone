@@ -98,6 +98,20 @@ public class DiskBalancerInfo {
     }
   }
 
+  /**
+   * Gives DiskBalancerConfiguration object of already persisting value.
+   *
+   * @return a DiskBalancerConfiguration with persisting values
+   */
+  public DiskBalancerConfiguration toConfiguration() {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+    config.setThreshold(this.threshold);
+    config.setDiskBandwidthInMB(this.bandwidthInMB);
+    config.setParallelThread(this.parallelThread);
+    config.setStopAfterDiskEven(this.stopAfterDiskEven);
+    return config;
+  }
+
   public DiskBalancerRunningStatus getOperationalState() {
     return operationalState;
   }

@@ -86,8 +86,6 @@ message ScmContainerLocationRequest {
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
-  optional DatanodeDiskBalancerInfoRequestProto datanodeDiskBalancerInfoRequest = 50;
-  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 51;
 }
 
 message ScmContainerLocationResponse {
@@ -145,8 +143,6 @@ message ScmContainerLocationResponse {
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
-  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 50;
-  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 51;
 
   enum Status {
     OK = 1;
@@ -203,8 +199,6 @@ enum Type {
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
-  DatanodeDiskBalancerInfo = 46;
-  DatanodeDiskBalancerOp = 47;
 }
 
 /**
@@ -369,35 +363,6 @@ message DatanodeUsageInfoRequestProto {
 
 message DatanodeUsageInfoResponseProto {
   repeated DatanodeUsageInfoProto info = 1;
-}
-
-enum DatanodeDiskBalancerInfoType{
-  report = 1;
-  status = 2;
-}
-
-/*
-  Datanode disk balancer status request message.
-*/
-message DatanodeDiskBalancerInfoRequestProto {
-  required DatanodeDiskBalancerInfoType infoType = 1;
-  optional uint32 count = 2;
-  repeated string hosts = 3;
-  optional DiskBalancerRunningStatus status = 4;
-}
-
-message DatanodeDiskBalancerInfoResponseProto {
-  repeated DatanodeDiskBalancerInfoProto info = 1;
-}
-
-message DatanodeDiskBalancerOpRequestProto {
-  required DiskBalancerOpType opType = 1;
-  repeated string hosts = 2;
-  optional DiskBalancerConfigurationProto conf = 3;
-}
-
-message DatanodeDiskBalancerOpResponseProto {
-  repeated DatanodeAdminErrorResponseProto failedHosts = 1;
 }
 
 /*

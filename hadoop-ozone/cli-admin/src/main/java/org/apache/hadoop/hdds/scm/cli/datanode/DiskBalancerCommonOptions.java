@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import java.util.Collections;
 import java.util.List;
 import picocli.CommandLine;
 
@@ -25,14 +26,8 @@ import picocli.CommandLine;
  */
 public class DiskBalancerCommonOptions {
 
-  @CommandLine.Option(names = {"-d", "--datanodes"},
-      description = "Datanode address(es) in the format <hostname[:port]> or <ip[:port]>. " +
-          "Port is optional and defaults to 9858 (CLIENT_RPC port). " +
-          "Multiple addresses can be comma-separated. " +
-          "Examples: 'DN-1', 'DN-1:9858', '192.168.1.10', 'DN-1,DN-2:9999,DN-3'",
-      required = false,
-      split = ",")
-  private List<String> datanodes;
+  @CommandLine.Mixin
+  private DatanodeParameters datanodeParameters;
 
   @CommandLine.Option(names = {"--in-service-datanodes"},
       description = "If set, the client will send DiskBalancer requests " +
@@ -40,11 +35,22 @@ public class DiskBalancerCommonOptions {
       required = false)
   private boolean inServiceDatanodes;
 
+  @CommandLine.Option(names = {"--json"},
+      description = "Format output as JSON",
+      defaultValue = "false")
+  private boolean json;
+
   public List<String> getDatanodes() {
-    return datanodes;
+    // Return empty list if datanodeParameters is null
+    // when --in-service-datanodes is used without positional args
+    return datanodeParameters != null ? datanodeParameters.getDatanodes() : Collections.emptyList();
   }
 
   public boolean isInServiceDatanodes() {
     return inServiceDatanodes;
+  }
+
+  public boolean isJson() {
+    return json;
   }
 }

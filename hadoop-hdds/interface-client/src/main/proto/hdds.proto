@@ -564,12 +564,6 @@ enum DiskBalancerRunningStatus {
     PAUSED = 3;
 }
 
-enum DiskBalancerOpType{
-    START = 1;
-    STOP = 2;
-    UPDATE = 3;
-}
-
 message DatanodeDiskBalancerInfoProto {
     required DatanodeDetailsProto node = 1;
     required double currentVolumeDensitySum = 2;
