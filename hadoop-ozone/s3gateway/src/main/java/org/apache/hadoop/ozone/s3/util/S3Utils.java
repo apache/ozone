@@ -223,39 +223,29 @@ public final class S3Utils {
   }
 
   /**
-   * Validates that the x-amz-content-sha256 header matches the actual SHA-256 hash.
+   * Checks if the x-amz-content-sha256 header is valid.
    *
    * @param headers the HTTP headers containing the x-amz-content-sha256 header
    * @param actualSha256 the actual SHA-256 hash computed from the content
    * @param isSignedPayload whether the payload is signed
-   * @param resource the resource path for error reporting
-   * @throws OS3Exception if the header is missing (for signed payloads) or mismatched
+   * @return true if the header is valid, false otherwise
    */
-  public static void validateXAmzContentSHA256Header(HttpHeaders headers, String actualSha256,
-                                                      boolean isSignedPayload, String resource)
-      throws OS3Exception {
+  public static boolean isValidXAmzContentSHA256Header(HttpHeaders headers, String actualSha256,
+                                                        boolean isSignedPayload) {
     final String expectedSha256 = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
 
     // If header is missing
     if (expectedSha256 == null) {
       // Allow missing header only for unsigned payloads
-      if (isSignedPayload) {
-        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
-        ex.setErrorMessage("An error occurred (InvalidArgument): " +
-            "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");
-        throw ex;
-      }
-      return;
+      return !isSignedPayload;
     }
 
     // Skip validation for unsigned or multi-chunks payloads
     if (hasUnsignedPayload(expectedSha256) || hasMultiChunksPayload(expectedSha256)) {
-      return;
+      return true;
     }
 
     // Validate that expected and actual SHA-256 match
-    if (!expectedSha256.equals(actualSha256)) {
-      throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, resource);
-    }
+    return expectedSha256.equals(actualSha256);
   }
 }

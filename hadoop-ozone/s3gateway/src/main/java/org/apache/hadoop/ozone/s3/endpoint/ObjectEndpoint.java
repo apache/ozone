@@ -137,6 +137,7 @@ import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
@@ -341,25 +342,43 @@ public class ObjectEndpoint extends EndpointBase {
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
-        try (OzoneOutputStream output = getClientProtocol().createKey(
-            volume.getName(), bucketName, keyPath, length, replicationConfig,
-            customMetadata, tags)) {
+        OzoneOutputStream output = null;
+        boolean hasValidSha256 = true;
+        try {
+          output = getClientProtocol().createKey(
+              volume.getName(), bucketName, keyPath, length, replicationConfig,
+              customMetadata, tags);
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
           putLength = IOUtils.copyLarge(multiDigestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
+
+          // validate "X-AMZ-CONTENT-SHA256"
+          String sha256 = DatatypeConverter.printHexBinary(
+                  multiDigestInputStream.getMessageDigest("SHA-256").digest())
+              .toLowerCase();
           eTag = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
+          hasValidSha256 = S3Utils.isValidXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload());
+          if (!hasValidSha256) {
+            throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+          }
+          output.close();
+        } catch (Exception e) {
+          if (output == null) {
+            throw e;
+          }
+          if (hasValidSha256) {
+            output.close();
+          } else {
+            output.getKeyOutputStream().cleanup();
+          }
+          throw e;
         }
       }
-      // validate "X-AMZ-CONTENT-SHA256"
-      String sha256 = DatatypeConverter.printHexBinary(
-              multiDigestInputStream.getMessageDigest("SHA-256").digest())
-          .toLowerCase();
-      S3Utils.validateXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload(), keyPath);
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
