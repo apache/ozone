@@ -172,7 +172,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     SHA_256_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
-        return MessageDigest.getInstance("SHA-256");
+        return MessageDigest.getInstance(OzoneConsts.FILE_HASH);
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }
@@ -355,7 +355,7 @@ public class ObjectEndpoint extends EndpointBase {
 
           // validate "X-AMZ-CONTENT-SHA256"
           String sha256 = DatatypeConverter.printHexBinary(
-                  multiDigestInputStream.getMessageDigest("SHA-256").digest())
+                  multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).digest())
               .toLowerCase();
           eTag = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -427,7 +427,7 @@ public class ObjectEndpoint extends EndpointBase {
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
         multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest("SHA-256").reset();
+        multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).reset();
       }
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -1156,7 +1156,7 @@ public class ObjectEndpoint extends EndpointBase {
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
         multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest("SHA-256").reset();
+        multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).reset();
       }
     }
   }

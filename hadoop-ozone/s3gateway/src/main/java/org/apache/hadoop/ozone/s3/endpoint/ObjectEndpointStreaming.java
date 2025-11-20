@@ -119,7 +119,7 @@ final class ObjectEndpointStreaming {
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
       String sha256 = DatatypeConverter.printHexBinary(
-          body.getMessageDigest("SHA-256").digest()).toLowerCase();
+          body.getMessageDigest(OzoneConsts.FILE_HASH).digest()).toLowerCase();
       hasValidSha256 = S3Utils.isValidXAmzContentSHA256Header(headers, sha256, isSignedPayload);
       if (!hasValidSha256) {
         throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
