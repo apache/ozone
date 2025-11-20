@@ -23,6 +23,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotificationStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 
 import org.slf4j.Logger;
@@ -50,6 +51,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
   private OMEventListenerLedgerPoller ledgerPoller;
   private KafkaClientWrapper kafkaClient;
+  private OMEventListenerNotificationStrategy notificationStrategy;
   private OMEventListenerLedgerPollerSeekPosition seekPosition;
 
   @Override
@@ -69,6 +71,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
         kafkaServiceInterval, kafkaServiceTimeout, kafkaProps,
         seekPosition);
 
+    this.notificationStrategy = new S3EventNotificationStrategy();
     this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
 
     this.ledgerPoller = new OMEventListenerLedgerPoller(
@@ -103,27 +106,18 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
   // callback called by OMEventListenerLedgerPoller
   public void handleCompletedRequest(OmCompletedRequestInfo completedRequestInfo) {
-    LOG.info("Processing {}", completedRequestInfo);
+    List<String> eventsToSend = notificationStrategy.determineEventsForOperation(completedRequestInfo);
 
-    // stub event until we implement a strategy to convert the events to
-    // a user facing schema (e.g. S3)
-    String event = String.format("{\"key\":\"%s/%s/%s\", \"type\":\"%s\"}",
-        completedRequestInfo.getVolumeName(),
-        completedRequestInfo.getBucketName(),
-        completedRequestInfo.getKeyName(),
-        String.valueOf(completedRequestInfo.getOpArgs().getOperationType()));
-
-
-    LOG.info("Sending {}", event);
-
-    try {
-      kafkaClient.send(event);
-    } catch (IOException ex) {
-      LOG.error("Failure to send event {}", event, ex);
-      return;
+    for (String event : eventsToSend) {
+      try {
+        kafkaClient.send(event);
+      } catch (IOException ex) {
+        LOG.error("Failure to send event {}", event, ex);
+        return;
+      }
     }
 
-    // we can update the seek position
+    // no errors so we can update the seek position
     seekPosition.set(completedRequestInfo.getDbKey());
   }
 

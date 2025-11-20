@@ -108,8 +108,8 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(events).hasSize(1);
 
     assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key1"))
-        .contains(toJsonKeyVal("type", "CREATE_KEY"));
+        .contains(toJsonKeyVal("eventName", "ObjectCreated:Put"))
+        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key1"));
   }
 
   @Test
@@ -124,8 +124,11 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(events).hasSize(1);
 
     assertThat(events.get(0))
+        .contains(toJsonKeyVal("eventName", "ObjectCreated:Put"))
         .contains(toJsonKeyVal("key", "vol1/bucket1/some/key2"))
-        .contains(toJsonKeyVal("type", "CREATE_FILE"));
+        .contains(toJsonKeyVal("isDirectory", "false"))
+        .contains(toJsonKeyVal("isRecursive", "false"))
+        .contains(toJsonKeyVal("isOverwrite", "true"));
   }
 
   @Test
@@ -137,8 +140,9 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(events).hasSize(1);
 
     assertThat(events.get(0))
+        .contains(toJsonKeyVal("eventName", "ObjectCreated:Put"))
         .contains(toJsonKeyVal("key", "vol1/bucket1/some/key3"))
-        .contains(toJsonKeyVal("type", "CREATE_DIRECTORY"));
+        .contains(toJsonKeyVal("isDirectory", "true"));
   }
 
   @Test
@@ -150,7 +154,8 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(events).hasSize(1);
 
     assertThat(events.get(0))
-        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key4"))
-        .contains(toJsonKeyVal("type", "RENAME_KEY"));
+        .contains(toJsonKeyVal("eventName", "ObjectRenamed:Rename"))
+        .contains(toJsonKeyVal("key", "vol1/bucket1/some/key_RENAMED"))
+        .contains(toJsonKeyVal("renameFromKey", "vol1/bucket1/some/key4"));
   }
 }
