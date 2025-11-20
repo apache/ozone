@@ -44,6 +44,7 @@
     <module>mini-cluster</module>
     <module>multitenancy-ranger</module>
     <module>ozone-manager</module>
+    <module>ozone-manager-plugins</module>
     <module>ozonefs</module>
     <module>ozonefs-common</module>
     <module>recon</module>
