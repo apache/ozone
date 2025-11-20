@@ -157,8 +157,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       }
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
-        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-        keyInfo.setCommittedKeyDeletedFlag(true);
+        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key)
+            .withCommittedKeyDeletedFlag(true);
         String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())

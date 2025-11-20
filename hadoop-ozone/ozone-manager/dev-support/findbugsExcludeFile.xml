@@ -16,4 +16,8 @@
    limitations under the License.
 -->
 <FindBugsFilter>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.snapshot.diff.delta.TestRDBDifferComputer"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
 </FindBugsFilter>

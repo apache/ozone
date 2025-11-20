@@ -114,6 +114,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -637,10 +638,25 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     RocksDBCheckpointDiffer mockCheckpointDiffer = mock(RocksDBCheckpointDiffer.class);
     // Create mock locks for each service
     BootstrapStateHandler.Lock mockDeletingLock = mock(BootstrapStateHandler.Lock.class);
+    UncheckedAutoCloseable mockDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
+    when(mockDeletingLock.acquireWriteLock()).thenReturn(mockDeletingAcquiredLock);
+
     BootstrapStateHandler.Lock mockDirDeletingLock = mock(BootstrapStateHandler.Lock.class);
+    UncheckedAutoCloseable mockDirDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
+    when(mockDirDeletingLock.acquireWriteLock()).thenReturn(mockDirDeletingAcquiredLock);
+
     BootstrapStateHandler.Lock mockFilteringLock = mock(BootstrapStateHandler.Lock.class);
+    UncheckedAutoCloseable mockFilteringAcquiredLock = mock(UncheckedAutoCloseable.class);
+    when(mockFilteringLock.acquireWriteLock()).thenReturn(mockFilteringAcquiredLock);
+
     BootstrapStateHandler.Lock mockSnapshotDeletingLock = mock(BootstrapStateHandler.Lock.class);
+    UncheckedAutoCloseable mockSnapshotDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
+    when(mockSnapshotDeletingLock.acquireWriteLock()).thenReturn(mockSnapshotDeletingAcquiredLock);
+
     BootstrapStateHandler.Lock mockCheckpointDifferLock = mock(BootstrapStateHandler.Lock.class);
+    UncheckedAutoCloseable mockCheckpointDifferAcquiredLock = mock(UncheckedAutoCloseable.class);
+    when(mockCheckpointDifferLock.acquireWriteLock()).thenReturn(mockCheckpointDifferAcquiredLock);
+
     // Configure service mocks to return their respective locks
     when(mockDeletingService.getBootstrapStateLock()).thenReturn(mockDeletingLock);
     when(mockDirDeletingService.getBootstrapStateLock()).thenReturn(mockDirDeletingLock);
@@ -665,25 +681,23 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Create the actual Lock instance (this tests the real implementation)
     OMDBCheckpointServlet.Lock bootstrapLock = new OMDBCheckpointServlet.Lock(mockOM);
     // Test successful lock acquisition
-    BootstrapStateHandler.Lock result = bootstrapLock.lock();
+    UncheckedAutoCloseable result = bootstrapLock.acquireWriteLock();
     // Verify all service locks were acquired
-    verify(mockDeletingLock).lock();
-    verify(mockDirDeletingLock).lock();
-    verify(mockFilteringLock).lock();
-    verify(mockSnapshotDeletingLock).lock();
-    verify(mockCheckpointDifferLock).lock();
+    verify(mockDeletingLock).acquireWriteLock();
+    verify(mockDirDeletingLock).acquireWriteLock();
+    verify(mockFilteringLock).acquireWriteLock();
+    verify(mockSnapshotDeletingLock).acquireWriteLock();
+    verify(mockCheckpointDifferLock).acquireWriteLock();
     // Verify double buffer flush was called
     verify(mockOM).awaitDoubleBufferFlush();
-    // Verify the lock returns itself
-    assertEquals(bootstrapLock, result);
     // Test unlock
-    bootstrapLock.unlock();
+    result.close();
     // Verify all service locks were released
-    verify(mockDeletingLock).unlock();
-    verify(mockDirDeletingLock).unlock();
-    verify(mockFilteringLock).unlock();
-    verify(mockSnapshotDeletingLock).unlock();
-    verify(mockCheckpointDifferLock).unlock();
+    verify(mockDeletingAcquiredLock).close();
+    verify(mockDirDeletingAcquiredLock).close();
+    verify(mockFilteringAcquiredLock).close();
+    verify(mockSnapshotDeletingAcquiredLock).close();
+    verify(mockCheckpointDifferAcquiredLock).close();
   }
 
   /**
@@ -709,13 +723,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     AtomicInteger servicesSucceeded = new AtomicInteger(0);
     // Checkpoint thread holds bootstrap lock
     Thread checkpointThread = new Thread(() -> {
-      try {
-        LOG.info("Acquiring bootstrap lock for checkpoint...");
-        BootstrapStateHandler.Lock acquired = bootstrapLock.lock();
+      LOG.info("Acquiring bootstrap lock for checkpoint...");
+      try (UncheckedAutoCloseable acquired = bootstrapLock.acquireWriteLock()) {
         bootstrapAcquired.countDown();
         Thread.sleep(3000); // Hold for 3 seconds
         LOG.info("Releasing bootstrap lock...");
-        acquired.unlock();
       } catch (Exception e) {
         fail("Checkpoint failed: " + e.getMessage());
       }
@@ -729,11 +741,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
               LOG.info("{} : Trying to acquire lock...", serviceName);
               servicesBlocked.incrementAndGet();
               BootstrapStateHandler.Lock serviceLock = service.getBootstrapStateLock();
-              serviceLock.lock(); // Should block!
-              servicesBlocked.decrementAndGet();
-              servicesSucceeded.incrementAndGet();
-              LOG.info(" {} : Lock acquired!", serviceName);
-              serviceLock.unlock();
+              try (UncheckedAutoCloseable lock = serviceLock.acquireReadLock()) {
+                // Should block!
+                servicesBlocked.decrementAndGet();
+                servicesSucceeded.incrementAndGet();
+                LOG.info(" {} : Lock acquired!", serviceName);
+              }
             }
             allServicesCompleted.countDown();
           } catch (Exception e) {

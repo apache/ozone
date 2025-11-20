@@ -19,9 +19,10 @@ package org.apache.hadoop.ozone.admin.om.snapshot;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
+import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,16 +41,10 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class DefragSubCommand implements Callable<Void> {
+public class DefragSubCommand extends AbstractSubcommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private SnapshotSubCommand parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
       names = {"--node-id"},
@@ -68,11 +63,9 @@ public class DefragSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    // Navigate up to get OMAdmin
-    OMAdmin omAdmin = getOMAdmin();
-    OzoneConfiguration conf = omAdmin.getParent().getOzoneConf();
+    OzoneConfiguration conf = getOzoneConf();
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
-        conf, omServiceId, nodeId);
+        conf, omServiceOption.getServiceID(), nodeId);
 
     if (omNodeDetails == null) {
       System.err.println("Error: OMNodeDetails could not be determined with given " +
@@ -112,10 +105,5 @@ public class DefragSubCommand implements Callable<Void> {
         System.out.println("Snapshot defragmentation task failed or was interrupted.");
       }
     }
-  }
-
-  private OMAdmin getOMAdmin() {
-    // The parent hierarchy is: DefragSubCommand -> SnapshotSubCommand -> OMAdmin
-    return parent.getParent();
   }
 }

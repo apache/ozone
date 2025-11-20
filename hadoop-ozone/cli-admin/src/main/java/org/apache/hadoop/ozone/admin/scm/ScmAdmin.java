@@ -37,7 +37,8 @@ import picocli.CommandLine;
         FinalizationScmStatusSubcommand.class,
         TransferScmLeaderSubCommand.class,
         DecommissionScmSubcommand.class,
-        RotateKeySubCommand.class
+        RotateKeySubCommand.class,
+        DeletedBlocksTxnCommands.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ScmAdmin implements AdminSubcommand {

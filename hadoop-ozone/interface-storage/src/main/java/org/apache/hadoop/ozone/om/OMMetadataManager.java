@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -686,6 +687,15 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   boolean containsIncompleteMPUs(String volume, String bucket)
       throws IOException;
 
+  TablePrefixInfo getTableBucketPrefix(String volume, String bucket) throws IOException;
+
+  /**
+   * Computes the bucket prefix for a table.
+   * @return would return "" if the table doesn't have bucket prefixed based key.
+   * @throws IOException
+   */
+  String getTableBucketPrefix(String tableName, String volume, String bucket) throws IOException;
+
   /**
    * Represents a unique identifier for a specific bucket within a volume.
    *
@@ -724,4 +734,5 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       return Objects.hash(volumeId, bucketId);
     }
   }
+
 }
