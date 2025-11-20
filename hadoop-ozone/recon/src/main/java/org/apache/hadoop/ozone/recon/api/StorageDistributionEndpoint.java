@@ -26,6 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -38,7 +42,6 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DeletionPendingBytesByComponent;
@@ -50,6 +53,8 @@ import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
+import org.apache.hadoop.ozone.recon.tasks.JmxMetricsCollectorTask;
+import org.apache.hadoop.ozone.recon.tasks.JmxMetricsCollectorTaskResult;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +83,7 @@ public class StorageDistributionEndpoint {
   private final Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
+  private static final int THREAD_POOL_SIZE = 10;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
@@ -282,17 +288,20 @@ public class StorageDistributionEndpoint {
   }
 
   private void initializeBlockDeletionMetricsMap() {
-    nodeManager.getNodeStats().keySet().parallelStream().forEach(nodeId -> {
-      try {
-        long dnPending = ReconUtils.getMetricsFromDatanode(nodeId,
-                "HddsDatanode",
-                "BlockDeletingService",
-                "TotalPendingBlockBytes");
-        blockDeletionMetricsMap.put(nodeId, dnPending);
-      } catch (IOException e) {
-        blockDeletionMetricsMap.put(nodeId, -1L);
+    List<JmxMetricsCollectorTask> tasks = nodeManager.getNodeStats().keySet().stream().map(dn ->
+      new JmxMetricsCollectorTask(dn, "HddsDatanode",
+          "BlockDeletingService", "TotalPendingBlockBytes"))
+        .collect(Collectors.toList());
+    try {
+      ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+      List<Future<JmxMetricsCollectorTaskResult>> results = executor.invokeAll(tasks);
+
+      for (Future<JmxMetricsCollectorTaskResult> result : results) {
+        blockDeletionMetricsMap.put(result.get().getDatanodeDetails(), result.get().getPendingBytes());
       }
-    });
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error("Error initializing block deletion metrics map", e);
+    }
   }
 
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {

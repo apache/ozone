@@ -27,15 +27,12 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
@@ -55,12 +52,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -98,10 +93,6 @@ public class ReconUtils {
 
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
-  
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final int HTTP_CONNECT_TIMEOUT_MS = 5000;
-  private static final int HTTP_SOCKET_TIMEOUT_MS = 10000;
 
   public ReconUtils() {
   }
@@ -855,127 +846,5 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
-  }
-
-  /**
-   * Retrieve metrics from a DataNode's JMX endpoint.
-   * Uses standard Java HttpURLConnection for simplicity and compatibility.
-   *
-   * @param datanode The DataNode to query
-   * @param service JMX service name (e.g., "HddsDatanode")
-   * @param name JMX bean name (e.g., "BlockDeletingService")
-   * @param keyName The metric key name (e.g., "TotalPendingBlockBytes")
-   * @return The metric value, or -1 if unavailable
-   * @throws IOException if connection fails
-   */
-  public static long getMetricsFromDatanode(DatanodeDetails datanode, 
-                                            String service, 
-                                            String name, 
-                                            String keyName)
-      throws IOException {
-    
-    if (datanode == null) {
-      log.warn("DataNode is null, cannot fetch metrics");
-      throw new IOException("DataNode details are null");
-    }
-
-    // Construct metrics URL for DataNode JMX endpoint
-    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=%s,name=%s",
-        datanode.getIpAddress(),
-        datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
-        service,
-        name);
-    HttpURLConnection connection = null;
-    try {
-      // Use standard Java HttpURLConnection (compatible with all HTTP implementations)
-      URL url = new URL(metricsUrl);
-      connection = (HttpURLConnection) url.openConnection();
-      
-      // Set timeouts to prevent indefinite blocking
-      connection.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);
-      connection.setReadTimeout(HTTP_SOCKET_TIMEOUT_MS);
-      connection.setRequestMethod("GET");
-      
-      // Check HTTP response code
-      int responseCode = connection.getResponseCode();
-      if (responseCode != HttpURLConnection.HTTP_OK) {
-        throw new IOException(String.format(
-            "Failed to fetch metrics from %s: HTTP %d", 
-            datanode.getIpAddress(), responseCode));
-      }
-      // Read response body
-      String jsonResponse;
-      try (InputStream in = connection.getInputStream()) {
-        // Use Apache Commons IO for Java compatibility (works with Java 8+)
-        byte[] responseBytes = IOUtils.toByteArray(in);
-        jsonResponse = new String(responseBytes, "UTF-8");
-      }
-      // Parse and extract metric value
-      return parseMetrics(jsonResponse, name, keyName);
-    } catch (IOException e) {
-      log.error("Error getting metrics from datanode {}: {}", 
-          datanode.getIpAddress(), e.getMessage());
-      // Return -1 to indicate error (caller should handle gracefully)
-      return -1L;
-    } finally {
-      if (connection != null) {
-        connection.disconnect();
-      }
-    }
-  }
-
-  /**
-   * Parse JMX response JSON and extract a specific metric value.
-   * Expected JSON format from DataNode JMX endpoint:
-   * {
-   *   "beans": [
-   *     {
-   *       "name": "Hadoop:service=HddsDatanode,name=BlockDeletingService",
-   *       "TotalPendingBlockBytes": 1024000,
-   *       ...
-   *     }
-   *   ]
-   * }
-   *
-   * @param jsonResponse The JSON response from JMX endpoint
-   * @param serviceName The service name to match in bean names
-   * @param keyName The key to extract from the matching bean
-   * @return The metric value, or -1 if not found
-   */
-  private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
-    if (jsonResponse == null || jsonResponse.isEmpty()) {
-      log.debug("Empty response received for metrics");
-      return -1L;
-    }
-    try {
-      JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
-      JsonNode beans = root.get("beans");
-      if (beans != null && beans.isArray()) {
-        // Find the bean matching the service name
-        for (JsonNode bean : beans) {
-          String beanName = bean.path("name").asText("");
-          if (beanName.contains(serviceName)) {
-            // Extract and return the metric value from the bean
-            return extractMetrics(bean, keyName);
-          }
-        }
-      }
-      log.debug("Could not find service {} in JMX response", serviceName);
-      return -1L;
-    } catch (Exception e) {
-      log.warn("Failed to parse metrics JSON response: {}", e.getMessage());
-      return -1L;
-    }
-  }
-
-  /**
-   * Extract a specific metric value from a JMX bean node.
-   *
-   * @param beanNode The JSON node representing a JMX bean
-   * @param keyName The metric key to extract
-   * @return The metric value, or 0L if not found
-   */
-  private static long extractMetrics(JsonNode beanNode, String keyName) {
-    return beanNode.path(keyName).asLong(0L);
   }
 }
