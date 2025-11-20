@@ -224,16 +224,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      // Map<String, String> metaDataMap = omKeyInfo.mutateMetadataCopy(metadata ->
-      //     metadata.putAll(KeyValueUtil.getFromProtobuf(
-      //         commitKeyArgs.getMetadataList()))
-      // );
       Map<String, String> metaDataMap = omKeyInfo.toBuilder().getMetadata();
       metaDataMap.putAll(KeyValueUtil.getFromProtobuf(
               commitKeyArgs.getMetadataList()));
-      // omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-      //     metadata.putAll(KeyValueUtil.getFromProtobuf(
-      //         commitKeyArgs.getMetadataList())));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       List<OmKeyLocationInfo> uncommitted =
