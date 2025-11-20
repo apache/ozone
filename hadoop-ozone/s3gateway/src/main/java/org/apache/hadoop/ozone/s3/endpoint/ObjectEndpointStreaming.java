@@ -126,6 +126,9 @@ final class ObjectEndpointStreaming {
       }
       streamOutput.close();
     } catch (Exception ex) {
+      if (streamOutput == null) {
+        throw ex;
+      }
       if (hasValidSha256) {
         streamOutput.close();
       } else {
