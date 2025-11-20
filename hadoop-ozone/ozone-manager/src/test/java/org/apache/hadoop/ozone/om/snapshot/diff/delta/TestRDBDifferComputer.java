@@ -360,7 +360,7 @@ public class TestRDBDifferComputer {
   }
 
   /**
-   * Tests that getDSIFromSI throws exception when no versions found.
+   * Tests that toDifferSnapshotInfo throws exception when no versions found.
    */
   @Test
   public void testToDifferSnapshotInfoWithNoVersions() throws IOException {
