@@ -663,7 +663,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
-      super((readLock) -> om.getMetadataManager().getLock().acquireResourceLock(BOOTSTRAP_LOCK));
+      super((readLock) -> {
+        return om.getMetadataManager().getLock().acquireResourceLock(BOOTSTRAP_LOCK);
+      });
       this.om = om;
     }
 

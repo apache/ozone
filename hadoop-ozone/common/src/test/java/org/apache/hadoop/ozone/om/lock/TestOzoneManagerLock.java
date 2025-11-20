@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -131,8 +134,9 @@ class TestOzoneManagerLock {
   @EnumSource
   public void testDAGLockWithParallelResource(DAGLeveledResource dagLeveledResource) {
     Map<DAGLeveledResource, Set<Resource>> forbiddenLockOrdering =
-        ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(DAGLeveledResource.SNAPSHOT_DB_LOCK,
-            SNAPSHOT_LOCAL_DATA_LOCK));
+        ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK),
+            BOOTSTRAP_LOCK, ImmutableSet.of(SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
+                SNAPSHOT_LOCAL_DATA_LOCK));
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     List<Resource> resources = new ArrayList<>();
     resources.addAll(Arrays.stream(LeveledResource.values()).collect(Collectors.toList()));
