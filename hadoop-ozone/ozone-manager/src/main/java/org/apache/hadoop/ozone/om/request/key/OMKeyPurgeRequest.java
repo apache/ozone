@@ -223,7 +223,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       }
       return bucketInfoList;
     } finally {
-        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketKeyList));
+      mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketKeyList));
     }
   }
 
