@@ -34,6 +34,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreWithIncrementalChunkList;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -239,8 +241,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         metadataTable.get(containerData.getBytesUsedKey()));
     dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
         metadataTable.get(containerData.getPendingDeleteBlockCountKey()));
-    dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
-        metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    if (metadataTable.get(containerData.getPendingDeleteBlockBytesKey()) != null) {
+      dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+          metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    }
     dBMetadata.put(OzoneConsts.DELETE_TRANSACTION_KEY,
         metadataTable.get(containerData.getLatestDeleteTxnKey()));
     dBMetadata.put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
@@ -434,28 +438,30 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       errors.add(deleteCountError);
     }
 
-    // check and repair if db delete bytes mismatches delete transaction
-    JsonNode pendingDeletionBlockSize = dBMetadata.path(
-        OzoneConsts.PENDING_DELETE_BLOCK_BYTES);
-    final long dbDeleteBytes = jsonToLong(pendingDeletionBlockSize);
-    final JsonNode pendingDeleteBytesAggregate = aggregates.path(PendingDelete.BYTES);
-    final long deleteTransactionBytes = jsonToLong(pendingDeleteBytesAggregate);
-    if (dbDeleteBytes != deleteTransactionBytes) {
-      passed = false;
-      final BooleanSupplier deleteBytesRepairAction = () -> {
-        final String key = containerData.getPendingDeleteBlockBytesKey();
-        try {
-          metadataTable.put(key, deleteTransactionBytes);
-        } catch (IOException ex) {
-          LOG.error("Failed to reset {} for container {}.",
-              key, containerData.getContainerID(), ex);
-        }
-        return false;
-      };
-      final ObjectNode deleteBytesError = buildErrorAndRepair(
-          "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
-          pendingDeleteBytesAggregate, pendingDeletionBlockSize, deleteBytesRepairAction);
-      errors.add(deleteBytesError);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      // check and repair if db delete bytes mismatches delete transaction
+      JsonNode pendingDeletionBlockSize = dBMetadata.path(
+          OzoneConsts.PENDING_DELETE_BLOCK_BYTES);
+      final long dbDeleteBytes = jsonToLong(pendingDeletionBlockSize);
+      final JsonNode pendingDeleteBytesAggregate = aggregates.path(PendingDelete.BYTES);
+      final long deleteTransactionBytes = jsonToLong(pendingDeleteBytesAggregate);
+      if (dbDeleteBytes != deleteTransactionBytes) {
+        passed = false;
+        final BooleanSupplier deleteBytesRepairAction = () -> {
+          final String key = containerData.getPendingDeleteBlockBytesKey();
+          try {
+            metadataTable.put(key, deleteTransactionBytes);
+          } catch (IOException ex) {
+            LOG.error("Failed to reset {} for container {}.",
+                key, containerData.getContainerID(), ex);
+          }
+          return false;
+        };
+        final ObjectNode deleteBytesError = buildErrorAndRepair(
+            "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+            pendingDeleteBytesAggregate, pendingDeletionBlockSize, deleteBytesRepairAction);
+        errors.add(deleteBytesError);
+      }
     }
 
     // check and repair chunks dir.

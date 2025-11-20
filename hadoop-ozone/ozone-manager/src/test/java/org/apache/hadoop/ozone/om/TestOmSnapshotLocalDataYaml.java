@@ -118,7 +118,7 @@ public class TestOmSnapshotLocalDataYaml {
         createLiveFileMetaData("sst2", "table1", "k3", "k4"),
         createLiveFileMetaData("sst3", "table2", "k4", "k5"));
     OmSnapshotLocalData dataYaml = new OmSnapshotLocalData(snapshotId, notDefraggedSSTFileList,
-        previousSnapshotId, transactionInfo);
+        previousSnapshotId, transactionInfo, 10);
 
     // Set version
     dataYaml.setVersion(42);
@@ -164,6 +164,7 @@ public class TestOmSnapshotLocalDataYaml {
 
     // Verify fields
     assertEquals(44, snapshotData.getVersion());
+    assertEquals(10, snapshotData.getDbTxSequenceNumber());
     assertTrue(snapshotData.getSstFiltered());
     assertEquals(transactionInfo, snapshotData.getTransactionInfo());
 

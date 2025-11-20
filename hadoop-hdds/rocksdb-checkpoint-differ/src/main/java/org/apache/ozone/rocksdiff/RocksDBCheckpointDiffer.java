@@ -771,9 +771,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param dest destination snapshot
    * @param versionMap version map containing the connection between source snapshot version and dest snapshot version.
    * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
-   * @return A list of SST files without extension.
-   *         e.g. ["/path/to/sstBackupDir/000050.sst",
-   *               "/path/to/sstBackupDir/000060.sst"]
+   * @return map of SST file absolute paths with extension to SstFileInfo.
    */
   public synchronized Optional<Map<Path, SstFileInfo>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
       DifferSnapshotInfo dest, Map<Integer, Integer> versionMap, TablePrefixInfo prefixInfo,

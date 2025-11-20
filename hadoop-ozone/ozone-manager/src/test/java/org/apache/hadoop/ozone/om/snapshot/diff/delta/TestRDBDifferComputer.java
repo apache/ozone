@@ -360,10 +360,10 @@ public class TestRDBDifferComputer {
   }
 
   /**
-   * Tests that getDSIFromSI throws exception when no versions found.
+   * Tests that toDifferSnapshotInfo throws exception when no versions found.
    */
   @Test
-  public void testGetDSIFromSIWithNoVersions() throws IOException {
+  public void testToDifferSnapshotInfoWithNoVersions() throws IOException {
     rdbDifferComputer = new RDBDifferComputer(omSnapshotManager, activeMetadataManager,
         deltaDirPath, activityReporter);
 
@@ -486,8 +486,7 @@ public class TestRDBDifferComputer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setName(snapshotName)
-        .setSnapshotId(snapshotId)
-        .setDbTxSequenceNumber(100L);
+        .setSnapshotId(snapshotId);
     return builder.build();
   }
 
@@ -528,8 +527,3 @@ public class TestRDBDifferComputer {
     return localData;
   }
 }
-
-
-
-
-
