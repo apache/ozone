@@ -77,4 +77,9 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
       }
     }
   }
+
+  @Override
+  protected String getActionName() {
+    return "stop";
+  }
 }

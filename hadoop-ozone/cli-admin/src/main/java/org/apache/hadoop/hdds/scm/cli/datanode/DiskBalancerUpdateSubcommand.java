@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -141,5 +142,28 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
             String.join(", ", failedNodes));
       }
     }
+  }
+
+  @Override
+  protected String getActionName() {
+    return "update";
+  }
+
+  @Override
+  protected Map<String, Object> getConfigurationMap() {
+    Map<String, Object> configMap = new LinkedHashMap<>();
+    if (threshold != null) {
+      configMap.put("threshold", threshold);
+    }
+    if (bandwidthInMB != null) {
+      configMap.put("bandwidthInMB", bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      configMap.put("parallelThread", parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      configMap.put("stopAfterDiskEven", stopAfterDiskEven);
+    }
+    return configMap.isEmpty() ? null : configMap;
   }
 }

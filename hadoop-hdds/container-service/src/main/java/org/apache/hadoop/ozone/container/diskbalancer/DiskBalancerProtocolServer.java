@@ -119,7 +119,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
     if (configProto != null) {
       // only update fields present in configProto
       DiskBalancerConfiguration existingConfig = info.toConfiguration();
-      finalConfig = DiskBalancerConfiguration.fromProtobuf(configProto, existingConfig);
+      finalConfig = DiskBalancerConfiguration.updateFromProtobuf(configProto, existingConfig);
       info.updateFromConf(finalConfig);
     } else {
       finalConfig = info.toConfiguration();
@@ -146,7 +146,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
 
     // only update fields present in configProto
     DiskBalancerConfiguration currentConfig = info.toConfiguration();
-    DiskBalancerConfiguration updateConfig = DiskBalancerConfiguration.fromProtobuf(configProto, currentConfig);
+    DiskBalancerConfiguration updateConfig = DiskBalancerConfiguration.updateFromProtobuf(configProto, currentConfig);
     info.updateFromConf(updateConfig);
     LOG.info("DiskBalancer opType : UPDATE :\n{}", updateConfig);
     refreshService(info);

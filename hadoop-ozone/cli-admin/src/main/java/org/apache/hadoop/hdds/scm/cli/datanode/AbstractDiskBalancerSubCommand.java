@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -79,7 +81,6 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     List<String> successNodes = new ArrayList<>();
     List<String> failedNodes = new ArrayList<>();
     List<Object> jsonResults = new ArrayList<>();
-    StringBuilder errorBuilder = new StringBuilder();
     
     // Execute commands and collect results
     for (String dn : targetDatanodes) {
@@ -93,8 +94,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
         } else {
           failedNodes.add(dn);
           if (options.isJson()) {
-            errorBuilder.append("Error on node [").append(dn)
-                .append("]: Command execution failed\n");
+            // Create error result object in JSON format
+            Map<String, Object> errorResult = createErrorResult(dn, 
+                "Command execution failed");
+            jsonResults.add(errorResult);
           }
         }
       } catch (Exception e) {
@@ -107,10 +110,11 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
           errorMsg = e.getClass().getSimpleName();
         }
         if (options.isJson()) {
-          errorBuilder.append("Error on node [").append(dn)
-              .append("]: ").append(errorMsg).append('\n');
+          // Create error result object in JSON format
+          Map<String, Object> errorResult = createErrorResult(dn, errorMsg);
+          jsonResults.add(errorResult);
         } else {
-          // Print error messages in non-JSON mode as well
+          // Print error messages in non-JSON mode
           System.err.printf("Error on node [%s]: %s%n", dn, errorMsg);
         }
       }
@@ -120,9 +124,6 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     if (options.isJson()) {
       if (!jsonResults.isEmpty()) {
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(jsonResults));
-      }
-      if (errorBuilder.length() > 0) {
-        System.err.print(errorBuilder);
       }
     } else {
       displayResults(successNodes, failedNodes);
@@ -199,5 +200,48 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    * @param failedNodes list of nodes where command failed
    */
   protected abstract void displayResults(List<String> successNodes, List<String> failedNodes);
+
+  /**
+   * Get the action name for this command (e.g., "start", "stop", "update", "status", "report").
+   * Used for creating error result objects in JSON format.
+   * 
+   * @return the action name
+   */
+  protected abstract String getActionName();
+
+  /**
+   * Get the configuration map for this command, if any configuration was provided.
+   * Used for creating error result objects in JSON format.
+   * Returns null if no configuration was provided.
+   * 
+   * @return configuration map or null
+   */
+  protected Map<String, Object> getConfigurationMap() {
+    // Default: no configuration
+    return null;
+  }
+
+  /**
+   * Create an error result object in JSON format.
+   * 
+   * @param datanode the datanode address
+   * @param errorMsg the error message
+   * @return error result map
+   */
+  private Map<String, Object> createErrorResult(String datanode, String errorMsg) {
+    Map<String, Object> errorResult = new LinkedHashMap<>();
+    errorResult.put("datanode", datanode);
+    errorResult.put("action", getActionName());
+    errorResult.put("status", "failure");
+    errorResult.put("errorMsg", errorMsg);
+    
+    // Include configuration if it was provided
+    Map<String, Object> configMap = getConfigurationMap();
+    if (configMap != null && !configMap.isEmpty()) {
+      errorResult.put("configuration", configMap);
+    }
+    
+    return errorResult;
+  }
 }
 

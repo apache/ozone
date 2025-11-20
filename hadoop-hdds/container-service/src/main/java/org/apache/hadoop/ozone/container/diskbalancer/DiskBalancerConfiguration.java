@@ -284,7 +284,7 @@ public final class DiskBalancerConfiguration {
    * @param existingConfig the existing configuration to merge into
    * @return the updated configuration object
    */
-  public static DiskBalancerConfiguration fromProtobuf(
+  public static DiskBalancerConfiguration updateFromProtobuf(
       @Nonnull HddsProtos.DiskBalancerConfigurationProto newConfigProto,
       @Nonnull DiskBalancerConfiguration existingConfig) {
     if (newConfigProto.hasThreshold()) {

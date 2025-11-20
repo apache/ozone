@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
@@ -39,7 +41,9 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand {
 
-  private final List<HddsProtos.DatanodeDiskBalancerInfoProto> reports = new ArrayList<>();
+  // Store reports temporarily for non-JSON mode consolidation
+  private final Map<String, HddsProtos.DatanodeDiskBalancerInfoProto> reports = 
+      new ConcurrentHashMap<>();
 
   @Override
   protected Object executeCommand(String hostName) throws IOException {
@@ -50,8 +54,15 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
           diskBalancerProxy.getDiskBalancerInfo(
               DatanodeDiskBalancerInfoType.REPORT,
               ClientVersion.CURRENT_VERSION);
-      reports.add(report);
-      return new ReportResult(report);
+      
+      // Only create JSON result object if JSON mode is enabled
+      if (getOptions().isJson()) {
+        return createReportResult(report);
+      }
+      
+      // For non-JSON mode, store the proto for later consolidation
+      reports.put(hostName, report);
+      return report; // Return non-null to indicate success
     } finally {
       diskBalancerProxy.close();
     }
@@ -59,19 +70,22 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
   @Override
   protected void displayResults(List<String> successNodes, List<String> failedNodes) {
-    // In JSON mode, results are already written, only show summary if needed
+    // In JSON mode, results are already written
     if (getOptions().isJson()) {
       return;
     }
 
+    // Display error messages for failed nodes
     if (!failedNodes.isEmpty()) {
       System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n", 
           String.join(", ", failedNodes));
     }
 
     // Display consolidated report for successful nodes
-    if (!reports.isEmpty()) {
-      System.out.println(generateReport(reports));
+    if (!successNodes.isEmpty() && !reports.isEmpty()) {
+      List<HddsProtos.DatanodeDiskBalancerInfoProto> reportList = 
+          new ArrayList<>(reports.values());
+      System.out.println(generateReport(reportList));
     }
   }
 
@@ -98,24 +112,22 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         contentList.toArray(new String[0]));
   }
 
+  @Override
+  protected String getActionName() {
+    return "report";
+  }
+
   /**
-   * Wrapper class for JSON serialization of DiskBalancer report.
+   * Create a JSON result map for a report.
+   * 
+   * @param report the DiskBalancer report proto
+   * @return JSON result map
    */
-  private static class ReportResult {
-    private final DatanodeDiskBalancerInfoProto report;
-
-    ReportResult(DatanodeDiskBalancerInfoProto report) {
-      this.report = report;
-    }
-
-    @JsonProperty
-    public String getDatanode() {
-      return report.getNode().getHostName();
-    }
-
-    @JsonProperty
-    public double getVolumeDensity() {
-      return report.getCurrentVolumeDensitySum();
-    }
+  private Map<String, Object> createReportResult(
+      HddsProtos.DatanodeDiskBalancerInfoProto report) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("datanode", report.getNode().getHostName());
+    result.put("volumeDensity", report.getCurrentVolumeDensitySum());
+    return result;
   }
 }

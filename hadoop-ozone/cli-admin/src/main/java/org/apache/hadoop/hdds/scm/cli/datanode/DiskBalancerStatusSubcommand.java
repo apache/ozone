@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
@@ -40,19 +41,28 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand {
 
-  private final List<HddsProtos.DatanodeDiskBalancerInfoProto> statuses = new ArrayList<>();
+  // Store statuses for non-JSON mode consolidation
+  private final Map<String, DatanodeDiskBalancerInfoProto> statuses =
+      new ConcurrentHashMap<>();
 
   @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
-      HddsProtos.DatanodeDiskBalancerInfoProto status = 
+      DatanodeDiskBalancerInfoProto status =
           diskBalancerProxy.getDiskBalancerInfo(
               DatanodeDiskBalancerInfoType.STATUS,
               ClientVersion.CURRENT_VERSION);
-      statuses.add(status);
-      return new StatusResult(status);
+      
+      // Only create JSON result object if JSON mode is enabled
+      if (getOptions().isJson()) {
+        return createStatusResult(status);
+      }
+      
+      // For non-JSON mode, store the proto for later consolidation
+      statuses.put(hostName, status);
+      return status; // Return non-null to indicate success
     } finally {
       diskBalancerProxy.close();
     }
@@ -60,23 +70,26 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   @Override
   protected void displayResults(List<String> successNodes, List<String> failedNodes) {
-    // In JSON mode, results are already written, only show summary if needed
+    // In JSON mode, results are already written
     if (getOptions().isJson()) {
       return;
     }
 
+    // Display error messages for failed nodes
     if (!failedNodes.isEmpty()) {
       System.err.printf("Failed to get DiskBalancer status from nodes: [%s]%n", 
           String.join(", ", failedNodes));
     }
 
     // Display consolidated status for successful nodes
-    if (!statuses.isEmpty()) {
-      System.out.println(generateStatus(statuses));
+    if (!successNodes.isEmpty() && !statuses.isEmpty()) {
+      List<DatanodeDiskBalancerInfoProto> statusList =
+          new ArrayList<>(statuses.values());
+      System.out.println(generateStatus(statusList));
     }
   }
 
-  private String generateStatus(List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
+  private String generateStatus(List<DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
         "%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
 
@@ -120,7 +133,34 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
         contentList.toArray(new String[0]));
   }
 
-  private long calculateEstimatedTimeLeft(HddsProtos.DatanodeDiskBalancerInfoProto proto) {
+  @Override
+  protected String getActionName() {
+    return "status";
+  }
+
+  /**
+   * Create a JSON result map for a status.
+   * 
+   * @param status the DiskBalancer status proto
+   * @return JSON result map
+   */
+  private Map<String, Object> createStatusResult(DatanodeDiskBalancerInfoProto status) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("datanode", status.getNode().getHostName());
+    result.put("status", status.getRunningStatus().name());
+    result.put("threshold", status.getDiskBalancerConf().getThreshold());
+    result.put("bandwidthInMB", status.getDiskBalancerConf().getDiskBandwidthInMB());
+    result.put("threads", status.getDiskBalancerConf().getParallelThread());
+    result.put("successMove", status.getSuccessMoveCount());
+    result.put("failureMove", status.getFailureMoveCount());
+    result.put("bytesMovedMB", (long) Math.ceil(status.getBytesMoved() / (1024.0 * 1024.0)));
+    result.put("estBytesToMoveMB", (long) Math.ceil(status.getBytesToMove() / (1024.0 * 1024.0)));
+    long estimatedTimeLeft = calculateEstimatedTimeLeft(status);
+    result.put("estTimeLeftMin", estimatedTimeLeft >= 0 ? estimatedTimeLeft : null);
+    return result;
+  }
+
+  private long calculateEstimatedTimeLeft(DatanodeDiskBalancerInfoProto proto) {
     long bytesToMove = proto.getBytesToMove();
 
     if (bytesToMove == 0) {
@@ -132,77 +172,5 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     double estimatedDataPendingMB = bytesToMove / (1024.0 * 1024.0);
     double estimatedTimeLeft = (bandwidth > 0) ? (estimatedDataPendingMB / bandwidth) / 60 : -1;
     return (long) Math.ceil(estimatedTimeLeft);
-  }
-
-  /**
-   * Wrapper class for JSON serialization of DiskBalancer status.
-   */
-  @JsonPropertyOrder({
-      "datanode", "status", "threshold", "bandwidthInMB", "threads",
-      "successMove", "failureMove", "bytesMovedMB", "estBytesToMoveMB", "estTimeLeftMin"
-  })
-  private static class StatusResult {
-    private final DatanodeDiskBalancerInfoProto status;
-
-    StatusResult(DatanodeDiskBalancerInfoProto status) {
-      this.status = status;
-    }
-
-    @JsonProperty
-    public String getDatanode() {
-      return status.getNode().getHostName();
-    }
-
-    @JsonProperty
-    public String getStatus() {
-      return status.getRunningStatus().name();
-    }
-
-    @JsonProperty
-    public double getThreshold() {
-      return status.getDiskBalancerConf().getThreshold();
-    }
-
-    @JsonProperty
-    public long getBandwidthInMB() {
-      return status.getDiskBalancerConf().getDiskBandwidthInMB();
-    }
-
-    @JsonProperty
-    public int getThreads() {
-      return status.getDiskBalancerConf().getParallelThread();
-    }
-
-    @JsonProperty
-    public long getSuccessMove() {
-      return status.getSuccessMoveCount();
-    }
-
-    @JsonProperty
-    public long getFailureMove() {
-      return status.getFailureMoveCount();
-    }
-
-    @JsonProperty
-    public long getBytesMovedMB() {
-      return (long) Math.ceil(status.getBytesMoved() / (1024.0 * 1024.0));
-    }
-
-    @JsonProperty
-    public long getEstBytesToMoveMB() {
-      return (long) Math.ceil(status.getBytesToMove() / (1024.0 * 1024.0));
-    }
-
-    @JsonProperty
-    public Long getEstTimeLeftMin() {
-      long bytesToMove = status.getBytesToMove();
-      if (bytesToMove == 0) {
-        return 0L;
-      }
-      long bandwidth = status.getDiskBalancerConf().getDiskBandwidthInMB();
-      double estimatedDataPendingMB = bytesToMove / (1024.0 * 1024.0);
-      double estimatedTimeLeft = (bandwidth > 0) ? (estimatedDataPendingMB / bandwidth) / 60 : -1;
-      return estimatedTimeLeft >= 0 ? (long) Math.ceil(estimatedTimeLeft) : null;
-    }
   }
 }
