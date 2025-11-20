@@ -150,11 +150,11 @@ public class MultiDigestInputStream extends FilterInputStream {
   /**
    * Gets the {@link MessageDigest} instance for the specified algorithm.
    *
-   * <p>Note: {@code java.security.DigestInputStream#getMessageDigest()} returns
+   * <p>Note: {@code DigestInputStream#getMessageDigest()} returns
    * the single digest instance associated with that stream. This class may
    * manage multiple digests; therefore this method accepts an algorithm name
    * and returns the corresponding {@link MessageDigest} or {@code null} if not
-   * registered.</p>
+   * registered.
    *
    * @param algorithm the digest algorithm name (for example, "MD5" or "SHA-256")
    * @return the MessageDigest instance for the specified algorithm,
