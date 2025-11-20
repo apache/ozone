@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -78,10 +79,17 @@ public class RatisBlockOutputStream extends BlockOutputStream
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      String volumeName,
+      String bucketName,
+      String keyName,
+      long objectID,
+      long parentObjectID,
+      Instant creationTime
   ) throws IOException {
     super(blockID, blockSize, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
+        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider,
+        volumeName, bucketName, keyName, objectID, parentObjectID, creationTime);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

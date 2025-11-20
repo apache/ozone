@@ -179,7 +179,8 @@ class TestBlockOutputStreamCorrectness {
         null,
         ContainerClientMetrics.acquire(),
         streamBufferArgs,
-        () -> newFixedThreadPool(10));
+        () -> newFixedThreadPool(10),
+        "dummyVolume", "dummyBucket", "dummyKey", -1, -1, null);
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
@@ -193,7 +194,8 @@ class TestBlockOutputStreamCorrectness {
         StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, clientConfig);
 
     return new ECBlockOutputStream(blockID, xcm, pipeline, BufferPool.empty(), clientConfig, null,
-        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2));
+        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2),
+        "dummyVolume", "dummyBucket", "dummyKey", -1, -1, null);
   }
 
   /**
