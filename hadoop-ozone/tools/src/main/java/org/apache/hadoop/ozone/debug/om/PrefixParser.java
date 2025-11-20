@@ -134,8 +134,7 @@ public class PrefixParser implements Callable<Void> {
     final long volumeObjectId = metadataManager.getVolumeId(
             info.getVolumeName());
     long lastObjectId = info.getObjectID();
-    WithParentObjectId objectBucketId = new WithParentObjectId();
-    objectBucketId = objectBucketId.toBuilder()
+    WithParentObjectId objectBucketId = WithParentObjectId.newBuilder()
         .withObjectID(lastObjectId)
         .build();
     dumpInfo(Types.BUCKET, effectivePath, objectBucketId,

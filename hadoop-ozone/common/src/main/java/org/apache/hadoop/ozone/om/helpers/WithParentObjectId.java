@@ -66,6 +66,10 @@ public class WithParentObjectId extends WithObjectID {
     return new Builder(this);
   }
 
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
   /** Builder for {@link WithParentObjectId}. */
   public static class Builder extends WithObjectID.Builder {
     private long parentObjectID;

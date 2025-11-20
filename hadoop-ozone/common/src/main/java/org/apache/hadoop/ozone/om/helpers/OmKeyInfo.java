@@ -688,6 +688,12 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setTags(Map<String, String> tags) {
+      this.tags.clear();
+      addAllTags(tags);
+      return this;
+    }
+
     public Builder addTag(String key, String value) {
       tags.put(key, value);
       return this;

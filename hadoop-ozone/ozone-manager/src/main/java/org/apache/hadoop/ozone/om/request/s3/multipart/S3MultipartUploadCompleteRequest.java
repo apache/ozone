@@ -463,6 +463,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
+    OmKeyInfo.Builder builder = null;
     if (omKeyInfo == null) {
       // This is a newly added key, it does not have any versions.
       OmKeyLocationInfoGroup keyLocationInfoGroup = new
@@ -473,8 +474,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               keyName, omMetadataManager);
 
       // A newly created key, this is the first version.
-      OmKeyInfo.Builder builder =
-          new OmKeyInfo.Builder().setVolumeName(volumeName)
+      builder = new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
           .setReplicationConfig(ReplicationConfig.fromProto(
               partKeyInfo.getType(), partKeyInfo.getFactor(),
@@ -498,7 +498,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setObjectID(dbOpenKeyInfo.getObjectID());
       }
       updatePrefixFSOInfo(dbOpenKeyInfo, builder);
-      omKeyInfo = builder.build();
     } else {
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
           keyName, omMetadataManager);
@@ -520,21 +519,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
       final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
-      OmKeyInfo.Builder omKeyInfoBuilder = omKeyInfo.toBuilder();
+      builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfoBuilder.setMetadata(dbOpenKeyInfo.getMetadata());
+        builder.setMetadata(dbOpenKeyInfo.getMetadata());
       }
-      omKeyInfo = omKeyInfoBuilder
-          .addMetadata(OzoneConsts.ETAG, multipartHash)
-          .build();
+      builder.addMetadata(OzoneConsts.ETAG, multipartHash);
       if (dbOpenKeyInfo.getTags() != null) {
-        omKeyInfo.setTags(dbOpenKeyInfo.getTags());
+        builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    omKeyInfo = omKeyInfo.toBuilder()
-        .withUpdateID(trxnLogIndex)
-        .build();
-    return omKeyInfo;
+    return builder.withUpdateID(trxnLogIndex).build();
   }
 
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,

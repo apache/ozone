@@ -161,9 +161,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             openKey + "entry is not found in the openKey table",
             KEY_NOT_FOUND);
       }
+      // Add/Update user defined metadata.
+      // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
               keyArgs.getMetadataList()))
+          .withUpdateID(trxnLogIndex)
           .build();
 
       // set the data size and location info list
@@ -174,8 +177,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           .collect(Collectors.toList()), true);
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo = omKeyInfo.toBuilder().withUpdateID(trxnLogIndex).build();
 
       int partNumber = keyArgs.getMultipartNumber();
       partName = getPartName(ozoneKey, uploadID, partNumber);
