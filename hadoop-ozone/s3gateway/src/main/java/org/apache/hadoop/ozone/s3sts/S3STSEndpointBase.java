@@ -48,9 +48,6 @@ public class S3STSEndpointBase implements Auditor {
   @Inject
   private SignatureInfo signatureInfo;
 
-  // Test-only override to inject a ClientProtocol without JAX-RS lifecycle
-  private ClientProtocol clientProtocolOverride;
-
   protected static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
