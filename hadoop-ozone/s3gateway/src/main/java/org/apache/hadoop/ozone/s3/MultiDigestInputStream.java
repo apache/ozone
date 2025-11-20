@@ -169,7 +169,7 @@ public class MultiDigestInputStream extends FilterInputStream {
    * Returns a copy of the map of all digests being computed.
    * Modifications to the returned map do not affect the stream's internal state.
    *
-   * @return a shallow copy of the digests map (algorithm name -> MessageDigest)
+   * @return a shallow copy of the digests map (algorithm name to MessageDigest)
    */
   public Map<String, MessageDigest> getAllDigests() {
     return new HashMap<>(digests);
