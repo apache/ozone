@@ -365,17 +365,14 @@ public class ObjectEndpoint extends EndpointBase {
           if (!hasValidSha256) {
             throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
           }
-          output.close();
-        } catch (Exception e) {
-          if (output == null) {
-            throw e;
+        } finally {
+          if (output != null) {
+            if (hasValidSha256) {
+              output.close();
+            } else {
+              output.getKeyOutputStream().cleanup();
+            }
           }
-          if (hasValidSha256) {
-            output.close();
-          } else {
-            output.getKeyOutputStream().cleanup();
-          }
-          throw e;
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);

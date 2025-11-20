@@ -376,15 +376,15 @@ class TestObjectPut {
   public void testPutObjectMessageDigestResetDuringException() throws OS3Exception {
     MessageDigest messageDigest = mock(MessageDigest.class);
     when(messageDigest.getAlgorithm()).thenReturn("MD5");
-    MessageDigest sha256Digeset = mock(MessageDigest.class);
-    when(sha256Digeset.getAlgorithm()).thenReturn("SHA-256");
+    MessageDigest sha256Digest = mock(MessageDigest.class);
+    when(sha256Digest.getAlgorithm()).thenReturn("SHA-256");
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      when(objectEndpoint.getSha256DigestInstance()).thenReturn(sha256Digeset);
+      when(objectEndpoint.getSha256DigestInstance()).thenReturn(sha256Digest);
 
       ByteArrayInputStream body =
           new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -396,7 +396,7 @@ class TestObjectPut {
         // Verify that the message digest is reset so that the instance can be reused for the
         // next request in the same thread
         verify(messageDigest, times(1)).reset();
-        verify(sha256Digeset, times(1)).reset();
+        verify(sha256Digest, times(1)).reset();
       }
     }
   }

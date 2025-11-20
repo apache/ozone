@@ -124,17 +124,14 @@ final class ObjectEndpointStreaming {
       if (!hasValidSha256) {
         throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
       }
-      streamOutput.close();
-    } catch (Exception ex) {
-      if (streamOutput == null) {
-        throw ex;
+    } finally {
+      if (streamOutput != null) {
+        if (hasValidSha256) {
+          streamOutput.close();
+        } else {
+          streamOutput.getKeyDataStreamOutput().cleanup();
+        }
       }
-      if (hasValidSha256) {
-        streamOutput.close();
-      } else {
-        streamOutput.getKeyDataStreamOutput().cleanup();
-      }
-      throw ex;
     }
     return Pair.of(eTag, writeLen);
   }
