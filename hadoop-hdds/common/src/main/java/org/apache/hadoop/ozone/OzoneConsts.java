@@ -142,8 +142,8 @@ public final class OzoneConsts {
   public static final String BLOCK_COMMIT_SEQUENCE_ID = "#BCSID";
   public static final String BLOCK_COUNT = "#BLOCKCOUNT";
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
-  public static final String PENDING_DELETE_BLOCK_COUNT =
-      "#PENDINGDELETEBLOCKCOUNT";
+  public static final String PENDING_DELETE_BLOCK_COUNT = "#PENDINGDELETEBLOCKCOUNT";
+  public static final String PENDING_DELETE_BLOCK_BYTES = "#PENDINGDELETEBLOCKBYTES";
   public static final String CONTAINER_DATA_CHECKSUM = "#DATACHECKSUM";
 
   /**
