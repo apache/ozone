@@ -38,10 +38,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
@@ -68,6 +64,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_I
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;

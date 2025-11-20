@@ -2277,7 +2277,7 @@
   </property>
   <property>
     <name>ozone.om.follower.read.local.lease.lag.limit</name>
-    <value>30000</value>
+    <value>10000</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description> If the lag between leader OM and follower OM is larger
       than this number, the follower OM is not up-to-date.
@@ -2285,11 +2285,11 @@
   </property>
   <property>
     <name>ozone.om.follower.read.local.lease.time.ms</name>
-    <value>15000</value>
+    <value>5000</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description> If the lag time Ms between leader OM and follower OM is larger
       than this number, the follower OM is not up-to-date.
-      By default, it's set to 3 * Ratis RPC timeout value.
+      By default, it's set to Ratis RPC timeout value.
     </description>
   </property>
 
