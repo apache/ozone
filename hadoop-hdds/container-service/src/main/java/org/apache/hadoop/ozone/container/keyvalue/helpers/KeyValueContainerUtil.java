@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector.getAggregatePendingDelete;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -30,7 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.PendingDelete;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -319,20 +320,30 @@ public final class KeyValueContainerUtil {
 
     // Set pending deleted block count.
     final long blockPendingDeletion;
+    long blockPendingDeletionBytes = 0L;
+    Long pendingDeletionBlockBytes = metadataTable.get(kvContainerData
+        .getPendingDeleteBlockBytesKey());
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
     if (pendingDeleteBlockCount != null) {
       blockPendingDeletion = pendingDeleteBlockCount;
+      if (pendingDeletionBlockBytes != null) {
+        blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      } else {
+        LOG.warn("Missing pendingDeleteBlocksize from {}: recalculate them from delete txn tables",
+            metadataTable.getName());
+        PendingDelete pendingDeletions = getAggregatePendingDelete(
+            store, kvContainerData, kvContainerData.getSchemaVersion());
+        blockPendingDeletionBytes = pendingDeletions.getBytes();
+      }
     } else {
-      // Set pending deleted block count.
-      LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
-      MetadataKeyFilters.KeyPrefixFilter filter =
-          kvContainerData.getDeletingBlockKeyFilter();
-      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
-          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
-          // TODO: add a count() method to avoid creating a list
-          .size();
+      LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
+          metadataTable.getName());
+      PendingDelete pendingDeletions = getAggregatePendingDelete(
+          store, kvContainerData, kvContainerData.getSchemaVersion());
+      blockPendingDeletion = pendingDeletions.getCount();
+      blockPendingDeletionBytes = pendingDeletions.getBytes();
     }
     // Set delete transaction id.
     Long delTxnId =
@@ -368,7 +379,8 @@ public final class KeyValueContainerUtil {
       blockCount = b.getCount();
     }
 
-    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount, blockPendingDeletion);
+    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount);
+    kvContainerData.getStatistics().setBlockPendingDeletion(blockPendingDeletion, blockPendingDeletionBytes);
 
     // If the container is missing a chunks directory, possibly due to the
     // bug fixed by HDDS-6235, create it here.
@@ -437,7 +449,7 @@ public final class KeyValueContainerUtil {
         usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0, 0);
   }
 
   public static long getBlockLengthTryCatch(BlockData block) {

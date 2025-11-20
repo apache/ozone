@@ -363,7 +363,7 @@ public class TestRDBDifferComputer {
    * Tests that getDSIFromSI throws exception when no versions found.
    */
   @Test
-  public void testGetDSIFromSIWithNoVersions() throws IOException {
+  public void testToDifferSnapshotInfoWithNoVersions() throws IOException {
     rdbDifferComputer = new RDBDifferComputer(omSnapshotManager, activeMetadataManager,
         deltaDirPath, activityReporter);
 
@@ -527,8 +527,3 @@ public class TestRDBDifferComputer {
     return localData;
   }
 }
-
-
-
-
-

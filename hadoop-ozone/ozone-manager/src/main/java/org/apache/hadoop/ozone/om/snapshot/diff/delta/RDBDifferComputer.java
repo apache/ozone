@@ -73,9 +73,9 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
     if (differ != null) {
       try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider snapProvider =
                getLocalDataProvider(toSnapshot.getSnapshotId(), fromSnapshot.getSnapshotId())) {
-        final DifferSnapshotInfo fromDSI = getDSIFromSI(getActiveMetadataManager(), fromSnapshot,
+        final DifferSnapshotInfo fromDSI = toDifferSnapshotInfo(getActiveMetadataManager(), fromSnapshot,
             snapProvider.getPreviousSnapshotLocalData());
-        final DifferSnapshotInfo toDSI = getDSIFromSI(getActiveMetadataManager(), toSnapshot,
+        final DifferSnapshotInfo toDSI = toDifferSnapshotInfo(getActiveMetadataManager(), toSnapshot,
             snapProvider.getSnapshotLocalData());
         final Map<Integer, Integer> versionMap = snapProvider.getSnapshotLocalData().getVersionSstFileInfos().entrySet()
             .stream().collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getPreviousSnapshotVersion()));
@@ -98,7 +98,7 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
   /**
    * Convert from SnapshotInfo to DifferSnapshotInfo.
    */
-  private static DifferSnapshotInfo getDSIFromSI(OMMetadataManager activeOmMetadataManager,
+  private static DifferSnapshotInfo toDifferSnapshotInfo(OMMetadataManager activeOmMetadataManager,
       SnapshotInfo snapshotInfo, OmSnapshotLocalData snapshotLocalData) throws IOException {
     final UUID snapshotId = snapshotInfo.getSnapshotId();
     final long dbTxSequenceNumber = snapshotLocalData.getDbTxSequenceNumber();
