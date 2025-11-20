@@ -144,6 +144,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
+import org.apache.hadoop.ozone.om.eventlistener.OMEventListenerPluginManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -218,6 +219,9 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService multipartUploadCleanupService;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private CompactionService compactionService;
+
+  // XXX: probably doesn't belong here
+  private OMEventListenerPluginManager eventListenerPluginManager;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -355,6 +359,15 @@ public class KeyManagerImpl implements KeyManager {
           serviceInterval, TimeUnit.MILLISECONDS, serviceTimeout,
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
+    }
+
+    // TODO:
+    // * this is probably the wrong place for this but adding it here
+    // for now just to get the plumbing fleshed out
+    //
+    if (eventListenerPluginManager == null) {
+      eventListenerPluginManager = new OMEventListenerPluginManager(ozoneManager, configuration);
+      eventListenerPluginManager.startAll();
     }
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
@@ -498,6 +511,10 @@ public class KeyManagerImpl implements KeyManager {
     if (compactionService != null) {
       compactionService.shutdown();
       compactionService = null;
+    }
+    if (eventListenerPluginManager != null) {
+      eventListenerPluginManager.shutdownAll();
+      eventListenerPluginManager= null;
     }
   }
 
