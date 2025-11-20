@@ -1023,6 +1023,15 @@ public class SCMNodeManager implements NodeManager {
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
+      
+      long reserved = 0L;
+      final DatanodeInfo di = nodeStateManager.getNode(dn);
+      for (StorageReportProto r : di.getStorageReports()) {
+        if (r.hasReserved()) {
+          reserved += r.getReserved();
+        } 
+      }
+      usageInfo.setReserved(reserved);
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
