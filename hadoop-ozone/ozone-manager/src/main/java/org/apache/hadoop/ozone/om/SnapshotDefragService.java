@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -83,7 +84,7 @@ public class SnapshotDefragService extends BackgroundService
   private final MultiSnapshotLocks snapshotIdLocks;
   private final OzoneConfiguration conf;
 
-  private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
 
   public SnapshotDefragService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -98,6 +99,8 @@ public class SnapshotDefragService extends BackgroundService
     running = new AtomicBoolean(false);
     IOzoneManagerLock omLock = ozoneManager.getMetadataManager().getLock();
     this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true, 1);
+    this.lock = new BootstrapStateHandler.Lock((readLock) ->
+        omLock.acquireLock(BOOTSTRAP_LOCK, getServiceName(), readLock));
   }
 
   @Override
