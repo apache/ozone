@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -110,7 +109,7 @@ public class JmxMetricsCollectorTask implements Callable<JmxMetricsCollectorTask
   }
 
   private static long parseMetrics(String jsonResponse, String serviceName, String keyName)
-      throws JsonProcessingException {
+      throws IOException {
     if (jsonResponse == null || jsonResponse.isEmpty()) {
       return -1L;
     }
