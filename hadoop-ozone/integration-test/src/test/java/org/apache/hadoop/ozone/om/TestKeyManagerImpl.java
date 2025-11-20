@@ -361,7 +361,7 @@ public class TestKeyManagerImpl {
   @Test
   public void testCreateDirectory() throws IOException {
     // Create directory where the parent directory does not exist
-    StringBuffer keyNameBuf = new StringBuffer();
+    StringBuilder keyNameBuf = new StringBuilder();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
       keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
@@ -440,7 +440,7 @@ public class TestKeyManagerImpl {
   void createFileUnderNonexistentParent() throws IOException {
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
-    StringBuffer keyNameBuf = new StringBuffer();
+    StringBuilder keyNameBuf = new StringBuilder();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 5; i++) {
       keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
