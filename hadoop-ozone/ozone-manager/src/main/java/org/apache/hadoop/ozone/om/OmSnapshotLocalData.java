@@ -67,7 +67,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Stores the transactionInfo corresponding to OM when the snaphot is purged.
   private TransactionInfo transactionInfo;
 
-  // Stores the rocksDB's transaction sequence number at the time of snapshot creation.'
+  // Stores the rocksDB's transaction sequence number at the time of snapshot creation.
   private long dbTxSequenceNumber;
 
   // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
