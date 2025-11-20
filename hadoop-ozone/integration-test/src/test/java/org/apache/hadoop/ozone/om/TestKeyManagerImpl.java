@@ -379,25 +379,30 @@ public class TestKeyManagerImpl {
       assertIsDirectory(BUCKET_NAME, path.toString());
       path = path.getParent();
     }
+  }
 
+  @Test
+  void cannotCreateDirUnderFile() throws IOException {
     // make sure create directory fails where parent is a file
-    keyName = RandomStringUtils.secure().nextAlphabetic(5);
-    keyArgs = createBuilder()
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
+    OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
-    OmKeyArgs finalKeyArgs = keyArgs;
     OMException e =
-        assertThrows(OMException.class, () -> writeClient.createDirectory(finalKeyArgs),
+        assertThrows(OMException.class, () -> writeClient.createDirectory(keyArgs),
             "Creation should fail for directory.");
     assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
+  }
 
+  @Test
+  void createDirUnderRoot() throws IOException {
     // create directory where parent is root
-    keyName = RandomStringUtils.secure().nextAlphabetic(5);
-    keyArgs = createBuilder()
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
+    OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
     writeClient.createDirectory(keyArgs);
@@ -420,9 +425,8 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // try to open created key with overWrite flag set to false
-    OmKeyArgs finalKeyArgs = keyArgs;
     OMException ex =
-        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs, false, false),
+        assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, false, false),
             "Open key should fail for non overwrite create");
     if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
       throw ex;
@@ -430,7 +434,10 @@ public class TestKeyManagerImpl {
 
     // create file should pass with overwrite flag set to true
     writeClient.createFile(keyArgs, true, false);
+  }
 
+  @Test
+  void createFileUnderNonexistentParent() throws IOException {
     // try to create a file where parent directories do not exist and
     // recursive flag is set to false
     StringBuffer keyNameBuf = new StringBuffer();
@@ -438,32 +445,33 @@ public class TestKeyManagerImpl {
     for (int i = 0; i < 5; i++) {
       keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
-    keyName = keyNameBuf.toString();
-    keyArgs = createBuilder()
+    String keyName = keyNameBuf.toString();
+    OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
-    OmKeyArgs finalKeyArgs1 = keyArgs;
-    ex =
-        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs1, false, false),
+    OMException ex =
+        assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, false, false),
             "Open file should fail for non recursive write");
     if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
       throw ex;
     }
 
     // file create should pass when recursive flag is set to true
-    keySession = writeClient.createFile(keyArgs, false, true);
+    OpenKeySession keySession = writeClient.createFile(keyArgs, false, true);
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
     assertTrue(keyManager
         .getFileStatus(keyArgs).isFile());
+  }
 
+  @Test
+  void cannotOverwriteDirWithFile() throws IOException {
     // try creating a file over a directory
-    keyArgs = createBuilder()
+    OmKeyArgs keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    OmKeyArgs finalKeyArgs2 = keyArgs;
-    ex = assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs2, true, true),
+    OMException ex = assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, true, true),
         "Open file should fail for non recursive write");
     if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
       throw ex;
@@ -730,9 +738,8 @@ public class TestKeyManagerImpl {
         .build();
 
     // lookup for a non-existent file
-    OmKeyArgs finalKeyArgs = keyArgs;
     OMException ex =
-        assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs, null),
+        assertThrows(OMException.class, () -> keyManager.lookupFile(keyArgs, null),
             "Lookup file should fail for non existent file");
     if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
       throw ex;
@@ -745,13 +752,15 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
     assertEquals(keyManager.lookupFile(keyArgs, null).getKeyName(),
         keyName);
+  }
 
+  @Test
+  void lookupFileFailsForDirectory() throws IOException {
     // lookup for created file
-    keyArgs = createBuilder()
+    OmKeyArgs keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    OmKeyArgs finalKeyArgs1 = keyArgs;
-    ex = assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs1, null),
+    OMException ex = assertThrows(OMException.class, () -> keyManager.lookupFile(keyArgs, null),
         "Lookup file should fail for a directory");
     if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
       throw ex;
