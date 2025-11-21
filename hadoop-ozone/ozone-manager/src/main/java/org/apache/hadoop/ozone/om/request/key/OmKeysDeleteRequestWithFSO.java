@@ -94,7 +94,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
     long quotaReleased = 0L;
     int emptyKeys = 0;
     // Mark all keys which can be deleted, in cache as deleted.
-    for (int i = 0 ; i < omKeyInfoList.size(); i++) {
+    for (int i = 0; i < omKeyInfoList.size(); i++) {
       final OmKeyInfo omKeyInfo = omKeyInfoList.get(i);
 
       final long volumeId = omMetadataManager.getVolumeId(
@@ -135,7 +135,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
     }
 
     // Mark directory keys.
-    for (int i = 0 ; i < dirList.size(); i++) {
+    for (int i = 0; i < dirList.size(); i++) {
       final OmKeyInfo dirInfo = dirList.get(i);
       final long volumeId = omMetadataManager.getVolumeId(
               dirInfo.getVolumeName());
@@ -145,7 +145,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       final String dirName = dirInfo.getFileName();
 
       final String dbDirKey = omMetadataManager.getOzonePathKey(
-        volumeId, bucketId, parentId, dirName);
+          volumeId, bucketId, parentId, dirName);
       omMetadataManager.getDirectoryTable()
           .addCacheEntry(new CacheKey<>(dbDirKey),
             CacheValue.get(trxnLogIndex));
