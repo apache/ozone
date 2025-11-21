@@ -758,7 +758,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     } catch (Exception e) {
       LOG.error("Error processing reinitialization event", e);
     } finally {
-      // Clean up checkpoint files after use (database connections are automatically closed by try-with-resources)
       if (checkpointedOMMetadataManager != null) {
         cleanupCheckpointFiles(checkpointedOMMetadataManager);
       }
