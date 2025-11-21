@@ -307,7 +307,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             "refCount should have been set to 1");
 
         omMetadataManager.getVolumeTable().addCacheEntry(
-            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            new CacheKey<>(dbVolumeKey),
             CacheValue.get(transactionLogIndex, omVolumeArgs));
       }
 
