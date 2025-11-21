@@ -62,6 +62,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   private final ConfigurationSource conf;
   private final PlacementPolicy placementPolicy;
   private final long containerSizeBytes;
+  private final long containerSpaceRequirement;
 
   public ECPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
@@ -73,6 +74,10 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     this.containerSizeBytes = (long) this.conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    double multiplier = conf.getDouble(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
+    this.containerSpaceRequirement = (long) (containerSizeBytes * multiplier);
   }
 
   @Override
@@ -88,7 +93,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       throws IOException {
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
-            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes);
+            replicationConfig.getRequiredNodes(), 0, this.containerSpaceRequirement);
     return create(replicationConfig, dns);
   }
 

@@ -82,6 +82,7 @@ public class ContainerManagerImpl implements ContainerManager {
   private final Random random = new Random();
 
   private final long maxContainerSize;
+  private final long containerSpaceRequirement;
 
   /**
    *
@@ -114,6 +115,11 @@ public class ContainerManagerImpl implements ContainerManager {
 
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    double multiplier = conf.getDouble(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
+    this.containerSpaceRequirement = (long) (maxContainerSize * multiplier);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -352,23 +358,23 @@ public class ContainerManagerImpl implements ContainerManager {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+          if (pipelineManager.hasEnoughSpace(pipeline, containerSpaceRequirement)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
+                pipeline, containerSpaceRequirement);
           }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+          if (pipelineManager.hasEnoughSpace(pipeline, containerSpaceRequirement)) {
             containerInfo = allocateContainer(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
+                pipeline, containerSpaceRequirement);
           }
         }
         return containerInfo;

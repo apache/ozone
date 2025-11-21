@@ -1036,6 +1036,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.space.requirement.multiplier</name>
+    <value>2.0</value>
+    <tag>OZONE, SCM, MANAGEMENT</tag>
+    <description>
+      Multiplier for container space requirement when checking if a datanode
+      has enough space for container allocation. The required space is calculated
+      as container size multiplied by this value. This prevents concurrent clients
+      from all passing the space check when there's only enough space for one
+      container. For example, with default container size of 5GB and multiplier
+      of 2.0, the system will require 10GB of available space before allocating
+      a new container. This ensures that if only 6GB is remaining, the check will
+      fail, preventing multiple clients from attempting to create containers
+      concurrently when there's only space for one.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.lock.stripes</name>
     <value>512</value>
     <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>

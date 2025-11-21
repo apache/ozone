@@ -27,8 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -177,6 +181,42 @@ public class TestContainerManagerImpl {
     pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
     container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNotNull(container);
+  }
+
+  @Test
+  public void testContainerSpaceRequirementMultiplier() throws IOException {
+    long sizeRequired = 256 * 1024 * 1024;
+    double multiplier = 2.0;
+    long containerSize = 5L * 1024 * 1024 * 1024;
+    long expectedSpaceRequirement = (long) (containerSize * multiplier);
+
+    PipelineManager spyPipelineManager = spy(pipelineManager);
+    File tempDir = new File(testDir, "tempDir");
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    conf.setDouble(ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER, multiplier);
+
+    ContainerManager manager = new ContainerManagerImpl(conf,
+        scmhaManager, sequenceIdGen, spyPipelineManager,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+
+    Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
+
+    doReturn(false).when(spyPipelineManager)
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
+    ContainerInfo container = manager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNull(container);
+    verify(spyPipelineManager, atLeast(1))
+        .hasEnoughSpace(eq(pipeline), eq(expectedSpaceRequirement));
+
+    reset(spyPipelineManager);
+    doReturn(true).when(spyPipelineManager)
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
+    container = manager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNotNull(container);
+    verify(spyPipelineManager, atLeast(1))
+        .hasEnoughSpace(eq(pipeline), eq(expectedSpaceRequirement));
   }
 
   @Test

@@ -65,6 +65,7 @@ public class RatisPipelineProvider
   private final LeaderChoosePolicy leaderChoosePolicy;
   private final SCMContext scmContext;
   private final long containerSizeBytes;
+  private final long containerSpaceRequirement;
   private final long minRatisVolumeSizeBytes;
 
   @VisibleForTesting
@@ -89,6 +90,10 @@ public class RatisPipelineProvider
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    double multiplier = conf.getDouble(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
+    this.containerSpaceRequirement = (long) (containerSizeBytes * multiplier);
     this.minRatisVolumeSizeBytes = (long) this.conf.getStorageSize(
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
@@ -165,7 +170,7 @@ public class RatisPipelineProvider
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSizeBytes, conf);
+          containerSpaceRequirement, conf);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
@@ -178,7 +183,7 @@ public class RatisPipelineProvider
       }
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSizeBytes);
+          containerSpaceRequirement);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());
