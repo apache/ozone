@@ -55,6 +55,10 @@ public class SignatureInfo {
 
   private String stringToSign = null;
 
+  private String payloadHash = null;
+
+  private String service = null;
+
   public SignatureInfo() { }
 
   private SignatureInfo(Builder b) {
@@ -72,7 +76,9 @@ public class SignatureInfo {
         .setAlgorithm(signatureInfo.getAlgorithm())
         .setSignPayload(signatureInfo.isSignPayload())
         .setUnfilteredURI(signatureInfo.getUnfilteredURI())
-        .setStringToSign(signatureInfo.getStringToSign()));
+        .setStringToSign(signatureInfo.getStringToSign())
+        .setPayloadHash(signatureInfo.getPayloadHash())
+        .setService(signatureInfo.getService()));
   }
 
   private void initialize(Builder b) {
@@ -87,6 +93,8 @@ public class SignatureInfo {
     this.signPayload = b.signPayload;
     this.unfilteredURI = b.unfilteredURI;
     this.stringToSign = b.stringToSign;
+    this.payloadHash = b.payloadHash;
+    this.service = b.service;
   }
 
   public String getAwsAccessId() {
@@ -141,6 +149,22 @@ public class SignatureInfo {
     this.stringToSign = strToSign;
   }
 
+  public String getPayloadHash() {
+    return this.payloadHash;
+  }
+
+  public void setPayloadHash(String payloadHash) {
+    this.payloadHash = payloadHash;
+  }
+
+  public String getService() {
+    return service;
+  }
+
+  public void setService(String service) {
+    this.service = service;
+  }
+
   /**
    * Signature version.
    */
@@ -163,6 +187,8 @@ public class SignatureInfo {
     private boolean signPayload = true;
     private String unfilteredURI = null;
     private String stringToSign = null;
+    private String payloadHash = null;
+    private String service = null;
 
     public Builder(Version version) {
       this.version = version;
@@ -215,6 +241,16 @@ public class SignatureInfo {
 
     public Builder setStringToSign(String stringToSign) {
       this.stringToSign = stringToSign;
+      return this;
+    }
+
+    public Builder setPayloadHash(String payloadHash) {
+      this.payloadHash = payloadHash;
+      return this;
+    }
+
+    public Builder setService(String service) {
+      this.service = service;
       return this;
     }
 

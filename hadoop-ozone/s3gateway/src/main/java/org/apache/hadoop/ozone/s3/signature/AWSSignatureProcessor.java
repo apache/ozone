@@ -18,8 +18,17 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,6 +48,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +70,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private ContainerRequestContext context;
 
   @Override
-  public SignatureInfo parseSignature() throws OS3Exception {
+  public SignatureInfo parseSignature() throws OS3Exception, IOException, NoSuchAlgorithmException {
 
     LowerCaseKeyStringMap headers =
         LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders());
@@ -89,11 +99,54 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       }
     }
     if (signatureInfo == null) {
-      signatureInfo = new SignatureInfo.Builder(Version.NONE).build();
+      signatureInfo = new SignatureInfo.Builder(Version.NONE).setService("s3").build();
     }
+    String payloadHash = getPayloadHash(headers, signatureInfo);
+    signatureInfo.setPayloadHash(payloadHash);
     signatureInfo.setUnfilteredURI(
         context.getUriInfo().getRequestUri().getPath());
     return signatureInfo;
+  }
+
+  private String getPayloadHash(Map<String, String> headers, SignatureInfo signatureInfo)
+      throws OS3Exception, NoSuchAlgorithmException, IOException {
+    if (signatureInfo.getVersion() == Version.V2) {
+      return "";
+    }
+    if (signatureInfo.getService().equals("s3")) {
+      if (!signatureInfo.isSignPayload()) {
+        // According to AWS Signature V4 documentation using Query Parameters
+        // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+        return UNSIGNED_PAYLOAD;
+      }
+      String contentSignatureHeaderValue = headers.get(X_AMZ_CONTENT_SHA256);
+      // According to AWS Signature V4 documentation using Authorization Header
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+      // The x-amz-content-sha256 header is required
+      // for all AWS Signature Version 4 requests using Authorization header.
+      if (contentSignatureHeaderValue == null) {
+        LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
+            + " header for signed payload");
+        throw S3_AUTHINFO_CREATION_ERROR;
+      }
+      // Simply return the header value of x-amz-content-sha256 as the payload hash
+      // These are the possible cases:
+      // 1. Actual payload checksum for single chunk upload
+      // 2. Unsigned payloads for multiple chunks upload
+      //    - UNSIGNED-PAYLOAD
+      //    - STREAMING-UNSIGNED-PAYLOAD-TRAILER
+      // 3. Signed payloads for multiple chunks upload
+      //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
+      //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
+      //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
+      //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
+      return contentSignatureHeaderValue;
+    }
+    InputStream in = context.getEntityStream();
+    byte[] body = readAllBytes(in);
+    String payloadHash = Hex.encode(MessageDigest.getInstance("SHA-256").digest(body));
+    context.setEntityStream(new ByteArrayInputStream(body));
+    return payloadHash;
   }
 
   private AuditMessage buildAuthFailureMessage(MalformedResourceException e) {
@@ -105,6 +158,16 @@ public class AWSSignatureProcessor implements SignatureProcessor {
         .withException(e)
         .build();
     return message;
+  }
+
+  private byte[] readAllBytes(InputStream in) throws IOException {
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    byte[] chunk = new byte[8192];
+    int n;
+    while ((n = in.read(chunk)) != -1) {
+      buffer.write(chunk, 0, n);
+    }
+    return buffer.toByteArray();
   }
 
   @VisibleForTesting

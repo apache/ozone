@@ -15,31 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.signature;
-
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.time.format.DateTimeFormatter;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+package org.apache.hadoop.ozone.s3sts;
 
 /**
- * Parser to request auth parser for http request.
+ * This class contains constants for configuration keys used
+ * in S3 STS endpoint.
  */
-public interface SignatureProcessor {
-
-  String CONTENT_TYPE = "content-type";
-
-  String CONTENT_MD5 = "content-md5";
-
-  String AWS4_SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
-
-  String HOST_HEADER = "Host";
-
-  DateTimeFormatter DATE_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd");
+public final class S3STSConfigKeys {
+  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
+      "ozone.s3g.sts.http.enabled";
 
   /**
-   * API to return string to sign.
+   * Never constructed.
    */
-  SignatureInfo parseSignature() throws OS3Exception, IOException, NoSuchAlgorithmException;
+  private S3STSConfigKeys() {
+
+  }
 }
