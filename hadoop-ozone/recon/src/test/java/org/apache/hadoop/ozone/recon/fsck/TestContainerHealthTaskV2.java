@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
@@ -139,7 +140,8 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
         reconContainerMetadataManager,
         new OzoneConfiguration(),
         reconTaskConfig,
-        getMockTaskStatusUpdaterManager());
+        getMockTaskStatusUpdaterManager(),
+        mock(ReconStorageContainerManagerFacade.class));
 
     taskV2.start();
 
@@ -219,7 +221,8 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
         mock(ReconContainerMetadataManager.class),
         new OzoneConfiguration(),
         reconTaskConfig,
-        getMockTaskStatusUpdaterManager());
+        getMockTaskStatusUpdaterManager(),
+        mock(ReconStorageContainerManagerFacade.class));
 
     taskV2.start();
 
@@ -274,7 +277,8 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
         mock(ReconContainerMetadataManager.class),
         new OzoneConfiguration(),
         reconTaskConfig,
-        getMockTaskStatusUpdaterManager());
+        getMockTaskStatusUpdaterManager(),
+        mock(ReconStorageContainerManagerFacade.class));
 
     taskV2.start();
 
@@ -347,7 +351,8 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
         mock(ReconContainerMetadataManager.class),
         new OzoneConfiguration(),
         reconTaskConfig,
-        getMockTaskStatusUpdaterManager());
+        getMockTaskStatusUpdaterManager(),
+        mock(ReconStorageContainerManagerFacade.class));
 
     taskV2.start();
 
@@ -415,7 +420,8 @@ public class TestContainerHealthTaskV2 extends AbstractReconSqlDBTest {
         mock(ReconContainerMetadataManager.class),
         new OzoneConfiguration(),
         reconTaskConfig,
-        getMockTaskStatusUpdaterManager());
+        getMockTaskStatusUpdaterManager(),
+        mock(ReconStorageContainerManagerFacade.class));
 
     taskV2.start();
 

@@ -115,6 +115,7 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTaskV2;
+import org.apache.hadoop.ozone.recon.fsck.ReconReplicationManager;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
@@ -170,6 +171,7 @@ public class ReconStorageContainerManagerFacade
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
+  private ReconReplicationManager reconReplicationManager;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
@@ -294,7 +296,8 @@ public class ReconStorageContainerManagerFacade
         reconContainerMetadataManager,
         conf,
         reconTaskConfig,
-        taskStatusUpdaterManager
+        taskStatusUpdaterManager,
+        this  // ReconStorageContainerManagerFacade - provides access to ReconReplicationManager
     );
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager,
@@ -302,6 +305,27 @@ public class ReconStorageContainerManagerFacade
 
     this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.dataSource = dataSource;
+
+    // Initialize Recon's ReplicationManager for Option 4 (local health checks)
+    try {
+      LOG.info("Creating ReconReplicationManager (Option 4)");
+      this.reconReplicationManager = new ReconReplicationManager(
+          conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
+          conf,
+          containerManager,
+          containerPlacementPolicy,  // Use for both Ratis and EC
+          containerPlacementPolicy,
+          eventQueue,
+          scmContext,
+          nodeManager,
+          Clock.system(ZoneId.systemDefault()),
+          containerHealthSchemaManagerV2
+      );
+      LOG.info("Successfully created ReconReplicationManager");
+    } catch (IOException e) {
+      LOG.error("Failed to create ReconReplicationManager", e);
+      throw e;
+    }
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager, pipelineSyncTask);
@@ -700,7 +724,7 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public ReplicationManager getReplicationManager() {
-    return null;
+    return reconReplicationManager;
   }
 
   @Override
