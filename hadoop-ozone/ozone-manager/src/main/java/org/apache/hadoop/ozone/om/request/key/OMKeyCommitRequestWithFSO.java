@@ -204,9 +204,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .withUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex);
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
             dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);
       }
@@ -224,16 +224,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.putAll(KeyValueUtil.getFromProtobuf(
-              commitKeyArgs.getMetadataList())));
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      // Set the new metadata from the request and UpdateID to current
+      // transactionLogIndex
+      omKeyInfo = omKeyInfo.toBuilder()
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+              commitKeyArgs.getMetadataList()))
+          .setDataSize(commitKeyArgs.getDataSize())
+          .withUpdateID(trxnLogIndex)
+          .build();
 
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
