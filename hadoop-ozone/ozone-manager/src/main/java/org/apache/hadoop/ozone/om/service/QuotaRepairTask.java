@@ -103,8 +103,8 @@ public class QuotaRepairTask {
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     // thread pool with 3 Table type * (1 task each + 3 thread for each task)
-    executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
     try (OMMetadataManager activeMetaManager =
+      executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
         createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
