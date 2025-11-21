@@ -161,7 +161,8 @@ public class TestOMSnapshotDAG {
               throw new IllegalStateException(String.format("Duplicate key %s", u));
             }, TreeMap::new));
       DifferSnapshotInfo dsi = new DifferSnapshotInfo((version) -> Paths.get(checkpointPath),
-          snapshotInfo.getSnapshotId(), snapshotInfo.getDbTxSequenceNumber(), versionSstFiles);
+          snapshotInfo.getSnapshotId(), snapshotLocalData.getSnapshotLocalData().getDbTxSequenceNumber(),
+          versionSstFiles);
       return new DifferSnapshotVersion(dsi, 0, COLUMN_FAMILIES_TO_TRACK_IN_DAG);
     }
   }
