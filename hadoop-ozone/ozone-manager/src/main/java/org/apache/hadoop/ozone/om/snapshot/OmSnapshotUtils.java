@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-<<<<<<< ours
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
-=======
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
->>>>>>> theirs
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
 import java.io.File;

@@ -479,9 +479,8 @@ public class OzoneManagerServiceProviderImpl
         }
         return null;
       });
-      Path unTarredOmDb = Paths.get(untarredDbDir.toString(), OM_CHECKPOINT_DATA_DIR, OM_DB_NAME);
       // Validate extracted files
-      File[] sstFiles = unTarredOmDb.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
+      File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
       if (sstFiles != null && sstFiles.length > 0) {
         LOG.info("Number of SST files found in the OM snapshot directory: {} - {}", untarredDbDir, sstFiles.length);
       }
