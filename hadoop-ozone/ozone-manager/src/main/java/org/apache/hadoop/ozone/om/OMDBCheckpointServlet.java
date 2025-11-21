@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -535,8 +536,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Check if the files are hard linked to each other.
       // Note comparison must be done against srcPath, because
       // destPath may only exist on Follower.
-      if (OmSnapshotUtils.getINode(srcPath).equals(
-          OmSnapshotUtils.getINode(file))) {
+      if (getINode(srcPath).equals(getINode(file))) {
         return destPath;
       } else {
         LOG.info("Found non linked sst files with the same name: {}, {}",
