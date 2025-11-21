@@ -299,18 +299,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setExpectedDataGeneration(null);
-
       // Combination
       // Set the UpdateID to current transactionLogIndex
-      Map<String, String> metadataMap = omKeyInfo.toBuilder().getMetadata();
-      metadataMap.putAll(KeyValueUtil.getFromProtobuf(
-                commitKeyArgs.getMetadataList()));
       omKeyInfo = omKeyInfo.toBuilder()
-          .setMetadata(metadataMap)
+          .setExpectedDataGeneration(null)
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                commitKeyArgs.getMetadataList()))
           .withUpdateID(trxnLogIndex)
+          .setDataSize(commitKeyArgs.getDataSize())
           .build();
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       // Update the block length for each block, return the allocated but
       // uncommitted blocks

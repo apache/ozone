@@ -973,33 +973,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (omBucketInfo.getIsVersionEnabled()) {
         newSize += dbKeyInfo.getDataSize();
       }
-      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
-      dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo = dbKeyInfo.toBuilder()
-          .withUpdateID(transactionLogIndex)
-          .build();
-      dbKeyInfo.setReplicationConfig(replicationConfig);
-
       // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
-      dbKeyInfo = dbKeyInfo.toBuilder()
-          .setMetadata(KeyValueUtil.getFromProtobuf(
-              keyArgs.getMetadataList()))
-          .build();
-
       // Construct a new tags from KeyArgs
       // Clear the old one when the key is overwritten
-      dbKeyInfo.getTags().clear();
-      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
-          keyArgs.getTagsList()));
+      final OmKeyInfo.Builder builder = dbKeyInfo.toBuilder()
+          .setDataSize(newSize)
+          .setModificationTime(keyArgs.getModificationTime())
+          .setReplicationConfig(replicationConfig)
+          .setMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+          .withUpdateID(transactionLogIndex)
+          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setFileEncryptionInfo(encInfo);
 
       if (keyArgs.hasExpectedDataGeneration()) {
-        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+        builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
 
-      dbKeyInfo.setFileEncryptionInfo(encInfo);
-      return dbKeyInfo;
+      return builder.build();
     }
 
     // the key does not exist, create a new object.

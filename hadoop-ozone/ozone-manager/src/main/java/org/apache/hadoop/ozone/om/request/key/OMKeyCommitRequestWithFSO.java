@@ -224,19 +224,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      Map<String, String> metaDataMap = omKeyInfo.toBuilder().getMetadata();
-      metaDataMap.putAll(KeyValueUtil.getFromProtobuf(
-              commitKeyArgs.getMetadataList()));
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      // Set the new metadata from the request and UpdateID to current
+      // transactionLogIndex
+      omKeyInfo = omKeyInfo.toBuilder()
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+              commitKeyArgs.getMetadataList()))
+          .setDataSize(commitKeyArgs.getDataSize())
+          .withUpdateID(trxnLogIndex)
+          .build();
 
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo = omKeyInfo.toBuilder()
-          .setMetadata(metaDataMap)
-          .withUpdateID(trxnLogIndex)
-          .build();
 
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
