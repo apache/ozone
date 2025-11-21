@@ -406,4 +406,58 @@ public class TestReconTasks {
 
     IOUtils.closeQuietly(client);
   }
+
+  /**
+   * Test that ContainerHealthTaskV2 can query MIS_REPLICATED containers.
+   * Steps:
+   * 1. Create a cluster
+   * 2. Verify the query mechanism for MIS_REPLICATED state works
+   *
+   * Note: Creating mis-replication scenarios (placement policy violations)
+   * is very complex in integration tests as it requires:
+   * - Multi-rack cluster setup with rack-aware placement policy
+   * - Or manipulating replica placement to violate policy constraints
+   *
+   * This test verifies the detection infrastructure exists. In production,
+   * mis-replication occurs when:
+   * 1. Replicas don't satisfy rack/node placement requirements
+   * 2. Replicas are on nodes that violate upgrade domain constraints
+   * 3. EC containers have incorrect replica placement
+   *
+   * Note: Tests for UNDER_REPLICATED and OVER_REPLICATED are in
+   * TestReconTasksV2MultiNode as they require multi-node clusters.
+   */
+  @Test
+  public void testContainerHealthTaskV2MisReplicated() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            recon.getReconServer().getReconStorageContainerManager();
+
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+
+    // Verify the query mechanism for MIS_REPLICATED state works
+    List<UnhealthyContainerRecordV2> misReplicatedContainers =
+        reconContainerManager.getContainerSchemaManagerV2()
+            .getUnhealthyContainers(
+                ContainerSchemaDefinitionV2.UnHealthyContainerStates.MIS_REPLICATED,
+                0L, 0L, 1000);
+
+    // Should be empty in normal single-node cluster operation
+    // (mis-replication requires multi-node/rack setup with placement policy)
+    assertEquals(0, misReplicatedContainers.size());
+
+    // Note: Creating actual mis-replication scenarios requires:
+    // 1. Multi-rack cluster configuration
+    // 2. Rack-aware placement policy configuration
+    // 3. Manually placing replicas to violate placement rules
+    //
+    // Example scenario that would create MIS_REPLICATED:
+    // - 3-replica container with rack-aware policy (each replica on different rack)
+    // - All 3 replicas end up on same rack (violates placement policy)
+    // - ContainerHealthTaskV2 would detect this as MIS_REPLICATED
+    //
+    // The detection logic in SCM's ReplicationManager handles this,
+    // and our Option 4 implementation reuses that logic.
+  }
 }
