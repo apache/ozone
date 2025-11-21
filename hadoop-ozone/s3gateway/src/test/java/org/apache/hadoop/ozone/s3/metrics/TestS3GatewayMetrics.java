@@ -414,15 +414,15 @@ public class TestS3GatewayMetrics {
   }
 
   @Test
-  public void testAbortMultiPartUploadFailure() throws Exception {
+  public void testAbortMultiPartUploadSuccessWithInvalidUploadId() throws Exception {
     long oriMetric = metrics.getAbortMultiPartUploadFailure();
 
-    // Fail the Abort Method by providing wrong uploadID
-    OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.delete(
-        bucketName, keyName, "wrongId", null));
-    assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
-    long curMetric = metrics.getAbortMultiPartUploadFailure();
-    assertEquals(1L, curMetric - oriMetric);
+    // aborting non-existent upload returns 204 (success) same as aws s3
+    Response response = keyEndpoint.delete(bucketName, keyName, "wrongId", null);
+
+    assertEquals(204, response.getStatus());
+    long curMetric = metrics.getAbortMultiPartUploadSuccess();
+    assertEquals(2L, curMetric - oriMetric);
   }
 
   @Test
