@@ -17,6 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import java.io.IOException;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -25,9 +32,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.hdds.scm.container.replication.NullReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
-import org.apache.hadoop.hdds.scm.container.replication.NullReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -36,14 +43,6 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Recon-specific extension of SCM's ReplicationManager.
@@ -79,6 +78,7 @@ public class ReconReplicationManager extends ReplicationManager {
   private final ContainerHealthSchemaManagerV2 healthSchemaManager;
   private final ContainerManager containerManager;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconReplicationManager(
       ReplicationManagerConfiguration rmConf,
       ConfigurationSource conf,

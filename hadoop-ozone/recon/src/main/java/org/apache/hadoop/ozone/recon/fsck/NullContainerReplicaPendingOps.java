@@ -17,16 +17,15 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import java.time.Clock;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import java.time.Clock;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Null implementation of ContainerReplicaPendingOps for Recon's
@@ -36,9 +35,7 @@ import java.util.List;
  * send replication commands to datanodes. It only uses ReplicationManager's
  * health check logic to determine container health states.</p>
  *
- * <p>As proven by code analysis in ContainerHealthTaskV2_Report_Sampling_Issue.md,
- * this does NOT cause false positives because SCM's health determination logic
- * (Phase 1) explicitly ignores pending operations by calling
+ * <p> Since SCM's health determination logic (Phase 1) explicitly ignores pending operations by calling
  * isSufficientlyReplicated(false). Pending operations only affect command
  * deduplication (Phase 2), which Recon doesn't need since it doesn't enqueue
  * commands.</p>
