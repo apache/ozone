@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
-import io.opentracing.Span;
+import io.opentelemetry.api.trace.Span;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -868,7 +868,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (responseProto == null) {
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.SUCCESS, null);
       } else {
-        containerSet.scanContainer(containerID);
+        containerSet.scanContainer(containerID, "ReadBlock failed " + responseProto.getResult());
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
         streamObserver.onNext(responseProto);
@@ -886,7 +886,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
     } finally {
-      span.finish();
+      span.end();
     }
   }
 
