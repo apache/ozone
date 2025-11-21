@@ -19,18 +19,13 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Duration;
 import java.util.List;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -107,22 +102,14 @@ public class TestReconTasksV2MultiNode {
           (ReconStorageContainerManagerFacade)
               testRecon.getReconServer().getReconStorageContainerManager();
 
-      StorageContainerManager scm = testCluster.getStorageContainerManager();
       PipelineManager reconPipelineManager = reconScm.getPipelineManager();
 
       // Make sure Recon's pipeline state is initialized
       LambdaTestUtils.await(60000, 5000,
           () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
-      ContainerManager scmContainerManager = scm.getContainerManager();
       ReconContainerManager reconContainerManager =
           (ReconContainerManager) reconScm.getContainerManager();
-
-      // Create a container with replication factor 3
-      ContainerInfo containerInfo =
-          scmContainerManager.allocateContainer(
-              RatisReplicationConfig.getInstance(
-                  HddsProtos.ReplicationFactor.THREE), "test");
 
       // Verify the query mechanism for UNDER_REPLICATED state works
       List<UnhealthyContainerRecordV2> underReplicatedContainers =
@@ -183,21 +170,14 @@ public class TestReconTasksV2MultiNode {
           (ReconStorageContainerManagerFacade)
               testRecon.getReconServer().getReconStorageContainerManager();
 
-      StorageContainerManager scm = testCluster.getStorageContainerManager();
       PipelineManager reconPipelineManager = reconScm.getPipelineManager();
 
       // Make sure Recon's pipeline state is initialized
       LambdaTestUtils.await(60000, 5000,
           () -> (!reconPipelineManager.getPipelines().isEmpty()));
 
-      ContainerManager scmContainerManager = scm.getContainerManager();
       ReconContainerManager reconContainerManager =
           (ReconContainerManager) reconScm.getContainerManager();
-
-      // Create a container with replication factor 1
-      ContainerInfo containerInfo =
-          scmContainerManager.allocateContainer(
-              RatisReplicationConfig.getInstance(ONE), "test");
 
       // Note: Creating over-replication in integration tests is challenging
       // as it requires artificially adding extra replicas. In production,
