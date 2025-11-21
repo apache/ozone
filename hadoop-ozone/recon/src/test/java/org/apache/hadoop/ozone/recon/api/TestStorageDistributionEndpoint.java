@@ -98,8 +98,8 @@ class TestStorageDistributionEndpoint {
     assertEquals(NAMESPACE_USED, namespaceReport.getTotalUsedSpace());
 
     UsedSpaceBreakDown usedSpaceBreakDown = responsePayload.getUsedSpaceBreakDown();
-    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
-    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
+    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedKeyBytes());
 
     DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getDeletionPendingBytesByStage();
     assertEquals(OM_PENDING_TOTAL, deletionBreakdown.getByComponent().get("OM").get("totalBytes"));
@@ -127,8 +127,8 @@ class TestStorageDistributionEndpoint {
     assertEquals(NAMESPACE_USED, namespaceReport.getTotalUsedSpace());
 
     UsedSpaceBreakDown usedSpaceBreakDown = responsePayload.getUsedSpaceBreakDown();
-    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
-    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
+    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedKeyBytes());
 
     DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getDeletionPendingBytesByStage();
     assertEquals(OM_PENDING_TOTAL, deletionBreakdown.getByComponent().get("OM").get("totalBytes"));
@@ -197,7 +197,7 @@ class TestStorageDistributionEndpoint {
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     StorageCapacityDistributionResponse payload = (StorageCapacityDistributionResponse) response.getEntity();
-    assertEquals(OPEN_KEYS_SIZE, payload.getUsedSpaceBreakDown().getOpenKeysBytes());
+    assertEquals(OPEN_KEYS_SIZE, payload.getUsedSpaceBreakDown().getOpenKeyBytes());
   }
 
   private void setupMockDependencies() throws IOException {
@@ -295,8 +295,8 @@ class TestStorageDistributionEndpoint {
 
     // Verify namespace metrics are partially available
     UsedSpaceBreakDown usedSpaceBreakDown = payload.getUsedSpaceBreakDown();
-    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
-    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
+    assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedKeyBytes());
 
     // Verify deletion metrics are still available (SCM didn't timeout)
     DeletionPendingBytesByComponent deletionBreakdown =
@@ -347,7 +347,7 @@ class TestStorageDistributionEndpoint {
 
     // Namespace and breakdown metrics should have default values
     UsedSpaceBreakDown usedSpaceBreakDown = payload.getUsedSpaceBreakDown();
-    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeysBytes());
+    assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
 
     DeletionPendingBytesByComponent deletionBreakdown =
         usedSpaceBreakDown.getDeletionPendingBytesByStage();

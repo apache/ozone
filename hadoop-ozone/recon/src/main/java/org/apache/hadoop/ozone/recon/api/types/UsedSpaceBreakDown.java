@@ -64,11 +64,11 @@ public class UsedSpaceBreakDown {
     this.pendingDeletionBytes = pendingDeletionBytes;
   }
 
-  public long getOpenKeysBytes() {
+  public long getOpenKeyBytes() {
     return openKeyBytes;
   }
 
-  public long getCommittedBytes() {
+  public long getCommittedKeyBytes() {
     return committedKeyBytes;
   }
 
