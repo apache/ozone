@@ -225,6 +225,10 @@ public final class OmVolumeArgs extends WithObjectID
     return usedNamespace;
   }
 
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -297,6 +301,18 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    @Override
+    public Builder withObjectID(long obId) {
+      super.withObjectID(obId);
+      return this;
+    }
+
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
+      return this;
+    }
+
     /**
      * Constructs a builder.
      */
@@ -308,6 +324,20 @@ public final class OmVolumeArgs extends WithObjectID
       this.acls = acls;
       quotaInBytes = OzoneConsts.QUOTA_RESET;
       quotaInNamespace = OzoneConsts.QUOTA_RESET;
+    }
+
+    private Builder(OmVolumeArgs omVolumeArgs) {
+      super(omVolumeArgs);
+      this.acls = omVolumeArgs.acls;
+      this.adminName = omVolumeArgs.adminName;
+      this.ownerName = omVolumeArgs.ownerName;
+      this.volume = omVolumeArgs.volume;
+      this.creationTime = omVolumeArgs.creationTime;
+      this.modificationTime = omVolumeArgs.modificationTime;
+      this.quotaInBytes = omVolumeArgs.quotaInBytes;
+      this.quotaInNamespace = omVolumeArgs.quotaInNamespace;
+      this.usedNamespace = omVolumeArgs.usedNamespace;
+      this.refCount = omVolumeArgs.refCount;
     }
 
     public Builder setAdminName(String admin) {

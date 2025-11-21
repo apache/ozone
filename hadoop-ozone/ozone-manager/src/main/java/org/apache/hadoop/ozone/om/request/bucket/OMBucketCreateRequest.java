@@ -253,9 +253,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      omBucketInfo.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      omBucketInfo = omBucketInfo.toBuilder()
+          .withObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .withUpdateID(transactionLogIndex)
+          .build();
 
       addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
 
