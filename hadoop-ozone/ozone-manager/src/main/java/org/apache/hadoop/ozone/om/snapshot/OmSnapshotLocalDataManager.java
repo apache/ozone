@@ -181,11 +181,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   public void createNewOmSnapshotLocalDataFile(RDBStore snapshotStore, SnapshotInfo snapshotInfo) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
              new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
-                 () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                         getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
-                             COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT),
-                         snapshotInfo.getPathPreviousSnapshotId(), null),
-                     null))) {
+                 () -> {
+                   List<LiveFileMetaData> lfms = getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
+                       COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+                   long dbTxnSeqNumber = lfms.stream().mapToLong(LiveFileMetaData::largestSeqno).max().orElse(0L);
+                   OmSnapshotLocalData localData = new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
+                       lfms, snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
+                   return Pair.of(localData, null);
+                 })) {
       snapshotLocalData.commit();
     }
   }
@@ -263,16 +266,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // Create a yaml file for snapshots which are missing
         if (!snapshotLocalDataFile.exists()) {
           List<LiveFileMetaData> sstList = Collections.emptyList();
+          long dbTxnSeqNumber = 0L;
           if (snapshotInfo.getSnapshotStatus() == SNAPSHOT_ACTIVE) {
             try (OmMetadataManagerImpl snapshotMetadataManager = defaultSnapProvider.apply(snapshotInfo)) {
               ManagedRocksDB snapDB = ((RDBStore)snapshotMetadataManager.getStore()).getDb().getManagedRocksDb();
               sstList = getLiveSSTFilesForCFs(snapDB, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+              dbTxnSeqNumber = sstList.stream().mapToLong(LiveFileMetaData::largestSeqno).max().orElse(0L);
             } catch (Exception e) {
               throw new IOException(e);
             }
           }
           OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapshotId, sstList,
-              snapshotInfo.getPathPreviousSnapshotId(), null);
+              snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
           // Set needsDefrag to true to indicate that the snapshot needs to be defragmented, since the snapshot has
           // never been defragmented before.
           snapshotLocalData.setNeedsDefrag(true);
