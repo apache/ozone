@@ -29,11 +29,7 @@ import java.util.Comparator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.PriorityQueue;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.function.Function;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -58,12 +54,6 @@ public class SstFileSetReader {
 
   public SstFileSetReader(final Collection<Path> sstFiles) {
     this.sstFiles = sstFiles;
-  }
-
-  public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
-    final Spliterator<T> spliterator =
-        Spliterators.spliteratorUnknownSize(itr, 0);
-    return StreamSupport.stream(spliterator, false).onClose(itr::close);
   }
 
   public long getEstimatedTotalKeys() throws RocksDBException {
@@ -91,7 +81,7 @@ public class SstFileSetReader {
     return estimatedTotalKeys;
   }
 
-  public Stream<String> getKeyStream(String lowerBound,
+  public ClosableIterator<String> getKeyStream(String lowerBound,
                                      String upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
@@ -137,10 +127,11 @@ public class SstFileSetReader {
         IOUtils.closeQuietly(lowerBoundSLice, upperBoundSlice);
       }
     };
-    return getStreamFromIterator(itr);
+    return itr;
   }
 
-  public Stream<String> getKeyStreamWithTombstone(String lowerBound, String upperBound) throws RocksDBException {
+  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
+      throws RocksDBException {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
@@ -173,7 +164,7 @@ public class SstFileSetReader {
         IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice);
       }
     };
-    return getStreamFromIterator(itr);
+    return itr;
   }
 
   private abstract static class ManagedSstFileIterator implements ClosableIterator<String> {

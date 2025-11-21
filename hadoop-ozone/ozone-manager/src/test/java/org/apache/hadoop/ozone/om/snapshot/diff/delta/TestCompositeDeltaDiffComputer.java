@@ -718,8 +718,7 @@ public class TestCompositeDeltaDiffComputer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setName(snapshotName)
-        .setSnapshotId(snapshotId)
-        .setDbTxSequenceNumber(100L);
+        .setSnapshotId(snapshotId);
     return builder.build();
   }
 }

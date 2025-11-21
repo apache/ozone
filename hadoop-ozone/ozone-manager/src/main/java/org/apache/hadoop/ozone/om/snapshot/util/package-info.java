@@ -15,32 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
-
-import java.util.List;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-
 /**
- * Used in {@link org.apache.hadoop.ozone.om.service.DirectoryDeletingService}
- * to capture the result of each delete task.
+ * Package containing utility classes for snapshot management.
  */
-public class DeleteKeysResult {
-
-  private List<OmKeyInfo> keysToDelete;
-
-  private boolean processedKeys;
-
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, boolean processedKeys) {
-    this.keysToDelete = keysToDelete;
-    this.processedKeys = processedKeys;
-  }
-
-  public List<OmKeyInfo> getKeysToDelete() {
-    return keysToDelete;
-  }
-
-  public boolean isProcessedKeys() {
-    return processedKeys;
-  }
-
-}
+package org.apache.hadoop.ozone.om.snapshot.util;
