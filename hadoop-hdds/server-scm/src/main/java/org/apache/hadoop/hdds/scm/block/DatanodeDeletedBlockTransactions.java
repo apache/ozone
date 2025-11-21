@@ -68,6 +68,14 @@ class DatanodeDeletedBlockTransactions {
         .collect(Collectors.toList());
   }
 
+  public int getNumberOfBlocksForDatanode(DatanodeID dnId) {
+    return Optional.ofNullable(transactions.get(dnId))
+        .orElse(new LinkedList<>())
+        .stream()
+        .mapToInt(DeletedBlocksTransaction::getLocalIDCount)
+        .sum();
+  }
+
   boolean isEmpty() {
     return transactions.isEmpty();
   }

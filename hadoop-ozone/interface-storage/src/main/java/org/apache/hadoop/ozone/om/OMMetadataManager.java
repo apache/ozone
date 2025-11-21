@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -50,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -60,7 +63,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 /**
  * OM metadata manager interface.
  */
-public interface OMMetadataManager extends DBStoreHAManager {
+public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   /**
    * Start metadata manager.
    *
@@ -88,6 +91,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return OzoneManagerLock
    */
   IOzoneManagerLock getLock();
+
+  /**
+   * Returns the Hierarchical ResourceLock used on Metadata DB.
+   */
+  HierarchicalResourceLockManager getHierarchicalLockManager();
 
   /**
    * Returns the epoch associated with current OM process.
@@ -134,6 +142,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *    e.g. /-9223372036854772480/-9223372036854771968/
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
+
+
+  /**
+   * Retrieves a pair of volume ID and bucket ID associated with the provided FSO (File System Object) key.
+   *
+   * @param fsoKey the key representing the File System Object, used to identify the corresponding volume and bucket.
+   * @return a Pair containing the volume ID as the first element and the bucket ID as the second element.
+   */
+  VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) throws IOException;
 
   /**
    * Given a volume, bucket and a key, return the corresponding DB key.
@@ -318,12 +335,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<OmVolumeArgs> listVolumes(String userName, String prefix,
       String startKey, int maxKeys) throws IOException;
-
-  /**
-   * Get total open key count (estimated, due to the nature of RocksDB impl)
-   * of both OpenKeyTable and OpenFileTable.
-   */
-  long getTotalOpenKeyCount() throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -675,4 +686,53 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   boolean containsIncompleteMPUs(String volume, String bucket)
       throws IOException;
+
+  TablePrefixInfo getTableBucketPrefix(String volume, String bucket) throws IOException;
+
+  /**
+   * Computes the bucket prefix for a table.
+   * @return would return "" if the table doesn't have bucket prefixed based key.
+   * @throws IOException
+   */
+  String getTableBucketPrefix(String tableName, String volume, String bucket) throws IOException;
+
+  /**
+   * Represents a unique identifier for a specific bucket within a volume.
+   *
+   * This class combines a volume identifier and a bucket identifier
+   * to uniquely identify a bucket within a storage system.
+   */
+  class VolumeBucketId {
+    private final long volumeId;
+    private final long bucketId;
+
+    public VolumeBucketId(long volumeId, long bucketId) {
+      this.volumeId = volumeId;
+      this.bucketId = bucketId;
+    }
+
+    public long getBucketId() {
+      return bucketId;
+    }
+
+    public long getVolumeId() {
+      return volumeId;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+      if (!(o instanceof VolumeBucketId)) {
+        return false;
+      }
+
+      VolumeBucketId that = (VolumeBucketId) o;
+      return volumeId == that.volumeId && bucketId == that.bucketId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(volumeId, bucketId);
+    }
+  }
+
 }

@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -35,6 +36,8 @@ import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +55,9 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("v1", adminName, ownerName));
-    assertEquals("Invalid volume name: v1", omException.getMessage());
+    assertEquals(
+        "volume name 'v1' is too short, valid length is 3-63 characters",
+        omException.getMessage());
   }
 
   @Test
@@ -205,6 +210,33 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
   }
 
   @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String adminName = UUID.randomUUID().toString();
+    String ownerName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
+        ownerName);
+
+    OMVolumeCreateRequest req = new OMVolumeCreateRequest(originalRequest) {
+      @Override
+      public void checkAcls(OzoneManager ozoneManager,
+          OzoneObj.ResourceType resType,
+          OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
+          String vol, String bucket, String key) throws java.io.IOException {
+        throw new OMException("denied",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
+  }
+
+  @Test
   public void 
         testAcceptS3CompliantVolumeNameCreationRegardlessOfStrictS3Setting()
         throws Exception {
@@ -272,7 +304,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute(volumeName, adminName, ownerName));
-    assertEquals("Invalid volume name: " + volumeName,
+    assertEquals("volume name has an unsupported character : _",
         omException.getMessage());
   }
 

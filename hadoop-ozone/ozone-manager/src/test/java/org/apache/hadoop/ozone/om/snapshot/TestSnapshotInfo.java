@@ -75,7 +75,6 @@ public class TestSnapshotInfo {
         .setPathPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath("test/path")
-        .setCheckpointDir("checkpoint.testdir")
         .build();
   }
 
@@ -158,5 +157,45 @@ public class TestSnapshotInfo {
     // Checking changes are flushed when both term & transactionIndex is greater.
     omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(2, 2));
     assertTrue(OmSnapshotManager.areSnapshotChangesFlushedToDB(omMetadataManager, EXPECTED_SNAPSHOT_KEY));
+  }
+
+  @Test
+  public void testCreateTransactionInfo() throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    SnapshotInfo info = createSnapshotInfo();
+    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
+    assertNull(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getCreateTransactionInfo());
+    // checking if true value is returned when snapshot is null.
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, null));
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(0, 0));
+    // Checking if changes have been flushed when createTransactionInfo is null
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, info));
+    TermIndex termIndex = TermIndex.valueOf(1, 1);
+    info.setCreateTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+    // Checking if changes to snapshot object has been updated but not updated on cache or disk.
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, snapshotInfo.get(EXPECTED_SNAPSHOT_KEY)));
+    snapshotInfo.addCacheEntry(new CacheKey<>(EXPECTED_SNAPSHOT_KEY), CacheValue.get(termIndex.getIndex(), info));
+
+    assertEquals(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getCreateTransactionInfo(), info.getCreateTransactionInfo());
+    SnapshotInfo tableSnapshotInfo = snapshotInfo.get(EXPECTED_SNAPSHOT_KEY);
+    // Checking if changes have not been flushed when snapshot last transaction info is behind OmTransactionTable value.
+    assertFalse(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, tableSnapshotInfo));
+    omMetadataManager.getTransactionInfoTable().addCacheEntry(new CacheKey<>(OzoneConsts.TRANSACTION_INFO_KEY),
+        CacheValue.get(termIndex.getIndex(), TransactionInfo.valueOf(1, 1)));
+    assertFalse(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, tableSnapshotInfo));
+
+    // Checking changes are flushed when transaction is equal.
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY,
+        TransactionInfo.valueOf(1, 1));
+
+
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, tableSnapshotInfo));
+    // Checking changes are flushed when transactionIndex is greater .
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(1, 2));
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, tableSnapshotInfo));
+    // Checking changes are flushed when both term & transactionIndex is greater.
+    omMetadataManager.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(2, 2));
+    assertTrue(OmSnapshotManager.isSnapshotFlushedToDB(omMetadataManager, tableSnapshotInfo));
   }
 }

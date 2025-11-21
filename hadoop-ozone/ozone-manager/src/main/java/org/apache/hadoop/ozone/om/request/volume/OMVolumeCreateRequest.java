@@ -66,11 +66,29 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    super.preExecute(ozoneManager);
+
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     // Verify resource name
     OmUtils.validateVolumeName(volumeInfo.getVolume(),
         ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            volumeInfo.getVolume(), null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_VOLUME,
+                buildVolumeAuditMap(volumeInfo.getVolume()), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
 
     // Set creation time & set modification time
     long initialTime = Time.now();
@@ -118,20 +136,12 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      omVolumeArgs.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .withObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .withUpdateID(transactionLogIndex)
+          .build();
 
       auditMap = omVolumeArgs.toAuditMap();
-
-      // check acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
-            null, null);
-      }
-
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));

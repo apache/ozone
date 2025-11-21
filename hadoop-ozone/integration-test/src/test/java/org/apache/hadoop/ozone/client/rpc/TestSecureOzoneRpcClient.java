@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
@@ -62,6 +63,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -84,8 +87,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -306,10 +311,12 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         assertEquals(committedBytes + dataSize,
             getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
         // check used quota
-        bucket = volume.getBucket(bucketName);
-        assertEquals(1, bucket.getUsedNamespace());
-        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
-
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> 1 == volume.getBucket(bucketName).getUsedNamespace(),
+            1000, 30000);
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> dataSize * ReplicationFactor.THREE.getValue()
+                == volume.getBucket(bucketName).getUsedBytes(), 1000, 30000);
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
@@ -423,6 +430,21 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     omResponse = getCluster().getOzoneManager().getOmServerProtocol()
         .submitRequest(null, readRequest);
     assertEquals(Status.INVALID_TOKEN, omResponse.getStatus());
+  }
+
+  @Test
+  public void testRemoteException() {
+    UserGroupInformation realUser = UserGroupInformation.createRemoteUser("realUser");
+    UserGroupInformation proxyUser = UserGroupInformation.createProxyUser("user", realUser);
+
+    assertThrows(AccessControlException.class, () -> {
+      proxyUser.doAs((PrivilegedExceptionAction<Void>) () -> {
+        try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getCluster().getConf())) {
+          ozoneClient.getObjectStore().listVolumes("/");
+        }
+        return null;
+      });
+    });
   }
 
   @Test

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,24 +29,28 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -73,6 +78,7 @@ public final class ContainerMerkleTreeTestUtils {
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
       assertEquals(expectedBlockTree.getDataChecksum(), actualBlockTree.getDataChecksum());
+      assertEquals(expectedBlockTree.getDeleted(), actualBlockTree.getDeleted());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
@@ -146,14 +152,34 @@ public final class ContainerMerkleTreeTestUtils {
 
   public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
+
     byte byteValue = 1;
-    for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
+    for (int i = 0; i < numBlocks; i++) {
+      long blockID = i + 1;
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        tree.addChunks(blockIndex, true,
+        tree.addChunks(blockID, true,
             buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
     }
     return tree;
+  }
+
+  /**
+   * Builds a tree with continuous block IDs from 1 to numLiveBlocks, then writes marks the specified IDs within that
+   * set of blocks as deleted.
+   */
+  public static ContainerProtos.ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numLiveBlocks,
+                                                        long... deletedBlockIDs) {
+
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf, numLiveBlocks);
+    return treeWriter.addDeletedBlocks(getDeletedBlockData(conf, deletedBlockIDs), true);
+  }
+
+  public static List<BlockData> getDeletedBlockData(ConfigurationSource conf, long... blockIDs) {
+    List<BlockData> deletedBlockData = new ArrayList<>();
+    // Container ID within the block is not used in these tests.
+    Arrays.stream(blockIDs).forEach(id -> deletedBlockData.add(buildBlockData(conf, 1, id)));
+    return deletedBlockData;
   }
 
   /**
@@ -164,7 +190,7 @@ public final class ContainerMerkleTreeTestUtils {
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
-    ContainerDiffReport diff = new ContainerDiffReport();
+    ContainerDiffReport diff = new ContainerDiffReport(1);
 
     introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
     introduceMissingChunks(treeBuilder, numMissingChunks, diff);
@@ -174,84 +200,99 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * Introduces missing blocks by removing random blocks from the tree.
+   * Writes a ContainerMerkleTree proto directly into a container without using a ContainerMerkleTreeWriter.
+   */
+  public static void updateTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
+      throws IOException {
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(data.getContainerID())
+        .setContainerMerkleTree(tree).build();
+    File checksumFile = getContainerChecksumFile(data);
+
+    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
+      checksumInfo.writeTo(outputStream);
+    } catch (IOException ex) {
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
+    }
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
+  }
+
+  /**
+   * Introduces missing blocks by removing blocks sequentially from the tree.
    */
   private static void introduceMissingBlocks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
-                                             int numMissingBlocks,
-                                             ContainerDiffReport diff) {
-    // Set to track unique blocks selected for mismatches
-    Set<Integer> selectedBlocks = new HashSet<>();
+      int numMissingBlocks, ContainerDiffReport diff) {
     Random random = new Random();
-    for (int i = 0; i < numMissingBlocks; i++) {
-      int randomBlockIndex;
-      do {
-        randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
-      } while (selectedBlocks.contains(randomBlockIndex));
-      selectedBlocks.add(randomBlockIndex);
-      ContainerProtos.BlockMerkleTree blockMerkleTree = treeBuilder.getBlockMerkleTree(randomBlockIndex);
+    for (int blockIndex = 0; blockIndex < numMissingBlocks; blockIndex++) {
+      ContainerProtos.BlockMerkleTree blockMerkleTree = treeBuilder.getBlockMerkleTree(blockIndex);
       diff.addMissingBlock(blockMerkleTree);
-      treeBuilder.removeBlockMerkleTree(randomBlockIndex);
+      treeBuilder.removeBlockMerkleTree(blockIndex);
       treeBuilder.setDataChecksum(random.nextLong());
     }
   }
 
   /**
-   * Introduces missing chunks by removing random chunks from selected blocks.
+   * Introduces missing chunks by removing the first chunk from each block. If more chunks must be removed,
+   * it will resume removing the next chunk from each block until numMissingChunks have been removed.
    */
   private static void introduceMissingChunks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
-                                             int numMissingChunks,
-                                             ContainerDiffReport diff) {
-    // Set to track unique blocks selected for mismatches
+       int numMissingChunks, ContainerDiffReport diff) {
     Random random = new Random();
-    for (int i = 0; i < numMissingChunks; i++) {
-      int randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
 
-      // Work on the chosen block to remove a random chunk
-      ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(randomBlockIndex);
-      if (blockBuilder.getChunkMerkleTreeCount() > 0) {
-        int randomChunkIndex = random.nextInt(blockBuilder.getChunkMerkleTreeCount());
-        ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(randomChunkIndex);
-        diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
-        blockBuilder.removeChunkMerkleTree(randomChunkIndex);
-        blockBuilder.setDataChecksum(random.nextLong());
-        treeBuilder.setDataChecksum(random.nextLong());
+    int numChunksRemoved = 0;
+    boolean hasChunks = true;
+    while (numChunksRemoved < numMissingChunks && hasChunks) {
+      hasChunks = false;
+      for (int blockIndex = 0; blockIndex < treeBuilder.getBlockMerkleTreeCount() &&
+          numChunksRemoved < numMissingChunks; blockIndex++) {
+        ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(blockIndex);
+        if (blockBuilder.getChunkMerkleTreeCount() > 0) {
+          ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(0);
+          diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
+          blockBuilder.removeChunkMerkleTree(0);
+          blockBuilder.setDataChecksum(random.nextLong());
+          treeBuilder.setDataChecksum(random.nextLong());
+          hasChunks = true;
+          numChunksRemoved++;
+        }
       }
     }
+    // Make sure we removed the expected number of chunks.
+    assertTrue(hasChunks);
   }
 
   /**
-   * Introduces corrupt chunks by altering the checksum and setting them as unhealthy,
-   * ensuring each chunk in a block is only selected once for corruption.
+   * Introduces corrupt chunks by corrupting the first chunk from each block. If more chunks must be corrupted,
+   * it will resume corrupting the next chunk from each block until numCorruptChunks have been corrupted.
    */
   private static void introduceCorruptChunks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
-                                             int numCorruptChunks,
-                                             ContainerDiffReport diff) {
-    Map<Integer, Set<Integer>> corruptedChunksByBlock = new HashMap<>();
+      int numCorruptChunks, ContainerDiffReport diff) {
     Random random = new Random();
+    boolean hasChunks = true;
+    int numChunksCorrupted = 0;
+    int chunkIndex = 0;
 
-    for (int i = 0; i < numCorruptChunks; i++) {
-      // Select a random block
-      int randomBlockIndex = random.nextInt(treeBuilder.getBlockMerkleTreeCount());
-      ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(randomBlockIndex);
-
-      // Ensure each chunk in the block is only corrupted once
-      Set<Integer> corruptedChunks = corruptedChunksByBlock.computeIfAbsent(randomBlockIndex, k -> new HashSet<>());
-      if (corruptedChunks.size() < blockBuilder.getChunkMerkleTreeCount()) {
-        int randomChunkIndex;
-        do {
-          randomChunkIndex = random.nextInt(blockBuilder.getChunkMerkleTreeCount());
-        } while (corruptedChunks.contains(randomChunkIndex));
-        corruptedChunks.add(randomChunkIndex);
-
-        // Corrupt the selected chunk
-        ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(randomChunkIndex);
-        diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
-        chunkBuilder.setDataChecksum(chunkBuilder.getDataChecksum() + random.nextInt(1000) + 1);
-        chunkBuilder.setChecksumMatches(false);
-        blockBuilder.setDataChecksum(random.nextLong());
-        treeBuilder.setDataChecksum(random.nextLong());
+    while (numChunksCorrupted < numCorruptChunks && hasChunks) {
+      hasChunks = false;
+      for (int blockIndex = 0; blockIndex < treeBuilder.getBlockMerkleTreeCount() &&
+          numChunksCorrupted < numCorruptChunks; blockIndex++) {
+        ContainerProtos.BlockMerkleTree.Builder blockBuilder = treeBuilder.getBlockMerkleTreeBuilder(blockIndex);
+        if (chunkIndex < blockBuilder.getChunkMerkleTreeCount()) {
+          ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(chunkIndex);
+          diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
+          chunkBuilder.setDataChecksum(random.nextLong());
+          chunkBuilder.setChecksumMatches(false);
+          blockBuilder.setDataChecksum(random.nextLong());
+          treeBuilder.setDataChecksum(random.nextLong());
+          hasChunks = true;
+          numChunksCorrupted++;
+        }
       }
+      chunkIndex++;
     }
+    // Make sure we corrupted the expected number of chunks.
+    assertTrue(hasChunks);
   }
 
   public static void assertContainerDiffMatch(ContainerDiffReport expectedDiff,
@@ -267,7 +308,7 @@ public final class ContainerMerkleTreeTestUtils {
 
     List<ContainerProtos.BlockMerkleTree> expectedMissingBlocks = expectedDiff.getMissingBlocks().stream().sorted(
         Comparator.comparing(ContainerProtos.BlockMerkleTree::getBlockID)).collect(Collectors.toList());
-    List<ContainerProtos.BlockMerkleTree> actualMissingBlocks = expectedDiff.getMissingBlocks().stream().sorted(
+    List<ContainerProtos.BlockMerkleTree> actualMissingBlocks = actualDiff.getMissingBlocks().stream().sorted(
         Comparator.comparing(ContainerProtos.BlockMerkleTree::getBlockID)).collect(Collectors.toList());
     for (int i = 0; i < expectedMissingBlocks.size(); i++) {
       ContainerProtos.BlockMerkleTree expectedBlockMerkleTree = expectedMissingBlocks.get(i);
@@ -330,27 +371,54 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * This function checks whether the container checksum file exists.
+   * This function checks whether the container checksum file exists for a container in a given datanode.
    */
   public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container<?> container = ozoneContainer.getController().getContainer(containerID);
-    return ContainerChecksumTreeManager.checksumFileExist(container);
+    return getContainerChecksumFile(container.getContainerData()).exists();
   }
 
-  public static void writeContainerDataTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
+  /**
+   * This function verifies that the in-memory data checksum matches the one stored in the container data and
+   * the RocksDB.
+   *
+   * @param containerData The container data to verify.
+   * @param conf          The Ozone configuration.
+   * @throws IOException If an error occurs while reading the checksum info or RocksDB.
+   */
+  public static void verifyAllDataChecksumsMatch(KeyValueContainerData containerData, OzoneConfiguration conf)
       throws IOException {
-    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
-        .setContainerID(data.getContainerID())
-        .setContainerMerkleTree(tree).build();
-    File checksumFile = getContainerChecksumFile(data);
-
-    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
-      checksumInfo.writeTo(outputStream);
-    } catch (IOException ex) {
-      throw new IOException("Error occurred when writing container merkle tree for containerID "
-          + data.getContainerID(), ex);
+    assertNotNull(containerData, "Container data should not be null");
+    ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager
+        .readChecksumInfo(containerData);
+    assertNotNull(containerChecksumInfo);
+    long dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    Long dbDataChecksum;
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
     }
-    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
+
+    if (containerData.getDataChecksum() == 0) {
+      assertEquals(containerData.getDataChecksum(), dataChecksum);
+      // RocksDB checksum can be null if the file doesn't exist or when the file is created by
+      // the block deleting service. 0 checksum will be stored when the container is loaded without
+      // merkle tree.
+      assertThat(dbDataChecksum).isIn(0L, null);
+    } else {
+      // In-Memory, Container Merkle Tree file, RocksDB checksum should be equal
+      assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
+          "the one in the checksum file.");
+      assertEquals(dbDataChecksum, dataChecksum);
+    }
+  }
+
+  public static BlockData buildBlockData(ConfigurationSource config, long containerID, long blockID) {
+    BlockData blockData = new BlockData(new BlockID(containerID, blockID));
+    byte byteValue = 0;
+    blockData.addChunk(buildChunk(config, 0, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 1, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 2, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    return blockData;
   }
 }

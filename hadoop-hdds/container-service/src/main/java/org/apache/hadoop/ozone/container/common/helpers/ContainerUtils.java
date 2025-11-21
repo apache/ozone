@@ -325,8 +325,22 @@ public final class ContainerUtils {
 
     if (currentUsage.getAvailable() - spared < sizeRequested) {
       throw new StorageContainerException("Failed to write " + sizeRequested + " bytes to container "
-          + containerId + " due to volume " + volume.getStorageID() + " out of space "
+          + containerId + " due to volume " + volume + " out of space "
           + currentUsage + ", minimum free space spared="  + spared, DISK_OUT_OF_SPACE);
+    }
+  }
+  
+  public static long getPendingDeletionBytes(ContainerData containerData) {
+    if (containerData.getContainerType()
+        .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
+      return ((KeyValueContainerData) containerData)
+          .getBlockPendingDeletionBytes();
+    } else {
+      // If another ContainerType is available later, implement it
+      throw new IllegalArgumentException(
+          "getPendingDeletionBlocks for ContainerType: " +
+              containerData.getContainerType() +
+              " not support.");
     }
   }
 }

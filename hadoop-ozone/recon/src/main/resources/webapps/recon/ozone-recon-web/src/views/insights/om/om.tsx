@@ -548,7 +548,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -594,7 +594,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
   };
@@ -653,7 +653,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -730,7 +730,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -764,7 +764,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -835,13 +835,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        if (error.name === "CanceledError") {
-          showDataFetchError(cancelRowExpandSignal.signal.reason)
-        }
-        else {
-          console.log(error);
-          showDataFetchError(error.toString());
-        }
+        showDataFetchError(error);
       });
     }
     else {

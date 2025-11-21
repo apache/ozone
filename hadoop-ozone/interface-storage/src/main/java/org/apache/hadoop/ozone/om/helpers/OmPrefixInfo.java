@@ -148,6 +148,12 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
       return this;
     }
 
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
+      return this;
+    }
+
     /**
      * Constructs the OmPrefixInfo.
      * @return instance of OmPrefixInfo.
@@ -174,11 +180,11 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   }
 
   /**
-   * Parses PrefixInfo protobuf and creates OmPrefixInfo.
+   * Parses PrefixInfo protobuf and creates OmPrefixInfo Builder.
    * @param prefixInfo
-   * @return instance of OmPrefixInfo
+   * @return Builder instance
    */
-  public static OmPrefixInfo getFromProtobuf(PersistedPrefixInfo prefixInfo) {
+  public static Builder builderFromProtobuf(PersistedPrefixInfo prefixInfo) {
     OmPrefixInfo.Builder opib = OmPrefixInfo.newBuilder()
         .setName(prefixInfo.getName());
     if (prefixInfo.getMetadataList() != null) {
@@ -196,7 +202,16 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     if (prefixInfo.hasUpdateID()) {
       opib.setUpdateID(prefixInfo.getUpdateID());
     }
-    return opib.build();
+    return opib;
+  }
+
+  /**
+   * Parses PrefixInfo protobuf and creates OmPrefixInfo.
+   * @param prefixInfo
+   * @return instance of OmPrefixInfo
+   */
+  public static OmPrefixInfo getFromProtobuf(PersistedPrefixInfo prefixInfo) {
+    return builderFromProtobuf(prefixInfo).build();
   }
 
   @Override

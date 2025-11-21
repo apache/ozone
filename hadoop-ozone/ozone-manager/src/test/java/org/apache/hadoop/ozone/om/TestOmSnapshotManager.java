@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
-import static org.apache.hadoop.hdds.utils.HAUtils.getExistingSstFiles;
+import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -29,8 +30,6 @@ import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -58,7 +59,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -84,6 +85,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.slf4j.event.Level;
 
 /**
@@ -96,6 +100,7 @@ class TestOmSnapshotManager {
   private SnapshotChainManager snapshotChainManager;
   private OmMetadataManagerImpl omMetadataManager;
   private OmSnapshotManager omSnapshotManager;
+  private OmSnapshotLocalDataManager snapshotLocalDataManager;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -128,6 +133,7 @@ class TestOmSnapshotManager {
     om = omTestManagers.getOzoneManager();
     omMetadataManager = (OmMetadataManagerImpl) om.getMetadataManager();
     omSnapshotManager = om.getOmSnapshotManager();
+    snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     snapshotChainManager = omMetadataManager.getSnapshotChainManager();
   }
 
@@ -147,6 +153,9 @@ class TestOmSnapshotManager {
       SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotInfoKey);
       snapshotChainManager.deleteSnapshot(snapshotInfo);
       snapshotInfoTable.delete(snapshotInfoKey);
+
+      Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
+      Files.deleteIfExists(snapshotYaml);
     }
     omSnapshotManager.invalidateCache();
   }
@@ -374,7 +383,7 @@ class TestOmSnapshotManager {
     File s1FileLink = new File(followerSnapDir2, "s1.sst");
 
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath());
+    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
@@ -417,44 +426,16 @@ class TestOmSnapshotManager {
   @Test
   public void testExcludeUtilities() throws IOException {
     File noLinkFile = new File(followerSnapDir2, "noLink.sst");
-
+    File nonSstFile = new File(followerSnapDir2, "nonSstFile");
     // Confirm that the list of existing sst files is as expected.
-    List<String> existingSstList = getExistingSstFiles(candidateDir);
+    List<String> existingSstList = getExistingFiles(candidateDir);
     Set<String> existingSstFiles = new HashSet<>(existingSstList);
-    int truncateLength = candidateDir.toString().length() + 1;
-    Set<String> expectedSstFiles = new HashSet<>(Arrays.asList(
-        s1File.toString().substring(truncateLength),
-        noLinkFile.toString().substring(truncateLength),
-        f1File.toString().substring(truncateLength)));
-    assertEquals(expectedSstFiles, existingSstFiles);
-
-    // Confirm that the excluded list is normalized as expected.
-    //  (Normalizing means matches the layout on the leader.)
-    File leaderSstBackupDir = new File(leaderDir.toString(), "sstBackup");
-    assertTrue(leaderSstBackupDir.mkdirs());
-    File leaderTmpDir = new File(leaderDir.toString(), "tmp");
-    assertTrue(leaderTmpDir.mkdirs());
-    OMDBCheckpointServlet.DirectoryData sstBackupDir =
-        new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
-        leaderSstBackupDir.toString());
-    Path srcSstBackup = Paths.get(sstBackupDir.getTmpDir().toString(),
-        "backup.sst");
-    Path destSstBackup = Paths.get(sstBackupDir.getOriginalDir().toString(),
-        "backup.sst");
-    truncateLength = leaderDir.toString().length() + 1;
-    existingSstList.add(truncateFileName(truncateLength, destSstBackup));
-    Map<String, Map<Path, Path>> normalizedMap =
-        OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
-        leaderCheckpointDir.toPath(), sstBackupDir);
-    Map<String, Map<Path, Path>> expectedMap = new TreeMap<>();
-    Path s1 = Paths.get(leaderSnapDir1.toString(), "s1.sst");
-    Path noLink = Paths.get(leaderSnapDir2.toString(), "noLink.sst");
-    Path f1 = Paths.get(leaderCheckpointDir.toString(), "f1.sst");
-    expectedMap.put("s1.sst", ImmutableMap.of(s1, s1));
-    expectedMap.put("noLink.sst", ImmutableMap.of(noLink, noLink));
-    expectedMap.put("f1.sst", ImmutableMap.of(f1, f1));
-    expectedMap.put("backup.sst", ImmutableMap.of(srcSstBackup, destSstBackup));
-    assertEquals(expectedMap, new TreeMap<>(normalizedMap));
+    Set<String> expectedSstFileNames = new HashSet<>(Arrays.asList(
+        s1File.getName(),
+        noLinkFile.getName(),
+        f1File.getName(),
+        nonSstFile.getName()));
+    assertEquals(expectedSstFileNames, existingSstFiles);
   }
 
   /*
@@ -687,6 +668,43 @@ class TestOmSnapshotManager {
         destAddNonSstToCopiedFiles);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPath(int version) {
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    RDBStore store = mock(RDBStore.class);
+    when(metadataManager.getStore()).thenReturn(store);
+    File file = new File("test-db");
+    when(store.getDbLocation()).thenReturn(file);
+    String path = "dir1/dir2";
+    when(store.getSnapshotsParentDir()).thenReturn(path);
+    UUID snapshotId = UUID.randomUUID();
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(metadataManager, snapshotId, version).toString();
+    String expectedPath = "dir1/dir2/test-db-" + snapshotId;
+    if (version != 0) {
+      expectedPath = expectedPath + "-" + version;
+    }
+    assertEquals(expectedPath, snapshotPath);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPathFromConf(int version) {
+    try (MockedStatic<OMStorage> mocked = mockStatic(OMStorage.class)) {
+      String omDir = "dir1/dir2";
+      mocked.when(() -> OMStorage.getOmDbDir(any())).thenReturn(new File(omDir));
+      OzoneConfiguration conf = mock(OzoneConfiguration.class);
+      SnapshotInfo snapshotInfo = createSnapshotInfo("volumeName", "bucketname");
+      String snapshotPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, version);
+      String expectedPath = omDir + OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+          OM_DB_NAME + "-" + snapshotInfo.getSnapshotId();
+      if (version != 0) {
+        expectedPath = expectedPath + "-" + version;
+      }
+      assertEquals(expectedPath, snapshotPath);
+    }
+  }
+
   @Test
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
@@ -720,6 +738,7 @@ class TestOmSnapshotManager {
     when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
 
     SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    first.setPathPreviousSnapshotId(null);
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
@@ -737,16 +756,19 @@ class TestOmSnapshotManager {
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
 
-    assertThat(logCapturer.getOutput()).contains(
-        "for snapshot " + first.getName() + " already exists.");
+    assertThat(logCapturer.getOutput())
+        .contains("for snapshot " + first.getTableKey() + " already exists.");
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,
                                           String bucketName) {
-    return SnapshotInfo.newInstance(volumeName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         UUID.randomUUID().toString(),
         UUID.randomUUID(),
         Time.now());
+    snapshotInfo.setPathPreviousSnapshotId(null);
+    snapshotInfo.setGlobalPreviousSnapshotId(null);
+    return snapshotInfo;
   }
 }

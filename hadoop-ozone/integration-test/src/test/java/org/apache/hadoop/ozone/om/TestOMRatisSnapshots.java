@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -67,6 +68,7 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -106,12 +108,12 @@ public class TestOMRatisSnapshots {
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   private static final int SNAPSHOTS_TO_CREATE = 100;
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final int NUM_OF_OMS = 3;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private int numOfOMs = 3;
   private OzoneBucket ozoneBucket;
   private String volumeName;
   private String bucketName;
@@ -123,18 +125,11 @@ public class TestOMRatisSnapshots {
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
+  private GenericTestUtils.PrintStreamCapturer output;
 
-  /**
-   * Create a MiniOzoneCluster for testing. The cluster initially has one
-   * inactive OM. So at the start of the cluster, there will be 2 active and 1
-   * inactive OM.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
         StorageUnit.KB);
@@ -146,6 +141,8 @@ public class TestOMRatisSnapshots {
         testInfo.getTestMethod().get().getName()
             .equals("testInstallSnapshot")) {
       snapshotThreshold = SNAPSHOT_THRESHOLD * 10;
+      AuditLogTestUtils.enableAuditLog();
+      output = GenericTestUtils.captureOut();
     }
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
@@ -155,14 +152,15 @@ public class TestOMRatisSnapshots {
         conf.getObject(OzoneManagerRatisServerConfig.class);
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
+    conf.set("ozone.om.client.rpc.timeout", "1m");
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
-        .setNumOfOzoneManagers(numOfOMs)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumOfActiveOMs(2)
         .build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
 
     volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
@@ -181,9 +179,6 @@ public class TestOMRatisSnapshots {
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -245,8 +240,8 @@ public class TestOMRatisSnapshots {
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
     GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+      long index = followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      return index >= leaderOMSnapshotIndex - 1;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -286,6 +281,8 @@ public class TestOMRatisSnapshots {
 
     assertLogCapture(logCapture,
         "Install Checkpoint is finished");
+    assertThat(output.get()).contains("op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"" + leaderOMNodeId + "\",\"term\":\"" +
+        leaderOMSnapshotTermIndex, "\"lastAppliedIndex\":\"" + followerOMLastAppliedIndex);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -309,6 +306,8 @@ public class TestOMRatisSnapshots {
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
+
+    output.reset();
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
@@ -330,11 +329,11 @@ public class TestOMRatisSnapshots {
     File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
     Path followerActiveDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
     Path followerSnapshotDir =
-        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo));
+        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo, 0));
     File leaderMetaDir = OMStorage.getOmDbDir(leaderOM.getConfiguration());
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
-        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0));
 
     // Get list of live files on the leader.
     RocksDB activeRocksDB = ((RDBStore) leaderOM.getMetadataManager().getStore())
@@ -363,15 +362,14 @@ public class TestOMRatisSnapshots {
           }
           // If it is a hard link on the leader, it should be a hard
           // link on the follower
-          if (OmSnapshotUtils.getINode(leaderActiveSST)
-              .equals(OmSnapshotUtils.getINode(leaderSnapshotSST))) {
+          if (getINode(leaderActiveSST).equals(getINode(leaderSnapshotSST))) {
             Path followerSnapshotSST =
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
             assertEquals(
-                OmSnapshotUtils.getINode(followerActiveSST),
-                OmSnapshotUtils.getINode(followerSnapshotSST),
+                getINode(followerActiveSST),
+                getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
             hardLinkCount++;
           }
@@ -412,7 +410,7 @@ public class TestOMRatisSnapshots {
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap100");
     followerOM.getConfiguration().setInt(
         OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-        KeyManagerImpl.DISABLE_VALUE);
+        -1);
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
 
@@ -562,7 +560,7 @@ public class TestOMRatisSnapshots {
     Path increment = Paths.get(tempDir.toString(), "increment" + numKeys);
     assertTrue(increment.toFile().mkdirs());
     unTarLatestTarBall(followerOM, increment);
-    List<String> sstFiles = HAUtils.getExistingSstFiles(increment.toFile());
+    List<String> sstFiles = HAUtils.getExistingFiles(increment.toFile());
     Path followerCandidatePath = followerOM.getOmSnapshotProvider().
         getCandidateDir().toPath();
 
@@ -648,7 +646,7 @@ public class TestOMRatisSnapshots {
     // Corrupt the mixed checkpoint in the candidate DB dir
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
         getCandidateDir();
-    List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
+    List<String> sstList = HAUtils.getExistingFiles(followerCandidateDir);
     assertThat(sstList.size()).isGreaterThan(0);
     for (int i = 0; i < sstList.size(); i += 2) {
       File victimSst = new File(followerCandidateDir, sstList.get(i));
@@ -1003,6 +1001,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
@@ -1048,7 +1047,7 @@ public class TestOMRatisSnapshots {
         .get(tableKey);
     // Allow the snapshot to be written to disk
     String fileName =
-        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {
@@ -1166,21 +1165,23 @@ public class TestOMRatisSnapshots {
       } else {
         // Each time we get a new tarball add a set of
         // its sst file to the list, (i.e. one per tarball.)
-        sstSetList.add(getSstFilenames(tarball));
+        sstSetList.add(getFilenames(tarball));
       }
     }
 
     // Get Size of sstfiles in tarball.
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      List<Path> sstPaths = Files.walk(tempDir).filter(
-          path -> path.toString().endsWith(".sst")).
-          collect(Collectors.toList());
-      long sstSize = 0;
+      OmSnapshotUtils.createHardLinks(tempDir, true);
+      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
+      long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
-        sstSize += Files.size(sstPath);
+        File file = sstPath.toFile();
+        if (file.isFile() && file.getName().endsWith(".sst")) {
+          totalFileSize += Files.size(sstPath);
+        }
       }
-      return sstSize;
+      return totalFileSize;
     }
 
     private void createEmptyTarball(File dummyTarFile)
@@ -1191,21 +1192,18 @@ public class TestOMRatisSnapshots {
       archiveOutputStream.close();
     }
 
-    // Return a list of sst files in tarball.
-    private Set<String> getSstFilenames(File tarball)
+    // Return a list of files in tarball.
+    private Set<String> getFilenames(File tarball)
         throws IOException {
-      Set<String> sstFilenames = new HashSet<>();
+      Set<String> fileNames = new HashSet<>();
       try (TarArchiveInputStream tarInput =
            new TarArchiveInputStream(Files.newInputStream(tarball.toPath()))) {
         TarArchiveEntry entry;
         while ((entry = tarInput.getNextTarEntry()) != null) {
-          String name = entry.getName();
-          if (name.toLowerCase().endsWith(".sst")) {
-            sstFilenames.add(entry.getName());
-          }
+          fileNames.add(entry.getName());
         }
       }
-      return sstFilenames;
+      return fileNames;
     }
 
     // Find the tarball in the dir.

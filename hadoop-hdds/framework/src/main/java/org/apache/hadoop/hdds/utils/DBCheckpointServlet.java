@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +97,7 @@ public class DBCheckpointServlet extends HttpServlet
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
-    lock = new Lock();
+    lock = new NoOpLock();
 
     // Create a directory for temp bootstrap data
     File dbLocation = dbStore.getDbLocation();
@@ -122,6 +124,10 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  public File getBootstrapTempData() {
+    return bootstrapTempData;
+  }
+
   private boolean hasPermission(UserGroupInformation user) {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
@@ -132,7 +138,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  private static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
+  protected static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
     int count = sstList.size();
     if (LOG.isDebugEnabled()) {
       LOG.debug(msg, count, "", sstList);
@@ -199,7 +205,8 @@ public class DBCheckpointServlet extends HttpServlet
     processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
-  private void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+  @VisibleForTesting
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
@@ -208,7 +215,7 @@ public class DBCheckpointServlet extends HttpServlet
     Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
     DBCheckpoint checkpoint = null;
     Path tmpdir = null;
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireWriteLock()) {
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
           "bootstrap-data-");
       checkpoint = getCheckpoint(tmpdir, flush);
@@ -272,11 +279,22 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  protected static Set<String> extractSstFilesToExclude(String[] sstParam) {
+  protected static Set<String> extractSstFilesToExclude(String[] filesInExclusionParam) {
+    Set<String> sstFilesToExclude = new HashSet<>();
+    if (filesInExclusionParam != null) {
+      sstFilesToExclude.addAll(
+          Arrays.stream(filesInExclusionParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct().collect(Collectors.toList()));
+      logSstFileList(sstFilesToExclude, "Received list of {} SST files to be excluded{}: {}", 5);
+    }
+    return sstFilesToExclude;
+  }
+
+  protected static Set<String> extractFilesToExclude(String[] sstParam) {
     Set<String> receivedSstFiles = new HashSet<>();
     if (sstParam != null) {
       receivedSstFiles.addAll(
-          Arrays.stream(sstParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX)).distinct().collect(Collectors.toList()));
+          Arrays.stream(sstParam).distinct().collect(Collectors.toList()));
       logSstFileList(receivedSstFiles, "Received list of {} SST files to be excluded{}: {}", 5);
     }
     return receivedSstFiles;
@@ -292,7 +310,7 @@ public class DBCheckpointServlet extends HttpServlet
    * @param request the HTTP servlet request
    * @return array of parsed sst form data parameters for exclusion
    */
-  private static String[] parseFormDataParameters(HttpServletRequest request) {
+  protected static String[] parseFormDataParameters(HttpServletRequest request) {
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 
@@ -376,18 +394,22 @@ public class DBCheckpointServlet extends HttpServlet
   /**
    * This lock is a no-op but can overridden by child classes.
    */
-  public static class Lock extends BootstrapStateHandler.Lock {
-    public Lock() {
+  public static class NoOpLock extends BootstrapStateHandler.Lock {
+
+    private final UncheckedAutoCloseable noopLock = () -> {
+    };
+
+    public NoOpLock() {
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
-      return this;
+    public UncheckedAutoCloseable acquireReadLock() {
+      return noopLock;
     }
 
     @Override
-    public void unlock() {
+    public UncheckedAutoCloseable acquireWriteLock() {
+      return noopLock;
     }
   }
 }

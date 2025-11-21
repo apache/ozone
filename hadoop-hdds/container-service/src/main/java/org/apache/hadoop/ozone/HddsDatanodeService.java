@@ -310,7 +310,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         }
 
         if (policy.isHttpsEnabled()) {
-          int httpsPort = httpServer.getHttpAddress().getPort();
+          int httpsPort = httpServer.getHttpsAddress().getPort();
           datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
           serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }

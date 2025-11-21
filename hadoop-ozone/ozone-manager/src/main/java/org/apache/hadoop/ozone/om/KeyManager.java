@@ -306,9 +306,9 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of dirs
    * @throws IOException
    */
-  DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      long remainingBufLimit) throws IOException;
+  DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId, OmKeyInfo parentInfo,
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum)
+      throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
@@ -317,10 +317,9 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return list of files
    * @throws IOException
    */
-  DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, long remainingBufLimit)
-          throws IOException;
+  DeleteKeysResult getPendingDeletionSubFiles(long volumeId, long bucketId, OmKeyInfo parentInfo,
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int remainingNum)
+      throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.
@@ -345,6 +344,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   SstFilteringService getSnapshotSstFilteringService();
+
+  /**
+   * Returns the instance of Snapshot Defrag service.
+   * @return Background service.
+   */
+  SnapshotDefragService getSnapshotDefragService();
 
   /**
    * Returns the instance of Snapshot Deleting service.

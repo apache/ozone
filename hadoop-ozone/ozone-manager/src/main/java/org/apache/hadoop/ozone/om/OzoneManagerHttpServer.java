@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT;
 
 import java.io.IOException;
@@ -37,6 +38,8 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
         ServiceListJSONServlet.class);
     addServlet("dbCheckpoint", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT,
         OMDBCheckpointServlet.class);
+    addServlet("dbCheckpointv2", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2,
+        OMDBCheckpointServletInodeBasedXfer.class);
     getWebAppContext().setAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE, om);
   }
 

@@ -24,7 +24,10 @@ import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 
@@ -59,4 +62,10 @@ public interface OzoneStorageContainerManager {
   SCMNodeDetails getScmNodeDetails();
 
   ReconfigurationHandler getReconfigurationHandler();
+
+  SCMMetadataStore getScmMetadataStore();
+
+  SCMHAManager getScmHAManager();
+
+  SequenceIdGenerator getSequenceIdGen();
 }

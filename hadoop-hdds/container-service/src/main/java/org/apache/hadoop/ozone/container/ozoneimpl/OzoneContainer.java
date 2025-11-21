@@ -125,7 +125,7 @@ public class OzoneContainer {
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
-  private OnDemandContainerDataScanner onDemandScanner;
+  private OnDemandContainerScanner onDemandScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
   private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
@@ -197,26 +197,14 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
-        recoveringContainerTimeout);
+    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore, recoveringContainerTimeout);
     volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    IncrementalReportSender<Container> icrSender = container -> {
-      synchronized (containerSet) {
-        ContainerReplicaProto containerReport = container.getContainerReport();
-
-        IncrementalContainerReportProto icr = IncrementalContainerReportProto
-            .newBuilder()
-            .addReport(containerReport)
-            .build();
-        context.addIncrementalReport(icr);
-        context.getParent().triggerHeartbeat();
-      }
-    };
+    IncrementalReportSender<Container> icrSender = createIncrementalReportSender();
 
     checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
@@ -351,7 +339,8 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<ContainerID, ContainerID> itr = containerSet.getContainerIdsTable().keyIterator()) {
+      try (TableIterator<ContainerID, ContainerID> itr
+               = getWitnessedContainerMetadataStore().getContainerCreateInfoTable().keyIterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next(), 0L);
@@ -369,6 +358,36 @@ public class OzoneContainer {
 
     LOG.info("Build ContainerSet costs {}s",
         (Time.monotonicNow() - startTime) / 1000);
+  }
+
+  private IncrementalReportSender<Container> createIncrementalReportSender() {
+    return new IncrementalReportSender<Container>() {
+      private void sendICR(Container container, boolean immediate) throws StorageContainerException {
+        ContainerReplicaProto containerReport = container.getContainerReport();
+        IncrementalContainerReportProto icr = IncrementalContainerReportProto
+            .newBuilder()
+            .addReport(containerReport)
+            .build();
+        context.addIncrementalReport(icr);
+        if (immediate) {
+          context.getParent().triggerHeartbeat();
+        }
+      }
+
+      @Override
+      public void send(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, true); // Immediate
+        }
+      }
+
+      @Override
+      public void sendDeferred(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, false); // Deferred
+        }
+      }
+    };
   }
 
   /**
@@ -439,7 +458,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
+    onDemandScanner = new OnDemandContainerScanner(c, controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
@@ -470,6 +489,11 @@ public class OzoneContainer {
   @VisibleForTesting
   public void resumeContainerScrub() {
     backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
+  }
+
+  @VisibleForTesting
+  public OnDemandContainerScanner getOnDemandScanner() {
+    return onDemandScanner;
   }
 
   /**
@@ -586,11 +610,13 @@ public class OzoneContainer {
 
   public Long gatherContainerUsages(HddsVolume storageVolume) {
     AtomicLong usages = new AtomicLong();
-    containerSet.getContainerMapIterator().forEachRemaining(e -> {
-      if (e.getValue().getContainerData().getVolume().getStorageID().equals(storageVolume.getStorageID())) {
-        usages.addAndGet(e.getValue().getContainerData().getBytesUsed());
+    Iterator<Long> containerIdIterator = storageVolume.getContainerIterator();
+    while (containerIdIterator.hasNext()) {
+      Container<?> container = containerSet.getContainer(containerIdIterator.next());
+      if (container != null) {
+        usages.addAndGet(container.getContainerData().getBytesUsed());
       }
-    });
+    }
     return usages.get();
   }
   /**
@@ -686,4 +712,7 @@ public class OzoneContainer {
     }
   }
 
+  public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
+    return witnessedContainerMetadataStore;
+  }
 }

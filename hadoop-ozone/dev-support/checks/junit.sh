@@ -16,6 +16,10 @@
 
 set -u -o pipefail
 
+# Handle cancellation signals
+cancelled=false
+trap 'cancelled=true; echo "Caught cancellation signal, exiting..."; exit 130' SIGINT SIGTERM
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -62,6 +66,11 @@ mkdir -p "$REPORT_DIR"
 
 rc=0
 for i in $(seq 1 ${ITERATIONS}); do
+  if [[ "${cancelled}" == "true" ]]; then
+    echo "Cancellation detected, stopping test iterations"
+    break
+  fi
+
   if [[ ${ITERATIONS} -gt 1 ]]; then
     original_report_dir="${REPORT_DIR}"
     REPORT_DIR="${original_report_dir}/iteration${i}"

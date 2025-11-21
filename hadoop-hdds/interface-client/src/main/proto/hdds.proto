@@ -200,6 +200,8 @@ message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
     repeated NodeOperationalState nodeOperationalStates = 3;
+    optional int32 totalVolumeCount = 4;
+    optional int32 healthyVolumeCount = 5;
 }
 
 message NodePool {
@@ -510,6 +512,13 @@ message DeletedBlocksTransactionInfo {
     optional int64 containerID = 2;
     repeated int64 localID = 3;
     optional int32 count = 4;
+}
+
+message DeletedBlocksTransactionSummary {
+    optional uint64 totalTransactionCount = 1;
+    optional uint64 totalBlockCount = 2;
+    optional uint64 totalBlockSize = 3;
+    optional uint64 totalBlockReplicatedSize = 4;
 }
 
 message CompactionFileInfoProto {

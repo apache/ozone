@@ -565,6 +565,7 @@ message SendContainerRequest {
   required bytes data = 3;
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
+  optional int64 size = 6;
 }
 
 message SendContainerResponse {
@@ -582,6 +583,7 @@ message BlockMerkleTree {
   optional int64 blockID = 1;
   optional int64 dataChecksum = 2;
   repeated ChunkMerkleTree chunkMerkleTree = 3;
+  optional bool deleted = 4;
 }
 
 message ContainerMerkleTree {
@@ -592,7 +594,6 @@ message ContainerMerkleTree {
 message ContainerChecksumInfo {
   optional int64 containerID = 1;
   optional ContainerMerkleTree containerMerkleTree = 2;
-  repeated BlockMerkleTree deletedBlocks = 3;
 }
 
 service XceiverClientProtocolService {
@@ -606,4 +607,9 @@ service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
+}
+
+message ContainerCreateInfo {
+    required ContainerDataProto.State state = 1;
+    optional int32 replicaIndex = 2 [default = -1];
 }

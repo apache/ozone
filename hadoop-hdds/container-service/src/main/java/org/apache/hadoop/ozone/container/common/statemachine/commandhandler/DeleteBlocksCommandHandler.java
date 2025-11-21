@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -64,6 +65,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
@@ -333,6 +335,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -480,8 +486,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         LOG.error("task failed.", e);
+      } catch (InterruptedException e) {
+        LOG.error("task interrupted.", e);
         Thread.currentThread().interrupt();
       }
     });
@@ -637,10 +645,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
+      // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
+      // Persist pending bytes only if the feature is finalized.
+      if (VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
+        long pendingBytes = containerData.getBlockPendingDeletionBytes();
+        pendingBytes += delTX.getTotalBlockSize();
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
+      }
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks,
+          delTX.hasTotalBlockSize() ? delTX.getTotalBlockSize() : 0);
       containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 

@@ -83,6 +83,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
@@ -712,6 +714,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
               .build();
+      case GetDeletedBlocksTransactionSummary:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetDeletedBlocksTxnSummaryResponse(
+                getDeletedBlocksTxnSummary(
+                    request.getGetDeletedBlocksTxnSummaryRequest()))
+            .build();
       case TransferLeadership:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -1324,6 +1334,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
       GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
     long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
@@ -1333,6 +1344,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public ResetDeletedBlockRetryCountResponseProto
       getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {
@@ -1340,6 +1352,18 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
+  }
+
+  public GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummary(
+      GetDeletedBlocksTxnSummaryRequestProto request) throws IOException {
+    HddsProtos.DeletedBlocksTransactionSummary summary = impl.getDeletedBlockSummary();
+    if (summary == null) {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder().build();
+    } else {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder()
+          .setSummary(summary)
+          .build();
+    }
   }
 
   public TransferLeadershipResponseProto transferScmLeadership(

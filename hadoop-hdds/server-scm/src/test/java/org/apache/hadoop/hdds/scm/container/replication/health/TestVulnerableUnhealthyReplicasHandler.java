@@ -60,7 +60,6 @@ public class TestVulnerableUnhealthyReplicasHandler {
   private ReplicationConfig repConfig;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
-  private ReplicationManagerReport report;
   private VulnerableUnhealthyReplicasHandler handler;
 
   @BeforeEach
@@ -69,7 +68,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
     handler = new VulnerableUnhealthyReplicasHandler(replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport();
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(2)

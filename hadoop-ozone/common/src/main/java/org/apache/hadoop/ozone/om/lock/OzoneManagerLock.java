@@ -578,34 +578,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return omLockMetrics;
   }
 
-  /**
-   * Flat Resource defined in Ozone. Locks can be acquired on a resource independent of one another.
-   */
-  public enum FlatResource implements Resource {
-    // Background services lock on a Snapshot.
-    SNAPSHOT_GC_LOCK("SNAPSHOT_GC_LOCK"),
-    // Lock acquired on a Snapshot's RocksDB Handle.
-    SNAPSHOT_DB_LOCK("SNAPSHOT_DB_LOCK");
-
-    private String name;
-    private ResourceManager resourceManager;
-
-    FlatResource(String name) {
-      this.name = name;
-      this.resourceManager = new ResourceManager();
-    }
-
-    @Override
-    public String getName() {
-      return name;
-    }
-
-    @Override
-    public ResourceManager getResourceManager() {
-      return resourceManager;
-    }
-  }
-
   private abstract static class ResourceLockManager<T extends Resource> {
 
     private final ThreadLocal<OMLockDetails> omLockDetails = ThreadLocal.withInitial(OMLockDetails::new);
@@ -715,9 +687,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
     SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"); // = 255
 
-    // level of the resource
-    private byte lockLevel;
-
     // This will tell the value, till which we can allow locking.
     private short mask;
 
@@ -731,9 +700,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     private ResourceManager resourceManager;
 
     LeveledResource(byte pos, String name) {
-      this.lockLevel = pos;
-      this.mask = (short) (Math.pow(2, lockLevel + 1) - 1);
-      this.setMask = (short) Math.pow(2, lockLevel);
+      // level of the resource
+      this.mask = (short) (Math.pow(2, pos + 1) - 1);
+      this.setMask = (short) Math.pow(2, pos);
       this.name = name;
       this.resourceManager = new ResourceManager();
     }

@@ -72,7 +72,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
-  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.001f;
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.02f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -258,13 +258,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
   @Config(key = "block.deleting.limit.per.interval",
-      defaultValue = "5000",
+      defaultValue = "20000",
       reconfigurable = true,
       type = ConfigType.INT,
-      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      tags = { ConfigTag.SCM, ConfigTag.DELETION, DATANODE },
       description = "Number of blocks to be deleted in an interval."
   )
-  private int blockLimitPerInterval = 5000;
+  private int blockLimitPerInterval = 20000;
 
   @Config(key = "block.deleting.max.lock.holding.time",
       defaultValue = "1s",
@@ -294,7 +294,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
-      defaultValue = "-1",
+      defaultValue = "0.02", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
       description = "This determines the free space percent to be used for closing containers" +

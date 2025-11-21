@@ -102,7 +102,6 @@ public class TestSchemaTwoBackwardsCompatibility {
   private BlockManager blockManager;
   private ChunkManager chunkManager;
   private ContainerSet containerSet;
-  private KeyValueHandler keyValueHandler;
   private OzoneContainer ozoneContainer;
 
   private static final int BLOCKS_PER_CONTAINER = 6;
@@ -132,7 +131,8 @@ public class TestSchemaTwoBackwardsCompatibility {
     chunkManager = new FilePerBlockStrategy(true, blockManager);
 
     containerSet = newContainerSet();
-    keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
@@ -304,7 +304,7 @@ public class TestSchemaTwoBackwardsCompatibility {
           db.getStore().getBatchHandler().commitBatchOperation(batch);
 
           cData.updateDeleteTransactionId(txn.getTxID());
-          cData.incrPendingDeletionBlocks(BLOCKS_PER_TXN);
+          cData.incrPendingDeletionBlocks(BLOCKS_PER_TXN, 256);
         }
       }
     }
