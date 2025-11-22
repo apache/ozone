@@ -124,10 +124,14 @@ public class ClusterStateEndpoint {
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
 
     SCMNodeStat stats = nodeManager.getStats();
-    DatanodeStorageReport storageReport =
-        new DatanodeStorageReport(stats.getCapacity().get(),
-            stats.getScmUsed().get(), stats.getRemaining().get(),
-            stats.getCommitted().get());
+
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(stats.getCapacity().get())
+        .setCommitted(stats.getCommitted().get())
+        .setUsed(stats.getScmUsed().get())
+        .setMinimumFreeSpace(stats.getFreeSpaceToSpare().get())
+        .setRemaining(stats.getRemaining().get())
+        .build();
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     Long totalKeys = 0L;

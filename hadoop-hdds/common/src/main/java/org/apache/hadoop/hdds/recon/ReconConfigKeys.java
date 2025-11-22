@@ -60,6 +60,15 @@ public final class ReconConfigKeys {
   // ex: http://prometheus:9090
   public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
       "ozone.recon.prometheus.http.endpoint";
+  public static final String OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE =
+      "ozone.recon.jmx.fetch.thread.pool.size";
+  public static final int OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE_DEFAULT = 10;
+  public static final String OZONE_RECON_JMX_FETCH_HTTP_CONNECT_TIMEOUT_MS =
+      "ozone.recon.jmx.fetch.http.connect.timeout.ms";
+  public static final int OZONE_RECON_JMX_FETCH_HTTP_CONNECT_TIMEOUT_MS_DEFAULT = 5000;
+  public static final String OZONE_RECON_JMX_FETCH_HTTP_SOCKET_TIMEOUT_MS =
+      "ozone.recon.jmx.fetch.http.socket.timeout.ms";
+  public static final int OZONE_RECON_JMX_FETCH_HTTP_SOCKET_TIMEOUT_MS_DEFAULT = 10000;
   /**
    * Recon administrator users delimited by a comma.
    * This is the list of users who can access admin only information from recon.
