@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.junit.jupiter.api.AfterEach;
@@ -58,7 +59,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -625,9 +627,18 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     }
   }
 
+  private static Stream<Arguments> testDAGLockOrderAcquisitionCases() {
+    return Arrays.stream(DAGLeveledResource.values()).flatMap(dagLeveledResource ->
+        Stream.of(
+            Arguments.of(dagLeveledResource, true),
+            Arguments.of(dagLeveledResource, false)
+        ));
+  }
+
   @ParameterizedTest
-  @EnumSource
-  public void testDAGLockOrderAcquisition(DAGLeveledResource dagLeveledResource) throws IOException {
+  @MethodSource("testDAGLockOrderAcquisitionCases")
+  public void testDAGLockOrderAcquisition(DAGLeveledResource dagLeveledResource, boolean resourceLock)
+      throws IOException {
     Map<DAGLeveledResource, Set<IOzoneManagerLock.Resource>> forbiddenLockOrdering =
         ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK),
             BOOTSTRAP_LOCK, ImmutableSet.of(SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
@@ -637,7 +648,8 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       String otherResourceName1 = otherResource.getName() + "key";
       String otherResourceName2 = otherResource.getName() + "key";
       String flatResourceName = dagLeveledResource.getName() + "key";
-      try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(otherResource, otherResourceName1);
+      try (HierarchicalResourceLock lock1 = resourceLock ? lockManager.acquireResourceWriteLock(otherResource)
+          : lockManager.acquireWriteLock(otherResource, otherResourceName1);
            HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(otherResource, otherResourceName2)) {
         assertTrue(lock1.isLockAcquired());
         assertTrue(lock2.isLockAcquired());
