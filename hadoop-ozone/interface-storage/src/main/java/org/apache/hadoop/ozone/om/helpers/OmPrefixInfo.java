@@ -148,6 +148,12 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
       return this;
     }
 
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
+      return this;
+    }
+
     /**
      * Constructs the OmPrefixInfo.
      * @return instance of OmPrefixInfo.

@@ -33,6 +33,8 @@ public class ECReconstructionCoordinatorTask
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
   private final String debugString;
+  public static final String METRIC_NAME = "ECReconstructions";
+  public static final String METRIC_DESCRIPTION_SEGMENT = "EC reconstructions";
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
@@ -47,12 +49,12 @@ public class ECReconstructionCoordinatorTask
 
   @Override
   public String getMetricName() {
-    return "ECReconstructions";
+    return METRIC_NAME;
   }
 
   @Override
   public String getMetricDescriptionSegment() {
-    return "EC reconstructions";
+    return METRIC_DESCRIPTION_SEGMENT;
   }
 
   @Override

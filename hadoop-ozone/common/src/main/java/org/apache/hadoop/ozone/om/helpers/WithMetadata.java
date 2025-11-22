@@ -81,7 +81,7 @@ public abstract class WithMetadata {
       return this;
     }
 
-    protected Map<String, String> getMetadata() {
+    public Map<String, String> getMetadata() {
       return metadata;
     }
   }
