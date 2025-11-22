@@ -592,7 +592,8 @@ public class SnapshotDefragService extends BackgroundService
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
-      if (checkpointSnapshotInfo.getSnapshotId() == snapshotInfo.getSnapshotId()) {
+      // If first snapshot in the chain perform full defragmentation.
+      if (snapshotInfo.getPathPreviousSnapshotId() == null) {
         performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       } else {
         performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
