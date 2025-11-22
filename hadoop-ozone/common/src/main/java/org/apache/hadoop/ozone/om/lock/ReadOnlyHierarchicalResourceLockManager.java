@@ -59,6 +59,11 @@ public class ReadOnlyHierarchicalResourceLockManager implements HierarchicalReso
   }
 
   @Override
+  public HierarchicalResourceLock acquireResourceWriteLock(DAGLeveledResource resource) throws IOException {
+    return EMPTY_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
   public Stream<DAGLeveledResource> getCurrentLockedResources() {
     return Stream.empty();
   }
