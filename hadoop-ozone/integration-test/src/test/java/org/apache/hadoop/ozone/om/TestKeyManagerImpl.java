@@ -395,7 +395,7 @@ public class TestKeyManagerImpl {
     OMException e =
         assertThrows(OMException.class, () -> writeClient.createDirectory(keyArgs),
             "Creation should fail for directory.");
-    assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
+    assertEquals(OMException.ResultCodes.FILE_ALREADY_EXISTS, e.getResult());
   }
 
   @Test
