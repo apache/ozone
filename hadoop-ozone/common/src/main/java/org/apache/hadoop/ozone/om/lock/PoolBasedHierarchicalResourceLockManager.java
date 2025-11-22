@@ -173,8 +173,8 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
 
     private PoolBasedHierachicalResourceLock(Lock lock) {
       this.resourceLock = lock;
-      lock.lock();
-      lockAcquired = false;
+      resourceLock.lock();
+      lockAcquired = true;
     }
 
     @Override
@@ -242,8 +242,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
 
   private static final class LockReferenceCountPair {
     private int count;
-    private ReadWriteLock resourceLock;
-    private ReadWriteLock lock;
+    private final ReadWriteLock lock;
 
     private LockReferenceCountPair(ReadWriteLock lock) {
       this.count = 0;

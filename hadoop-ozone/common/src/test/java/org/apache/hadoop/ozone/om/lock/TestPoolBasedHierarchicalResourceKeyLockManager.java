@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.lock;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,7 +93,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
   public void testBasicWriteLockAcquisition() throws Exception {
     String key = "test-key-2";
 
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -131,7 +132,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
     try {
       // First thread acquires write lock
       CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
-        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
+        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
           latch1.countDown();
           // Hold lock for a short time
           Thread.sleep(100);
@@ -145,7 +146,59 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
 
       // Second thread tries to acquire write lock
       CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
-        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
+        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
+          secondLockAcquired.set(true);
+          latch2.countDown();
+        } catch (Exception e) {
+          fail("Second thread failed to acquire lock: " + e.getMessage());
+        }
+      }, executor);
+
+      // Wait for both threads to complete
+      future1.get(5, TimeUnit.SECONDS);
+      future2.get(5, TimeUnit.SECONDS);
+
+      // Second lock should have been acquired after first was released
+      assertTrue(secondLockAcquired.get());
+
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  /**
+   * Test write lock exclusivity - only one write lock can be acquired at a time.
+   */
+  @ParameterizedTest
+  @Timeout(10)
+  @ValueSource(booleans = {true, false})
+  public void testResouceLockExclusivity(boolean readLock) throws Exception {
+    String key = "test-key-4";
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    AtomicBoolean secondLockAcquired = new AtomicBoolean(false);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    try {
+      // First thread acquires write lock
+      CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
+        try (HierarchicalResourceLock lock = lockManager.acquireResourceWriteLock(SNAPSHOT_DB_LOCK)) {
+          latch1.countDown();
+          // Hold lock for a short time
+          Thread.sleep(100);
+        } catch (Exception e) {
+          fail("First thread failed to acquire lock: " + e.getMessage());
+        }
+      }, executor);
+
+      // Wait for first lock to be acquired
+      latch1.await();
+
+      // Second thread tries to acquire write lock
+      CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
+        try (HierarchicalResourceLock lock = readLock ? lockManager.acquireReadLock(SNAPSHOT_DB_LOCK, key) :
+            lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
           secondLockAcquired.set(true);
           latch2.countDown();
         } catch (Exception e) {
@@ -225,7 +278,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
   public void testLockStateAfterClose() throws Exception {
     String key = "test-key-6";
 
-    HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key);
+    HierarchicalResourceLock lock = lockManager.acquireReadLock(SNAPSHOT_DB_LOCK, key);
     assertTrue(lock.isLockAcquired());
 
     lock.close();
@@ -308,7 +361,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
       assertNotNull(customLockManager);
       for (int i = 0; i < 500; i++) {
         try {
-          locks.add(customLockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, "test" + i));
+          locks.add(customLockManager.acquireReadLock(SNAPSHOT_DB_LOCK, "test" + i));
         } catch (IOException e) {
           fail("Lock acquisition failed with custom configuration: " + e.getMessage());
         }
@@ -317,7 +370,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         // Basic functionality test with custom configuration
         latch.countDown();
-        try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK,
+        try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(SNAPSHOT_DB_LOCK,
             "test" + 501)) {
           assertTrue(lock.isLockAcquired());
         } catch (Exception e) {
@@ -475,7 +528,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
     String key = "test-key-close";
 
     // Acquire a lock
-    HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key);
+    HierarchicalResourceLock lock = lockManager.acquireReadLock(SNAPSHOT_DB_LOCK, key);
     assertTrue(lock.isLockAcquired());
 
     // Close the lock
@@ -529,7 +582,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
       "key.with.dots", "key/with/slashes", "123456789",
       "key with spaces", "very-long-key-name-that-exceeds-normal-length-expectations"})
   public void testVariousKeyFormats(String key) throws Exception {
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -571,7 +624,7 @@ public class TestPoolBasedHierarchicalResourceKeyLockManager {
 
     String key = "exception-test";
 
-    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
       // If we reach here, no IOException was thrown, which is expected for normal operation
