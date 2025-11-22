@@ -786,4 +786,8 @@ public class DatanodeStateMachine implements Closeable {
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
   }
+
+  public void setNextHB(long time) {
+    nextHB.set(time);
+  }
 }
