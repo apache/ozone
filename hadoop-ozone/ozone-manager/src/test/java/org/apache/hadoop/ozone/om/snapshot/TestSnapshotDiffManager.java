@@ -52,7 +52,6 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.RE
 import static org.apache.ratis.util.JavaUtils.attempt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,6 +81,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -381,16 +382,6 @@ public class TestSnapshotDiffManager {
     return omSnapshot;
   }
 
-  private Table<String, ? extends WithParentObjectId> getMockedTable(
-      Map<String, WithParentObjectId> map, String tableName)
-      throws IOException {
-    Table<String, ? extends WithParentObjectId> mocked = mock(Table.class);
-    when(mocked.get(any()))
-        .thenAnswer(invocation -> map.get(invocation.getArgument(0)));
-    when(mocked.getName()).thenReturn(tableName);
-    return mocked;
-  }
-
   private WithParentObjectId getKeyInfo(int objectId, int updateId,
                                         int parentObjectId,
                                         String snapshotTableName) {
@@ -404,6 +395,25 @@ public class TestSnapshotDiffManager {
         .setVolumeName("vol").setBucketName("bucket").setUpdateID(updateId)
         .setReplicationConfig(new ECReplicationConfig(3, 2))
         .setKeyName(name).build();
+  }
+
+  private ClosableIterator<String> getNewIterator(Iterator<String> itr) {
+    return new ClosableIterator<String>() {
+      @Override
+      public boolean hasNext() {
+        return itr.hasNext();
+      }
+
+      @Override
+      public String next() {
+        return itr.next();
+      }
+
+      @Override
+      public void close() {
+
+      }
+    };
   }
 
   /**
@@ -426,47 +436,37 @@ public class TestSnapshotDiffManager {
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
       throws IOException, RocksDBException {
-    Set<String> keysIncludingTombstones = IntStream.range(0, 100)
-        .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
+    List<String> keysIncludingTombstones = IntStream.range(0, 100)
+        .boxed().map(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i).sorted().collect(Collectors.toList());
     // Mocking SST file with keys in SST file excluding tombstones
-    Set<String> keysExcludingTombstones = IntStream.range(0, 50).boxed()
-        .map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
+    List<String> keysExcludingTombstones = IntStream.range(0, 50).boxed()
+        .map(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i).sorted().collect(Collectors.toList());
 
     // Mocking SSTFileReader functions to return the above keys list.
     try (MockedConstruction<SstFileSetReader> mockedSSTFileReader =
              mockConstruction(SstFileSetReader.class,
                  (mock, context) -> {
                    when(mock.getKeyStreamWithTombstone(any(), any()))
-                       .thenReturn(keysIncludingTombstones.stream());
+                       .thenReturn(getNewIterator(keysIncludingTombstones.iterator()));
                    when(mock.getKeyStream(any(), any()))
-                       .thenReturn(keysExcludingTombstones.stream());
+                       .thenReturn(getNewIterator(keysExcludingTombstones.iterator()));
                  });
     ) {
       Map<String, WithParentObjectId> toSnapshotTableMap =
           IntStream.concat(IntStream.range(0, 25), IntStream.range(50, 100))
-              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+              .boxed().collect(Collectors.toMap(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i,
                   i -> getKeyInfo(i, i, i + 100,
                       snapshotTableName)));
-      Table<String, ? extends WithParentObjectId> toSnapshotTable =
-          getMockedTable(toSnapshotTableMap, snapshotTableName);
+      Table<String, WithParentObjectId> toSnapshotTable = new StringInMemoryTestTable<>(toSnapshotTableMap,
+          snapshotTableName);
 
       Map<String, WithParentObjectId> fromSnapshotTableMap =
           IntStream.range(0, 50)
-              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+              .boxed().collect(Collectors.toMap(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i,
                   i -> getKeyInfo(i, i, i + 100, snapshotTableName)));
 
-      Table<String, ? extends WithParentObjectId> fromSnapshotTable =
-          getMockedTable(fromSnapshotTableMap, snapshotTableName);
-
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
-
-      Boolean isKeyInBucket = doAnswer(invocation -> {
-            String[] split = invocation.getArgument(0, String.class).split("/");
-            String keyName = split[split.length - 1];
-            return Integer.parseInt(keyName.substring(3)) % 2 == 0;
-          }
-      ).when(spy).isKeyInBucket(anyString(), any(), anyString());
-      assertFalse(isKeyInBucket);
+      Table<String, WithParentObjectId> fromSnapshotTable =
+          new StringInMemoryTestTable<>(fromSnapshotTableMap, snapshotTableName);
 
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
           new StubbedPersistentMap<>();
@@ -478,12 +478,12 @@ public class TestSnapshotDiffManager {
       Set<Long> oldParentIds = Sets.newHashSet();
       Set<Long> newParentIds = Sets.newHashSet();
 
-      spy.addToObjectIdMap(toSnapshotTable,
+      snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
           fromSnapshotTable, Sets.newHashSet(Paths.get("dummy.sst")),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, "")), "");
+          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -499,8 +499,7 @@ public class TestSnapshotDiffManager {
         assertEquals(nativeLibraryLoaded ? 25 : 0, oldObjectIdCnt);
       }
 
-      try (ClosableIterator<Map.Entry<byte[], byte[]>> newObjectIdIter =
-               newObjectIdKeyMap.iterator()) {
+      try (ClosableIterator<Map.Entry<byte[], byte[]>> newObjectIdIter = newObjectIdKeyMap.iterator()) {
         int newObjectIdCnt = 0;
         while (newObjectIdIter.hasNext()) {
           Map.Entry<byte[], byte[]> v = newObjectIdIter.next();

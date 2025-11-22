@@ -150,13 +150,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       OmBucketInfo newOmBucketInfo = omBucketInfo.toBuilder()
           .setOwner(newOwner)
           .setModificationTime(setBucketPropertyRequest.getModificationTime())
+          .withUpdateID(transactionLogIndex)
           .build();
 
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",
           newOwner, bucketName, volumeName);
-
-      // Set the updateID to current transaction log index
-      newOmBucketInfo.setUpdateID(transactionLogIndex);
 
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(

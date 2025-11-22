@@ -316,7 +316,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .withUpdateID(trxnLogIndex)
+          .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
 

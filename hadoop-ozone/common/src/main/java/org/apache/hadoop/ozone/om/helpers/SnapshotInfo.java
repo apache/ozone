@@ -71,10 +71,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private UUID pathPreviousSnapshotId;
   private UUID globalPreviousSnapshotId;
   private String snapshotPath; // snapshot mask
-  /**
-   * RocksDB's transaction sequence number at the time of checkpoint creation.
-   */
-  private long dbTxSequenceNumber;
   private boolean deepClean;
   private boolean sstFiltered;
   private long referencedSize;
@@ -98,7 +94,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.pathPreviousSnapshotId = b.pathPreviousSnapshotId;
     this.globalPreviousSnapshotId = b.globalPreviousSnapshotId;
     this.snapshotPath = b.snapshotPath;
-    this.dbTxSequenceNumber = b.dbTxSequenceNumber;
     this.deepClean = b.deepClean;
     this.sstFiltered = b.sstFiltered;
     this.referencedSize = b.referencedSize;
@@ -221,7 +216,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setPathPreviousSnapshotId(pathPreviousSnapshotId)
         .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
         .setSnapshotPath(snapshotPath)
-        .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean)
         .setSstFiltered(sstFiltered)
         .setReferencedSize(referencedSize)
@@ -249,7 +243,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private UUID pathPreviousSnapshotId;
     private UUID globalPreviousSnapshotId;
     private String snapshotPath;
-    private long dbTxSequenceNumber;
     private boolean deepClean;
     private boolean sstFiltered;
     private long referencedSize;
@@ -324,12 +317,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     /** @param snapshotPath - Snapshot path, bucket .snapshot path. */
     public Builder setSnapshotPath(String snapshotPath) {
       this.snapshotPath = snapshotPath;
-      return this;
-    }
-
-    /** @param dbTxSequenceNumber - RDB latest transaction sequence number. */
-    public Builder setDbTxSequenceNumber(long dbTxSequenceNumber) {
-      this.dbTxSequenceNumber = dbTxSequenceNumber;
       return this;
     }
 
@@ -441,7 +428,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     }
 
     sib.setSnapshotPath(snapshotPath)
-        .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean);
     return sib.build();
   }
@@ -523,9 +509,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasCreateTransactionInfo()) {
       osib.setCreateTransactionInfo(snapshotInfoProto.getCreateTransactionInfo());
     }
-
-    osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
-        .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
+    osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath());
 
     return osib;
   }
@@ -566,14 +550,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    */
   public String getCheckpointDirName(int version) {
     return getCheckpointDirName(getSnapshotId(), version);
-  }
-
-  public long getDbTxSequenceNumber() {
-    return dbTxSequenceNumber;
-  }
-
-  public void setDbTxSequenceNumber(long dbTxSequenceNumber) {
-    this.dbTxSequenceNumber = dbTxSequenceNumber;
   }
 
   /**
@@ -761,7 +737,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", pathPreviousSnapshotId: '" + pathPreviousSnapshotId + '\'' +
         ", globalPreviousSnapshotId: '" + globalPreviousSnapshotId + '\'' +
         ", snapshotPath: '" + snapshotPath + '\'' +
-        ", dbTxSequenceNumber: '" + dbTxSequenceNumber + '\'' +
         ", deepClean: '" + deepClean + '\'' +
         ", sstFiltered: '" + sstFiltered + '\'' +
         ", referencedSize: '" + referencedSize + '\'' +

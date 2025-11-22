@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public class ReconcileContainerCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final DNContainerOperationClient dnClient;
-  private String metricsName;
+  private static final String METRIC_NAME = ReconcileContainerTask.METRIC_NAME;
 
   public ReconcileContainerCommandHandler(ReplicationSupervisor supervisor, DNContainerOperationClient dnClient) {
     this.supervisor = supervisor;
@@ -45,9 +45,6 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
       SCMConnectionManager connectionManager) {
     ReconcileContainerCommand reconcileCommand = (ReconcileContainerCommand) command;
     ReconcileContainerTask task = new ReconcileContainerTask(container.getController(), dnClient, reconcileCommand);
-    if (metricsName == null) {
-      metricsName = task.getMetricName();
-    }
     supervisor.addTask(task);
   }
 
@@ -58,29 +55,25 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationQueuedCount(metricsName);
+    return (int) this.supervisor.getReplicationQueuedCount(METRIC_NAME);
   }
 
   @Override
   public int getInvocationCount() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestCount(metricsName);
+    return (int) this.supervisor.getReplicationRequestCount(METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return this.metricsName == null ? 0 : (int) this.supervisor
-        .getReplicationRequestAvgTime(metricsName);
+    return this.supervisor.getReplicationRequestAvgTime(METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return this.metricsName == null ? 0 : this.supervisor
-        .getReplicationRequestTotalTime(metricsName);
+    return this.supervisor.getReplicationRequestTotalTime(METRIC_NAME);
   }
 
   public String getMetricsName() {
-    return this.metricsName;
+    return METRIC_NAME;
   }
 }

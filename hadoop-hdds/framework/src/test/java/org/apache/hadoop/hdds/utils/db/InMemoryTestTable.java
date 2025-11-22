@@ -30,14 +30,24 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
  */
 public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final NavigableMap<KEY, VALUE> map;
+  private final String name;
 
   public InMemoryTestTable() {
-    this(Collections.emptyMap());
+    this("");
   }
 
   public InMemoryTestTable(Map<KEY, VALUE> map) {
+    this(map, "");
+  }
+
+  public InMemoryTestTable(String name) {
+    this(Collections.emptyMap(), name);
+  }
+
+  public InMemoryTestTable(Map<KEY, VALUE> map, String name) {
     this.map = new ConcurrentSkipListMap<>(map);
     this.map.putAll(map);
+    this.name = name;
   }
 
   @Override
@@ -97,7 +107,7 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public String getName() {
-    return "";
+    return name;
   }
 
   @Override
