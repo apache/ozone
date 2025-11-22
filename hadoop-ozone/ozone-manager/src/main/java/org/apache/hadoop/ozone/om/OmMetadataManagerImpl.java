@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -234,6 +235,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    return createCheckpointMetadataManager(conf, checkpoint, true);
+  }
+
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
@@ -246,7 +252,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new OmMetadataManagerImpl(conf, dir, name.toString());
+    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly);
+  }
+
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name) throws IOException {
+    this(conf, dir, name, true);
   }
 
   /**
@@ -257,7 +267,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param name - Checkpoint directory name.
    * @throws IOException
    */
-  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly)
       throws IOException {
     lock = new OmReadOnlyLock();
     hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
@@ -265,10 +275,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
     this.store = newDBStoreBuilder(conf, name, dir)
-        .setOpenReadOnly(true)
+        .setOpenReadOnly(readOnly)
         .disableDefaultCFAutoCompaction(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
-        .setEnableCompactionDag(false)
+        .setEnableCompactionDag(false, null)
         .setCreateCheckpointDirs(false)
         .setEnableRocksDbMetrics(true)
         .build();
@@ -294,7 +304,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           .setOpenReadOnly(false)
           .disableDefaultCFAutoCompaction(true)
           .setMaxNumberOfOpenFiles(maxOpenFiles)
-          .setEnableCompactionDag(false)
+          .setEnableCompactionDag(false, null)
           .setCreateCheckpointDirs(false)
           .setEnableRocksDbMetrics(enableRocksDBMetrics)
           .build();
@@ -413,7 +423,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
 
-      this.store = loadDB(configuration, metaDir, maxOpenFiles);
+      this.store = loadDB(configuration, metaDir, maxOpenFiles, lock);
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -421,10 +431,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles,
+      IOzoneManagerLock ozoneManagerLock) throws IOException {
     return newDBStoreBuilder(configuration, null, metaDir)
         .setOpenReadOnly(false)
-        .setEnableCompactionDag(true)
+        .setEnableCompactionDag(true,
+            (readLock) -> ozoneManagerLock.acquireLock(BOOTSTRAP_LOCK, "rocksdbCheckpointDifferAOS", readLock))
         .setCreateCheckpointDirs(true)
         .setEnableRocksDbMetrics(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
@@ -517,6 +529,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public DBStore getStore() {
     return store;
+  }
+
+  @Override
+  public Path getSnapshotParentDir() {
+    return Paths.get(store.getSnapshotsParentDir());
   }
 
   /**

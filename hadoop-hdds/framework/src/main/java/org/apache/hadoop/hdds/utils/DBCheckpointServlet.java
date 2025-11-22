@@ -395,21 +395,21 @@ public class DBCheckpointServlet extends HttpServlet
    * This lock is a no-op but can overridden by child classes.
    */
   public static class NoOpLock extends BootstrapStateHandler.Lock {
-
-    private final UncheckedAutoCloseable noopLock = () -> {
+    private static final UncheckedAutoCloseable NOOP_LOCK = () -> {
     };
 
     public NoOpLock() {
+      super((readLock) -> NOOP_LOCK);
     }
 
     @Override
     public UncheckedAutoCloseable acquireReadLock() {
-      return noopLock;
+      return NOOP_LOCK;
     }
 
     @Override
     public UncheckedAutoCloseable acquireWriteLock() {
-      return noopLock;
+      return NOOP_LOCK;
     }
   }
 }
