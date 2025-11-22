@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -1002,13 +1003,15 @@ public class TestOMRatisSnapshots {
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
     OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
+    Path checkpointDataDir =  Paths.get(leaderCheckpointLocation.toString(), OM_CHECKPOINT_DATA_DIR);
+    Path omDbLocation = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
-        .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
+        .getTrxnInfoFromCheckpoint(conf, omDbLocation);
 
     // Corrupt the leader checkpoint and install that on the OM. The
     // operation should fail and OM should shutdown.
     boolean delete = true;
-    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    File[] files = omDbLocation.toFile().listFiles();
     assertNotNull(files);
     for (File file : files) {
       if (file.getName().contains(".sst")) {
@@ -1025,7 +1028,7 @@ public class TestOMRatisSnapshots {
     LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
     followerOM.setExitManagerForTesting(new DummyExitManager());
     // Install corrupted checkpoint
-    followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+    followerOM.installCheckpoint(leaderOMNodeId, checkpointDataDir,
         leaderCheckpointTrxnInfo);
 
     // Wait checkpoint installation to be finished.
@@ -1173,11 +1176,18 @@ public class TestOMRatisSnapshots {
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
       OmSnapshotUtils.createHardLinks(tempDir, true);
-      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
+      Path parent = tempDir.getParent();
+      if (parent == null) {
+        throw new IOException("tempDir has no parent directory: " + tempDir);
+      }
+      Path checkpointDataDir = parent.resolve(OM_CHECKPOINT_DATA_DIR);
+      List<Path> sstPaths = Files.walk(checkpointDataDir)
+          .filter(path -> path.toString().endsWith(".sst"))
+          .collect(Collectors.toList());
       long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
         File file = sstPath.toFile();
-        if (file.isFile() && file.getName().endsWith(".sst")) {
+        if (file.isFile()) {
           totalFileSize += Files.size(sstPath);
         }
       }

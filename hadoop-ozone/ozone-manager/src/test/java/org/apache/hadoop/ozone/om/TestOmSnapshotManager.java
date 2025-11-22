@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
 import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -378,9 +379,12 @@ class TestOmSnapshotManager {
     Files.move(hardLinkList, Paths.get(candidateDir.toString(),
         OM_HARDLINK_FILE));
 
+    Path snapshot2Path = Paths.get(candidateDir.getParent(), OM_CHECKPOINT_DATA_DIR,
+        OM_SNAPSHOT_CHECKPOINT_DIR, followerSnapDir2.getName());
+
     // Pointers to follower links to be created.
-    File f1FileLink = new File(followerSnapDir2, "f1.sst");
-    File s1FileLink = new File(followerSnapDir2, "s1.sst");
+    File f1FileLink = new File(snapshot2Path.toFile(), "f1.sst");
+    File s1FileLink = new File(snapshot2Path.toFile(), "s1.sst");
 
     // Create links on the follower from list.
     OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
