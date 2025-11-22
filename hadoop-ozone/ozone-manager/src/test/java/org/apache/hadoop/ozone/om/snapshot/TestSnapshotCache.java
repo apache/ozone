@@ -17,13 +17,15 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -51,6 +54,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -187,6 +191,17 @@ class TestSnapshotCache {
       snapshotCache.lock();
     }
     verify(lock, times(numberOfLocks)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+  }
+
+  @Test
+  public void testLockSupplierReturnsLockWithAnotherLockReleased() {
+    IOzoneManagerLock ozoneManagerLock = new OzoneManagerLock(new OzoneConfiguration());
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50, true, ozoneManagerLock);
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
+      ozoneManagerLock.acquireWriteLock(VOLUME_LOCK, "vol1");
+      ozoneManagerLock.releaseWriteLock(VOLUME_LOCK, "vol1");
+      assertTrue(lockDetails.get().isLockAcquired());
+    }
   }
 
   @ParameterizedTest

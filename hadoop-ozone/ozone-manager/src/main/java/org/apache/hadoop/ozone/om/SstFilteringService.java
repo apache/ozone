@@ -19,7 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -83,7 +86,7 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
-  private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
 
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
     Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
@@ -101,6 +104,10 @@ public class SstFilteringService extends BackgroundService
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
+    IOzoneManagerLock ozoneManagerLock = ozoneManager.getMetadataManager().getLock();
+    Function<Boolean, UncheckedAutoCloseable> lockSupplier = (readLock) ->
+        ozoneManagerLock.acquireLock(BOOTSTRAP_LOCK, getServiceName(), readLock);
+    this.lock = new BootstrapStateHandler.Lock(lockSupplier);
   }
 
   @Override
