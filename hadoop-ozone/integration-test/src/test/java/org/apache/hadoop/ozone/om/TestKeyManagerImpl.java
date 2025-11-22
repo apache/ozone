@@ -408,8 +408,8 @@ public class TestKeyManagerImpl {
     writeClient.createDirectory(keyArgs);
     OzoneFileStatus fileStatus = keyManager.getFileStatus(keyArgs);
     assertTrue(fileStatus.isDirectory());
-    assertTrue(fileStatus.getKeyInfo().getKeyLocationVersions().get(0)
-        .getLocationList().isEmpty());
+    assertThat(fileStatus.getKeyInfo().getKeyLocationVersions().get(0).getLocationList())
+        .isEmpty();
   }
 
   @Test
@@ -643,7 +643,7 @@ public class TestKeyManagerImpl {
     // add acl with invalid prefix name
     Exception ex = assertThrows(OMException.class,
         () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
+    assertThat(ex).hasMessageStartingWith("Missing trailing slash");
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -661,7 +661,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
-    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
+    assertThat(ex).hasMessageStartingWith("Missing trailing slash");
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<>();
@@ -669,12 +669,12 @@ public class TestKeyManagerImpl {
 
     ex = assertThrows(OMException.class,
         () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
-    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
+    assertThat(ex).hasMessageStartingWith("Missing trailing slash");
 
     // remove acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
+    assertThat(ex).hasMessageStartingWith("Missing trailing slash");
   }
 
   @Test
@@ -1072,7 +1072,7 @@ public class TestKeyManagerImpl {
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String keyName = fileStatus.getKeyInfo().getKeyName();
       expectedKeys.add(keyName);
-      assertTrue(keyName.startsWith(prefixKey));
+      assertThat(keyName).startsWith(prefixKey);
     }
     assertEquals(expectedKeys, existKeySet);
 
@@ -1106,7 +1106,7 @@ public class TestKeyManagerImpl {
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String keyName = fileStatus.getKeyInfo().getKeyName();
       expectedKeys.add(keyName);
-      assertTrue(keyName.startsWith(prefixKey));
+      assertThat(keyName).startsWith(prefixKey);
     }
     assertEquals(expectedKeys, existKeySet);
 
@@ -1124,7 +1124,7 @@ public class TestKeyManagerImpl {
       for (OzoneFileStatus fileStatus : fileStatuses) {
         startKey = fileStatus.getKeyInfo().getKeyName();
         expectedKeys.add(startKey);
-        assertTrue(startKey.startsWith(prefixKey));
+        assertThat(startKey).startsWith(prefixKey);
       }
       // fileStatuses.size() == batchSize indicates there might be another batch
       // fileStatuses.size() < batchSize indicates it is the last batch
@@ -1142,7 +1142,7 @@ public class TestKeyManagerImpl {
     }
     // Update existKeySet
     existKeySet.removeAll(deletedKeySet);
-    assertTrue(existKeySet.isEmpty());
+    assertThat(existKeySet).isEmpty();
   }
 
   @ParameterizedTest
