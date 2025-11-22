@@ -187,7 +187,7 @@
       4.7.6: https://github.com/remkop/picocli/issues/2309
       4.7.7: https://github.com/remkop/picocli/issues/2407
     -->
-    <picocli.version>4.7.5</picocli.version>
+    <picocli.version>4.7.7</picocli.version>
     <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
     <project.build.outputTimestamp>2025-03-12T22:12:52Z</project.build.outputTimestamp>
