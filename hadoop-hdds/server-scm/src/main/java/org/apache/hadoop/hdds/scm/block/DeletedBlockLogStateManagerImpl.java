@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -208,31 +207,6 @@ public class DeletedBlockLogStateManagerImpl
     // This method is being retained to ensure backward compatibility and prevent
     // issues during minor upgrades. It will be removed in the future, during a major release.
     return 0;
-  }
-
-  @Override
-  public ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
-    Objects.requireNonNull(txIDs, "txIds cannot be null.");
-    ArrayList<DeletedBlocksTransaction> transactions = new ArrayList<>();
-    for (long txId: txIDs) {
-      try {
-        if (deletingTxIDs.contains(txId)) {
-          LOG.debug("txId {} is already in deletingTxIDs.", txId);
-          continue;
-        }
-        DeletedBlocksTransaction transaction = deletedTable.get(txId);
-        if (transaction == null) {
-          LOG.debug("txId {} is not found in deletedTable.", txId);
-          continue;
-        }
-        transactions.add(transaction);
-      } catch (IOException ex) {
-        LOG.error("Could not get deleted block transaction {}.", txId, ex);
-        throw ex;
-      }
-    }
-    LOG.debug("Get {} DeletedBlocksTransactions for {} input txIDs", transactions.size(), txIDs.size());
-    return transactions;
   }
 
   @Override

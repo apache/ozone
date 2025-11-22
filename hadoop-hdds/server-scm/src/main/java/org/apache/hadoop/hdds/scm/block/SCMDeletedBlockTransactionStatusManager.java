@@ -657,9 +657,6 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   @Nullable
   public DeletedBlocksTransactionSummary getTransactionSummary() {
-    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
-      return null;
-    }
     return DeletedBlocksTransactionSummary.newBuilder()
         .setTotalTransactionCount(totalTxCount.get())
         .setTotalBlockCount(totalBlockCount.get())
@@ -669,18 +666,14 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   private void initDataDistributionData() throws IOException {
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
-      DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
-      if (summary != null) {
-        totalTxCount.set(summary.getTotalTransactionCount());
-        totalBlockCount.set(summary.getTotalBlockCount());
-        totalBlocksSize.set(summary.getTotalBlockSize());
-        totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-        LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {}",
-            totalBlockCount.get(), totalBlocksSize.get());
-      }
-    } else {
-      LOG.info(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION + " is not finalized");
+    DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
+    if (summary != null) {
+      totalTxCount.set(summary.getTotalTransactionCount());
+      totalBlockCount.set(summary.getTotalBlockCount());
+      totalBlocksSize.set(summary.getTotalBlockSize());
+      totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
+      LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {}",
+          totalBlockCount.get(), totalBlocksSize.get());
     }
   }
 

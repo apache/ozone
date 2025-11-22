@@ -58,8 +58,6 @@ public interface DeletedBlockLogStateManager {
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
 
-  ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException;
-
   void onFlush();
 
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
