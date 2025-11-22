@@ -46,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -87,6 +88,7 @@ import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -102,6 +104,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -162,6 +165,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2047,6 +2051,115 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public ContainerCommandResponseProto readBlock(
+      ContainerCommandRequestProto request, Container kvContainer,
+      DispatcherContext dispatcherContext,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+    ContainerCommandResponseProto responseProto = null;
+    if (!request.hasReadBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Block request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+    try {
+      ReadBlockRequestProto readBlock = request.getReadBlock();
+
+      BlockID blockID = BlockID.getFromProtobuf(
+          readBlock.getBlockID());
+      // This is a new api the block should always be checked.
+      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      BlockUtils.verifyBCSId(kvContainer, blockID);
+
+      BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+      List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+      long blockOffset = 0;
+      int chunkIndex = -1;
+      long chunkOffset = 0;
+      long offset = readBlock.getOffset();
+      for (int i = 0; i < chunkInfos.size(); i++) {
+        final long chunkLen = chunkInfos.get(i).getLen();
+        blockOffset += chunkLen;
+        if (blockOffset > offset) {
+          chunkIndex = i;
+          chunkOffset = offset - blockOffset + chunkLen;
+          break;
+        }
+      }
+      Preconditions.checkState(chunkIndex >= 0);
+
+      if (dispatcherContext == null) {
+        dispatcherContext = DispatcherContext.getHandleReadBlock();
+      }
+
+      ChunkBufferToByteString data;
+
+      long len =  readBlock.getLen();
+      long adjustedChunkOffset, adjustedChunkLen;
+      do {
+        ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
+        if (readBlock.getVerifyChecksum()) {
+          Pair<Long, Long> adjustedOffsetAndLength =
+              computeChecksumBoundaries(chunk, chunkOffset, len);
+          adjustedChunkOffset = adjustedOffsetAndLength.getLeft();
+          adjustedChunkLen = adjustedOffsetAndLength.getRight();
+          adjustedChunkOffset += chunk.getOffset();
+        } else {
+          adjustedChunkOffset = chunkOffset;
+          adjustedChunkLen = Math.min(
+              chunk.getLen() + chunk.getOffset() - chunkOffset, len);
+        }
+
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
+            ContainerProtos.ChunkInfo.newBuilder(chunk)
+                .setOffset(adjustedChunkOffset)
+                .setLen(adjustedChunkLen).build());
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+        BlockUtils.verifyBCSId(kvContainer, blockID);
+        data = getChunkManager().readChunk(
+            kvContainer, blockID, chunkInfo, dispatcherContext);
+
+        Preconditions.checkNotNull(data, "Chunk data is null");
+        streamObserver.onNext(
+            getReadBlockResponse(request,
+                blockData.getProtoBufMessage().getBlockID(),
+                chunkInfo.getProtoBufMessage(),
+                data, byteBufferToByteString));
+        len -= adjustedChunkLen + adjustedChunkOffset - chunkOffset;
+        chunkOffset = 0;
+        chunkIndex++;
+      } while (len > 0);
+
+      metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+    } catch (StorageContainerException ex) {
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ioe) {
+      responseProto = ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION),
+          request);
+    }
+    return responseProto;
+  }
+
+  private Pair<Long, Long> computeChecksumBoundaries(
+      ContainerProtos.ChunkInfo chunkInfo, long startByteIndex, long dataLen) {
+
+    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
+
+    // index of the last byte to be read from chunk, inclusively.
+    final long endByteIndex = startByteIndex + dataLen - 1;
+
+    long adjustedChunkOffset = (startByteIndex / bytesPerChecksum)
+        * bytesPerChecksum; // inclusive
+    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
+        * bytesPerChecksum; // exclusive
+    long adjustedChunkLen =
+        Math.min(endIndex, chunkInfo.getLen()) - adjustedChunkOffset;
+    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
+  }
+
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
@@ -2084,7 +2197,7 @@ public class KeyValueHandler extends Handler {
       }
       if (nonZero) {
         LOG.error("blocks in rocksDB on container delete: {}",
-            stringBuilder.toString());
+            stringBuilder);
       }
     }
     return nonZero;

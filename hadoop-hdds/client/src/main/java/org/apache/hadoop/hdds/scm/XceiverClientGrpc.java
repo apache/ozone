@@ -44,6 +44,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -451,7 +453,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
+        if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
+          responseProto = sendCommandReadBlock(request, dn).getResponse().get();
+        } else {
+          responseProto = sendCommandAsync(request, dn).getResponse().get();
+        }
         if (validators != null && !validators.isEmpty()) {
           for (Validator validator : validators) {
             validator.accept(request, responseProto);
@@ -495,7 +501,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
-                processForDebug(request), pipeline);
+            processForDebug(request), pipeline);
       } else {
         LOG.warn(message + " on the pipeline {}.",
                 request.getCmdType(), pipeline);
@@ -621,6 +627,69 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     requestObserver.onNext(request);
     requestObserver.onCompleted();
     return new XceiverClientReply(replyFuture);
+  }
+
+  public XceiverClientReply sendCommandReadBlock(
+      ContainerCommandRequestProto request, DatanodeDetails dn)
+      throws IOException, InterruptedException {
+
+    CompletableFuture<ContainerCommandResponseProto> future =
+        new CompletableFuture<>();
+    ContainerCommandResponseProto.Builder response =
+        ContainerCommandResponseProto.newBuilder();
+    ContainerProtos.ReadBlockResponseProto.Builder readBlock =
+        ContainerProtos.ReadBlockResponseProto.newBuilder();
+    checkOpen(dn);
+    DatanodeID dnId = dn.getID();
+    Type cmdType = request.getCmdType();
+    semaphore.acquire();
+    long requestTime = System.currentTimeMillis();
+    metrics.incrPendingContainerOpsMetrics(cmdType);
+
+    final StreamObserver<ContainerCommandRequestProto> requestObserver =
+        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(new StreamObserver<ContainerCommandResponseProto>() {
+              @Override
+              public void onNext(
+                  ContainerCommandResponseProto responseProto) {
+                if (responseProto.getResult() == Result.SUCCESS) {
+                  readBlock.addReadChunk(responseProto.getReadChunk());
+                } else {
+                  future.complete(
+                      ContainerCommandResponseProto.newBuilder(responseProto)
+                          .setCmdType(Type.ReadBlock).build());
+                }
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                future.completeExceptionally(t);
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, Time.monotonicNow() - requestTime);
+                semaphore.release();
+              }
+
+              @Override
+              public void onCompleted() {
+                if (readBlock.getReadChunkCount() > 0) {
+                  future.complete(response.setReadBlock(readBlock)
+                      .setCmdType(Type.ReadBlock).setResult(Result.SUCCESS).build());
+                }
+                if (!future.isDone()) {
+                  future.completeExceptionally(new IOException(
+                      "Stream completed but no reply for request " +
+                          processForDebug(request)));
+                }
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, System.currentTimeMillis() - requestTime);
+                semaphore.release();
+              }
+            });
+    requestObserver.onNext(request);
+    requestObserver.onCompleted();
+    return new XceiverClientReply(future);
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)
