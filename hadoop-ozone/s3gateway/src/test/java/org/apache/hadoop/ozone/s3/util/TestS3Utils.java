@@ -18,12 +18,17 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -146,6 +151,56 @@ public class TestS3Utils {
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  public static List<Arguments> validXAmzContentSHA256Headers() {
+    String actualSha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    return Arrays.asList(
+        // Header missing with unsigned payload
+        Arguments.of("missing header with unsigned payload", null, actualSha256, false),
+        // Various unsigned payload types
+        Arguments.of("UNSIGNED-PAYLOAD", S3Consts.UNSIGNED_PAYLOAD, actualSha256, true),
+        Arguments.of("STREAMING-UNSIGNED-PAYLOAD-TRAILER",
+            S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER, actualSha256, true),
+        // Various multi-chunks payload types
+        Arguments.of("STREAMING-AWS4-HMAC-SHA256-PAYLOAD",
+            "STREAMING-AWS4-HMAC-SHA256-PAYLOAD", actualSha256, true),
+        Arguments.of("STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER",
+            "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER", actualSha256, true),
+        // Matching SHA-256
+        Arguments.of("matching SHA-256", actualSha256, actualSha256, true)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("validXAmzContentSHA256Headers")
+  public void testIsValidXAmzContentSHA256HeaderValid(String testName, String headerValue, String actualSha256,
+                                                       boolean isSignedPayload) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
+
+    assertTrue(S3Utils.isValidXAmzContentSHA256Header(headers, actualSha256, isSignedPayload));
+  }
+
+  public static List<Arguments> invalidXAmzContentSHA256Headers() {
+    String actualSha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    String differentSha256 = "different0hash0000000000000000000000000000000000000000000000000000";
+    return Arrays.asList(
+        // Header missing with signed payload
+        Arguments.of("missing header with signed payload", null, actualSha256, true),
+        // SHA-256 mismatch
+        Arguments.of("SHA-256 mismatch", actualSha256, differentSha256, true)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidXAmzContentSHA256Headers")
+  public void testIsValidXAmzContentSHA256HeaderInvalid(String testName, String headerValue, String actualSha256,
+                                                         boolean isSignedPayload) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
+
+    assertFalse(S3Utils.isValidXAmzContentSHA256Header(headers, actualSha256, isSignedPayload));
   }
 
 }
