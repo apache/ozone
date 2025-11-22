@@ -234,6 +234,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    return createCheckpointMetadataManager(conf, checkpoint, true);
+  }
+
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
@@ -246,7 +251,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new OmMetadataManagerImpl(conf, dir, name.toString());
+    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly);
+  }
+
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name) throws IOException {
+    this(conf, dir, name, true);
   }
 
   /**
@@ -257,7 +266,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param name - Checkpoint directory name.
    * @throws IOException
    */
-  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly)
       throws IOException {
     lock = new OmReadOnlyLock();
     hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
@@ -265,7 +274,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
     this.store = newDBStoreBuilder(conf, name, dir)
-        .setOpenReadOnly(true)
+        .setOpenReadOnly(readOnly)
         .disableDefaultCFAutoCompaction(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
         .setEnableCompactionDag(false)
@@ -517,6 +526,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public DBStore getStore() {
     return store;
+  }
+
+  @Override
+  public Path getSnapshotParentDir() {
+    return Paths.get(store.getSnapshotsParentDir());
   }
 
   /**
