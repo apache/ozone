@@ -201,9 +201,6 @@ public class SnapshotDefragService extends BackgroundService
    * @throws IOException If an I/O error occurs while accessing the local snapshot data or metadata.
    */
   private Pair<Boolean, Integer> needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
-    if (!SstFilteringService.isSstFiltered(conf, snapshotInfo)) {
-      return Pair.of(false, 0);
-    }
     // Update snapshot local metadata to point to the correct previous snapshotId if it was different and check if
     // snapshot needs defrag.
     try (WritableOmSnapshotLocalDataProvider writableOmSnapshotLocalDataProvider =
