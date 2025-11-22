@@ -87,7 +87,7 @@ public final class SafeModeRuleFactory {
       StorageContainerManager scm = (StorageContainerManager) ozoneScm;
       SCMHAManager scmHAManager = scm.getScmHAManager();
       if (scmHAManager != null && scmHAManager.getRatisServer() != null) {
-        preCheckRules.add(new StateMachineReadyRule(eventQueue, safeModeManager,
+        safeModeRules.add(new StateMachineReadyRule(eventQueue, safeModeManager,
             scmHAManager.getRatisServer().getSCMStateMachine()));
       }
     }
