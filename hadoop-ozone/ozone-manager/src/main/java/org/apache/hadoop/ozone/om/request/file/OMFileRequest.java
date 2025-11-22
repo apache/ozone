@@ -478,8 +478,6 @@ public final class OMFileRequest {
       // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
       // (Full key path is required in commit key request)
       omFileInfo.setKeyName(keyName);
-      // fileName will contain only the leaf(file1) which is actual file name.
-      omFileInfo.setFileName(fileName);
       table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
     } else {
       table.addCacheEntry(dbOpenFileName, trxnLogIndex);
@@ -504,7 +502,6 @@ public final class OMFileRequest {
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
     omFileInfo.setKeyName(fileName);
-    omFileInfo.setFileName(fileName);
 
     BucketLayout bucketLayout =
         getBucketLayout(omMetadataManager, omFileInfo.getVolumeName(),
@@ -729,7 +726,6 @@ public final class OMFileRequest {
   }
 
   public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmKeyInfo omKeyInfo) {
-    omKeyInfo.setFileName(omKeyInfo.getKeyName());
     String fullKeyPath = OMFileRequest.getAbsolutePath(
         parentInfo.getKeyName(), omKeyInfo.getKeyName());
     omKeyInfo.setKeyName(fullKeyPath);
@@ -760,7 +756,6 @@ public final class OMFileRequest {
         .setModificationTime(dirInfo.getModificationTime())
         .setObjectID(dirInfo.getObjectID())
         .setUpdateID(dirInfo.getUpdateID())
-        .setFileName(dirInfo.getName())
         .setReplicationConfig(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(

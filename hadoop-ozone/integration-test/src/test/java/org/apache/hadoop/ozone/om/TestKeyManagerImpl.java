@@ -1949,7 +1949,6 @@ public class TestKeyManagerImpl {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName() + "/")
-        .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
         .setOmKeyLocationInfos(null)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
