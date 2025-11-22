@@ -510,8 +510,20 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
 
     @Override
+    public Builder withObjectID(long obId) {
+      super.withObjectID(obId);
+      return this;
+    }
+
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
+      return this;
+    }
+
+    @Override
+    public Builder withUpdateID(long newValue) {
+      super.withUpdateID(newValue);
       return this;
     }
 

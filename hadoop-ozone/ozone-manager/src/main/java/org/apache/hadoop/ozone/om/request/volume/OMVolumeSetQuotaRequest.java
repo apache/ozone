@@ -136,7 +136,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         omVolumeArgs.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
       }
 
-      omVolumeArgs.setUpdateID(transactionLogIndex);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .withUpdateID(transactionLogIndex)
+          .build();
       omVolumeArgs.setModificationTime(
           setVolumePropertyRequest.getModificationTime());
 

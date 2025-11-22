@@ -236,7 +236,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo.setUpdateID(trxnLogIndex);
+          omMultipartKeyInfo = omMultipartKeyInfo.toBuilder()
+              .withUpdateID(trxnLogIndex)
+              .build();
 
           // Parse the multipart upload components (e.g. volume, bucket, key)
           // from the multipartInfoTable db key

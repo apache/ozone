@@ -201,9 +201,6 @@ public class SnapshotDefragService extends BackgroundService
    * @throws IOException If an I/O error occurs while accessing the local snapshot data or metadata.
    */
   private Pair<Boolean, Integer> needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
-    if (!SstFilteringService.isSstFiltered(conf, snapshotInfo)) {
-      return Pair.of(false, 0);
-    }
     // Update snapshot local metadata to point to the correct previous snapshotId if it was different and check if
     // snapshot needs defrag.
     try (WritableOmSnapshotLocalDataProvider writableOmSnapshotLocalDataProvider =
@@ -592,7 +589,8 @@ public class SnapshotDefragService extends BackgroundService
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
-      if (checkpointSnapshotInfo.getSnapshotId() == snapshotInfo.getSnapshotId()) {
+      // If first snapshot in the chain perform full defragmentation.
+      if (snapshotInfo.getPathPreviousSnapshotId() == null) {
         performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       } else {
         performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),

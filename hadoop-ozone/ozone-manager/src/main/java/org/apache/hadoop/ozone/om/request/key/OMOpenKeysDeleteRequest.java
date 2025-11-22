@@ -196,7 +196,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omKeyInfo.setUpdateID(trxnLogIndex);
+          omKeyInfo = omKeyInfo.toBuilder()
+              .withUpdateID(trxnLogIndex)
+              .build();
           deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, omKeyInfo));
 
           // Update openKeyTable cache.
