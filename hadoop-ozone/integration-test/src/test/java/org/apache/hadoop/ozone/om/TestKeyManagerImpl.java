@@ -849,10 +849,10 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerID).setPipelineID(pipeline.getId()).build();
-    List<ContainerWithPipeline> containerWithPipelines = Arrays.asList(
+    List<ContainerWithPipeline> containerWithPipelines = Collections.singletonList(
         new ContainerWithPipeline(containerInfo, pipeline));
     when(mockScmContainerClient.getContainerWithPipelineBatch(
-        Arrays.asList(containerID))).thenReturn(containerWithPipelines);
+        Collections.singletonList(containerID))).thenReturn(containerWithPipelines);
   }
 
   @Test
