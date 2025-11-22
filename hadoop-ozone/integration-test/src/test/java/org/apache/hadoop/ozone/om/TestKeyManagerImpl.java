@@ -664,7 +664,7 @@ public class TestKeyManagerImpl {
     assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // set acl with invalid prefix name
-    List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
+    List<OzoneAcl> ozoneAcls = new ArrayList<>();
     ozoneAcls.add(ozAcl1);
 
     ex = assertThrows(OMException.class,
