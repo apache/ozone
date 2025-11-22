@@ -428,9 +428,7 @@ public class TestKeyManagerImpl {
     OMException ex =
         assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, false, false),
             "Open key should fail for non overwrite create");
-    if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
-      throw ex;
-    }
+    assertEquals(OMException.ResultCodes.FILE_ALREADY_EXISTS, ex.getResult());
 
     // create file should pass with overwrite flag set to true
     writeClient.createFile(keyArgs, true, false);
@@ -452,9 +450,7 @@ public class TestKeyManagerImpl {
     OMException ex =
         assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, false, false),
             "Open file should fail for non recursive write");
-    if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
-      throw ex;
-    }
+    assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
 
     // file create should pass when recursive flag is set to true
     OpenKeySession keySession = writeClient.createFile(keyArgs, false, true);
@@ -473,9 +469,7 @@ public class TestKeyManagerImpl {
         .build();
     OMException ex = assertThrows(OMException.class, () -> writeClient.createFile(keyArgs, true, true),
         "Open file should fail for non recursive write");
-    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-      throw ex;
-    }
+    assertEquals(OMException.ResultCodes.NOT_A_FILE, ex.getResult());
   }
 
   @Test
@@ -741,9 +735,7 @@ public class TestKeyManagerImpl {
     OMException ex =
         assertThrows(OMException.class, () -> keyManager.lookupFile(keyArgs, null),
             "Lookup file should fail for non existent file");
-    if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
-      throw ex;
-    }
+    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
 
     // create a file
     OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
@@ -762,9 +754,7 @@ public class TestKeyManagerImpl {
         .build();
     OMException ex = assertThrows(OMException.class, () -> keyManager.lookupFile(keyArgs, null),
         "Lookup file should fail for a directory");
-    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-      throw ex;
-    }
+    assertEquals(OMException.ResultCodes.NOT_A_FILE, ex.getResult());
   }
 
   private OmKeyArgs createKeyArgs(String toKeyName) throws IOException {
