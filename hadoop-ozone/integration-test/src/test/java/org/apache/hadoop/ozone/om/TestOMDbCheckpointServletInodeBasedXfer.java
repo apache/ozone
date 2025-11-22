@@ -105,13 +105,12 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -630,74 +629,31 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   @Test
   public void testBootstrapLockCoordination() throws Exception {
-    // Create mocks for all background services
-    KeyDeletingService mockDeletingService = mock(KeyDeletingService.class);
-    DirectoryDeletingService mockDirDeletingService = mock(DirectoryDeletingService.class);
-    SstFilteringService mockFilteringService = mock(SstFilteringService.class);
-    SnapshotDeletingService mockSnapshotDeletingService = mock(SnapshotDeletingService.class);
-    RocksDBCheckpointDiffer mockCheckpointDiffer = mock(RocksDBCheckpointDiffer.class);
-    // Create mock locks for each service
-    BootstrapStateHandler.Lock mockDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockDeletingLock.acquireWriteLock()).thenReturn(mockDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockDirDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockDirDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockDirDeletingLock.acquireWriteLock()).thenReturn(mockDirDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockFilteringLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockFilteringAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockFilteringLock.acquireWriteLock()).thenReturn(mockFilteringAcquiredLock);
-
-    BootstrapStateHandler.Lock mockSnapshotDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockSnapshotDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockSnapshotDeletingLock.acquireWriteLock()).thenReturn(mockSnapshotDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockCheckpointDifferLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockCheckpointDifferAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockCheckpointDifferLock.acquireWriteLock()).thenReturn(mockCheckpointDifferAcquiredLock);
-
-    // Configure service mocks to return their respective locks
-    when(mockDeletingService.getBootstrapStateLock()).thenReturn(mockDeletingLock);
-    when(mockDirDeletingService.getBootstrapStateLock()).thenReturn(mockDirDeletingLock);
-    when(mockFilteringService.getBootstrapStateLock()).thenReturn(mockFilteringLock);
-    when(mockSnapshotDeletingService.getBootstrapStateLock()).thenReturn(mockSnapshotDeletingLock);
-    when(mockCheckpointDiffer.getBootstrapStateLock()).thenReturn(mockCheckpointDifferLock);
-    // Mock KeyManager and its services
-    KeyManager mockKeyManager = mock(KeyManager.class);
-    when(mockKeyManager.getDeletingService()).thenReturn(mockDeletingService);
-    when(mockKeyManager.getDirDeletingService()).thenReturn(mockDirDeletingService);
-    when(mockKeyManager.getSnapshotSstFilteringService()).thenReturn(mockFilteringService);
-    when(mockKeyManager.getSnapshotDeletingService()).thenReturn(mockSnapshotDeletingService);
     // Mock OMMetadataManager and Store
     OMMetadataManager mockMetadataManager = mock(OMMetadataManager.class);
     DBStore mockStore = mock(DBStore.class);
     when(mockMetadataManager.getStore()).thenReturn(mockStore);
-    when(mockStore.getRocksDBCheckpointDiffer()).thenReturn(mockCheckpointDiffer);
     // Mock OzoneManager
     OzoneManager mockOM = mock(OzoneManager.class);
-    when(mockOM.getKeyManager()).thenReturn(mockKeyManager);
     when(mockOM.getMetadataManager()).thenReturn(mockMetadataManager);
+
+    IOzoneManagerLock mockOmLock = mock(IOzoneManagerLock.class);
+    when(mockOmLock.acquireResourceLock(any())).thenCallRealMethod();
+    when(mockOmLock.acquireResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(mockMetadataManager.getLock()).thenReturn(mockOmLock);
     // Create the actual Lock instance (this tests the real implementation)
     OMDBCheckpointServlet.Lock bootstrapLock = new OMDBCheckpointServlet.Lock(mockOM);
     // Test successful lock acquisition
     UncheckedAutoCloseable result = bootstrapLock.acquireWriteLock();
     // Verify all service locks were acquired
-    verify(mockDeletingLock).acquireWriteLock();
-    verify(mockDirDeletingLock).acquireWriteLock();
-    verify(mockFilteringLock).acquireWriteLock();
-    verify(mockSnapshotDeletingLock).acquireWriteLock();
-    verify(mockCheckpointDifferLock).acquireWriteLock();
+    verify(mockOmLock).acquireResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK));
     // Verify double buffer flush was called
     verify(mockOM).awaitDoubleBufferFlush();
     // Test unlock
     result.close();
-    // Verify all service locks were released
-    verify(mockDeletingAcquiredLock).close();
-    verify(mockDirDeletingAcquiredLock).close();
-    verify(mockFilteringAcquiredLock).close();
-    verify(mockSnapshotDeletingAcquiredLock).close();
-    verify(mockCheckpointDifferAcquiredLock).close();
+    verify(mockOmLock).releaseResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK));
+
   }
 
   /**

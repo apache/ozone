@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
@@ -171,8 +172,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final Scheduler scheduler;
   private volatile boolean closed;
   private final long maxAllowedTimeInDag;
-  private final BootstrapStateHandler.Lock lock
-      = new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
   private static final int SST_READ_AHEAD_SIZE = 2 * 1024 * 1024;
   private int pruneSSTFileBatchSize;
   private SSTFilePruningMetrics sstFilePruningMetrics;
@@ -216,12 +216,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                           String sstBackupDirName,
                           String compactionLogDirName,
                           String activeDBLocationName,
-                          ConfigurationSource configuration) {
+                          ConfigurationSource configuration,
+                          Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
     Preconditions.checkNotNull(compactionLogDirName);
     Preconditions.checkNotNull(activeDBLocationName);
-
+    Preconditions.checkNotNull(lockSupplier);
+    this.lock = new BootstrapStateHandler.Lock(lockSupplier);
     this.metadataDir = metadataDirName;
     this.compactionLogDir =
         createCompactionLogDir(metadataDirName, compactionLogDirName);
@@ -1421,14 +1423,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         String sstBackupDirName,
         String compactionLogDirName,
         String activeDBLocationName,
-        ConfigurationSource configuration
+        ConfigurationSource configuration,
+        Function<Boolean, UncheckedAutoCloseable> lockSupplier
     ) {
       return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
           new RocksDBCheckpointDiffer(metadataDirName,
               sstBackupDirName,
               compactionLogDirName,
               activeDBLocationName,
-              configuration));
+              configuration,
+              lockSupplier));
     }
 
     /**
