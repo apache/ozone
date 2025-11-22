@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import java.io.IOException;
+import java.util.stream.Stream;
 
 /**
  * A read only lock manager that does not acquire any lock.
@@ -55,6 +56,11 @@ public class ReadOnlyHierarchicalResourceLockManager implements HierarchicalReso
   @Override
   public HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException {
     return EMPTY_LOCK_NOT_ACQUIRED;
+  }
+
+  @Override
+  public Stream<DAGLeveledResource> getCurrentLockedResources() {
+    return Stream.empty();
   }
 
   @Override

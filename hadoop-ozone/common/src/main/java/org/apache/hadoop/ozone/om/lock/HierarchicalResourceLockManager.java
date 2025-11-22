@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.lock;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.stream.Stream;
 
 /**
  * Interface for Hierachical Resource Lock where the lock order acquired on resource is going to be deterministic and
@@ -46,6 +47,13 @@ public interface HierarchicalResourceLockManager extends AutoCloseable {
    * @throws IOException if an I/O error occurs during the process of acquiring the lock
    */
   HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException;
+
+  /**
+   * Retrieves a stream of all currently locked resources in the system by the thread calling this method.
+   *
+   * @return a stream of {@code DAGLeveledResource} representing the resources that are currently locked
+   */
+  Stream<DAGLeveledResource> getCurrentLockedResources();
 
   /**
    * Interface for managing the lock lifecycle corresponding to a Hierarchical Resource.
