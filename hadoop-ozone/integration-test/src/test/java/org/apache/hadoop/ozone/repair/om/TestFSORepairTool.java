@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -367,6 +368,17 @@ public class TestFSORepairTool {
     return execute(true, args);
   }
 
+  private int executeWithDb(boolean dryRun, String omDbPath, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", omDbPath));
+    if (dryRun) {
+      argList.add("--dry-run");
+    }
+    argList.addAll(Arrays.asList(args));
+
+    return withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
+  }
+
   private int execute(boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
     if (dryRun) {
@@ -376,6 +388,39 @@ public class TestFSORepairTool {
 
     return withTextFromSystemIn("y")
         .execute(() -> cmd.execute(argList.toArray(new String[0])));
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testAlternateOmDbDirName() throws Exception {
+    File original = new File(OMStorage.getOmDbDir(cluster.getConf()), OM_DB_NAME);
+    // Place backup under a different parent directory to ensure we don't
+    // accidentally open the original om.db due to path handling bugs.
+    File backupParent = new File(OMStorage.getOmDbDir(cluster.getConf()), "copy");
+    File backup = new File(backupParent, "om-db-backup");
+
+    if (backup.exists()) {
+      FileUtils.deleteDirectory(backup);
+    }
+    if (backupParent.exists()) {
+      FileUtils.deleteDirectory(backupParent);
+    }
+    boolean created = backupParent.mkdirs();
+    if (!created && !backupParent.exists()) {
+      throw new IOException("Failed to create backup parent directory: " + backupParent);
+    }
+    FileUtils.copyDirectory(original, backup);
+
+    out.reset();
+    String expectedOutput = serializeReport(fullReport);
+    int exitCode = executeWithDb(true, backup.getPath());
+    assertEquals(0, exitCode, err.getOutput());
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+
+    FileUtils.deleteDirectory(backupParent);
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
@@ -405,12 +450,12 @@ public class TestFSORepairTool {
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
-        report.getUnreachable().getDirs(),
-        report.getUnreachable().getFiles(),
-        report.getUnreachable().getBytes(),
-        report.getUnreferenced().getDirs(),
-        report.getUnreferenced().getFiles(),
-        report.getUnreferenced().getBytes()
+        report.getPendingToDelete().getDirs(),
+        report.getPendingToDelete().getFiles(),
+        report.getPendingToDelete().getBytes(),
+        report.getOrphaned().getDirs(),
+        report.getOrphaned().getFiles(),
+        report.getOrphaned().getBytes()
     );
   }
 
@@ -462,14 +507,14 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol-empty/bucket-empty"));
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -507,14 +552,14 @@ public class TestFSORepairTool {
 
     FSORepairTool.ReportStatistics reachableCount = 
         new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
         new FSORepairTool.ReportStatistics(1, 2, fileSize * 2L);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
         new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -581,15 +626,15 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    // dir1 does not count towards the unreferenced directories the tool
+    // dir1 does not count towards the orphaned directories the tool
     // will see. It was deleted completely so the tool will never see it.
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
