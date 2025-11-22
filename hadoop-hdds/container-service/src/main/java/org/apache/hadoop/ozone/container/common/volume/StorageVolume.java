@@ -489,6 +489,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       builder.setCapacity(usage.getCapacity())
           .setRemaining(usage.getAvailable())
           .setScmUsed(usage.getUsedSpace());
+      getVolumeUsage().ifPresent(vu -> builder.setReserved(vu.getReservedInBytes()));
     }
 
     return builder;

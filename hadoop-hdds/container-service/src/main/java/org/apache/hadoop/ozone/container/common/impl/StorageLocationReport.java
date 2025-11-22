@@ -42,6 +42,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   private final long freeSpaceToSpare;
   private final StorageType storageType;
   private final String storageLocation;
+  private final long reserved;
 
   private StorageLocationReport(Builder builder) {
     this.id = builder.id;
@@ -53,6 +54,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+    this.reserved = builder.reserved;
   }
 
   public long getUsableSpace() {
@@ -137,6 +139,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return storageTypeProto;
   }
 
+  public long getReserved() { 
+    return reserved;
+  }
+
   private static StorageType getStorageType(StorageTypeProto proto) throws
       IOException {
     StorageType storageType;
@@ -179,6 +185,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .setFreeSpaceToSpare(getFreeSpaceToSpare())
+        .setReserved(getReserved())
         .build();
   }
 
@@ -229,6 +236,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
+
+    if (report.hasReserved()) {
+      builder.setReserved(report.getReserved());
+    }
     return builder.build();
   }
 
@@ -275,6 +286,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     private long freeSpaceToSpare;
     private StorageType storageType;
     private String storageLocation;
+    private long reserved;
 
     /**
      * Sets the storageId.
@@ -382,6 +394,15 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     public Builder setStorageLocation(String storageLocationValue) {
       this.storageLocation = storageLocationValue;
       return this;
+    }
+
+    public Builder setReserved(long reserved) { 
+      this.reserved = reserved; 
+      return this; 
+    }
+
+    public long getReserved() { 
+      return reserved;
     }
 
     /**

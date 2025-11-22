@@ -117,3 +117,4 @@ Get usage info as JSON
                         Should contain   ${output}  remainingPercent
                         Should contain   ${output}  totalUsed
                         Should contain   ${output}  totalUsedPercent
+                        Should contain   ${output}  reserved
