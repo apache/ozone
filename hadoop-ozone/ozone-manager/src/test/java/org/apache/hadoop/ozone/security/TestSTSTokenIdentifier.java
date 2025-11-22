@@ -70,11 +70,12 @@ public class TestSTSTokenIdentifier {
     assertThat(proto.getMaxDate()).isEqualTo(expiry.toEpochMilli());
     assertThat(proto.getOriginalAccessKeyId()).isEqualTo("origAccess");
     assertThat(proto.getRoleArn()).isEqualTo("arn:aws:iam::123456789012:role/RoleY");
-    assertThat(proto.getSecretAccessKey()).isEqualTo("secretKey");
+    assertThat(proto.getSecretAccessKey()).isNotEqualTo("secretKey");   // must be encrypted
     assertThat(proto.getSessionPolicy()).isEqualTo("sessionPolicy");
     assertThat(proto.getSecretKeyId()).isEqualTo(secretKeyId.toString());
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
+    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getOwnerId()).isEqualTo("tempAccess");
@@ -111,11 +112,14 @@ public class TestSTSTokenIdentifier {
     final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
         "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleX",
         expiry, "secretKey", null, ENCRYPTION_KEY);
+    final UUID secretKeyId = UUID.randomUUID();
+    stsTokenIdentifier.setSecretKeyId(secretKeyId);
 
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
+    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -127,11 +131,14 @@ public class TestSTSTokenIdentifier {
     final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
         "tempAccess", "origAccess", "arn:aws:iam::123456789012:role/RoleZ",
         expiry, "secretKey", "", ENCRYPTION_KEY);
+    final UUID secretKeyId = UUID.randomUUID();
+    stsTokenIdentifier.setSecretKeyId(secretKeyId);
 
     final OMTokenProto proto = stsTokenIdentifier.toProtoBuf();
     assertThat(proto.getSessionPolicy()).isEmpty();
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
+    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEmpty();
@@ -173,6 +180,7 @@ public class TestSTSTokenIdentifier {
 
     final byte[] bytes = baos.toByteArray();
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
+    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
     parsedTokenIdentifier.readFromByteArray(bytes);
 
     assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
@@ -207,8 +215,19 @@ public class TestSTSTokenIdentifier {
       anotherTokenIdentifier.write(out);
     }
 
-    // The byte arrays should be different due to different secret key IDs
+    // The byte arrays will not be the same because the encrypted secretAccessKey cipher for each will differ.
+    // However, the STSTokenIdentifier derived from each byte array should also not be the same.
     assertThat(baos1.toByteArray()).isNotEqualTo(baos2.toByteArray());
+    final byte[] byteArr1 = baos1.toByteArray();
+    final byte[] byteArr2 = baos2.toByteArray();
+    assertThat(byteArr1).isNotEqualTo(byteArr2);
+    final STSTokenIdentifier tokenFromByteArr1 = new STSTokenIdentifier();
+    tokenFromByteArr1.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr1.readFromByteArray(byteArr1);
+    final STSTokenIdentifier tokenFromByteArr2 = new STSTokenIdentifier();
+    tokenFromByteArr2.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr2.readFromByteArray(byteArr2);
+    assertThat(tokenFromByteArr1).isNotEqualTo(tokenFromByteArr2);
   }
 
   @Test
@@ -236,8 +255,18 @@ public class TestSTSTokenIdentifier {
       anotherTokenIdentifier.write(out);
     }
 
-    // The byte arrays should be the same since they have the same contents
-    assertThat(baos1.toByteArray()).isEqualTo(baos2.toByteArray());
+    // The byte arrays should not be the same because the encrypted secretAccessKey cipher for each will differ.
+    // However, the STSTokenIdentifier derived from each byte array should be the same.
+    final byte[] byteArr1 = baos1.toByteArray();
+    final byte[] byteArr2 = baos2.toByteArray();
+    assertThat(byteArr1).isNotEqualTo(byteArr2);
+    final STSTokenIdentifier tokenFromByteArr1 = new STSTokenIdentifier();
+    tokenFromByteArr1.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr1.readFromByteArray(byteArr1);
+    final STSTokenIdentifier tokenFromByteArr2 = new STSTokenIdentifier();
+    tokenFromByteArr2.setEncryptionKey(ENCRYPTION_KEY);
+    tokenFromByteArr2.readFromByteArray(byteArr2);
+    assertThat(tokenFromByteArr1).isEqualTo(tokenFromByteArr2);
   }
 
   @Test

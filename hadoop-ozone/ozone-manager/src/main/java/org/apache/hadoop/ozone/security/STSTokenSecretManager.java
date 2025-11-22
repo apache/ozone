@@ -72,7 +72,6 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
     // Note - the encryptionKey will NOT be encoded in the token.  When generateToken() is called, it eventually calls
     // the write() method in STSTokenIdentifier which calls toProtoBuf(), and the encryptionKey is not
     // serialized there.
-    // TODO sts - use the encryptionKey in a future PR to encrypt/decrypt the secretAccessKey
     final STSTokenIdentifier identifier = new STSTokenIdentifier(
         tempAccessKeyId, originalAccessKeyId, roleArn, expiration, secretAccessKey, sessionPolicy, encryptionKey);
 
