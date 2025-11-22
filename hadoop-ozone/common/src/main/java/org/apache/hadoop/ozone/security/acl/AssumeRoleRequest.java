@@ -123,5 +123,10 @@ public class AssumeRoleRequest {
     public int hashCode() {
       return Objects.hash(objects, permissions);
     }
+
+    @Override
+    public String toString() {
+      return "OzoneGrant{" + "objects=" + objects + ", permissions=" + permissions + '}';
+    }
   }
 }
