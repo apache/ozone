@@ -364,7 +364,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }).collect(Collectors.toList());
 
       for (String yamlRelativePath : yamlRelativePaths) {
-        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
+        String yamlFileName = Paths.get(newDbDir.getParent(), OzoneConsts.OM_CHECKPOINT_DATA_DIR,
+            yamlRelativePath).toString();
         assertTrue(Files.exists(Paths.get(yamlFileName)));
       }
     }
@@ -401,9 +402,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
-    Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(),OM_CHECKPOINT_DATA_DIR,
-        OM_SNAPSHOT_CHECKPOINT_DIR,
-        OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
+    Path snapshotDbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,
+        OM_SNAPSHOT_CHECKPOINT_DIR, OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
@@ -590,9 +590,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot1DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     assertTrue(purgeEndTime.get() >= checkpointEndTime.get(),
         "Purge should complete after checkpoint releases snapshot cache lock");
@@ -858,9 +858,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot1DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     boolean snapshot1IncludedInCheckpoint = Files.exists(snapshot1DbDir);
     boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);

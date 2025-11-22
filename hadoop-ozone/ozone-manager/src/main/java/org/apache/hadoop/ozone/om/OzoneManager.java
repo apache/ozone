@@ -4048,7 +4048,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       // Install hard links.
       OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation(), false);
-      termIndex = installCheckpoint(leaderId, omDBCheckpoint);
+      Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
+      if (checkpointLocation == null) {
+        throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
+      }
+      Path parent = checkpointLocation.getParent();
+      if (parent == null) {
+        throw new IOException("Cannot install checkpoint from leader " + leaderId +
+            ": checkpointLocation has no parent: " + checkpointLocation);
+      }
+      Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+      termIndex = installCheckpoint(leaderId, checkpointDataDir);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
@@ -4065,22 +4075,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws Exception {
 
     Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
-    if (checkpointLocation == null) {
-      throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
-    }
-    Path parent = checkpointLocation.getParent();
-    if (parent == null) {
-      throw new IOException("Cannot install checkpoint from leader " + leaderId +
-          ": checkpointLocation has no parent: " + checkpointLocation);
-    }
-    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
-    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
     TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
-        .getTrxnInfoFromCheckpoint(configuration, omDbPath);
+        .getTrxnInfoFromCheckpoint(configuration, checkpointLocation);
 
     LOG.info("Installing checkpoint with OMTransactionInfo {}",
         checkpointTrxnInfo);
 
+    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
+  }
+
+  /**
+   * Install checkpoint obtained from leader using the dbCheckpoint endpoint.
+   * The unpacked directory after installing hardlinks would contain a
+   * checkpoint_data dir that comprises of both active OM DB dir and the
+   * db.snapshots directory.
+   */
+  TermIndex installCheckpoint(String leaderId, Path checkpointDataDir)
+      throws Exception {
+    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
+        .getTrxnInfoFromCheckpoint(configuration, omDbPath);
+    LOG.info("Installing checkpoint with OMTransactionInfo {}",
+        checkpointTrxnInfo);
     return installCheckpoint(leaderId, checkpointDataDir, checkpointTrxnInfo);
   }
 
@@ -4287,7 +4303,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                    File dbBackup, File dbSnapshotsDir,
                                    File dbSnapshotsBackup) throws IOException {
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
-    Path newDbDir = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    Path newDb = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
     Path newDbSnapshotsDir = Paths.get(checkpointDataDir.toString(), OM_SNAPSHOT_DIR);
     // Now that we have backed up the old DB data, we just need to move the
     // directories in checkpoint_data to the main path
@@ -4301,7 +4317,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // starting up.
       Files.createFile(markerFile);
       // replace the dbDir and dbSnapshotDir
-      replaceDir(dbDir, newDbDir);
+      replaceDir(oldDB, newDb);
       replaceDir(dbSnapshotsDir, newDbSnapshotsDir);
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
