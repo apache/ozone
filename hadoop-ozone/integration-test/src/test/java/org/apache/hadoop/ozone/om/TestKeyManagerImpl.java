@@ -824,12 +824,9 @@ public class TestKeyManagerImpl {
     OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
     // randomly select 3 datanodes
     List<DatanodeDetails> nodeList = new ArrayList<>();
-    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
-        0, null, null, null, null, 0));
-    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
-        1, null, null, null, null, 0));
-    nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
-        2, null, null, null, null, 0));
+    for (int i = 0; i <= 2; i++) {
+      nodeList.add((DatanodeDetails) scm.getClusterMap().getNode(i, null, null, null, null, 0));
+    }
     assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
     assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
