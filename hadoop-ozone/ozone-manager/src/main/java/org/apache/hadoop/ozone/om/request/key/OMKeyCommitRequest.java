@@ -276,9 +276,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .withUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
       }
@@ -299,20 +299,20 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setExpectedDataGeneration(null);
-
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.putAll(KeyValueUtil.getFromProtobuf(
-              commitKeyArgs.getMetadataList())));
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      // Combination
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setExpectedDataGeneration(null)
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                commitKeyArgs.getMetadataList()))
+          .withUpdateID(trxnLogIndex)
+          .setDataSize(commitKeyArgs.getDataSize())
+          .build();
 
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
 
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();
