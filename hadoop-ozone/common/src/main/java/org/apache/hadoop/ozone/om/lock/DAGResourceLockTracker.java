@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 
 final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResource> {
 
-  private final EnumMap<DAGLeveledResource, ThreadLocal<Boolean>> acquiredLocksMap =
+  private final EnumMap<DAGLeveledResource, ThreadLocal<Integer>> acquiredLocksMap =
       new EnumMap<>(DAGLeveledResource.class);
   private final Map<DAGLeveledResource, Set<DAGLeveledResource>> lockDependentAdjacencySet =
       new EnumMap<>(DAGLeveledResource.class);
@@ -90,26 +90,30 @@ final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResourc
   private DAGResourceLockTracker() {
     populateLockDependentAdjacencySet();
     for (DAGLeveledResource dagLeveledResource : DAGLeveledResource.values()) {
-      acquiredLocksMap.put(dagLeveledResource, ThreadLocal.withInitial(() -> Boolean.FALSE));
+      acquiredLocksMap.put(dagLeveledResource, ThreadLocal.withInitial(() -> 0));
     }
+  }
+
+  private void updateAcquiredLockCount(DAGLeveledResource resource, int delta) {
+    acquiredLocksMap.get(resource).set(acquiredLocksMap.get(resource).get() + delta);
   }
 
   @Override
   OMLockDetails lockResource(DAGLeveledResource resource) {
-    acquiredLocksMap.get(resource).set(Boolean.TRUE);
+    updateAcquiredLockCount(resource, 1);
     return super.lockResource(resource);
   }
 
   @Override
   OMLockDetails unlockResource(DAGLeveledResource resource) {
-    acquiredLocksMap.get(resource).set(Boolean.FALSE);
+    updateAcquiredLockCount(resource, -1);
     return super.unlockResource(resource);
   }
 
   @Override
   public boolean canLockResource(DAGLeveledResource resource) {
     for (DAGLeveledResource child : lockDependentAdjacencySet.get(resource)) {
-      if (acquiredLocksMap.get(child).get()) {
+      if (acquiredLocksMap.get(child).get() > 0) {
         return false;
       }
     }
@@ -118,6 +122,6 @@ final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResourc
 
   @Override
   Stream<DAGLeveledResource> getCurrentLockedResources() {
-    return acquiredLocksMap.keySet().stream().filter(dagLeveled -> acquiredLocksMap.get(dagLeveled).get());
+    return acquiredLocksMap.keySet().stream().filter(dagLeveled -> acquiredLocksMap.get(dagLeveled).get() > 0);
   }
 }

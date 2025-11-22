@@ -124,8 +124,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     }
-    Lock resourceWriteLock = lockMap.get(resource).getKey().writeLock();
-    return new PoolBasedHierachicalResourceLock(resourceWriteLock);
+    return new PoolBasedHierachicalResourceLock(resource);
   }
 
   private String getErrorMessage(IOzoneManagerLock.Resource resource) {
@@ -166,14 +165,17 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
    * and UncheckedAutoCloseable interfaces to manage hierarchical resource locks from
    * a shared pool. It ensures proper lock acquisition and release during its lifecycle.
    */
-  private static final class PoolBasedHierachicalResourceLock implements HierarchicalResourceLock,
+  private final class PoolBasedHierachicalResourceLock implements HierarchicalResourceLock,
       UncheckedAutoCloseable {
+    private final DAGLeveledResource resource;
     private final Lock resourceLock;
     private boolean lockAcquired;
 
-    private PoolBasedHierachicalResourceLock(Lock lock) {
-      this.resourceLock = lock;
+    private PoolBasedHierachicalResourceLock(DAGLeveledResource resource) {
+      this.resource = resource;
+      this.resourceLock = lockMap.get(this.resource).getKey().writeLock();
       resourceLock.lock();
+      resourceLockTracker.lockResource(this.resource);
       lockAcquired = true;
     }
 
@@ -186,6 +188,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
     public synchronized void close() {
       if (lockAcquired) {
         resourceLock.unlock();
+        resourceLockTracker.unlockResource(this.resource);
         lockAcquired = false;
       }
     }
@@ -221,6 +224,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
       this.resourceLock = lockMap.get(resource).getKey().readLock();
       this.resourceLock.lock();
       this.keyLock.lock();
+      resourceLockTracker.lockResource(resource);
       this.isLockAcquired = true;
     }
 
@@ -234,6 +238,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
       if (isLockAcquired) {
         this.keyLock.unlock();
         this.resourceLock.unlock();
+        resourceLockTracker.unlockResource(resource);
         operateOnLock(resource, key, (LockReferenceCountPair::decrement));
         isLockAcquired = false;
       }
