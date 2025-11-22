@@ -46,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -58,6 +59,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -68,7 +70,9 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,6 +80,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -102,6 +107,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -121,6 +127,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -162,6 +169,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.ServerCallStreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +181,7 @@ public class KeyValueHandler extends Handler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
+  private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
 
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -2047,6 +2057,125 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public ContainerCommandResponseProto readBlock(
+      ContainerCommandRequestProto request, Container kvContainer,
+      DispatcherContext dispatcherContext,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+
+    if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Only File Per Block is supported", IO_EXCEPTION), request);
+    }
+
+    ContainerCommandResponseProto responseProto = null;
+    if (!request.hasReadBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Block request. trace ID: {}", request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+    try {
+      ReadBlockRequestProto readBlock = request.getReadBlock();
+
+      BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+      // This is a new api the block should always be checked.
+      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      BlockUtils.verifyBCSId(kvContainer, blockID);
+
+      File blockFile = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
+
+      BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+      List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+      // To get the chunksize, check the first chunk. Either there is only 1 chunk and its the largest, or there are
+      // multiple chunks and they are all the same size except the last one.
+      long bytesPerChunk = chunkInfos.get(0).getLen();
+      // The bytes per checksum is stored in the checksum data of each chunk, so check the first chunk as they all
+      // must be the same.
+      ContainerProtos.ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
+      ChecksumData noChecksumChecksumData;
+      int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
+      if (checksumType == ContainerProtos.ChecksumType.NONE) {
+        noChecksumChecksumData = new ChecksumData(checksumType, 0);
+      } else {
+        noChecksumChecksumData = null;
+        bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
+      }
+      final int finalBytesPerChecksum = bytesPerChecksum;
+      // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+      // previous checksum boundary.
+      // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+      // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
+      // it simplifies the code to always do this.
+
+      ServerCallStreamObserver<ContainerCommandResponseProto> serverCallStreamObserver =
+          ((ServerCallStreamObserver<ContainerCommandResponseProto>) streamObserver);
+      Runnable dataStream = new Runnable() {
+
+        private final RandomAccessFile file = new RandomAccessFile(blockFile, "r");
+        private final FileChannel channel = file.getChannel();
+        private final ByteBuffer buffer = ByteBuffer.allocate(finalBytesPerChecksum);
+        private long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % finalBytesPerChecksum;
+
+        @Override
+        public void run() {
+          try {
+            channel.position(adjustedOffset);
+            while (serverCallStreamObserver.isReady() && !serverCallStreamObserver.isCancelled()) {
+              int read = channel.read(buffer);
+              if (read == -1) {
+                serverCallStreamObserver.onCompleted();
+                channel.close();
+                file.close();
+                break;
+              }
+              buffer.flip();
+              ChecksumData checksumData;
+              if (checksumType != ContainerProtos.ChecksumType.NONE) {
+                // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from
+                // and its offset to pull out the correct checksum bytes for each read.
+                int chunkIndex = (int) (adjustedOffset / bytesPerChunk);
+                int chunkOffset = (int) (adjustedOffset % bytesPerChunk);
+                int checksumIndex = chunkOffset / finalBytesPerChecksum;
+                ByteString checksum =
+                    blockData.getChunks().get(chunkIndex).getChecksumData().getChecksums(checksumIndex);
+                checksumData =
+                    new ChecksumData(checksumType, finalBytesPerChecksum, Collections.singletonList(checksum));
+              } else {
+                checksumData = noChecksumChecksumData;
+              }
+              serverCallStreamObserver.onNext(getReadBlockResponse(request, checksumData, buffer, adjustedOffset));
+              adjustedOffset += finalBytesPerChecksum;
+              buffer.clear();
+            }
+            if (serverCallStreamObserver.isCancelled()) {
+              channel.close();
+              file.close();
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reading block file {}", blockFile, e);
+            serverCallStreamObserver.onError(e);
+            try {
+              channel.close();
+              file.close();
+            } catch (IOException ioException) {
+              LOG.error("Error while closing file/channel for block file {}", blockFile, ioException);
+            }
+          }
+        }
+      };
+      serverCallStreamObserver.setOnReadyHandler(dataStream);
+      dataStream.run();
+      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+    } catch (StorageContainerException ex) {
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ioe) {
+      responseProto = ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION), request);
+    }
+    return responseProto;
+  }
+
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
@@ -2084,7 +2213,7 @@ public class KeyValueHandler extends Handler {
       }
       if (nonZero) {
         LOG.error("blocks in rocksDB on container delete: {}",
-            stringBuilder.toString());
+            stringBuilder);
       }
     }
     return nonZero;

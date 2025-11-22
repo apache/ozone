@@ -15,40 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit;
+package org.apache.hadoop.hdds.scm;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientResponseObserver;
 
 /**
- * Enum to define Audit Action types for Datanode.
+ * SPI for streaming reader to set the streaming read response.
  */
-public enum DNAction implements AuditAction {
+public interface StreamingReaderSpi extends ClientResponseObserver
+    <ContainerProtos.ContainerCommandRequestProto, ContainerProtos.ContainerCommandResponseProto> {
 
-  CREATE_CONTAINER,
-  READ_CONTAINER,
-  UPDATE_CONTAINER,
-  DELETE_CONTAINER,
-  LIST_CONTAINER,
-  PUT_BLOCK,
-  GET_BLOCK,
-  DELETE_BLOCK,
-  LIST_BLOCK,
-  READ_CHUNK,
-  DELETE_CHUNK,
-  WRITE_CHUNK,
-  LIST_CHUNK,
-  COMPACT_CHUNK,
-  PUT_SMALL_FILE,
-  GET_SMALL_FILE,
-  CLOSE_CONTAINER,
-  GET_COMMITTED_BLOCK_LENGTH,
-  STREAM_INIT,
-  FINALIZE_BLOCK,
-  ECHO,
-  GET_CONTAINER_CHECKSUM_INFO,
-  READ_BLOCK;
-
-  @Override
-  public String getAction() {
-    return this.toString();
-  }
+  void setStreamingDatanode(DatanodeDetails datanodeDetails);
 
 }

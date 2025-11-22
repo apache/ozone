@@ -39,7 +39,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 /**
@@ -49,8 +52,9 @@ public class TestBlockInputStreamFactoryImpl {
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  @Test
-  public void testNonECGivesBlockInputStream() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testNonECGivesBlockInputStream(boolean streamReadBlockEnabled) throws IOException {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
@@ -62,11 +66,16 @@ public class TestBlockInputStreamFactoryImpl {
     Mockito.when(pipeline.getReplicaIndex(any(DatanodeDetails.class))).thenReturn(1);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
+    clientConfig.setStreamReadBlock(streamReadBlockEnabled);
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), null, null,
             clientConfig);
-    assertInstanceOf(BlockInputStream.class, stream);
+    if (streamReadBlockEnabled) {
+      assertInstanceOf(StreamBlockInputStream.class, stream);
+    } else {
+      assertInstanceOf(BlockInputStream.class, stream);
+    }
     assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     assertEquals(stream.getLength(), blockInfo.getLength());
   }
