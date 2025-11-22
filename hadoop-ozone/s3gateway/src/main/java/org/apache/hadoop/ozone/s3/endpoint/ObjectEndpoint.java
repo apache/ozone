@@ -709,6 +709,7 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws IOException
    * @throws OS3Exception
    */
+  @SuppressWarnings("emptyblock")
   private Response abortMultipartUpload(OzoneVolume volume, String bucket,
                                         String key, String uploadId)
       throws IOException, OS3Exception {
@@ -718,11 +719,13 @@ public class ObjectEndpoint extends EndpointBase {
           key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
+        // NO_SUCH_MULTIPART_UPLOAD_ERROR is not a problem, AWS doesn't throw exception for missing
+        // multipart uploads. AbortMultipartUpload is idempotent - just return 204
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
+      } else {
+        throw ex;
       }
-      throw ex;
     }
     getMetrics().updateAbortMultipartUploadSuccessStats(startNanos);
     return Response
