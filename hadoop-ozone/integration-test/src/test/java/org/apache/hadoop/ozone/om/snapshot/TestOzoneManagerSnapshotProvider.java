@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.base.Preconditions;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -123,8 +124,17 @@ public class TestOzoneManagerSnapshotProvider {
 
     OmSnapshotUtils.createHardLinks(dbCheckpoint.getCheckpointLocation(), true);
 
-    Path omDbLocation = Paths.get(dbCheckpoint.getCheckpointLocation().getParent().toString(),
-        OzoneConsts.OM_CHECKPOINT_DATA_DIR, OzoneConsts.OM_DB_NAME);
+    Preconditions.checkNotNull(dbCheckpoint, "dbCheckpoint is null");
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Preconditions.checkNotNull(checkpointLocation, "checkpointLocation is null");
+    Path parent = checkpointLocation.getParent();
+    Preconditions.checkNotNull(parent, "checkpointLocation parent is null");
+
+    Path omDbLocation = Paths.get(
+        parent.toString(),
+        OzoneConsts.OM_CHECKPOINT_DATA_DIR,
+        OzoneConsts.OM_DB_NAME
+    );
 
     TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
