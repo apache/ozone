@@ -163,19 +163,21 @@ public class OMQuotaRepairRequest extends OMClientRequest {
             VOLUME_LOCK, omVolumeArgs.getVolume()));
         boolean acquiredVolumeLock = getOmLockDetails().isLockAcquired();
         try {
+          OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
           boolean isQuotaReset = false;
           if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInBytes(QUOTA_RESET);
+            builder.setQuotaInBytes(QUOTA_RESET);
             isQuotaReset = true;
           }
           if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInNamespace(QUOTA_RESET);
+            builder.setQuotaInNamespace(QUOTA_RESET);
             isQuotaReset = true;
           }
           if (isQuotaReset) {
+            OmVolumeArgs updated = builder.build();
             metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, omVolumeArgs));
-            volUpdateMap.put(entry.getKey(), omVolumeArgs);
+                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, updated));
+            volUpdateMap.put(entry.getKey(), updated);
           }
         } finally {
           if (acquiredVolumeLock) {

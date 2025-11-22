@@ -174,9 +174,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
               volumeName, null, null);
         }
 
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-        // Decrement volume ref count
-        omVolumeArgs.decRefCount();
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .decRefCount()
+            .build();
 
         // Update omVolumeArgs
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
