@@ -190,7 +190,7 @@ public class TestKeyManagerImpl {
     NodeSchemaManager schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(schemas, false);
     NetworkTopology clusterMap = new NetworkTopologyImpl(schemaManager);
-    nodeManager.getAllNodes().stream().forEach(node -> {
+    nodeManager.getAllNodes().forEach(node -> {
       node.setNetworkName(node.getUuidString());
       clusterMap.add(node);
     });
