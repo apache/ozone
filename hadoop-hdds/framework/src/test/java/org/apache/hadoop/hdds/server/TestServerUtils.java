@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -263,4 +264,73 @@ public class TestServerUtils {
         () -> ServerUtils.getOzoneMetaDirPath(conf));
   }
 
+  /**
+   * Test that SCM, OM, and Datanode colocated on the same host with only
+   * ozone.metadata.dirs configured don't conflict with Ratis directories.
+   */
+  @Test
+  public void testColocatedComponentsWithSharedMetadataDir() {
+    final File metaDir = new File(folder.toFile(), "sharedMetaDir");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Only configure ozone.metadata.dirs (the fallback config)
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      assertFalse(metaDir.exists());
+
+      // Test Ratis directories - each component should get its own with flat naming
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+
+      // Verify Ratis directories use flat naming pattern (component.ratis)
+      assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
+      assertEquals(new File(metaDir, "om.ratis").getPath(), omRatisDir);
+      assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
+
+      // Verify all Ratis directories are different
+      assertNotEquals(scmRatisDir, omRatisDir);
+      assertNotEquals(scmRatisDir, dnRatisDir);
+      assertNotEquals(omRatisDir, dnRatisDir);
+
+      // Verify the base metadata dir exists
+      assertTrue(metaDir.exists());
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  /**
+   * Test backward compatibility: old shared /ratis directory should be used
+   * when it exists and is non-empty (simulating upgrade from version 2.0.0).
+   */
+  @Test
+  public void testBackwardCompatibilityWithOldSharedRatisDir() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create old shared ratis directory with some files (simulating existing data)
+      assertTrue(oldSharedRatisDir.mkdirs());
+      File testFile = new File(oldSharedRatisDir, "test-file");
+      assertTrue(testFile.createNewFile());
+
+      // Test that all components use the old shared location
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+
+      // All should use the old shared location
+      assertEquals(oldSharedRatisDir.getPath(), scmRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), omRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), dnRatisDir);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
 }

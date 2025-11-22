@@ -472,7 +472,7 @@ public final class OzoneManagerRatisUtils {
     String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+      storageDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
     }
     return storageDir;
   }
