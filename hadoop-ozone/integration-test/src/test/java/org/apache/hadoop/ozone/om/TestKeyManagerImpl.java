@@ -56,7 +56,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
-import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -169,6 +168,8 @@ public class TestKeyManagerImpl {
   private static final String BUCKET2_NAME = "bucket2";
   private static final String VERSIONED_BUCKET_NAME = "versionedbucket1";
   private static final String VOLUME_NAME = "vol1";
+  private static final ResolvedBucket RESOLVED_BUCKET = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
+      VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
   private static OzoneManagerProtocol writeClient;
   private static OzoneClient rpcClient;
   private static OzoneManager om;
@@ -783,7 +784,7 @@ public class TestKeyManagerImpl {
 
     createKeyWithPipeline(keyArgs);
 
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET, null);
     assertEquals(key.getKeyName(), keyName);
     Pipeline keyPipeline =
         key.getLatestVersionLocations().getLocationList().get(0).getPipeline();
@@ -794,25 +795,25 @@ public class TestKeyManagerImpl {
     assertNotEquals(follower1, follower2);
 
     // lookup key, leader as client
-    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET,
         leader.getIpAddress());
     assertEquals(leader, key1.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower1 as client
-    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET,
         follower1.getIpAddress());
     assertEquals(follower1, key2.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower2 as client
-    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET,
         follower2.getIpAddress());
     assertEquals(follower2, key3.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, random node as client
-    OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+    OmKeyInfo key4 = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET,
         "/d=default-drack/127.0.0.1");
     assertThat(keyPipeline.getNodes())
         .containsAll(key4.getLatestVersionLocations()
@@ -855,13 +856,6 @@ public class TestKeyManagerImpl {
         Arrays.asList(containerID))).thenReturn(containerWithPipelines);
   }
 
-  @Nonnull
-  private ResolvedBucket resolvedBucket() {
-    ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
-        VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
-    return bucket;
-  }
-
   @Test
   public void testLatestLocationVersion() throws IOException {
     String keyName = RandomStringUtils.secure().nextAlphabetic(5);
@@ -898,13 +892,13 @@ public class TestKeyManagerImpl {
 
   private void assertDoesNotExist(OmKeyArgs keyArgs) {
     // lookup for a non-existent key
-    OMException ex = assertThrows(OMException.class, () -> keyManager.lookupKey(keyArgs, resolvedBucket(), null));
+    OMException ex = assertThrows(OMException.class, () -> keyManager.lookupKey(keyArgs, RESOLVED_BUCKET, null));
     assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
   }
 
   private void assertKeyLocations(OmKeyArgs keyArgs, int expectedLocations) throws IOException {
     // Test lookupKey
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, RESOLVED_BUCKET, null);
     assertEquals(expectedLocations, key.getKeyLocationVersions().size());
 
     // Test ListStatus
@@ -1493,7 +1487,7 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setMultipartUploadPartNumber(0)
             .build();
-    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
     assertEquals(keyName, omKeyInfo.getKeyName());
     assertNotNull(omKeyInfo.getLatestVersionLocations());
 
@@ -1519,7 +1513,7 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setMultipartUploadPartNumber(3)
             .build();
-    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
     assertEquals(keyName, omKeyInfo.getKeyName());
     assertNotNull(omKeyInfo.getLatestVersionLocations());
 
@@ -1543,7 +1537,7 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setMultipartUploadPartNumber(99)
             .build();
-    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
     assertEquals(keyName, omKeyInfo.getKeyName());
     assertNotNull(omKeyInfo.getLatestVersionLocations());
 
