@@ -4307,7 +4307,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Path newDbSnapshotsDir = Paths.get(checkpointDataDir.toString(), OM_SNAPSHOT_DIR);
     // Now that we have backed up the old DB data, we just need to move the
     // directories in checkpoint_data to the main path
-    // 1. replace dbDir with newDbDir
+    // 1. replace oldDb with newDb
     // 2. replace dbSnapshotsDir with newDbSnapshotsDir
     try {
       // Create a Transient Marker file. This file will be deleted if the

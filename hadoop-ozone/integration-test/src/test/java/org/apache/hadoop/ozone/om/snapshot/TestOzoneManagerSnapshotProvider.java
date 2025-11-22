@@ -123,8 +123,8 @@ public class TestOzoneManagerSnapshotProvider {
 
     OmSnapshotUtils.createHardLinks(dbCheckpoint.getCheckpointLocation(), true);
 
-    Path omDbLocation = Paths.get(dbCheckpoint.getCheckpointLocation().toString(), OzoneConsts.OM_CHECKPOINT_DATA_DIR,
-        OzoneConsts.OM_DB_NAME);
+    Path omDbLocation = Paths.get(dbCheckpoint.getCheckpointLocation().getParent().toString(),
+        OzoneConsts.OM_CHECKPOINT_DATA_DIR, OzoneConsts.OM_DB_NAME);
 
     TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
