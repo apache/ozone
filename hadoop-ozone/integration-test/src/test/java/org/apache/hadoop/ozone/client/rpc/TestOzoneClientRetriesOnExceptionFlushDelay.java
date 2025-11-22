@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -74,13 +73,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
   private String keyString;
   private XceiverClientManager xceiverClientManager;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
@@ -120,9 +112,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

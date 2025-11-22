@@ -23,7 +23,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -48,6 +47,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
@@ -620,23 +620,21 @@ public class DatanodeStateMachine implements Closeable {
    * (single) thread, or queues it in the handler where a thread pool executor
    * will process it. The total commands queued in the datanode is therefore
    * the sum those in the CommandQueue and the dispatcher queues.
-   * @return A map containing a count for each known command.
+   * @return EnumCounters containing a count for each known command.
    */
-  public Map<SCMCommandProto.Type, Integer> getQueuedCommandCount() {
-    // This is a "sparse map" - there is not guaranteed to be an entry for
-    // every command type
-    Map<SCMCommandProto.Type, Integer> commandQSummary =
+  public EnumCounters<SCMCommandProto.Type> getQueuedCommandCount() {
+    // Get command counts from StateContext command queue
+    EnumCounters<SCMCommandProto.Type> commandQSummary =
         context.getCommandQueueSummary();
-    // This map will contain an entry for every command type which is registered
+    // This EnumCounters will contain an entry for every command type which is registered
     // with the dispatcher, and that should be all command types the DN knows
-    // about. Any commands with nothing in the queue will return a count of
+    // about. Any commands with nothing in the queue will have a count of
     // zero.
-    Map<SCMCommandProto.Type, Integer> dispatcherQSummary =
+    EnumCounters<SCMCommandProto.Type> dispatcherQSummary =
         commandDispatcher.getQueuedCommandCount();
-    // Merge the "sparse" map into the fully populated one returning a count
+    // Merge the two EnumCounters into the fully populated one having a count
     // for all known command types.
-    commandQSummary.forEach((k, v)
-        -> dispatcherQSummary.merge(k, v, Integer::sum));
+    dispatcherQSummary.add(commandQSummary);
     return dispatcherQSummary;
   }
 

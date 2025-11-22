@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -40,6 +41,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,10 +71,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -347,7 +351,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneConfiguration conf = getConf();
 
     Set<Path> snapshotPaths = new HashSet<>();
-
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     // get snapshotInfo entries
     OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
@@ -359,11 +364,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
-        Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        if (waitForDir) {
-          waitForDirToExist(path);
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+                 snapshotLocalDataManager.getOmSnapshotLocalDataMeta(entry.getValue())) {
+          Path path = Paths.get(getSnapshotPath(conf, entry.getValue(), snapMetaProvider.getMeta().getVersion()));
+          if (waitForDir) {
+            waitForDirToExist(path);
+          }
+          snapshotPaths.add(path);
         }
-        snapshotPaths.add(path);
       }
     } finally {
       checkpointMetadataManager.stop();
@@ -528,8 +536,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Check if the files are hard linked to each other.
       // Note comparison must be done against srcPath, because
       // destPath may only exist on Follower.
-      if (OmSnapshotUtils.getINode(srcPath).equals(
-          OmSnapshotUtils.getINode(file))) {
+      if (getINode(srcPath).equals(getINode(file))) {
         return destPath;
       } else {
         LOG.info("Found non linked sst files with the same name: {}, {}",
@@ -679,21 +686,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
+    public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
       // First lock all the handlers.
+      List<UncheckedAutoCloseable> acquiredLocks = new ArrayList<>(locks.size());
       for (BootstrapStateHandler.Lock lock : locks) {
-        lock.lock();
+        acquiredLocks.add(lock.acquireWriteLock());
       }
 
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
-      return this;
+      return () -> acquiredLocks.forEach(UncheckedAutoCloseable::close);
     }
 
     @Override
-    public void unlock() {
-      locks.forEach(BootstrapStateHandler.Lock::unlock);
+    public UncheckedAutoCloseable acquireReadLock() {
+      throw new UnsupportedOperationException("Read locks are not supported for OMDBCheckpointServlet");
     }
   }
 }

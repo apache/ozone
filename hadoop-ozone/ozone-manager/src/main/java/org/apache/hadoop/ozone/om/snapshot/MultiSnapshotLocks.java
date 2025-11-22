@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -39,11 +40,16 @@ public class MultiSnapshotLocks {
   private final boolean writeLock;
   private OMLockDetails lockDetails;
 
+  @VisibleForTesting
   public MultiSnapshotLocks(IOzoneManagerLock lock, Resource resource, boolean writeLock) {
+    this(lock, resource, writeLock, 0);
+  }
+
+  public MultiSnapshotLocks(IOzoneManagerLock lock, Resource resource, boolean writeLock, int maxNumberOfLocks) {
     this.writeLock = writeLock;
     this.resource = resource;
     this.lock = lock;
-    this.objectLocks = new ArrayList<>();
+    this.objectLocks = new ArrayList<>(maxNumberOfLocks);
     this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 

@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -148,8 +149,8 @@ public class TestSnapshotRequestAndResponse {
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
-        ozoneManager);
+    omMetadataManager = spy(new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager));
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
         .thenAnswer(i -> new ResolvedBucket(i.getArgument(0),
@@ -225,7 +226,7 @@ public class TestSnapshotRequestAndResponse {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
+        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotInfo.getSnapshotId(), 0));
     // Check the DB is still there
     assertTrue(Files.exists(snapshotDirPath));
     return snapshotDirPath;
@@ -276,5 +277,4 @@ public class TestSnapshotRequestAndResponse {
         })
         .collect(Collectors.toList());
   }
-
 }

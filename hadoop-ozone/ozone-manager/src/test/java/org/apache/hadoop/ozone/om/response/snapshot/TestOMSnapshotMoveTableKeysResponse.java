@@ -17,8 +17,19 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
@@ -107,13 +119,24 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testMoveTableKeysToNextSnapshot(boolean nextSnapshotExists) throws Exception {
+    IOzoneManagerLock lock = spy(getOmMetadataManager().getLock());
+    when(getOmMetadataManager().getLock()).thenReturn(lock);
     OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(getOmMetadataManager(), getVolumeName(), getBucketName());
     createSnapshots(nextSnapshotExists, omBucketInfo.getObjectID());
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = getOmSnapshotManager().getSnapshot(
         getVolumeName(), getBucketName(), snapshotName1);
          UncheckedAutoCloseableSupplier<OmSnapshot> snapshot2 = nextSnapshotExists ? getOmSnapshotManager().getSnapshot(
              getVolumeName(), getBucketName(), snapshotName2) : null) {
-
+      List<List<String>> expectedSnapshotIdLocks =
+          Arrays.asList(Collections.singletonList(snapshot1.get().getSnapshotID().toString()),
+          nextSnapshotExists ? Collections.singletonList(snapshot2.get().getSnapshotID().toString()) : null);
+      List<List<String>> locks = new ArrayList<>();
+      doAnswer(i -> {
+        for (String[] id : (Collection<String[]>)i.getArgument(1)) {
+          locks.add(id == null ? null : Arrays.stream(id).collect(Collectors.toList()));
+        }
+        return i.callRealMethod();
+      }).when(lock).acquireReadLocks(eq(SNAPSHOT_DB_CONTENT_LOCK), anyList());
       OmSnapshot snapshot = snapshot1.get();
       List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> deletedTable = new ArrayList<>();
       List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> deletedDirTable = new ArrayList<>();
@@ -144,6 +167,7 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
         response.addToDBBatch(getOmMetadataManager(), batchOperation);
         getOmMetadataManager().getStore().commitBatchOperation(batchOperation);
       }
+      assertEquals(expectedSnapshotIdLocks, locks);
       Assertions.assertTrue(snapshot.getMetadataManager().getDeletedTable().isEmpty());
       Assertions.assertTrue(snapshot.getMetadataManager().getDeletedDirTable().isEmpty());
       Assertions.assertTrue(snapshot.getMetadataManager().getSnapshotRenamedTable().isEmpty());
@@ -153,7 +177,7 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       nextMetadataManager.getDeletedTable().iterator().forEachRemaining(entry -> {
         count.getAndIncrement();
         int maxCount = count.get() >= 6 && count.get() <= 8 ? 20 : 10;
-        Assertions.assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
+        assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
         List<Long> versions = entry.getValue().getOmKeyInfoList().stream().map(OmKeyInfo::getKeyLocationVersions)
             .map(omKeyInfo -> omKeyInfo.get(0).getVersion()).collect(Collectors.toList());
         List<Long> expectedVersions = new ArrayList<>();
@@ -161,20 +185,20 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
           expectedVersions.addAll(LongStream.range(10, 20).boxed().collect(Collectors.toList()));
         }
         expectedVersions.addAll(LongStream.range(0, 10).boxed().collect(Collectors.toList()));
-        Assertions.assertEquals(expectedVersions, versions);
+        assertEquals(expectedVersions, versions);
       });
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
       count.set(0);
 
       nextMetadataManager.getDeletedDirTable().iterator().forEachRemaining(entry -> count.getAndIncrement());
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
       count.set(0);
       nextMetadataManager.getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
         String expectedValue = renameEntries.getOrDefault(entry.getKey(), entry.getValue());
-        Assertions.assertEquals(expectedValue, entry.getValue());
+        assertEquals(expectedValue, entry.getValue());
         count.getAndIncrement();
       });
-      Assertions.assertEquals(15, count.get());
+      assertEquals(15, count.get());
     }
 
   }

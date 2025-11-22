@@ -144,9 +144,6 @@ public class TestECKeyOutputStream {
         .applyTo(configuration);
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeAll
   protected static void init() throws Exception {
     chunkSize = 1024 * 1024;
@@ -168,9 +165,6 @@ public class TestECKeyOutputStream {
     initInputChunks();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

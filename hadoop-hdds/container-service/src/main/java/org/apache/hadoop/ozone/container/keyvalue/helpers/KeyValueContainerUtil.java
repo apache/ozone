@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector.getAggregatePendingDelete;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -30,7 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -43,9 +44,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.PendingDelete;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -317,58 +320,24 @@ public final class KeyValueContainerUtil {
       throws IOException {
     Table<String, Long> metadataTable = store.getMetadataTable();
 
-    // Set pending deleted block count.
-    final long blockPendingDeletion;
-    Long pendingDeleteBlockCount =
-        metadataTable.get(kvContainerData
-            .getPendingDeleteBlockCountKey());
-    if (pendingDeleteBlockCount != null) {
-      blockPendingDeletion = pendingDeleteBlockCount;
-    } else {
-      // Set pending deleted block count.
-      LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
-      MetadataKeyFilters.KeyPrefixFilter filter =
-          kvContainerData.getDeletingBlockKeyFilter();
-      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
-          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
-          // TODO: add a count() method to avoid creating a list
-          .size();
-    }
-    // Set delete transaction id.
-    Long delTxnId =
-        metadataTable.get(kvContainerData.getLatestDeleteTxnKey());
+    // Set pending deleted block count and bytes
+    PendingDelete pendingDeletions = populatePendingDeletionMetadata(kvContainerData, metadataTable, store);
+
+    // Set delete transaction id
+    Long delTxnId = metadataTable.get(kvContainerData.getLatestDeleteTxnKey());
     if (delTxnId != null) {
-      kvContainerData
-          .updateDeleteTransactionId(delTxnId);
+      kvContainerData.updateDeleteTransactionId(delTxnId);
     }
 
-    // Set BlockCommitSequenceId.
-    Long bcsId = metadataTable.get(
-        kvContainerData.getBcsIdKey());
+    // Set BlockCommitSequenceId
+    Long bcsId = metadataTable.get(kvContainerData.getBcsIdKey());
     if (bcsId != null) {
-      kvContainerData
-          .updateBlockCommitSequenceId(bcsId);
+      kvContainerData.updateBlockCommitSequenceId(bcsId);
     }
 
-    // Set bytes used.
-    // commitSpace for Open Containers relies on usedBytes
-    final long blockBytes;
-    final long blockCount;
-    final Long metadataTableBytesUsed = metadataTable.get(kvContainerData.getBytesUsedKey());
-    // Set block count.
-    final Long metadataTableBlockCount = metadataTable.get(kvContainerData.getBlockCountKey());
-    if (metadataTableBytesUsed != null && metadataTableBlockCount != null) {
-      blockBytes = metadataTableBytesUsed;
-      blockCount = metadataTableBlockCount;
-    } else {
-      LOG.warn("Missing bytesUsed={} or blockCount={} from {}: recalculate them from block table",
-          metadataTableBytesUsed, metadataTableBlockCount, metadataTable.getName());
-      final ContainerData.BlockByteAndCounts b = getUsedBytesAndBlockCount(store, kvContainerData);
-      blockBytes = b.getBytes();
-      blockCount = b.getCount();
-    }
-
-    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount, blockPendingDeletion);
+    // Set block statistics
+    populateBlockStatistics(kvContainerData, metadataTable, store);
+    kvContainerData.getStatistics().setBlockPendingDeletion(pendingDeletions.getCount(), pendingDeletions.getBytes());
 
     // If the container is missing a chunks directory, possibly due to the
     // bug fixed by HDDS-6235, create it here.
@@ -390,6 +359,78 @@ public final class KeyValueContainerUtil {
 
     // Load finalizeBlockLocalIds for container in memory.
     populateContainerFinalizeBlock(kvContainerData, store);
+  }
+
+  private static PendingDelete populatePendingDeletionMetadata(
+      KeyValueContainerData kvContainerData, Table<String, Long> metadataTable,
+      DatanodeStore store) throws IOException {
+
+    Long pendingDeletionBlockBytes = metadataTable.get(kvContainerData.getPendingDeleteBlockBytesKey());
+    Long pendingDeleteBlockCount = metadataTable.get(kvContainerData.getPendingDeleteBlockCountKey());
+
+    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      return handlePreDataDistributionFeature(pendingDeleteBlockCount, metadataTable, store, kvContainerData);
+    } else if (pendingDeleteBlockCount != null) {
+      return handlePostDataDistributionFeature(pendingDeleteBlockCount, pendingDeletionBlockBytes,
+          metadataTable, store, kvContainerData);
+    } else {
+      LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
+          metadataTable.getName());
+      return getAggregatePendingDelete(store, kvContainerData, kvContainerData.getSchemaVersion());
+    }
+  }
+
+  private static PendingDelete handlePreDataDistributionFeature(
+      Long pendingDeleteBlockCount, Table<String, Long> metadataTable,
+      DatanodeStore store, KeyValueContainerData kvContainerData) throws IOException {
+
+    if (pendingDeleteBlockCount != null) {
+      return new PendingDelete(pendingDeleteBlockCount, 0L);
+    } else {
+      LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
+          metadataTable.getName());
+      return getAggregatePendingDelete(store, kvContainerData, kvContainerData.getSchemaVersion());
+    }
+  }
+
+  private static PendingDelete handlePostDataDistributionFeature(
+      Long pendingDeleteBlockCount, Long pendingDeletionBlockBytes,
+      Table<String, Long> metadataTable, DatanodeStore store,
+      KeyValueContainerData kvContainerData) throws IOException {
+
+    if (pendingDeletionBlockBytes != null) {
+      return new PendingDelete(pendingDeleteBlockCount, pendingDeletionBlockBytes);
+    } else {
+      LOG.warn("Missing pendingDeleteBlockSize from {}: recalculate them from delete txn tables",
+          metadataTable.getName());
+      PendingDelete pendingDeletions = getAggregatePendingDelete(
+          store, kvContainerData, kvContainerData.getSchemaVersion());
+      return new PendingDelete(pendingDeleteBlockCount, pendingDeletions.getBytes());
+    }
+  }
+
+  private static void populateBlockStatistics(
+      KeyValueContainerData kvContainerData, Table<String, Long> metadataTable,
+      DatanodeStore store) throws IOException {
+
+    final Long metadataTableBytesUsed = metadataTable.get(kvContainerData.getBytesUsedKey());
+    final Long metadataTableBlockCount = metadataTable.get(kvContainerData.getBlockCountKey());
+
+    final long blockBytes;
+    final long blockCount;
+
+    if (metadataTableBytesUsed != null && metadataTableBlockCount != null) {
+      blockBytes = metadataTableBytesUsed;
+      blockCount = metadataTableBlockCount;
+    } else {
+      LOG.warn("Missing bytesUsed={} or blockCount={} from {}: recalculate them from block table",
+          metadataTableBytesUsed, metadataTableBlockCount, metadataTable.getName());
+      final ContainerData.BlockByteAndCounts blockData = getUsedBytesAndBlockCount(store, kvContainerData);
+      blockBytes = blockData.getBytes();
+      blockCount = blockData.getCount();
+    }
+
+    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount);
   }
 
   /**
@@ -437,7 +478,7 @@ public final class KeyValueContainerUtil {
         usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0, 0);
   }
 
   public static long getBlockLengthTryCatch(BlockData block) {
