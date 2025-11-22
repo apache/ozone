@@ -31,9 +31,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -109,7 +112,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   public OzoneManagerLock(ConfigurationSource conf) {
     omLockMetrics = OMLockMetrics.create();
-    this.resourcelockMap = ImmutableMap.of(LeveledResource.class, getLeveledLocks(conf), FlatResource.class,
+    this.resourcelockMap = ImmutableMap.of(LeveledResource.class, getLeveledLocks(conf), DAGLeveledResource.class,
         getFlatLocks(conf));
   }
 
@@ -124,11 +127,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockManager> getFlatLocks(
       ConfigurationSource conf) {
-    Map<FlatResource, Striped<ReadWriteLock>> stripedLockMap = new EnumMap<>(FlatResource.class);
-    for (FlatResource r : FlatResource.values()) {
+    Map<DAGLeveledResource, Striped<ReadWriteLock>> stripedLockMap = new EnumMap<>(DAGLeveledResource.class);
+    for (DAGLeveledResource r : DAGLeveledResource.values()) {
       stripedLockMap.put(r, createStripeLock(r, conf));
     }
-    return Pair.of(Collections.unmodifiableMap(stripedLockMap), new FlatResourceLockManager());
+    return Pair.of(Collections.unmodifiableMap(stripedLockMap), new DAGResourceLockManager());
   }
 
   private Striped<ReadWriteLock> createStripeLock(Resource r,
@@ -601,36 +604,97 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private static final class FlatResourceLockManager extends ResourceLockManager<FlatResource> {
+  private static final class DAGResourceLockManager extends ResourceLockManager<DAGLeveledResource> {
 
-    private EnumMap<FlatResource, ThreadLocal<Boolean>> acquiredLocksMap = new EnumMap<>(FlatResource.class);
+    private final EnumMap<DAGLeveledResource, ThreadLocal<Boolean>> acquiredLocksMap =
+        new EnumMap<>(DAGLeveledResource.class);
+    private final Map<DAGLeveledResource, Set<DAGLeveledResource>> lockDependentAdjacencySet =
+        new EnumMap<>(DAGLeveledResource.class);
 
-    private FlatResourceLockManager() {
-      for (FlatResource flatResource : FlatResource.values()) {
-        acquiredLocksMap.put(flatResource, ThreadLocal.withInitial(() -> Boolean.FALSE));
+    /**
+     * Performs a depth-first traversal (DFS) on the directed acyclic graph (DAG)
+     * of {@link DAGLeveledResource} objects, processing dependencies and updating
+     * the lock-dependent adjacency set with resource relationships.
+     *
+     * @param resource the DAGLeveledResource instance to start the traversal from
+     * @param stack a stack to manage the DFS traversal state
+     * @param visited a set to keep track of resources that have already been visited
+     *                during the traversal
+     */
+    private void dfs(DAGLeveledResource resource, Stack<DAGLeveledResource> stack, Set<DAGLeveledResource> visited) {
+      if (visited.contains(resource)) {
+        return;
+      }
+      if (!stack.isEmpty()) {
+        throw new IllegalStateException("Stack is not empty while beginning to traverse the DAG for resource :"
+            + resource);
+      }
+      stack.push(resource);
+      while (!stack.isEmpty()) {
+        DAGLeveledResource current = stack.peek();
+        if (!visited.contains(current)) {
+          visited.add(current);
+          for (DAGLeveledResource child : current.getChildren()) {
+            stack.push(child);
+          }
+        } else {
+          if (!lockDependentAdjacencySet.containsKey(current)) {
+            Set<DAGLeveledResource> adjacentResources = null;
+            for (DAGLeveledResource child : current.getChildren()) {
+              if (adjacentResources == null) {
+                adjacentResources = new HashSet<>();
+              }
+              adjacentResources.add(child);
+              adjacentResources.addAll(lockDependentAdjacencySet.get(child));
+            }
+            lockDependentAdjacencySet.put(current,
+                adjacentResources == null ? Collections.emptySet() : adjacentResources);
+          }
+          stack.pop();
+        }
+      }
+    }
+
+    private void populateLockDependentAdjacencySet() {
+      Set<DAGLeveledResource> visited = new HashSet<>();
+      Stack<DAGLeveledResource> stack = new Stack<>();
+      for (DAGLeveledResource resource : DAGLeveledResource.values()) {
+        dfs(resource, stack, visited);
+      }
+    }
+
+    private DAGResourceLockManager() {
+      populateLockDependentAdjacencySet();
+      for (DAGLeveledResource dagLeveledResource : DAGLeveledResource.values()) {
+        acquiredLocksMap.put(dagLeveledResource, ThreadLocal.withInitial(() -> Boolean.FALSE));
       }
     }
 
     @Override
-    OMLockDetails lockResource(FlatResource resource) {
+    OMLockDetails lockResource(DAGLeveledResource resource) {
       acquiredLocksMap.get(resource).set(Boolean.TRUE);
       return super.lockResource(resource);
     }
 
     @Override
-    OMLockDetails unlockResource(FlatResource resource) {
+    OMLockDetails unlockResource(DAGLeveledResource resource) {
       acquiredLocksMap.get(resource).set(Boolean.FALSE);
       return super.unlockResource(resource);
     }
 
     @Override
-    public boolean canLockResource(FlatResource resource) {
+    public boolean canLockResource(DAGLeveledResource resource) {
+      for (DAGLeveledResource child : lockDependentAdjacencySet.get(resource)) {
+        if (acquiredLocksMap.get(child).get()) {
+          return false;
+        }
+      }
       return true;
     }
 
     @Override
-    Stream<FlatResource> getCurrentLockedResources() {
-      return acquiredLocksMap.keySet().stream().filter(flatResource -> acquiredLocksMap.get(flatResource).get());
+    Stream<DAGLeveledResource> getCurrentLockedResources() {
+      return acquiredLocksMap.keySet().stream().filter(dagLeveled -> acquiredLocksMap.get(dagLeveled).get());
     }
   }
 

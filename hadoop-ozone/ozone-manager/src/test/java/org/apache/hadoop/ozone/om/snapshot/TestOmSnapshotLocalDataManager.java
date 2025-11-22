@@ -83,7 +83,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
@@ -211,22 +211,23 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   private String getReadLockMessageAcquire(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getReadLockMessageRelease(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageAcquire(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageRelease(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
-  private HierarchicalResourceLock getHierarchicalResourceLock(FlatResource resource, String key, boolean isWriteLock) {
+  private HierarchicalResourceLock getHierarchicalResourceLock(DAGLeveledResource resource, String key,
+      boolean isWriteLock) {
     return new HierarchicalResourceLock() {
       @Override
       public boolean isLockAcquired() {
@@ -247,12 +248,12 @@ public class TestOmSnapshotLocalDataManager {
   private void mockLockManager() throws IOException {
     lockCapturor.clear();
     reset(lockManager);
-    when(lockManager.acquireReadLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireReadLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(READ_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), false);
         });
-    when(lockManager.acquireWriteLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireWriteLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(WRITE_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), true);
