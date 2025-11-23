@@ -683,14 +683,19 @@ public class TestIamSessionPolicyResolver {
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Set<IOzoneObj> readAndListObject = objSet(bucket("bucket1"));
+    final Set<IOzoneObj> readVolume = objSet(volume());
 
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)));
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)),
+        new AssumeRoleRequest.OzoneGrant(readVolume, acls(READ)));
 
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)));
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)),
+        new AssumeRoleRequest.OzoneGrant(readVolume, acls(READ)));
   }
 
   @Test
@@ -699,6 +704,7 @@ public class TestIamSessionPolicyResolver {
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "bucket1*", null, null));
     final Set<IOzoneObj> writeAclObject = objSet(bucket("bucket1*"));
+    final Set<IOzoneObj> readVolume = objSet(volume());
 
     expectIllegalArgumentException(
         () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
@@ -706,7 +712,9 @@ public class TestIamSessionPolicyResolver {
 
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(writeAclObject, acls(WRITE_ACL)));
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(writeAclObject, acls(WRITE_ACL)),
+        new AssumeRoleRequest.OzoneGrant(readVolume, acls(READ)));
   }
 
   @Test
@@ -714,15 +722,15 @@ public class TestIamSessionPolicyResolver {
     final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_EXACT, "bucket1", null, "key.txt"));
-    final Set<IOzoneObj> readObject = objSet(key("bucket1", "key.txt"));
+    final Set<IOzoneObj> readObjects = objSet(key("bucket1", "key.txt"), bucket("bucket1"), volume());
 
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(readObjects, acls(READ)));
 
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(readObjects, acls(READ)));
   }
 
   @Test
@@ -731,10 +739,10 @@ public class TestIamSessionPolicyResolver {
 
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "prefix/", null));
-    final Set<IOzoneObj> nativeReadObject = objSet(prefix("bucket1", "prefix/"));
+    final Set<IOzoneObj> nativeReadObjects = objSet(prefix("bucket1", "prefix/"), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObject, acls(READ)));
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObjects, acls(READ)));
 
     expectIllegalArgumentException(
         () -> createPathsAndPermissions(VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet()),
@@ -751,10 +759,10 @@ public class TestIamSessionPolicyResolver {
         () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
         "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
 
-    final Set<IOzoneObj> rangerReadObject = objSet(key("bucket1", "prefix/*"));
+    final Set<IOzoneObj> rangerReadObjects = objSet(key("bucket1", "prefix/*"), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
-    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObject, acls(READ)));
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObjects, acls(READ)));
   }
 
   @Test
@@ -764,19 +772,19 @@ public class TestIamSessionPolicyResolver {
 
     final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", null, null));
-    final Set<IOzoneObj> nativeReadObject = objSet(
-        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"));
+    final Set<IOzoneObj> nativeReadObjects = objSet(
+        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, nativeResourceSpecs, prefixes);
-    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObject, acls(READ)));
+    assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObjects, acls(READ)));
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", null, null));
-    final Set<IOzoneObj> rangerReadObject = objSet(
-        key("bucket1", "folder1/"), key("bucket1", "folder2/"));
+    final Set<IOzoneObj> rangerReadObjects = objSet(
+        key("bucket1", "folder1/"), key("bucket1", "folder2/"), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, rangerResourceSpecs, prefixes);
-    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObject, acls(READ)));
+    assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObjects, acls(READ)));
   }
 
   // TODO sts - add more createPathsAndPermissions tests in the next PR

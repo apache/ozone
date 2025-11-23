@@ -483,6 +483,9 @@ public final class IamSessionPolicyResolver {
   private static void processResourceSpecWithActions(String volumeName, AuthorizerType authorizerType,
       Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Set<String> prefixes,
       Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+
+    addHierarchicalReadAclsIfNeeded(volumeName, authorizerType, mappedS3Actions, resourceSpec, objToAclsMap);
+
     // Process based on ResourceSpec type
     switch (resourceSpec.type) {
     case ANY:
@@ -517,6 +520,28 @@ public final class IamSessionPolicyResolver {
       break;
     default:
       throw new IllegalStateException("Unexpected resourceSpec type found: " + resourceSpec.type);
+    }
+  }
+
+  private static void addHierarchicalReadAclsIfNeeded(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    final boolean hasBucketActions = mappedS3Actions.stream()
+        .anyMatch(a -> a.kind == ActionKind.BUCKET || a == S3Action.ALL_S3);
+    final boolean hasObjectActions = mappedS3Actions.stream()
+        .anyMatch(a -> a.kind == ActionKind.OBJECT || a == S3Action.ALL_S3);
+
+    // Hierarchical READ addition (object actions require READ on the bucket and READ on the volume in addition
+    // to the object ACL(s); bucket actions require READ on the volume in addition to the bucket ACL(s)).  The Set
+    // data structure will deduplicate if these hierarchical actions are already present
+    if (hasObjectActions) {
+      // Volume READ
+      addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(ACLType.READ));
+      // Bucket READ (use resource bucket or "*" for ANY)
+      final String bucketForParent = resourceSpec.type == S3ResourceType.ANY ? "*" : resourceSpec.bucket;
+      addAclsForObj(objToAclsMap, bucketObj(volumeName, bucketForParent), EnumSet.of(ACLType.READ));
+    } else if (hasBucketActions) {
+      // Volume READ
+      addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(ACLType.READ));
     }
   }
 
