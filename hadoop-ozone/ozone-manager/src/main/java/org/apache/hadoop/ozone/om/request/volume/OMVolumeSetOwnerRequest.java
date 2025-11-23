@@ -151,15 +151,15 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           maxUserVolumeCount, transactionLogIndex);
 
       // Set owner with new owner name.
-      omVolumeArgs.setOwnerName(newOwner);
-      omVolumeArgs = omVolumeArgs.toBuilder()
-          .withUpdateID(transactionLogIndex)
-          .build();
-
       // Update modificationTime.
-      omVolumeArgs.setModificationTime(
-          setVolumePropertyRequest.getModificationTime());
-
+      omVolumeArgs.assertMonotonicUpdateID(transactionLogIndex);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .setOwnerName(newOwner)
+          .setUpdateID(transactionLogIndex)
+          .setModificationTime(
+              setVolumePropertyRequest.getModificationTime())
+          .build();
+          
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),

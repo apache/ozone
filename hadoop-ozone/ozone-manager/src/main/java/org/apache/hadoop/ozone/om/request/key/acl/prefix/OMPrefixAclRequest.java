@@ -90,8 +90,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
       if (omPrefixInfo != null) {
+        omPrefixInfo.assertMonotonicUpdateID(trxnLogIndex);
         omPrefixInfo = omPrefixInfo.toBuilder()
-            .withUpdateID(trxnLogIndex)
+            .setUpdateID(trxnLogIndex)
             .build();
       }
 

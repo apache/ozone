@@ -118,8 +118,9 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
       // Clear / delete the tags
       omKeyInfo.getTags().clear();
       // Set the UpdateId to the current transactionLogIndex
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Note: Key modification time is not changed because S3 last modified

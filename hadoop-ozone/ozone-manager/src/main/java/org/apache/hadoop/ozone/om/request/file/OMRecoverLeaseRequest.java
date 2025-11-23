@@ -228,9 +228,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
             KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
       }
+      openKeyInfo.assertMonotonicUpdateID(transactionLogIndex);
       openKeyInfo = openKeyInfo.toBuilder()
           .addMetadata(OzoneConsts.LEASE_RECOVERY, "true")
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
       openKeyInfo.setModificationTime(Time.now());
       // add to cache.

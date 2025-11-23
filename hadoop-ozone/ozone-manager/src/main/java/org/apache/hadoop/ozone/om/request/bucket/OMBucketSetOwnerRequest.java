@@ -147,10 +147,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
         return omClientResponse;
       }
 
+      omBucketInfo.assertMonotonicUpdateID(transactionLogIndex);
       OmBucketInfo newOmBucketInfo = omBucketInfo.toBuilder()
           .setOwner(newOwner)
           .setModificationTime(setBucketPropertyRequest.getModificationTime())
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",

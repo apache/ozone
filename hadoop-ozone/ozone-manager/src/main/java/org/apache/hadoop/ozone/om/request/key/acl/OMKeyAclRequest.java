@@ -107,8 +107,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
 
       operationResult = apply(omKeyInfo, trxnLogIndex);
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Update the modification time when updating ACLs of Key.

@@ -978,12 +978,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
       // Construct a new tags from KeyArgs
       // Clear the old one when the key is overwritten
+      dbKeyInfo.assertMonotonicUpdateID(transactionLogIndex);
       final OmKeyInfo.Builder builder = dbKeyInfo.toBuilder()
           .setDataSize(newSize)
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
           .setMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .setFileEncryptionInfo(encInfo);
 

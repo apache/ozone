@@ -64,6 +64,44 @@ public abstract class WithObjectID extends WithMetadata {
     return updateID;
   }
 
+  /**
+   * Asserts that the new updateID is greater than the current updateID.
+   * @param newValue - new updateID value
+   */
+  public final void assertMonotonicUpdateID(long newValue) {
+    // Because in non-HA, we have multiple rpc handler threads and
+    // transactionID is generated in OzoneManagerServerSideTranslatorPB.
+
+    // Lets take T1 -> Set Bucket Property
+    // T2 -> Set Bucket Acl
+
+    // Now T2 got lock first, so updateID will be set to 2. Now when T1 gets
+    // executed we will hit the precondition exception. So for OM non-HA with
+    // out ratis we should not have this check.
+
+    // Same can happen after OM restart also.
+
+    // OM Start
+    // T1 -> Create Bucket
+    // T2 -> Set Bucket Property
+
+    // OM restart
+    // T1 -> Set Bucket Acl
+
+    // So when T1 is executing, Bucket will have updateID 2 which is set by T2
+    // execution before restart.
+
+    // Main reason, in non-HA transaction Index after restart starts from 0.
+    // And also because of this same reason we don't do replay checks in non-HA.
+    final long currentValue = getUpdateID();
+    if (newValue < currentValue) {
+      throw new IllegalArgumentException(String.format(
+          "Trying to set updateID to %d which is not greater than the " +
+              "current value of %d for %s",
+          newValue, currentValue, getObjectInfo()));
+    }
+  }
+
   /** Hook method, customized in subclasses. */
   public String getObjectInfo() {
     return this.toString();
@@ -108,46 +146,6 @@ public abstract class WithObjectID extends WithMetadata {
             "which is not zero. Current Object ID is " + this.objectID);
       }
       this.objectID = obId;
-      return this;
-    }
-
-    /**
-     * Sets the update ID. For each modification of this object, we will set
-     * this to a value greater than the current value.
-     */
-    public Builder withUpdateID(long newValue) {
-      // Because in non-HA, we have multiple rpc handler threads and
-      // transactionID is generated in OzoneManagerServerSideTranslatorPB.
-
-      // Lets take T1 -> Set Bucket Property
-      // T2 -> Set Bucket Acl
-
-      // Now T2 got lock first, so updateID will be set to 2. Now when T1 gets
-      // executed we will hit the precondition exception. So for OM non-HA with
-      // out ratis we should not have this check.
-
-      // Same can happen after OM restart also.
-
-      // OM Start
-      // T1 -> Create Bucket
-      // T2 -> Set Bucket Property
-
-      // OM restart
-      // T1 -> Set Bucket Acl
-
-      // So when T1 is executing, Bucket will have updateID 2 which is set by T2
-      // execution before restart.
-
-      // Main reason, in non-HA transaction Index after restart starts from 0.
-      // And also because of this same reason we don't do replay checks in non-HA.
-      final long currentValue = getUpdateID();
-      if (newValue < currentValue) {
-        throw new IllegalArgumentException(String.format(
-            "Trying to set updateID to %d which is not greater than the " +
-                "current value of %d for %s", newValue, currentValue,
-            getObjectInfo()));
-      }
-      this.updateID = newValue;
       return this;
     }
 

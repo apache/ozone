@@ -307,12 +307,6 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
-    @Override
-    public Builder withUpdateID(long newValue) {
-      super.withUpdateID(newValue);
-      return this;
-    }
-
     /**
      * Constructs a builder.
      */

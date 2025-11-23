@@ -202,9 +202,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
         openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
+        openKeyToDelete.assertMonotonicUpdateID(trxnLogIndex);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
-            .withUpdateID(trxnLogIndex)
+            .setUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
@@ -226,11 +227,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // Set the new metadata from the request and UpdateID to current
       // transactionLogIndex
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
               commitKeyArgs.getMetadataList()))
           .setDataSize(commitKeyArgs.getDataSize())
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       List<OmKeyLocationInfo> uncommitted =

@@ -106,8 +106,9 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
               omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = apply(omKeyInfo, trxnLogIndex);
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
 

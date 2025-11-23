@@ -108,8 +108,9 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
         }
         omVolumeArgs.setModificationTime(modificationTime);
 
+        omVolumeArgs.assertMonotonicUpdateID(trxnLogIndex);
         omVolumeArgs = omVolumeArgs.toBuilder()
-            .withUpdateID(trxnLogIndex)
+            .setUpdateID(trxnLogIndex)
             .build();
 
         // update cache.

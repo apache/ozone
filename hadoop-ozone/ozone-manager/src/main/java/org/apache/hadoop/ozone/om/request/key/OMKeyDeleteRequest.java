@@ -147,8 +147,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Update table cache. Put a tombstone entry

@@ -253,9 +253,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
+      omBucketInfo.assertMonotonicUpdateID(transactionLogIndex);
       omBucketInfo = omBucketInfo.toBuilder()
           .withObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);

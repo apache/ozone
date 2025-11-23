@@ -522,12 +522,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
 
     @Override
-    public Builder withUpdateID(long newValue) {
-      super.withUpdateID(newValue);
-      return this;
-    }
-
-    @Override
     public Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
       return this;

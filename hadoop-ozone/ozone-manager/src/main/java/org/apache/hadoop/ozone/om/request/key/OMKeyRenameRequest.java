@@ -176,8 +176,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
       }
 
+      fromKeyValue.assertMonotonicUpdateID(trxnLogIndex);
       fromKeyValue = fromKeyValue.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       fromKeyValue.setKeyName(toKeyName);

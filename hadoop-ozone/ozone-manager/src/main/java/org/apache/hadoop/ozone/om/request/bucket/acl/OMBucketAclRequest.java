@@ -120,8 +120,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
           modificationTime = getOmRequest().getRemoveAclRequest()
               .getModificationTime();
         }
+        omBucketInfo.assertMonotonicUpdateID(transactionLogIndex);
         omBucketInfo = omBucketInfo.toBuilder()
-            .withUpdateID(transactionLogIndex)
+            .setUpdateID(transactionLogIndex)
             .setModificationTime(modificationTime)
             .build();
 

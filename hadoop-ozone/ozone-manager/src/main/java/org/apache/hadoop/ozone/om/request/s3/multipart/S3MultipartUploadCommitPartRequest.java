@@ -163,10 +163,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       }
       // Add/Update user defined metadata.
       // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
               keyArgs.getMetadataList()))
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // set the data size and location info list
@@ -207,8 +208,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
+      multipartKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       multipartKeyInfo = multipartKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in

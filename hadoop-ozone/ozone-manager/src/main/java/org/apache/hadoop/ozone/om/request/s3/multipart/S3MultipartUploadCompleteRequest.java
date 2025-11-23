@@ -519,6 +519,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
       final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      omKeyInfo.assertMonotonicUpdateID(trxnLogIndex);
       builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
         builder.setMetadata(dbOpenKeyInfo.getMetadata());
@@ -528,7 +529,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    return builder.withUpdateID(trxnLogIndex).build();
+    return builder.setUpdateID(trxnLogIndex).build();
   }
 
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
