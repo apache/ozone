@@ -395,34 +395,53 @@ public class BucketEndpoint extends EndpointBase {
       result.setMaxUploads(maxUploads);
       result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
+      final String normalizedPrefix = prefix == null ? "" : prefix;
+      // track the previous directory name to avoid duplicate CommonPrefixes entries
       String prevDir = null;
       for (OzoneMultipartUpload upload : ozoneMultipartUploadList.getUploads()) {
         String keyName = upload.getKeyName();
+        // filter out keys that don't match the prefix in FS-optimized buckets
         if (bucket.getBucketLayout().isFileSystemOptimized() &&
-            StringUtils.isNotEmpty(prefix) &&
-            !keyName.startsWith(prefix)) {
+            StringUtils.isNotEmpty(normalizedPrefix) &&
+            !keyName.startsWith(normalizedPrefix)) {
           continue;
         }
-        String relativeKeyName = keyName.substring(prefix.length());
+        // skip keys shorter than prefix to avoid substring errors
+        if (keyName.length() < normalizedPrefix.length()) {
+          continue;
+        }
+        // relative key name after removing the prefix
+        String relativeKeyName = keyName.substring(normalizedPrefix.length());
 
+        // Track whether this upload was added as a CommonPrefix
         boolean addedAsPrefix = false;
-        if (!StringUtils.isEmpty(delimiter)) {
+        // Only extract common prefixes when delimiter is provided
+        if (StringUtils.isNotBlank(delimiter)) {
+          // collapse objects that share the same delimiter
+          // first segment after the prefix into a single CommonPrefixes entry.
+          // This matches AWS behavior where keys under the same "directory" are grouped.
           int depth = StringUtils.countMatches(relativeKeyName, delimiter);
           if (depth > 0) {
-            String dirName = relativeKeyName.substring(0, relativeKeyName.indexOf(delimiter));
+            // Key has delimiter(s): extract the first directory segment
+            int delimiterIndex = relativeKeyName.indexOf(delimiter);
+            String dirName = relativeKeyName.substring(0, delimiterIndex);
+            // Only add CommonPrefix if this directory hasn't been added yet (deduplication)
             if (!dirName.equals(prevDir)) {
-              result.addPrefix(EncodingTypeObject.createNullable(
-                  prefix + dirName + delimiter, encodingType));
+              result.addCommonPrefix(EncodingTypeObject.createNullable(
+                  normalizedPrefix + dirName + delimiter, encodingType));
               prevDir = dirName;
-              addedAsPrefix = true;
             }
+            addedAsPrefix = true;
           } else if (relativeKeyName.endsWith(delimiter)) {
-            result.addPrefix(EncodingTypeObject.createNullable(
-                prefix + relativeKeyName, encodingType));
+            // Key itself ends with delimiter (represents a "directory" placeholder)
+            result.addCommonPrefix(EncodingTypeObject.createNullable(
+                normalizedPrefix + relativeKeyName, encodingType));
             addedAsPrefix = true;
           }
         }
-        
+
+        // This ensures all uploads are represented: either as individual Upload entries
+        // or as part of CommonPrefixes (when delimiter is used).
         if (!addedAsPrefix) {
           result.addUpload(new ListMultipartUploadsResult.Upload(
               EncodingTypeObject.createNullable(upload.getKeyName(), encodingType),
