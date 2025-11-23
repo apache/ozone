@@ -396,7 +396,8 @@ public final class IamSessionPolicyResolver {
     // Used for ListBuckets api
     LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(ACLType.READ, ACLType.LIST)),
 
-    // Bucket-scope
+    // Bucket-scope - the code will automatically add READ permission at the volume level in addition to the ACL(s) at
+    // the bucket level
     CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(ACLType.CREATE)),
     DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(ACLType.DELETE)),
     GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.READ_ACL)),
@@ -404,35 +405,28 @@ public final class IamSessionPolicyResolver {
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
     LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.LIST)),
     // Used for ListMultipartUploads API
-    LIST_BUCKET_MULTIPART_UPLOADS(
-        "s3:ListBucketMultipartUploads",
+    LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads",
         ActionKind.BUCKET,
         EnumSet.of(ACLType.READ, ACLType.LIST)
     ),
     PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.WRITE_ACL)),
 
-    // Object-scope
+    // Object-scope - the code will automatically add READ permission at the volume level and READ permission at the
+    // bucket level in addition to the ACL(s) at the object level
     ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     // Used for DeleteObject (when versionId parameter is not supplied),
     // DeleteObjects (when versionId parameter is not supplied) APIs
     DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
-    // Used for DeleteObject (when versionId parameter is supplied),
-    // DeleteObjects (when versionId parameter is supplied) APIs
-    DELETE_OBJECT_VERSION("s3:DeleteObjectVersion", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
     GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
-    // Used for GetObject API when versionId parameter is supplied
-    GET_OBJECT_VERSION("s3:GetObjectVersion", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     // Used for ListParts API
     LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
     // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
     // CopyObject (for destination bucket), PutObject APIs
     PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(ACLType.CREATE, ACLType.WRITE)),
     PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.WRITE)),
-    // Used for PutObjectTagging (with versionId parameter) API
-    PUT_OBJECT_VERSION_TAGGING("s3:PutObjectVersionTagging", ActionKind.OBJECT, EnumSet.of(ACLType.WRITE)),
 
     // Wildcard all
     ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL));

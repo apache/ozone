@@ -284,14 +284,12 @@ public class TestIamSessionPolicyResolver {
     // Verify s3:Get* contains Get actions
     final Set<S3Action> getActions = caseInsensitiveS3ActionMap.get("s3:get*");
     assertThat(getActions).containsOnly(
-        S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION, S3Action.GET_OBJECT_VERSION,
-        S3Action.GET_OBJECT_TAGGING);
+        S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION, S3Action.GET_OBJECT_TAGGING);
 
     // Verify s3:Put* contains Put actions
     final Set<S3Action> putActions = caseInsensitiveS3ActionMap.get("s3:put*");
     assertThat(putActions).containsOnly(
-        S3Action.PUT_OBJECT, S3Action.PUT_OBJECT_VERSION_TAGGING, S3Action.PUT_OBJECT_TAGGING,
-        S3Action.PUT_BUCKET_ACL);
+        S3Action.PUT_OBJECT, S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
 
     // Verify s3:List* contains List actions
     final Set<S3Action> listActions = caseInsensitiveS3ActionMap.get("s3:list*");
@@ -302,8 +300,7 @@ public class TestIamSessionPolicyResolver {
     // Verify s3:Delete* contains Delete actions
     final Set<S3Action> deleteActions = caseInsensitiveS3ActionMap.get("s3:delete*");
     assertThat(deleteActions).containsOnly(
-        S3Action.DELETE_OBJECT, S3Action.DELETE_OBJECT_VERSION, S3Action.DELETE_BUCKET,
-        S3Action.DELETE_OBJECT_TAGGING);
+        S3Action.DELETE_OBJECT, S3Action.DELETE_BUCKET, S3Action.DELETE_OBJECT_TAGGING);
 
     // Verify s3:Create* contains Create actions
     final Set<S3Action> createActions = caseInsensitiveS3ActionMap.get("s3:create*");
@@ -361,12 +358,12 @@ public class TestIamSessionPolicyResolver {
   public void testMapPolicyActionsToS3ActionsWithWildcardExpansion() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(Collections.singleton("s3:Get*"));
     assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
-        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING);
+        S3Action.GET_OBJECT_TAGGING);
 
     // Ensure it is case-insensitive
     final Set<S3Action> resultCi = mapPolicyActionsToS3Actions(Collections.singleton("s3:gET*"));
     assertThat(resultCi).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
-        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING);
+        S3Action.GET_OBJECT_TAGGING);
   }
 
   @Test
@@ -395,16 +392,15 @@ public class TestIamSessionPolicyResolver {
   @Test
   public void testMapPolicyActionsToS3ActionsDeduplicatesResults() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:GetObject", "s3:GetBucketAcl"));
-    assertThat(result).contains(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
-        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING);
+    assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
+        S3Action.GET_OBJECT_TAGGING);
   }
 
   @Test
   public void testMapPolicyActionsToS3ActionsHandlesMultipleWildcards() {
     final Set<S3Action> result = mapPolicyActionsToS3Actions(strSet("s3:Get*", "s3:Put*"));
     assertThat(result).containsOnly(S3Action.GET_OBJECT, S3Action.GET_BUCKET_ACL, S3Action.GET_BUCKET_LOCATION,
-        S3Action.GET_OBJECT_VERSION, S3Action.GET_OBJECT_TAGGING, S3Action.PUT_OBJECT,
-        S3Action.PUT_OBJECT_VERSION_TAGGING, S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
+        S3Action.GET_OBJECT_TAGGING, S3Action.PUT_OBJECT, S3Action.PUT_OBJECT_TAGGING, S3Action.PUT_BUCKET_ACL);
   }
 
   @Test
