@@ -230,8 +230,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       }
       openKeyInfo = openKeyInfo.toBuilder()
           .addMetadata(OzoneConsts.LEASE_RECOVERY, "true")
+          .withUpdateID(transactionLogIndex)
           .build();
-      openKeyInfo.setUpdateID(transactionLogIndex);
       openKeyInfo.setModificationTime(Time.now());
       // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
