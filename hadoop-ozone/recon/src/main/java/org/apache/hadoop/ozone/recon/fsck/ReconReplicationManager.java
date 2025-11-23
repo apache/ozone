@@ -110,6 +110,28 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   /**
+   * Override start() to prevent background threads from running.
+   *
+   * <p>In Recon, we don't want the ReplicationManager's background threads
+   * (replicationMonitor, underReplicatedProcessor, overReplicatedProcessor)
+   * to run continuously. Instead, we call processAll() manually from
+   * ContainerHealthTaskV2 on a schedule.</p>
+   *
+   * <p>This prevents:
+   * <ul>
+   *   <li>Unnecessary CPU usage from continuous monitoring</li>
+   *   <li>Initialization race conditions (start() being called before fields are initialized)</li>
+   *   <li>Replication commands being generated (Recon is read-only)</li>
+   * </ul>
+   * </p>
+   */
+  @Override
+  public synchronized void start() {
+    LOG.info("ReconReplicationManager.start() called - no-op (manual invocation via processAll())");
+    // Do nothing - we call processAll() manually from ContainerHealthTaskV2
+  }
+
+  /**
    * Override processAll() to capture ALL per-container health states,
    * not just aggregate counts and 100 samples.
    *
