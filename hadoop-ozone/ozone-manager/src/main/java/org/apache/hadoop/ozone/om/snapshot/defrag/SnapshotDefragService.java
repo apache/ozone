@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.snapshot.defrag;
 
 import static java.nio.file.Files.createDirectories;
 import static org.apache.commons.io.file.PathUtils.deleteDirectory;
@@ -68,6 +68,12 @@ import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
