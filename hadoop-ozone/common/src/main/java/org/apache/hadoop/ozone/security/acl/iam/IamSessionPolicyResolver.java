@@ -20,6 +20,12 @@ package org.apache.hadoop.ozone.security.acl.iam;
 import static java.util.Collections.singleton;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -394,51 +400,64 @@ public final class IamSessionPolicyResolver {
   enum S3Action {
     // Volume-scope
     // Used for ListBuckets api
-    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(ACLType.READ, ACLType.LIST)),
+    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(READ, LIST),
+        EnumSet.noneOf(ACLType.class), EnumSet.noneOf(ACLType.class)),
 
-    // Bucket-scope - the code will automatically add READ permission at the volume level in addition to the ACL(s) at
-    // the bucket level
-    CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(ACLType.CREATE)),
-    DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(ACLType.DELETE)),
-    GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.READ_ACL)),
-    GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(ACLType.READ)),
+    // Bucket-scope
+    CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(CREATE),
+        EnumSet.noneOf(ACLType.class)),
+    DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(DELETE),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
-    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(ACLType.READ, ACLType.LIST)),
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST),
+        EnumSet.noneOf(ACLType.class)),
     // Used for ListMultipartUploads API
-    LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads",
-        ActionKind.BUCKET,
-        EnumSet.of(ACLType.READ, ACLType.LIST)
-    ),
-    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(ACLType.WRITE_ACL)),
+    LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
+        EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(WRITE_ACL),
+        EnumSet.noneOf(ACLType.class)),
 
-    // Object-scope - the code will automatically add READ permission at the volume level and READ permission at the
-    // bucket level in addition to the ACL(s) at the object level
-    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
+    // Object-scope
+    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(DELETE)),
     // Used for DeleteObject (when versionId parameter is not supplied),
     // DeleteObjects (when versionId parameter is not supplied) APIs
-    DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
-    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.DELETE)),
+    DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(DELETE)),
+    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(DELETE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
-    GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
-    GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
+    GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
     // Used for ListParts API
-    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(ACLType.READ)),
+    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(READ)),
     // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
     // CopyObject (for destination bucket), PutObject APIs
-    PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(ACLType.CREATE, ACLType.WRITE)),
-    PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(ACLType.WRITE)),
+    PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(CREATE, ACLType.WRITE)),
+    PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(ACLType.WRITE)),
 
     // Wildcard all
-    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL));
+    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
 
     private final String name;
     private final ActionKind kind;
-    private final Set<ACLType> perms;
+    private final Set<ACLType> volumePerms;
+    private final Set<ACLType> bucketPerms;
+    private final Set<ACLType> objectPerms;
 
-    S3Action(String name, ActionKind kind, Set<ACLType> perms) {
+    S3Action(String name, ActionKind kind, Set<ACLType> volumePerms, Set<ACLType> bucketPerms,
+        Set<ACLType> objectPerms) {
       this.name = name;
       this.kind = kind;
-      this.perms = perms;
+      this.volumePerms = volumePerms;
+      this.bucketPerms = bucketPerms;
+      this.objectPerms = objectPerms;
     }
   }
 }
