@@ -128,8 +128,6 @@ public class OMException extends IOException {
 
     KEY_NOT_FOUND,
 
-    KEY_GENERATION_MISMATCH,
-
     INVALID_KEY_NAME,
 
     ACCESS_DENIED,
@@ -277,5 +275,7 @@ public class OMException extends IOException {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
 
     TOO_MANY_SNAPSHOTS,
+
+    KEY_GENERATION_MISMATCH,
   }
 }
