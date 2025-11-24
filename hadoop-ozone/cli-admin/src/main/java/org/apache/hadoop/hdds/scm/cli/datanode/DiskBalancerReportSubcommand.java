@@ -127,6 +127,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       HddsProtos.DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("datanode", report.getNode().getHostName());
+    result.put("action", "report");
+    result.put("status", "success");
     result.put("volumeDensity", report.getCurrentVolumeDensitySum());
     return result;
   }

@@ -73,24 +73,14 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       HddsProtos.DiskBalancerConfigurationProto config = buildConfigProto();
       diskBalancerProxy.updateDiskBalancerConfiguration(config);
       
-      Map<String, Object> result = new java.util.LinkedHashMap<>();
+      Map<String, Object> result = new LinkedHashMap<>();
       result.put("datanode", hostName);
       result.put("action", "update");
       result.put("status", "success");
-      Map<String, Object> configMap = new java.util.LinkedHashMap<>();
-      if (threshold != null) {
-        configMap.put("threshold", threshold);
+      Map<String, Object> configMap = getConfigurationMap();
+      if (configMap != null && !configMap.isEmpty()) {
+        result.put("configuration", configMap);
       }
-      if (bandwidthInMB != null) {
-        configMap.put("bandwidthInMB", bandwidthInMB);
-      }
-      if (parallelThread != null) {
-        configMap.put("parallelThread", parallelThread);
-      }
-      if (stopAfterDiskEven != null) {
-        configMap.put("stopAfterDiskEven", stopAfterDiskEven);
-      }
-      result.put("configuration", configMap);
       return result;
     } finally {
       diskBalancerProxy.close();

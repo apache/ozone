@@ -86,19 +86,9 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     for (String dn : targetDatanodes) {
       try {
         Object result = executeCommand(dn);
-        if (result != null) {
-          successNodes.add(dn);
-          if (options.isJson()) {
-            jsonResults.add(result);
-          }
-        } else {
-          failedNodes.add(dn);
-          if (options.isJson()) {
-            // Create error result object in JSON format
-            Map<String, Object> errorResult = createErrorResult(dn, 
-                "Command execution failed");
-            jsonResults.add(errorResult);
-          }
+        successNodes.add(dn);
+        if (options.isJson()) {
+          jsonResults.add(result);
         }
       } catch (Exception e) {
         failedNodes.add(dn);
@@ -183,11 +173,11 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
   /**
    * Execute the DiskBalancer command on a single hostName.
-   * Return a JSON-serializable object if successful, null if failed.
+   * Return a JSON-serializable object if successful.
    * The base class handles whether to use it for JSON output or not.
    *
    * @param hostName the hostName in "host:port" format
-   * @return result object for JSON serialization if successful, null if failed
+   * @return result object for JSON serialization (must not be null)
    * @throws Exception if execution fails
    */
   protected abstract Object executeCommand(String hostName) throws Exception;

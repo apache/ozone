@@ -64,25 +64,12 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       DiskBalancerConfigurationProto config = buildConfigProto();
       diskBalancerProxy.startDiskBalancer(config);
       
-      Map<String, Object> result = new java.util.LinkedHashMap<>();
+      Map<String, Object> result = new LinkedHashMap<>();
       result.put("datanode", hostName);
       result.put("action", "start");
       result.put("status", "success");
-      if (threshold != null || bandwidthInMB != null || 
-          parallelThread != null || stopAfterDiskEven != null) {
-        Map<String, Object> configMap = new java.util.LinkedHashMap<>();
-        if (threshold != null) {
-          configMap.put("threshold", threshold);
-        }
-        if (bandwidthInMB != null) {
-          configMap.put("bandwidthInMB", bandwidthInMB);
-        }
-        if (parallelThread != null) {
-          configMap.put("parallelThread", parallelThread);
-        }
-        if (stopAfterDiskEven != null) {
-          configMap.put("stopAfterDiskEven", stopAfterDiskEven);
-        }
+      Map<String, Object> configMap = getConfigurationMap();
+      if (configMap != null && !configMap.isEmpty()) {
         result.put("configuration", configMap);
       }
       return result;

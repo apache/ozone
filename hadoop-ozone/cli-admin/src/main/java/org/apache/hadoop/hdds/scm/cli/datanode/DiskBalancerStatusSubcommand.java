@@ -147,7 +147,9 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
   private Map<String, Object> createStatusResult(DatanodeDiskBalancerInfoProto status) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("datanode", status.getNode().getHostName());
-    result.put("status", status.getRunningStatus().name());
+    result.put("action", "status");
+    result.put("status", "success");
+    result.put("serviceStatus", status.getRunningStatus().name());
     result.put("threshold", status.getDiskBalancerConf().getThreshold());
     result.put("bandwidthInMB", status.getDiskBalancerConf().getDiskBandwidthInMB());
     result.put("threads", status.getDiskBalancerConf().getParallelThread());
