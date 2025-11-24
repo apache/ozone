@@ -206,7 +206,8 @@ public class SnapshotDefragService extends BackgroundService
    *         - The integer represents the version of the snapshot being evaluated.
    * @throws IOException If an I/O error occurs while accessing the local snapshot data or metadata.
    */
-  private Pair<Boolean, Integer> needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
+  @VisibleForTesting
+  Pair<Boolean, Integer> needsDefragmentation(SnapshotInfo snapshotInfo) throws IOException {
     // Update snapshot local metadata to point to the correct previous snapshotId if it was different and check if
     // snapshot needs defrag.
     try (WritableOmSnapshotLocalDataProvider writableOmSnapshotLocalDataProvider =
@@ -255,7 +256,8 @@ public class SnapshotDefragService extends BackgroundService
    * @param incrementalTables the set of tables for which incremental defragmentation is performed.
    * @throws IOException if an I/O error occurs during table operations or compaction
    */
-  private void performFullDefragmentation(DBStore checkpointDBStore, TablePrefixInfo prefixInfo,
+  @VisibleForTesting
+  void performFullDefragmentation(DBStore checkpointDBStore, TablePrefixInfo prefixInfo,
       Set<String> incrementalTables) throws IOException {
     for (String table : incrementalTables) {
       Table<String, byte[]> checkpointTable = checkpointDBStore.getTable(table, StringCodec.get(),
@@ -305,7 +307,8 @@ public class SnapshotDefragService extends BackgroundService
    * @param incrementalTables the set of tables for which incremental defragmentation is performed.
    * @throws IOException if an I/O error occurs during processing.
    */
-  private void performIncrementalDefragmentation(SnapshotInfo previousSnapshotInfo, SnapshotInfo snapshotInfo,
+  @VisibleForTesting
+  void performIncrementalDefragmentation(SnapshotInfo previousSnapshotInfo, SnapshotInfo snapshotInfo,
       int snapshotVersion, DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
       throws IOException {
     // Map of delta files grouped on the basis of the tableName.
@@ -413,7 +416,8 @@ public class SnapshotDefragService extends BackgroundService
    * @param incrementalTables the set of tables identified for incremental defragmentation.
    * @throws IOException if an I/O error occurs during table ingestion or file operations.
    */
-  private void ingestNonIncrementalTables(DBStore checkpointDBStore,
+  @VisibleForTesting
+  void ingestNonIncrementalTables(DBStore checkpointDBStore,
       SnapshotInfo snapshotInfo, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables) throws IOException {
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
@@ -462,7 +466,8 @@ public class SnapshotDefragService extends BackgroundService
    * @throws IOException If an I/O error occurs during file operations, checkpoint processing,
    *                     or snapshot metadata updates.
    */
-  private int atomicSwitchSnapshotDB(UUID snapshotId, Path checkpointPath) throws IOException {
+  @VisibleForTesting
+  int atomicSwitchSnapshotDB(UUID snapshotId, Path checkpointPath) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
              snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
       OmSnapshotLocalData localData = snapshotLocalDataProvider.getSnapshotLocalData();
@@ -513,7 +518,8 @@ public class SnapshotDefragService extends BackgroundService
    * @throws IOException If an I/O error occurs during snapshot processing,
    *                     checkpoint creation, or table operations.
    */
-  private OmMetadataManagerImpl createCheckpoint(SnapshotInfo snapshotInfo,
+  @VisibleForTesting
+  OmMetadataManagerImpl createCheckpoint(SnapshotInfo snapshotInfo,
       Set<String> incrementalColumnFamilies) throws IOException {
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getActiveSnapshot(
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName())) {
