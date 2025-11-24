@@ -77,27 +77,20 @@ public class TestSnapshotDefragService {
   private OmMetadataManagerImpl metadataManager;
 
   @Mock
-  private SnapshotChainManager snapshotChainManager;
-
-  @Mock
   private IOzoneManagerLock omLock;
 
   @Mock
   private OMLayoutVersionManager versionManager;
 
-  private CompositeDeltaDiffComputer compositeDeltaDiffComputer;
-
   @TempDir
   private Path tempDir;
-
-  private OzoneConfiguration configuration;
   private SnapshotDefragService defragService;
   private AutoCloseable mocks;
 
   @BeforeEach
   public void setup() throws IOException {
     mocks = MockitoAnnotations.openMocks(this);
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
 
     // Setup basic mocks
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
@@ -122,7 +115,6 @@ public class TestSnapshotDefragService {
           configuration
       );
       assertEquals(1, compositeDeltaDiffComputer.constructed().size());
-      this.compositeDeltaDiffComputer = compositeDeltaDiffComputer.constructed().get(0);
     }
 
   }
@@ -192,7 +184,7 @@ public class TestSnapshotDefragService {
     doAnswer(invocationOnMock -> {
       commit.incrementAndGet();
       return null;
-    }).when(provider).needsDefrag();
+    }).when(provider).commit();
     when(provider.needsDefrag()).thenAnswer(i -> commit.get() == 1);
     int version = ThreadLocalRandom.current().nextInt(100);
     when(localData.getVersion()).thenReturn(version);
