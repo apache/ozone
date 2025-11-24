@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -62,6 +63,13 @@ public abstract class ContainerKeyMapperHelper {
 
   // Single lock to guard all initialization operations (table truncation + map clearing)
   private static final Object INITIALIZATION_LOCK = new Object();
+
+  /**
+   * Reference counter to track how many tasks are actively using the shared map.
+   * Initialized to 2 (FSO + OBS tasks) during initialization.
+   * Each task decrements on completion. Last task (count reaches 0) clears the shared map.
+   */
+  private static final AtomicInteger ACTIVE_TASK_COUNT = new AtomicInteger(0);
 
   /**
    * SHARED across all tasks (FSO + OBS) for cross-task synchronization.
@@ -102,6 +110,10 @@ public abstract class ContainerKeyMapperHelper {
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
           LOG.info("{}: Initialized shared container count map for cross-task synchronization", taskName);
           
+          // Step 3: Initialize reference counter (2 tasks: FSO + OBS)
+          ACTIVE_TASK_COUNT.set(2);
+          LOG.info("{}: Initialized active task counter to 2", taskName);
+          
         } catch (Exception e) {
           // CRITICAL: Reset flag so another task can retry
           ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
@@ -136,7 +148,6 @@ public abstract class ContainerKeyMapperHelper {
       // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
-      // Use fair lock to prevent write lock starvation when flushing
       ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
       // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
       AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
@@ -516,6 +527,22 @@ public abstract class ContainerKeyMapperHelper {
 
       // Only clear localContainerKeyMap (per-task), keep sharedContainerKeyCountMap for other tasks
       localContainerKeyMap.clear();
+      
+      // If this is a final flush (sharedContainerKeyCountMap is not empty),
+      // decrement reference counter and cleanup if last task
+      if (!sharedContainerKeyCountMap.isEmpty()) {
+        int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
+        LOG.info("Task completed. Remaining active tasks: {}", remainingTasks);
+        
+        if (remainingTasks == 0) {
+          // Last task finished - clean up shared resources
+          synchronized (INITIALIZATION_LOCK) {
+            SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+            ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+            LOG.info("Last task completed. Cleared shared map and reset initialization flag.");
+          }
+        }
+      }
 
     } catch (IOException e) {
       LOG.error("Unable to write Container Key and Container Key Count data in Recon DB.", e);
@@ -533,7 +560,8 @@ public abstract class ContainerKeyMapperHelper {
     synchronized (INITIALIZATION_LOCK) {
       SHARED_CONTAINER_KEY_COUNT_MAP.clear();
       ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
-      LOG.debug("Cleared shared container count map and reset initialization flag for tests");
+      ACTIVE_TASK_COUNT.set(0);
+      LOG.debug("Cleared shared container count map, reset initialization flag, and reset task counter for tests");
     }
   }
 
