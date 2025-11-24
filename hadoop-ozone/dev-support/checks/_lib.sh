@@ -40,7 +40,7 @@ _install_tool() {
     return
   fi
 
-  if [[ ! -d "${dir}" ]]; then
+  if [[ ! -d "${dir}" ]] || ! which "$bin" >& /dev/null; then
     mkdir -pv "${dir}"
     pushd "${dir}"
     if eval "${func}"; then
