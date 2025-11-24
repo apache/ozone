@@ -245,6 +245,14 @@ public class RDBStore implements DBStore {
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
     }
+    try {
+      // Flush to ensure all data is persisted to disk before closing.
+      flushDB();
+      LOG.debug("Successfully flushed DB before close");
+    } catch (Exception e) {
+      LOG.warn("Failed to flush DB before close", e);
+      // Continue with close even if flush fails
+    }
     IOUtils.close(LOG, db);
   }
 

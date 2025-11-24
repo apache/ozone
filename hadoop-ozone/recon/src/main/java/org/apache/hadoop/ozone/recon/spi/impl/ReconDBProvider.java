@@ -138,14 +138,6 @@ public class ReconDBProvider {
 
   public void close() throws Exception {
     if (this.dbStore != null) {
-      try {
-        // Flush to ensure all data is persisted to disk before closing.
-        dbStore.flushDB();
-        LOG.debug("Successfully flushed DB before close");
-      } catch (Exception e) {
-        LOG.warn("Failed to flush DB before close", e);
-        // Continue with close even if flush fails
-      }
       dbStore.close();
       dbStore = null;
     }
