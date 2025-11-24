@@ -46,7 +46,11 @@ _install_tool() {
     if eval "${func}"; then
       echo "Installed ${tool} in ${dir}"
     else
-      echo "Failed to install ${tool}"
+      msg="Failed to install ${tool}"
+      echo "$msg" >&2
+      if [[ -n "${REPORT_FILE}" ]]; then
+        echo "$msg" >> "${REPORT_FILE}"
+      fi
       exit 1
     fi
     popd
