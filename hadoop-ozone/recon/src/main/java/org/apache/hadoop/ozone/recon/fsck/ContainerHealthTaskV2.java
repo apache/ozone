@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.slf4j.Logger;
@@ -67,7 +66,6 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTaskV2(
       ContainerManager containerManager,
-      StorageContainerServiceProvider scmClient,
       ContainerHealthSchemaManagerV2 schemaManagerV2,
       PlacementPolicy placementPolicy,
       ReconContainerMetadataManager reconContainerMetadataManager,

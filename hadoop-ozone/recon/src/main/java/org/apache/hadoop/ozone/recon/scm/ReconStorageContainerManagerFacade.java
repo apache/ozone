@@ -290,7 +290,6 @@ public class ReconStorageContainerManagerFacade
     LOG.info("Creating ContainerHealthTaskV2");
     containerHealthTaskV2 = new ContainerHealthTaskV2(
         containerManager,
-        scmServiceProvider,
         containerHealthSchemaManagerV2,
         containerPlacementPolicy,
         reconContainerMetadataManager,
