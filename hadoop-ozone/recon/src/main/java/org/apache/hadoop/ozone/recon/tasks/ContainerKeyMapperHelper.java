@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -59,8 +60,8 @@ public abstract class ContainerKeyMapperHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerKeyMapperHelper.class);
 
-  // Static lock to guard table truncation.
-  private static final Object TRUNCATE_LOCK = new Object();
+  // Single lock to guard all initialization operations (table truncation + map clearing)
+  private static final Object INITIALIZATION_LOCK = new Object();
 
   /**
    * SHARED across all tasks (FSO + OBS) for cross-task synchronization.
@@ -71,59 +72,45 @@ public abstract class ContainerKeyMapperHelper {
    */
   private static final Map<Long, AtomicLong> SHARED_CONTAINER_KEY_COUNT_MAP = new ConcurrentHashMap<>();
 
-  // Lock to guard shared map initialization/clearing
-  private static final Object SHARED_MAP_LOCK = new Object();
-
   /**
-   * Ensures that the container key tables are truncated only once before reprocessing.
-   * Uses an AtomicBoolean to track if truncation has already been performed.
-   *
-   * @param reconContainerMetadataManager The metadata manager instance responsible for DB operations.
+   * Performs one-time initialization for Container Key Mapper tasks.
+   * This includes:
+   * 1. Truncating container key tables in DB
+   * 2. Clearing the shared container count map
+   * 
+   * This method is called by both FSO and OBS tasks at the start of reprocess.
+   * Only the first task to call this will perform initialization.
+   * 
+   * @param reconContainerMetadataManager The metadata manager for DB operations
+   * @param taskName Name of the task calling this method (for logging)
+   * @throws RuntimeException if initialization fails
    */
-  public static void truncateTablesIfNeeded(ReconContainerMetadataManager reconContainerMetadataManager,
-                                            String taskName) {
-    synchronized (TRUNCATE_LOCK) {
-      if (ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.compareAndSet(false, true)) {
+  private static void initializeContainerKeyMapperIfNeeded(
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      String taskName) {
+    
+    synchronized (INITIALIZATION_LOCK) {
+      // Check if already initialized by another task
+      if (ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.compareAndSet(false, true)) {
         try {
-          // Perform table truncation
+          // Step 1: Truncate tables
+          LOG.info("{}: Truncating container key tables for reprocess", taskName);
           reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
-          LOG.debug("Successfully truncated container key tables.");
+          LOG.info("{}: Successfully truncated container key tables", taskName);
+          
+          // Step 2: Clear shared map
+          SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+          LOG.info("{}: Initialized shared container count map for cross-task synchronization", taskName);
+          
         } catch (Exception e) {
-          // Reset the flag so truncation can be retried
-          ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.set(false);
-          LOG.error("Error while truncating container key tables for task {}. Resetting flag.", taskName, e);
-          throw new RuntimeException("Table truncation failed", e);
+          // CRITICAL: Reset flag so another task can retry
+          ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+          LOG.error("{}: Container Key Mapper initialization failed. Resetting flag for retry.", taskName, e);
+          throw new RuntimeException("Container Key Mapper initialization failed", e);
         }
       } else {
-        LOG.debug("Container key tables already truncated by another task.");
+        LOG.debug("{}: Container Key Mapper already initialized by another task", taskName);
       }
-    }
-  }
-
-  /**
-   * Ensures the shared container count map is cleared once per reprocess cycle.
-   * This must be called by the first task that starts reprocessing to prevent
-   * cross-task data corruption where FSO and OBS tasks overwrite each other's counts.
-   */
-  private static void initializeSharedContainerCountMapIfNeeded(String taskName) {
-    synchronized (SHARED_MAP_LOCK) {
-      if (ReconConstants.CONTAINER_KEY_COUNT_MAP_INITIALIZED.compareAndSet(false, true)) {
-        SHARED_CONTAINER_KEY_COUNT_MAP.clear();
-        LOG.info("{}: Initialized shared container count map for cross-task synchronization", taskName);
-      } else {
-        LOG.debug("{}: Shared container count map already initialized by another task", taskName);
-      }
-    }
-  }
-
-  /**
-   * Clears the shared container count map and resets its initialization flag.
-   * This method should be called by tests to ensure clean state between test runs.
-   */
-  public static void clearSharedContainerCountMap() {
-    synchronized (SHARED_MAP_LOCK) {
-      SHARED_CONTAINER_KEY_COUNT_MAP.clear();
-      ReconConstants.CONTAINER_KEY_COUNT_MAP_INITIALIZED.set(false);
     }
   }
 
@@ -143,11 +130,8 @@ public abstract class ContainerKeyMapperHelper {
           taskName, maxIterators, maxWorkers, maxKeysInMemory, bucketLayout);
       Instant start = Instant.now();
 
-      // Ensure the tables are truncated only once
-      truncateTablesIfNeeded(reconContainerMetadataManager, taskName);
-
-      // Initialize shared container count map once per cycle
-      initializeSharedContainerCountMapIfNeeded(taskName);
+      // Perform one-time initialization (truncate tables + clear shared map)
+      initializeContainerKeyMapperIfNeeded(reconContainerMetadataManager, taskName);
 
       // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
@@ -538,6 +522,19 @@ public abstract class ContainerKeyMapperHelper {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Clears the shared container count map and resets initialization flag.
+   * This method should be called by tests to ensure clean state between test runs.
+   */
+  @VisibleForTesting
+  public static void clearSharedContainerCountMap() {
+    synchronized (INITIALIZATION_LOCK) {
+      SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+      ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+      LOG.debug("Cleared shared container count map and reset initialization flag for tests");
+    }
   }
 
 }
