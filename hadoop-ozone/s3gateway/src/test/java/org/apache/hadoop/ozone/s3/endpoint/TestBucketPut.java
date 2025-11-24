@@ -19,17 +19,26 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +49,24 @@ public class TestBucketPut {
 
   private String bucketName = OzoneConsts.BUCKET;
   private BucketEndpoint bucketEndpoint;
+  private HttpHeaders mockHeaders;
+  private static final String VALID_ACL_XML =
+      "<AccessControlPolicy xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\" " +
+          "                      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">" +
+          "  <Owner>" +
+          "    <ID>owner-id</ID>" +
+          "    <DisplayName>owner-name</DisplayName>" +
+          "  </Owner>" +
+          "  <AccessControlList>" +
+          "    <Grant>" +
+          "      <Grantee xsi:type=\"CanonicalUser\">" +
+          "        <ID>owner-id</ID>" +
+          "        <DisplayName>owner-name</DisplayName>" +
+          "      </Grantee>" +
+          "      <Permission>FULL_CONTROL</Permission>" +
+          "    </Grant>" +
+          "  </AccessControlList>" +
+          "</AccessControlPolicy>";
 
   @BeforeEach
   public void setup() throws Exception {
@@ -51,16 +78,52 @@ public class TestBucketPut {
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
+
+    mockHeaders = mock(HttpHeaders.class);
+    bucketEndpoint.setHeaders(mockHeaders);
+
+    Class<?> clazz = bucketEndpoint.getClass();
+    Field headersField = null;
+    while (clazz != null) {
+      try {
+        headersField = clazz.getDeclaredField("headers");
+        break;
+      } catch (NoSuchFieldException e) {
+        clazz = clazz.getSuperclass();
+      }
+    }
+    if (headersField == null) {
+      throw new IllegalStateException("Field 'headers' not found on BucketEndpoint hierarchy");
+    }
+    headersField.setAccessible(true);
+    headersField.set(bucketEndpoint, mockHeaders);
   }
 
   @Test
-  public void testBucketFailWithAuthHeaderMissing() throws Exception {
-    try {
-      bucketEndpoint.put(bucketName, null, null);
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
-    }
+  public void testAclWithMissingHeaders() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    InputStream body = new ByteArrayInputStream(VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
+
+    Response resp = bucketEndpoint.put(bucketName, "acl", body);
+    Assertions.assertEquals(200, resp.getStatus());
+  }
+
+  @Test
+  public void testAclWithMissingHeadersAndNoBody() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    WebApplicationException wae = assertThrows(WebApplicationException.class,
+        () -> bucketEndpoint.put(bucketName, "acl", null));
+
+    Throwable cause = wae.getCause();
+    assertNotNull(cause);
+    assertTrue(cause instanceof OS3Exception);
+
+    OS3Exception os3 = (OS3Exception) cause;
+
+    assertEquals("InvalidRequest", os3.getCode());
+    assertEquals(400, os3.getHttpCode());
   }
 
   @Test
@@ -73,16 +136,60 @@ public class TestBucketPut {
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
         bucketName, null, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
-    assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
+    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
   }
 
   @Test
-  public void testBucketFailWithInvalidHeader() throws Exception {
-    try {
-      bucketEndpoint.put(bucketName, null, null);
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
-    }
+  public void testPutAclOnNonExistingBucket() throws Exception {
+    OS3Exception e = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put(bucketName, "acl", null));
+    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
+    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
   }
+
+  @Test
+  public void testPutAclWithGrantFullControlHeader() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn("id=\"owner-id\"");
+
+    Response resp = bucketEndpoint.put(bucketName, "acl", null);
+
+    assertEquals(200, resp.getStatus());
+  }
+
+  @Test
+  public void testPutAclWithInvalidXmlBody() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    InputStream body = new ByteArrayInputStream(
+        "not-xml".getBytes(StandardCharsets.UTF_8));
+
+    WebApplicationException wae = assertThrows(WebApplicationException.class,
+        () -> bucketEndpoint.put(bucketName, "acl", body));
+
+    Throwable cause = wae.getCause();
+    assertNotNull(cause);
+    assertTrue(cause instanceof OS3Exception);
+    OS3Exception os3 = (OS3Exception) cause;
+
+    assertEquals("InvalidRequest", os3.getCode());
+    assertEquals(400, os3.getHttpCode());
+  }
+
+  @Test
+  public void testPutAclWithMalformedGrantHeader() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn("id\"owner-id\"");
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put(bucketName, "acl", null));
+
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals(400, ex.getHttpCode());
+  }
+
 }
