@@ -153,7 +153,6 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
-    @Override
     public OmDirectoryInfo build() {
       return new OmDirectoryInfo(this);
     }

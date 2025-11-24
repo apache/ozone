@@ -709,7 +709,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    @Override
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -958,14 +957,13 @@ public final class OmKeyInfo extends WithParentObjectId
     return Objects.hash(volumeName, bucketName, keyName, getParentObjectID());
   }
 
-  /**
-   * Return a new copy of the object.
-   */
-  @Override
   public Builder toBuilder() {
     return new Builder(this);
   }
 
+  /**
+   * Return a new copy of the object.
+   */
   @Override
   public OmKeyInfo copyObject() {
     return new Builder(this).build();
