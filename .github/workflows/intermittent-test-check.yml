@@ -95,7 +95,7 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   build:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
@@ -149,7 +149,7 @@ jobs:
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
   run-test:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis

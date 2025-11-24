@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,15 +51,18 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
   private final Map<String, SnapshotInfo> updatedSnapInfos;
+  private final TransactionInfo transactionInfo;
 
   public OMSnapshotPurgeResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull List<String> snapshotDbKeys,
-      Map<String, SnapshotInfo> updatedSnapInfos
+      Map<String, SnapshotInfo> updatedSnapInfos,
+      TransactionInfo transactionInfo
   ) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
     this.updatedSnapInfos = updatedSnapInfos;
+    this.transactionInfo = transactionInfo;
   }
 
   /**
@@ -69,6 +74,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     checkStatusNotOK();
     this.snapshotDbKeys = null;
     this.updatedSnapInfos = null;
+    this.transactionInfo = null;
   }
 
   @Override
@@ -96,9 +102,13 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       // Remove the snapshot from snapshotId to snapshotTableKey map.
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
-      // Delete Snapshot checkpoint directory.
+
       OmSnapshotLocalDataManager snapshotLocalDataManager = ((OmMetadataManagerImpl) omMetadataManager)
           .getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+      // Update snapshot local data to update purge transaction info. This would be used to check whether the
+      // snapshot purged txn is flushed to rocksdb.
+      updateLocalData(snapshotLocalDataManager, snapshotInfo);
+      // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(snapshotLocalDataManager, omMetadataManager, snapshotInfo);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
@@ -115,11 +125,19 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     }
   }
 
+  private void updateLocalData(OmSnapshotLocalDataManager localDataManager, SnapshotInfo snapshotInfo)
+      throws IOException {
+    try (WritableOmSnapshotLocalDataProvider snap = localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
+      snap.setTransactionInfo(this.transactionInfo);
+      snap.commit();
+    }
+  }
+
   /**
    * Deletes the checkpoint directory for a snapshot.
    */
   private void deleteCheckpointDirectory(OmSnapshotLocalDataManager snapshotLocalDataManager,
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) throws IOException {
     // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
     // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
     // directory can run in parallel along with this operation.
@@ -127,14 +145,18 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         .acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
     boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
     if (acquiredSnapshotLock) {
-      Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
-      try {
-        FileUtils.deleteDirectory(snapshotDirPath.toFile());
-      } catch (IOException ex) {
-        LOG.error("Failed to delete snapshot directory {} for snapshot {}",
-            snapshotDirPath, snapshotInfo.getTableKey(), ex);
-      } finally {
-        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
+      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+               snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+        Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo,
+            snapMetaProvider.getMeta().getVersion());
+        try {
+          FileUtils.deleteDirectory(snapshotDirPath.toFile());
+        } catch (IOException ex) {
+          LOG.error("Failed to delete snapshot directory {} for snapshot {}",
+              snapshotDirPath, snapshotInfo.getTableKey(), ex);
+        } finally {
+          omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
+        }
       }
     }
   }

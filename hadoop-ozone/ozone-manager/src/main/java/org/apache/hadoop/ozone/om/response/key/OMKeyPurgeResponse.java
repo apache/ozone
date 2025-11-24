@@ -19,21 +19,26 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -82,10 +87,15 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
     if (fromSnapshot != null) {
       OmSnapshotManager omSnapshotManager =
           ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
-
+      IOzoneManagerLock lock = omMetadataManager.getLock();
+      UUID fromSnapshotId = fromSnapshot.getSnapshotId();
+      OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_CONTENT_LOCK, fromSnapshotId.toString());
+      if (!lockDetails.isLockAcquired()) {
+        throw new OMException("Unable to acquire read lock on " + SNAPSHOT_DB_CONTENT_LOCK + " for snapshot: " +
+            fromSnapshotId, OMException.ResultCodes.INTERNAL_ERROR);
+      }
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmFromSnapshot =
-          omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
-
+          omSnapshotManager.getSnapshot(fromSnapshotId)) {
         OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
         DBStore fromSnapshotStore = fromOmSnapshot.getMetadataManager().getStore();
         // Init Batch Operation for snapshot db.
@@ -95,6 +105,8 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
           processKeysToUpdate(writeBatch, fromOmSnapshot.getMetadataManager());
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
+      } finally {
+        lock.releaseReadLock(SNAPSHOT_DB_CONTENT_LOCK, fromSnapshotId.toString());
       }
       omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
     } else {
