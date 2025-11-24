@@ -97,7 +97,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         .collect(Collectors.toList());
 
     if (json) {
-      System.out.print(
+      System.out.println(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(usageList));
       return;
     }
@@ -150,9 +150,10 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     System.out.printf("%-24s: %s (%s) %n", "Free Space To Spare",
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
-    System.out.printf("%-13s: %s (%s) %n%n", "Reserved",
+    System.out.printf("%-13s: %s (%s) %n", "Reserved",
         info.getReserved() + " B", 
         StringUtils.byteDesc(info.getReserved()));
+    System.out.println();
   }
 
   /**

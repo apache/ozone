@@ -1023,15 +1023,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
-      
-      long reserved = 0L;
-      final DatanodeInfo di = nodeStateManager.getNode(dn);
-      for (StorageReportProto r : di.getStorageReports()) {
-        if (r.hasReserved()) {
-          reserved += r.getReserved();
-        } 
-      }
-      usageInfo.setReserved(reserved);
+      usageInfo.setReserved(getTotalReserved(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1651,6 +1643,18 @@ public class SCMNodeManager implements NodeManager {
   public int getPipeLineCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getPipelinesCount(datanodeDetails);
+  }
+
+  public long getTotalReserved(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    long reserved = 0L;
+    final DatanodeInfo di = nodeStateManager.getNode(datanodeDetails);
+    for (StorageReportProto r : di.getStorageReports()) {
+      if (r.hasReserved()) {
+        reserved += r.getReserved();
+      }
+    }
+    return reserved;
   }
 
   @Override
