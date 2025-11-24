@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -1370,17 +1372,52 @@ public class SCMNodeManager implements NodeManager {
   private void nodeReadOnlyStatistics(Map<String, String> nodeStatics) {
     List<DatanodeInfo> allNodes = getAllNodes();
     int readOnlyCount = 0;
-    long blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    long blockSize = (long) conf.getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    long minRatisVolumeSizeBytes = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        StorageUnit.BYTES);
+    long containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
 
     for (DatanodeInfo dnInfo : allNodes) {
-      if (!SCMCommonPlacementPolicy.hasEnoughSpace(dnInfo, blockSize, containerSize, conf)) {
+      boolean hasWritableContainer = hasContainerWithSpace(dnInfo, blockSize, containerSize);
+      if (hasWritableContainer) {
+        continue;
+      }
+
+      boolean canAllocateNewContainers = SCMCommonPlacementPolicy.hasEnoughSpace(
+          dnInfo, minRatisVolumeSizeBytes, containerSize, conf);
+      if (!canAllocateNewContainers) {
         readOnlyCount++;
       }
     }
     nodeStatics.put("ReadOnlyNodes", String.valueOf(readOnlyCount));
+  }
+  
+  /**
+   * Check if a datanode has any OPEN container with enough space to accept new blocks.
+   */
+  private boolean hasContainerWithSpace(DatanodeInfo dnInfo, long blockSize, long containerSize) {
+    try {
+      Set<ContainerID> containers = getContainers(dnInfo);
+      for (ContainerID containerID : containers) {
+        ContainerInfo containerInfo = scmContext.getScm().getContainerManager().getContainer(containerID);
+        
+        if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN &&
+            containerInfo.getUsedBytes() + blockSize <= containerSize) {
+          return true;
+        }
+      }
+    } catch (Exception e) {
+      LOG.debug("Error checking containers for datanode {}: {}", dnInfo.getID(), e.getMessage());
+    }
+    return false;
   }
 
   /**
