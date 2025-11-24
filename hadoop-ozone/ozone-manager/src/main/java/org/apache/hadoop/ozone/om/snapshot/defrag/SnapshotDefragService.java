@@ -450,18 +450,19 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   /**
-   * Atomically switches the snapshot database to a new version by moving the
-   * checkpoint directory to the next version directory and updating relevant
-   * metadata. Ensures data consistency and manages cleanup of older versions.
+   * Atomically switches the current snapshot database to a new version derived
+   * from the provided checkpoint directory. This involves moving the checkpoint
+   * path to a versioned directory, updating the snapshot metadata, and committing
+   * the changes to persist the snapshot version update.
    *
-   * @param snapshotId Unique identifier of the snapshot to switch.
-   * @param checkpointPath Path to the checkpoint directory that will be moved
-   *                       to the new version directory.
-   * @throws IOException If an error occurs during directory operations,
-   *                     metadata management, lock acquisition, or database access.
+   * @param snapshotId The UUID identifying the snapshot to update.
+   * @param checkpointPath The path to the checkpoint directory that serves as the basis
+   *                       for the updated snapshot version.
+   * @return The previous version number of the snapshot prior to the update.
+   * @throws IOException If an I/O error occurs during file operations, checkpoint processing,
+   *                     or snapshot metadata updates.
    */
-  private void atomicSwitchSnapshotDB(UUID snapshotId, Path checkpointPath) throws IOException {
-    int previousVersion;
+  private int atomicSwitchSnapshotDB(UUID snapshotId, Path checkpointPath) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
              snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotId)) {
       OmSnapshotLocalData localData = snapshotLocalDataProvider.getSnapshotLocalData();
@@ -481,36 +482,7 @@ public class SnapshotDefragService extends BackgroundService
         snapshotLocalDataProvider.addSnapshotVersion(newVersionCheckpointStore);
         snapshotLocalDataProvider.commit();
       }
-      previousVersion = localData.getVersion() - 1;
-    }
-
-    // Binary search smallest existing version and delete the older versions starting from the smallest version.
-    // This is to ensure efficient crash recovery.
-    int smallestExistingVersion = 0;
-    int largestExistingVersion = previousVersion;
-    while (smallestExistingVersion <= largestExistingVersion) {
-      int midVersion = smallestExistingVersion + (largestExistingVersion - smallestExistingVersion) / 2;
-      Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, midVersion);
-      if (path.toFile().exists()) {
-        largestExistingVersion = midVersion - 1;
-      } else {
-        smallestExistingVersion = midVersion + 1;
-      }
-    }
-
-    // Acquire Snapshot DBHandle lock before removing the older version to ensure all readers are done with the
-    // snapshot db use.
-    try (UncheckedAutoCloseableSupplier<OMLockDetails> lock =
-             ozoneManager.getOmSnapshotManager().getSnapshotCache().lock(snapshotId)) {
-      if (!lock.get().isLockAcquired()) {
-        throw new IOException("Failed to acquire dbHandlelock on snapshot: " + snapshotId);
-      }
-      // Delete the older version directories. Always starting deletes from smallest version to largest version to
-      // ensure binary search works correctly on a later basis.
-      for (int version = smallestExistingVersion; version <= previousVersion; version++) {
-        Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, version);
-        deleteDirectory(path);
-      }
+      return localData.getVersion() - 1;
     }
   }
 
@@ -602,7 +574,7 @@ public class SnapshotDefragService extends BackgroundService
         performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
             checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       }
-
+      int previousVersion;
       // Acquire Content lock on the snapshot to ensure the contents of the table doesn't get changed.
       acquireContentLock(snapshotId);
       try {
@@ -610,12 +582,13 @@ public class SnapshotDefragService extends BackgroundService
         // remaining tables from the original snapshot.
         ingestNonIncrementalTables(checkpointDBStore, snapshotInfo, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
         checkpointMetadataManager.close();
+        checkpointMetadataManager = null;
         // Switch the snapshot DB location to the new version.
-        atomicSwitchSnapshotDB(snapshotId, checkpointLocation);
+        previousVersion  = atomicSwitchSnapshotDB(snapshotId, checkpointLocation);
       } finally {
         snapshotContentLocks.releaseLock();
       }
-      checkpointMetadataManager = null;
+      omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
     } finally {
       if (checkpointMetadataManager != null) {
         checkpointMetadataManager.close();
