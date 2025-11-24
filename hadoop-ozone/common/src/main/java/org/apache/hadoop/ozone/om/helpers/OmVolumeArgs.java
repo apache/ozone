@@ -405,12 +405,22 @@ public final class OmVolumeArgs extends WithObjectID
     }
 
     public OmVolumeArgs build() {
+      validate();
+      return buildMaybeInvalid();
+    }
+
+    @Override
+    protected void validate() {
+      super.validate();
       Preconditions.checkNotNull(adminName);
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
-      return new OmVolumeArgs(this);
     }
 
+    @Override
+    protected OmVolumeArgs buildMaybeInvalid() {
+      return new OmVolumeArgs(this);
+    }
   }
 
   public VolumeInfo getProtobuf() {

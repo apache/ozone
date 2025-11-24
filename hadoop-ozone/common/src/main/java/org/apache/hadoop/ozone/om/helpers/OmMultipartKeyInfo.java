@@ -305,6 +305,12 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     }
 
     public OmMultipartKeyInfo build() {
+      validate();
+      return buildMaybeInvalid();
+    }
+
+    @Override
+    protected OmMultipartKeyInfo buildMaybeInvalid() {
       return new OmMultipartKeyInfo(this);
     }
   }

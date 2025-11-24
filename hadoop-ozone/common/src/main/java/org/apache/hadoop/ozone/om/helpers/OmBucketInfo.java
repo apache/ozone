@@ -614,10 +614,21 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
      * @return instance of OmBucketInfo.
      */
     public OmBucketInfo build() {
+      validate();
+      return buildMaybeInvalid();
+    }
+
+    @Override
+    protected void validate() {
+      super.validate();
       Preconditions.checkNotNull(volumeName);
       Preconditions.checkNotNull(bucketName);
       Preconditions.checkNotNull(acls);
       Preconditions.checkNotNull(storageType);
+    }
+
+    @Override
+    protected OmBucketInfo buildMaybeInvalid() {
       return new OmBucketInfo(this);
     }
   }

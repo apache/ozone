@@ -710,6 +710,12 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public OmKeyInfo build() {
+      validate();
+      return buildMaybeInvalid();
+    }
+
+    @Override
+    protected OmKeyInfo buildMaybeInvalid() {
       return new OmKeyInfo(this);
     }
   }
