@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -53,8 +53,12 @@ import org.slf4j.LoggerFactory;
 public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implements Closeable {
   private final Table<K, V> table;
   private final Codec<K> keyCodec;
-  private final ExecutorService iteratorExecutor;
-  private final ExecutorService valueExecutors;
+
+  // Thread Pools
+  private final ExecutorService iteratorExecutor; // 5
+  private final ExecutorService valueExecutors; // 20
+
+
   private final int maxNumberOfVals;
   private final OMMetadataManager metadataManager;
   private final int maxIteratorTasks;
@@ -68,14 +72,19 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     this.table = table;
     this.keyCodec = keyCodec;
     this.metadataManager = metadataManager;
-    this.maxIteratorTasks = 2 * iteratorCount;
-    this.maxWorkerTasks = workerCount * 2;
+    this.maxIteratorTasks = 2 * iteratorCount;  // Allow up to 10 pending iterator tasks
+    this.maxWorkerTasks = workerCount * 2;      // Allow up to 40 pending worker tasks
+
+    // Create team of 5 iterator threads with UNLIMITED queue
+    // LinkedBlockingQueue() with no size = can hold infinite pending tasks
     this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
-                    new ArrayBlockingQueue<>(iteratorCount * 2),
-                    new ThreadPoolExecutor.CallerRunsPolicy());
+                    new LinkedBlockingQueue<>());
+
+    // Create team of 20 worker threads with UNLIMITED queue
     this.valueExecutors = new ThreadPoolExecutor(workerCount, workerCount, 1, TimeUnit.MINUTES,
-            new ArrayBlockingQueue<>(workerCount * 2),
-            new ThreadPoolExecutor.CallerRunsPolicy());
+            new LinkedBlockingQueue<>());
+
+    // Calculate batch size per worker (e.g., 2000 / 20 = 100 keys per batch per worker)
     this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
     this.logCountThreshold = logThreshold;
   }
@@ -131,6 +140,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     }
   }
 
+  // Main parallelization logic
   public void performTaskOnTableVals(String taskName, K startKey, K endKey,
       Function<Table.KeyValue<K, V>, Void> keyOperation) throws IOException, ExecutionException, InterruptedException {
     List<K> bounds = getBounds(startKey, endKey);
@@ -151,16 +161,32 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
       }
       return;
     }
-    
+
+    // ===== PARALLEL PROCESSING SETUP =====
+
+    // Queue to track iterator threads (5 threads creating work)
     Queue<Future<?>> iterFutures = new LinkedList<>();
+
+    // Queue to track worker threads (20 threads doing work)
     Queue<Future<?>> workerFutures = new ConcurrentLinkedQueue<>();
+
     AtomicLong keyCounter = new AtomicLong();
     AtomicLong prevLogCounter = new AtomicLong();
+
+    // ===== STEP 2: START ITERATOR THREADS =====
+    // For each segment boundary, create an iterator thread
+    // Example: If bounds = [0, 5M, 10M, 15M, 20M], this loop runs 4 times:
+    //   idx=1: beg=0, end=5M
+    //   idx=2: beg=5M, end=10M
+    //   idx=3: beg=10M, end=15M
+    //   idx=4: beg=15M, end=20M
     for (int idx = 1; idx < bounds.size(); idx++) {
       K beg = bounds.get(idx - 1);
       K end = bounds.get(idx);
       boolean inclusive = idx == bounds.size() - 1;
       waitForQueueSize(iterFutures, maxIteratorTasks - 1);
+
+      // ===== STEP 3: SUBMIT ITERATOR TASK =====
       iterFutures.add(iteratorExecutor.submit(() -> {
         try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter  = table.iterator()) {
           iter.seek(beg);
@@ -187,12 +213,19 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                 reachedEnd = true;
                 break;
               }
+
+              // If batch is full (2000 keys), stop collecting
               if (keyValues.size() >= maxNumberOfVals) {
                 break;
               }
             }
+
+            // ===== STEP 5: HAND BATCH TO WORKER THREAD =====
             if (!keyValues.isEmpty()) {
-              waitForQueueSize(workerFutures, maxWorkerTasks - 10);
+              // WAIT if worker queue is too full (max 39 pending tasks)
+              waitForQueueSize(workerFutures, maxWorkerTasks - 1);
+
+              // Submit batch to worker thread pool
               workerFutures.add(valueExecutors.submit(() -> {
                 for (Table.KeyValue<K, V> kv : keyValues) {
                   keyOperation.apply(kv);
@@ -207,8 +240,10 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                     }
                   }
                 }
+                // Worker task done! Future is now complete.
               }));
             }
+            // If we reached the end of our segment, stop reading
             if (reachedEnd) {
               break;
             }
@@ -227,7 +262,11 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
         }
       }));
     }
+
+    // ===== STEP 7: WAIT FOR EVERYONE TO FINISH =====
+    // Wait for all 5 iterator threads to finish reading
     waitForQueueSize(iterFutures, 0);
+    // Wait for all 20 worker threads to finish processing
     waitForQueueSize(workerFutures, 0);
     
     // Log final stats
