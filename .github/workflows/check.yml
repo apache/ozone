@@ -247,7 +247,7 @@ jobs:
           if [[ -s "target/${{ inputs.script }}/summary.md" ]]; then
             cat target/${{ inputs.script }}/summary.md >> $GITHUB_STEP_SUMMARY
           fi
-          hadoop-ozone/dev-support/checks/_summary.sh target/${{ inputs.script }}/summary.txt
+          hadoop-ozone/dev-support/checks/_summary.sh target/${{ inputs.script }}/summary.txt || true
 
       - name: Archive build results
         if: ${{ !cancelled() }}

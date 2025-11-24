@@ -223,7 +223,7 @@ jobs:
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt || true
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
