@@ -353,21 +353,6 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void updateContainerState(final HddsProtos.ContainerID containerID,
-                                   final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
-    final ContainerID id = ContainerID.getFromProtobuf(containerID);
-    try (AutoCloseableLock ignored = readLock(id)) {
-      if (containers.contains(id)) {
-        final ContainerInfo containerInfo = containers.getContainerInfo(id);
-        Long currentSequenceId = containerInfo.getSequenceId();
-        // Delegate to @Replicate method with current sequenceId
-        updateContainerStateWithSequenceId(containerID, event, currentSequenceId);
-      }
-    }
-  }
-
-  @Override
   public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
                                                   final LifeCycleEvent event,
                                                   final Long sequenceId)
