@@ -48,19 +48,6 @@ public abstract class FileSizeCountTaskHelper {
   private static final Object TRUNCATE_LOCK = new Object();
 
   /**
-   * GLOBAL lock for cross-task synchronization during DB writes.
-   * 
-   * Scope: Shared across ALL tasks (FSO, OBS, Legacy)
-   * Protects: RocksDB read-modify-write operations
-   * Purpose: Ensures atomic updates when multiple tasks flush concurrently to the same bins
-   * 
-   * IMPORTANT: Callers MUST acquire this lock before calling writeCountsToDB().
-   * This lock should NOT be acquired inside writeCountsToDB() to avoid nested locking.
-   */
-  public static final ReentrantReadWriteLock FILE_COUNT_WRITE_LOCK = 
-      new ReentrantReadWriteLock();
-
-  /**
    * Increments the count for a given key on a PUT event.
    */
   public static void handlePutKeyEvent(OmKeyInfo omKeyInfo,
@@ -142,13 +129,8 @@ public abstract class FileSizeCountTaskHelper {
     long iterationEndTime = Time.monotonicNow();
     
     long writeStartTime = Time.monotonicNow();
-    // Acquire GLOBAL lock (cross-task) before writing to DB
-    FILE_COUNT_WRITE_LOCK.writeLock().lock();
-    try {
-      writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-    } finally {
-      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
-    }
+    // Write remaining counts to DB (no global lock needed - FSO and OBS are mutually exclusive)
+    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
     long writeEndTime = Time.monotonicNow();
     
     long overallEndTime = Time.monotonicNow();
@@ -178,9 +160,8 @@ public abstract class FileSizeCountTaskHelper {
         taskName, maxIterators, maxWorkers, bucketLayout);
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
-    
+
     // LOCAL lock (task-specific) - coordinates worker threads within this task only
-    // Protects: in-memory fileSizeCountMap from concurrent access by workers in THIS task
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
     AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
@@ -197,26 +178,21 @@ public abstract class FileSizeCountTaskHelper {
       
       // Only one thread should attempt flush to avoid blocking all workers
       if (fileSizeCountMap.size() >= FLUSH_THRESHOLD &&
+          // If current value is false: Set to true and return true
+          // If current value is true: Do nothing and return false
           isFlushingInProgress.compareAndSet(false, true)) {
         try {
-          // Step 1: Acquire LOCAL lock (task-specific) to stop worker threads in THIS task
           lock.writeLock().lock();
           try {
-            // Double-check after acquiring write lock
+            // Double-check size after acquiring write lock
             if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
               LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-              // Step 2: Acquire GLOBAL lock (cross-task) to protect DB from concurrent FSO/OBS/Legacy writes
-              FILE_COUNT_WRITE_LOCK.writeLock().lock();
-              try {
-                writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-                fileSizeCountMap.clear();
-              } finally {
-                FILE_COUNT_WRITE_LOCK.writeLock().unlock();  // Release GLOBAL lock
-              }
+              writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+              fileSizeCountMap.clear();
             }
           } finally {
-            isFlushingInProgress.set(false);  // Reset flag after flush completes
-            lock.writeLock().unlock();  // Release LOCAL lock
+            isFlushingInProgress.set(false);
+            lock.writeLock().unlock();
           }
         } catch (Exception e) {
           throw new RuntimeException("Failed to flush file size counts", e);
@@ -301,13 +277,8 @@ public abstract class FileSizeCountTaskHelper {
       }
     }
     
-    // Acquire GLOBAL lock (cross-task) before writing to DB
-    FILE_COUNT_WRITE_LOCK.writeLock().lock();
-    try {
-      writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-    } finally {
-      FILE_COUNT_WRITE_LOCK.writeLock().unlock();
-    }
+    // Write remaining counts to DB (no lock needed for incremental processing)
+    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
     
     LOG.debug("{} successfully processed using RocksDB in {} milliseconds", taskName,
         (Time.monotonicNow() - startTime));
@@ -317,8 +288,8 @@ public abstract class FileSizeCountTaskHelper {
   /**
    * Writes the accumulated file size counts to RocksDB using ReconFileMetadataManager.
    * 
-   * IMPORTANT: Caller MUST hold FILE_COUNT_WRITE_LOCK.writeLock() before calling this method.
-   * This ensures atomic read-modify-write operations across concurrent FSO/OBS task flushes.
+   * Thread Safety: FSO and OBS tasks write to different bucket keys (mutually exclusive),
+   * so no global lock is needed. RocksDB handles concurrent writes to different keys safely.
    */
   public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
                                      ReconFileMetadataManager reconFileMetadataManager) {
@@ -326,13 +297,12 @@ public abstract class FileSizeCountTaskHelper {
       return;
     }
 
-    // Note: Caller must already hold FILE_COUNT_WRITE_LOCK.writeLock()
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
         FileSizeCountKey key = entry.getKey();
         Long deltaCount = entry.getValue();
 
-        // Always do read-modify-write to handle concurrent task flushes correctly
+        // Read-modify-write: Read current count, add delta, write back
         Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
         Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
 
