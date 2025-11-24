@@ -371,8 +371,9 @@ public class SnapshotDefragService extends BackgroundService
     Collection<Pair<Path, SstFileInfo>> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
         previousSnapshotInfo, snapshotInfo, incrementalTables);
 
-    Map<String, List<Pair<Path, SstFileInfo>>> tableGroupedDeltaFiles = allTableDeltaFiles.stream()
-        .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily()));
+    Map<String, List<Path>> tableGroupedDeltaFiles = allTableDeltaFiles.stream()
+        .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily(),
+            Collectors.mapping(Pair::getKey, Collectors.toList())));
 
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
@@ -380,26 +381,25 @@ public class SnapshotDefragService extends BackgroundService
     Set<Path> filesToBeDeleted = new HashSet<>();
     // All files computed as delta must be deleted irrespective of whether ingestion succeeded or not.
     allTableDeltaFiles.forEach(pair -> filesToBeDeleted.add(pair.getKey()));
-    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getActiveSnapshot(volumeName,
-        bucketName, snapshotInfo.getName());
-         UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot = omSnapshotManager.getActiveSnapshot(
-             volumeName, bucketName, previousSnapshotInfo.getName())) {
-      for (Map.Entry<String, List<Pair<Path, SstFileInfo>>> entry : tableGroupedDeltaFiles.entrySet()) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             omSnapshotManager.getActiveSnapshot(volumeName, bucketName, snapshotInfo.getName());
+         UncheckedAutoCloseableSupplier<OmSnapshot> previousSnapshot =
+             omSnapshotManager.getActiveSnapshot(volumeName, bucketName, previousSnapshotInfo.getName())) {
+      for (Map.Entry<String, List<Path>> entry : tableGroupedDeltaFiles.entrySet()) {
         String table = entry.getKey();
-        List<Pair<Path, SstFileInfo>> deltaFiles = entry.getValue();
+        List<Path> deltaFiles = entry.getValue();
         Path fileToBeIngested;
         if (deltaFiles.size() == 1 && snapshotVersion > 0) {
           // If there is only one delta file for the table and the snapshot version is also not 0 then the same delta
           // file can reingested into the checkpointStore.
-          fileToBeIngested = deltaFiles.get(0).getKey();
+          fileToBeIngested = deltaFiles.get(0);
         } else {
           Table<String, byte[]> snapshotTable = snapshot.get().getMetadataManager().getStore()
               .getTable(table, StringCodec.get(), ByteArrayCodec.get());
           Table<String, byte[]> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
               .getTable(table, StringCodec.get(), ByteArrayCodec.get());
-          List<Path> deltaFilePaths = deltaFiles.stream().map(Pair::getKey).collect(Collectors.toList());
           String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
-          Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFilePaths, snapshotTable,
+          Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
               previousSnapshotTable, tableBucketPrefix);
           fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
           filesToBeDeleted.add(spillResult.getLeft());
