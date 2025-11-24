@@ -102,28 +102,6 @@ public abstract class WithObjectID extends WithMetadata {
     }
 
     /**
-     * Set the Object ID.
-     * The object ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
-     * deserialized from the protobuf in many places in code. We need to set
-     * this object ID, after it is deserialized.
-     *
-     * @param obId - long
-     */
-    public Builder withObjectID(long obId) {
-      this.objectID = obId;
-      return this;
-    }
-
-    /**
-     * Sets the update ID. For each modification of this object, we will set
-     * this to a value greater than the current value.
-     */
-    public Builder withUpdateID(long newValue) {
-      this.updateID = newValue;
-      return this;
-    }
-
-    /**
      * Sets the update ID for this Object. Update IDs are monotonically
      * increasing values which are updated each time there is an update.
      */

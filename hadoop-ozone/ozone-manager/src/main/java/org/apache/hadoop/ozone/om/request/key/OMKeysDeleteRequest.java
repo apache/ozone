@@ -317,7 +317,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           CacheValue.get(trxnLogIndex));
 
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;

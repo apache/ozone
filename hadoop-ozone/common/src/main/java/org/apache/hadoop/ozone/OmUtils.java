@@ -557,7 +557,7 @@ public final class OmUtils {
     }
 
     // Set the updateID
-    builder.withUpdateID(trxnLogIndex);
+    builder.setUpdateID(trxnLogIndex);
 
     //The key doesn't exist in deletedTable, so create a new instance.
     return new RepeatedOmKeyInfo(builder.build(), bucketId);
