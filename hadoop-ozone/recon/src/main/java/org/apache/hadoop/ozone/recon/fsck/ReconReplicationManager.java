@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -132,13 +133,51 @@ public class ReconReplicationManager extends ReplicationManager {
   }
 
   /**
+   * Checks if container replicas have mismatched data checksums.
+   * This is a Recon-specific check not done by SCM's ReplicationManager.
+   *
+   * <p>REPLICA_MISMATCH detection is crucial for identifying:
+   * <ul>
+   *   <li>Bit rot (silent data corruption)</li>
+   *   <li>Failed writes to some replicas</li>
+   *   <li>Storage corruption on specific datanodes</li>
+   *   <li>Network corruption during replication</li>
+   * </ul>
+   * </p>
+   *
+   * <p>This matches the legacy ContainerHealthTask logic:
+   * {@code replicas.stream().map(ContainerReplica::getDataChecksum).distinct().count() != 1}
+   * </p>
+   *
+   * @param replicas Set of container replicas to check
+   * @return true if replicas have different data checksums
+   */
+  private boolean hasDataChecksumMismatch(Set<ContainerReplica> replicas) {
+    if (replicas == null || replicas.isEmpty()) {
+      return false;
+    }
+
+    // Count distinct checksums (filter out nulls)
+    long distinctChecksums = replicas.stream()
+        .map(ContainerReplica::getDataChecksum)
+        .filter(Objects::nonNull)
+        .distinct()
+        .count();
+
+    // More than 1 distinct checksum = data mismatch
+    // 0 distinct checksums = all nulls, no mismatch
+    return distinctChecksums > 1;
+  }
+
+  /**
    * Override processAll() to capture ALL per-container health states,
    * not just aggregate counts and 100 samples.
    *
    * <p><b>Processing Flow:</b></p>
    * <ol>
    *   <li>Get all containers from ContainerManager</li>
-   *   <li>Process each container using inherited health check chain</li>
+   *   <li>Process each container using inherited health check chain (SCM logic)</li>
+   *   <li>Additionally check for REPLICA_MISMATCH (Recon-specific)</li>
    *   <li>Capture ALL unhealthy container IDs per health state (no sampling limit)</li>
    *   <li>Store results in Recon's UNHEALTHY_CONTAINERS_V2 table</li>
    * </ol>
@@ -147,6 +186,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <ul>
    *   <li>Uses ReconReplicationManagerReport (captures all containers)</li>
    *   <li>Uses NullReplicationQueue (doesn't enqueue commands)</li>
+   *   <li>Adds REPLICA_MISMATCH detection (not done by SCM)</li>
    *   <li>Stores results in database instead of just keeping in-memory report</li>
    * </ul>
    */
@@ -170,9 +210,19 @@ public class ReconReplicationManager extends ReplicationManager {
     for (ContainerInfo container : containers) {
       report.increment(container.getState());
       try {
-        // Call inherited processContainer - this runs the health check chain
+        ContainerID cid = container.containerID();
+
+        // Call inherited processContainer - this runs SCM's health check chain
         // readOnly=true ensures no commands are generated
         processContainer(container, nullQueue, report, true);
+
+        // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
+        if (hasDataChecksumMismatch(replicas)) {
+          report.addReplicaMismatchContainer(cid);
+          LOG.debug("Container {} has data checksum mismatch across replicas", cid);
+        }
+
         processedCount++;
 
         if (processedCount % 10000 == 0) {
@@ -213,11 +263,12 @@ public class ReconReplicationManager extends ReplicationManager {
         report.getAllContainersByState();
 
     LOG.info("Processing health states: MISSING={}, UNDER_REPLICATED={}, " +
-            "OVER_REPLICATED={}, MIS_REPLICATED={}",
+            "OVER_REPLICATED={}, MIS_REPLICATED={}, REPLICA_MISMATCH={}",
         report.getAllContainersCount(HealthState.MISSING),
         report.getAllContainersCount(HealthState.UNDER_REPLICATED),
         report.getAllContainersCount(HealthState.OVER_REPLICATED),
-        report.getAllContainersCount(HealthState.MIS_REPLICATED));
+        report.getAllContainersCount(HealthState.MIS_REPLICATED),
+        report.getReplicaMismatchCount());
 
     // Process MISSING containers
     List<ContainerID> missingContainers =
@@ -230,7 +281,7 @@ public class ReconReplicationManager extends ReplicationManager {
             UnHealthyContainerStates.MISSING, currentTime, expected, 0,
             "No replicas available"));
       } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing MISSING state", cid);
+        LOG.warn("Container {} not found when processing MISSING state", cid, e);
       }
     }
 
@@ -247,7 +298,7 @@ public class ReconReplicationManager extends ReplicationManager {
             UnHealthyContainerStates.UNDER_REPLICATED, currentTime, expected, actual,
             "Insufficient replicas"));
       } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing UNDER_REPLICATED state", cid);
+        LOG.warn("Container {} not found when processing UNDER_REPLICATED state", cid, e);
       }
     }
 
@@ -264,7 +315,7 @@ public class ReconReplicationManager extends ReplicationManager {
             UnHealthyContainerStates.OVER_REPLICATED, currentTime, expected, actual,
             "Excess replicas"));
       } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing OVER_REPLICATED state", cid);
+        LOG.warn("Container {} not found when processing OVER_REPLICATED state", cid, e);
       }
     }
 
@@ -285,6 +336,22 @@ public class ReconReplicationManager extends ReplicationManager {
       }
     }
 
+    // Process REPLICA_MISMATCH containers (Recon-specific)
+    List<ContainerID> replicaMismatchContainers = report.getReplicaMismatchContainers();
+    for (ContainerID cid : replicaMismatchContainers) {
+      try {
+        ContainerInfo container = containerManager.getContainer(cid);
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
+        int expected = container.getReplicationConfig().getRequiredNodes();
+        int actual = replicas.size();
+        recordsToInsert.add(createRecord(container,
+            UnHealthyContainerStates.REPLICA_MISMATCH, currentTime, expected, actual,
+            "Data checksum mismatch across replicas"));
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("Container {} not found when processing REPLICA_MISMATCH state", cid, e);
+      }
+    }
+
     // Collect all container IDs for SCM state deletion
     for (ContainerInfo container : allContainers) {
       containerIdsToDelete.add(container.getContainerID());
@@ -297,9 +364,11 @@ public class ReconReplicationManager extends ReplicationManager {
     LOG.info("Inserting {} unhealthy container records", recordsToInsert.size());
     healthSchemaManager.insertUnhealthyContainerRecords(recordsToInsert);
 
-    LOG.info("Stored {} MISSING, {} UNDER_REPLICATED, {} OVER_REPLICATED, {} MIS_REPLICATED",
+    LOG.info("Stored {} MISSING, {} UNDER_REPLICATED, {} OVER_REPLICATED, " +
+            "{} MIS_REPLICATED, {} REPLICA_MISMATCH",
         missingContainers.size(), underRepContainers.size(),
-        overRepContainers.size(), misRepContainers.size());
+        overRepContainers.size(), misRepContainers.size(),
+        replicaMismatchContainers.size());
   }
 
   /**

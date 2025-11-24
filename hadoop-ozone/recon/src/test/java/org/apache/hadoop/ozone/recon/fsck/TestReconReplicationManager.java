@@ -40,7 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Smoke tests for ReconReplicationManager (Option 4 - Local ReplicationManager).
+ * Smoke tests for ReconReplicationManager Local ReplicationManager.
  *
  * These tests verify that:
  * 1. ReconReplicationManager can be instantiated properly

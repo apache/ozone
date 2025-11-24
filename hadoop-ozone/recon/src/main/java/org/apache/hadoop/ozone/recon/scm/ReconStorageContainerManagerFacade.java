@@ -305,9 +305,9 @@ public class ReconStorageContainerManagerFacade
     this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.dataSource = dataSource;
 
-    // Initialize Recon's ReplicationManager for Option 4 (local health checks)
+    // Initialize Recon's ReplicationManager for local health checks
     try {
-      LOG.info("Creating ReconReplicationManager (Option 4)");
+      LOG.info("Creating ReconReplicationManager");
       this.reconReplicationManager = new ReconReplicationManager(
           conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
           conf,

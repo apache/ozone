@@ -38,6 +38,10 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
  * the sampling limitation while maintaining backward compatibility by still
  * calling the parent's incrementAndSample() method.</p>
  *
+ * <p><b>REPLICA_MISMATCH Handling:</b> Since SCM's HealthState enum doesn't include
+ * REPLICA_MISMATCH (it's a Recon-specific check for data checksum mismatches),
+ * we track it separately in replicaMismatchContainers.</p>
+ *
  * <p><b>Memory Impact:</b> For a cluster with 100K containers and 5% unhealthy rate,
  * this adds approximately 620KB of memory during report generation (5K containers
  * × 124 bytes per container). Even in worst case (100% unhealthy), memory usage
@@ -48,6 +52,9 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
   // Captures ALL containers per health state (no SAMPLE_LIMIT restriction)
   private final Map<HealthState, List<ContainerID>> allContainersByState =
       new HashMap<>();
+
+  // Captures containers with REPLICA_MISMATCH (Recon-specific, not in SCM's HealthState)
+  private final List<ContainerID> replicaMismatchContainers = new ArrayList<>();
 
   /**
    * Override to capture ALL containers, not just first 100 samples.
@@ -109,5 +116,34 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    */
   public void clearAllContainers() {
     allContainersByState.clear();
+    replicaMismatchContainers.clear();
+  }
+
+  /**
+   * Add a container to the REPLICA_MISMATCH list.
+   * This is a Recon-specific health state not tracked by SCM.
+   *
+   * @param container The container ID with replica checksum mismatch
+   */
+  public void addReplicaMismatchContainer(ContainerID container) {
+    replicaMismatchContainers.add(container);
+  }
+
+  /**
+   * Get all containers with REPLICA_MISMATCH state.
+   *
+   * @return List of container IDs with data checksum mismatches, or empty list
+   */
+  public List<ContainerID> getReplicaMismatchContainers() {
+    return Collections.unmodifiableList(replicaMismatchContainers);
+  }
+
+  /**
+   * Get count of containers with REPLICA_MISMATCH.
+   *
+   * @return Number of containers with replica checksum mismatches
+   */
+  public int getReplicaMismatchCount() {
+    return replicaMismatchContainers.size();
   }
 }

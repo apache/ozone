@@ -31,9 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * V2 implementation of Container Health Task using Option 4: Local ReplicationManager.
+ * V2 implementation of Container Health Task using Local ReplicationManager.
  *
- * <p><b>Option 4 Architecture:</b></p>
+ * <p><b>Solution:</b></p>
  * <ul>
  *   <li>Uses Recon's local ReplicationManager (not RPC to SCM)</li>
  *   <li>Calls processAll() once to check all containers in batch</li>
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  *   <li>All database operations handled inside ReconReplicationManager</li>
  * </ul>
  *
- * <p><b>Benefits over Option 3:</b></p>
+ * <p><b>Benefits over RPC call to SCM 3:</b></p>
  * <ul>
  *   <li>Zero RPC overhead (no per-container calls to SCM)</li>
  *   <li>Zero SCM load</li>
@@ -76,7 +76,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     super(taskStatusUpdaterManager);
     this.reconScm = reconScm;
     this.interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
-    LOG.info("Initialized ContainerHealthTaskV2 with Option 4 (Local ReplicationManager), interval={}ms",
+    LOG.info("Initialized ContainerHealthTaskV2 with Local ReplicationManager, interval={}ms",
         interval);
   }
 
@@ -101,7 +101,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   }
 
   /**
-   * Main task execution - uses Recon's local ReplicationManager (Option 4).
+   * Main task execution - uses Recon's local ReplicationManager.
    *
    * <p>Simply calls processAll() on ReconReplicationManager, which:
    * <ul>
@@ -112,7 +112,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
    */
   @Override
   protected void runTask() throws Exception {
-    LOG.info("ContainerHealthTaskV2 starting - using local ReplicationManager (Option 4)");
+    LOG.info("ContainerHealthTaskV2 starting - using local ReplicationManager");
 
     // Get Recon's ReplicationManager (actually a ReconReplicationManager instance)
     ReconReplicationManager reconRM =

@@ -458,6 +458,6 @@ public class TestReconTasks {
     // - ContainerHealthTaskV2 would detect this as MIS_REPLICATED
     //
     // The detection logic in SCM's ReplicationManager handles this,
-    // and our Option 4 implementation reuses that logic.
+    // and our Recon's RM logic implementation reuses that logic.
   }
 }

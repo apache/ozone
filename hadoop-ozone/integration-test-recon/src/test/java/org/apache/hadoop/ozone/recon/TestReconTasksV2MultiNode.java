@@ -62,7 +62,7 @@ public class TestReconTasksV2MultiNode {
    *
    * The detection logic is tested end-to-end in:
    * - TestReconTasks.testContainerHealthTaskV2WithSCMSync() - which proves
-   *   Option 4 works for MISSING containers (similar detection logic)
+   *   Recon's RM logic works for MISSING containers (similar detection logic)
    *
    * Full end-to-end test for UNDER_REPLICATED would require:
    * 1. Allocate container with RF=3
