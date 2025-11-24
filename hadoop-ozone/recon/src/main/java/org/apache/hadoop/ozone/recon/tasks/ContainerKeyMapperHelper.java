@@ -112,8 +112,7 @@ public abstract class ContainerKeyMapperHelper {
           
           // Step 3: Initialize reference counter (2 tasks: FSO + OBS)
           ACTIVE_TASK_COUNT.set(2);
-          LOG.info("{}: Initialized active task counter to 2", taskName);
-          
+
         } catch (Exception e) {
           // CRITICAL: Reset flag so another task can retry
           ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
@@ -204,6 +203,19 @@ public abstract class ContainerKeyMapperHelper {
       // Write total container count once at the end (after all processing)
       if (totalContainers > 0) {
         reconContainerMetadataManager.incrementContainerCountBy(totalContainers);
+      }
+
+      // Decrement active task counter and cleanup if this is the last task
+      int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
+      LOG.info("{}: Task completed. Remaining active tasks: {}", taskName, remainingTasks);
+      
+      if (remainingTasks == 0) {
+        // Last task finished - clean up shared resources
+        synchronized (INITIALIZATION_LOCK) {
+          SHARED_CONTAINER_KEY_COUNT_MAP.clear();
+          ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
+          LOG.debug("{}: Last task completed. Cleared shared map and reset initialization flag.", taskName);
+        }
       }
 
       Instant end = Instant.now();
@@ -527,22 +539,6 @@ public abstract class ContainerKeyMapperHelper {
 
       // Only clear localContainerKeyMap (per-task), keep sharedContainerKeyCountMap for other tasks
       localContainerKeyMap.clear();
-      
-      // If this is a final flush (sharedContainerKeyCountMap is not empty),
-      // decrement reference counter and cleanup if last task
-      if (!sharedContainerKeyCountMap.isEmpty()) {
-        int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
-        LOG.info("Task completed. Remaining active tasks: {}", remainingTasks);
-        
-        if (remainingTasks == 0) {
-          // Last task finished - clean up shared resources
-          synchronized (INITIALIZATION_LOCK) {
-            SHARED_CONTAINER_KEY_COUNT_MAP.clear();
-            ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
-            LOG.info("Last task completed. Cleared shared map and reset initialization flag.");
-          }
-        }
-      }
 
     } catch (IOException e) {
       LOG.error("Unable to write Container Key and Container Key Count data in Recon DB.", e);
