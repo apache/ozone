@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
@@ -497,6 +498,9 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
+    // TODO: OM bootstrapping is not aware of defrag dir yet. Remove the workaround workaround when implemented
+    initialFullSet.remove(OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR);
+
     assertThat(finalFullSet).contains(expectedLogStr);
     assertThat(finalFullSet).contains(expectedSstStr);
     assertEquals(initialFullSet, finalFullSet, "expected snapshot files not found");
