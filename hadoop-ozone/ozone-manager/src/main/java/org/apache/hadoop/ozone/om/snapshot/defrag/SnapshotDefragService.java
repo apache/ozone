@@ -291,6 +291,62 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   /**
+   * Spills table difference into an SST file based on the provided delta file paths,
+   * current snapshot table, previous snapshot table, and an optional table key prefix.
+   *
+   * The method reads the delta files and compares the records against the snapshot tables.
+   * Any differences, including tombstones (deleted entries), are written to a new SST file.
+   *
+   * @param deltaFilePaths the list of paths to the delta files to process
+   * @param snapshotTable the current snapshot table for comparison
+   * @param previousSnapshotTable the previous snapshot table for comparison
+   * @param tableKeyPrefix the prefix for filtering certain keys, or null if all keys are to be included
+   * @return a pair of the path of the created SST file containing the differences and a boolean
+   *         indicating whether any delta entries were written (true if there are differences, false otherwise)
+   * @throws IOException if an I/O error occurs during processing
+   */
+  @VisibleForTesting
+  Pair<Path, Boolean> spillTableDiffIntoSstFile(List<Path> deltaFilePaths, Table<String, byte[]> snapshotTable,
+      Table<String, byte[]> previousSnapshotTable, String tableKeyPrefix) throws IOException {
+    String sstFileReaderUpperBound = null;
+    if (Strings.isNotEmpty(tableKeyPrefix)) {
+      sstFileReaderUpperBound = getLexicographicallyHigherString(tableKeyPrefix);
+    }
+    SstFileSetReader sstFileSetReader = new SstFileSetReader(deltaFilePaths);
+    Path fileToBeIngested = differTmpDir.resolve(snapshotTable.getName() + "-" + UUID.randomUUID()
+        + SST_FILE_EXTENSION);
+    int deltaEntriesCount = 0;
+    try (ClosableIterator<String> keysToCheck =
+             sstFileSetReader.getKeyStreamWithTombstone(tableKeyPrefix, sstFileReaderUpperBound);
+         TableMergeIterator<String, byte[]> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
+             tableKeyPrefix, snapshotTable, previousSnapshotTable);
+         RDBSstFileWriter rdbSstFileWriter = new RDBSstFileWriter(fileToBeIngested.toFile())) {
+      while (tableMergeIterator.hasNext()) {
+        Table.KeyValue<String, List<byte[]>> kvs = tableMergeIterator.next();
+        // Check if the values are equal or if they are not equal then the value should be written to the
+        // delta sstFile.
+        if (!Arrays.equals(kvs.getValue().get(0), kvs.getValue().get(1))) {
+          try (CodecBuffer key = StringCodec.get().toHeapCodecBuffer(kvs.getKey())) {
+            byte[] keyArray = key.asReadOnlyByteBuffer().array();
+            byte[] val = kvs.getValue().get(0);
+            // If the value is null then add a tombstone to the delta sstFile.
+            if (val == null) {
+              rdbSstFileWriter.delete(keyArray);
+            } else {
+              rdbSstFileWriter.put(keyArray, val);
+            }
+          }
+          deltaEntriesCount++;
+        }
+      }
+    } catch (RocksDBException e) {
+      throw new RocksDatabaseException("Error while reading sst files.", e);
+    }
+    // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
+    return Pair.of(fileToBeIngested, deltaEntriesCount != 0);
+  }
+
+  /**
    * Performs an incremental defragmentation process, which involves determining
    * and processing delta files between snapshots for metadata updates. The method
    * computes the changes, manages file ingestion to the checkpoint metadata manager,
@@ -341,49 +397,12 @@ public class SnapshotDefragService extends BackgroundService
               .getTable(table, StringCodec.get(), ByteArrayCodec.get());
           Table<String, byte[]> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
               .getTable(table, StringCodec.get(), ByteArrayCodec.get());
-
-          String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
-          String sstFileReaderLowerBound = bucketPrefixInfo.getTablePrefix(entry.getKey());
-          String sstFileReaderUpperBound = null;
-          if (Strings.isNotEmpty(sstFileReaderLowerBound)) {
-            sstFileReaderUpperBound = getLexicographicallyHigherString(sstFileReaderLowerBound);
-          }
           List<Path> deltaFilePaths = deltaFiles.stream().map(Pair::getKey).collect(Collectors.toList());
-          SstFileSetReader sstFileSetReader = new SstFileSetReader(deltaFilePaths);
-          fileToBeIngested = differTmpDir.resolve(table + "-" + UUID.randomUUID() + SST_FILE_EXTENSION);
-          // Delete all delta files after reingesting into the checkpointStore.
-          filesToBeDeleted.add(fileToBeIngested);
-          int deltaEntriesCount = 0;
-          try (ClosableIterator<String> keysToCheck =
-                   sstFileSetReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound);
-               TableMergeIterator<String, byte[]> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
-                  tableBucketPrefix, snapshotTable, previousSnapshotTable);
-               RDBSstFileWriter rdbSstFileWriter = new RDBSstFileWriter(fileToBeIngested.toFile())) {
-            while (tableMergeIterator.hasNext()) {
-              Table.KeyValue<String, List<byte[]>> kvs = tableMergeIterator.next();
-              // Check if the values are equal or if they are not equal then the value should be written to the
-              // delta sstFile.
-              if (!Arrays.equals(kvs.getValue().get(0), kvs.getValue().get(1))) {
-                try (CodecBuffer key = StringCodec.get().toHeapCodecBuffer(kvs.getKey())) {
-                  byte[] keyArray = key.asReadOnlyByteBuffer().array();
-                  byte[] val = kvs.getValue().get(0);
-                  // If the value is null then add a tombstone to the delta sstFile.
-                  if (val == null) {
-                    rdbSstFileWriter.delete(keyArray);
-                  } else {
-                    rdbSstFileWriter.put(keyArray, val);
-                  }
-                }
-                deltaEntriesCount++;
-              }
-            }
-          } catch (RocksDBException e) {
-            throw new RocksDatabaseException("Error while reading sst files.", e);
-          }
-          if (deltaEntriesCount == 0) {
-            // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
-            fileToBeIngested = null;
-          }
+          String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
+          Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFilePaths, snapshotTable,
+              previousSnapshotTable, tableBucketPrefix);
+          fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
+          filesToBeDeleted.add(spillResult.getLeft());
         }
         if (fileToBeIngested != null) {
           if (!fileToBeIngested.toFile().exists()) {
