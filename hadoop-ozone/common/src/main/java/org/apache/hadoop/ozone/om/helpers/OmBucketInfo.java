@@ -607,7 +607,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
 
     @Override
-    protected OmBucketInfo buildMaybeInvalid() {
+    protected OmBucketInfo buildObject() {
       return new OmBucketInfo(this);
     }
   }

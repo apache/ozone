@@ -154,7 +154,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     }
 
     @Override
-    protected OmDirectoryInfo buildMaybeInvalid() {
+    protected OmDirectoryInfo buildObject() {
       return new OmDirectoryInfo(this);
     }
   }

@@ -155,7 +155,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     }
 
     @Override
-    protected OmPrefixInfo buildMaybeInvalid() {
+    protected OmPrefixInfo buildObject() {
       return new OmPrefixInfo(this);
     }
   }

@@ -401,7 +401,7 @@ public final class OmVolumeArgs extends WithObjectID
     }
 
     @Override
-    protected OmVolumeArgs buildMaybeInvalid() {
+    protected OmVolumeArgs buildObject() {
       return new OmVolumeArgs(this);
     }
   }

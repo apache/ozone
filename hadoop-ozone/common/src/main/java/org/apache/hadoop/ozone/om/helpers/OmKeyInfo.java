@@ -698,7 +698,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     @Override
-    protected OmKeyInfo buildMaybeInvalid() {
+    protected OmKeyInfo buildObject() {
       return new OmKeyInfo(this);
     }
   }

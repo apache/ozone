@@ -128,15 +128,15 @@ public abstract class WithObjectID extends WithMetadata {
         throw new IllegalArgumentException(String.format(
             "Trying to set updateID to %d which is not greater than the " +
                 "current value of %d for %s", updateID, initialUpdateID,
-            buildMaybeInvalid().getObjectInfo()));
+            buildObject().getObjectInfo()));
       }
     }
 
-    protected abstract T buildMaybeInvalid();
+    protected abstract T buildObject();
 
     public final T build() {
       validate();
-      return buildMaybeInvalid();
+      return buildObject();
     }
   }
 }
