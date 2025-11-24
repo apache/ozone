@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.security;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -74,9 +73,9 @@ public final class STSTokenEncryption {
       return plaintext;
     }
     
-    byte[] aesKey = null;
-    byte[] iv = null;
-    byte[] salt = null;
+    byte[] aesKey;
+    byte[] iv;
+    byte[] salt;
     try {
       // Generate random salt
       salt = new byte[HKDF_SALT_LENGTH];
@@ -104,17 +103,6 @@ public final class STSTokenEncryption {
       return Base64.getEncoder().encodeToString(result);
     } catch (Exception e) {
       throw new STSTokenEncryptionException("Failed to encrypt sensitive data", e);
-    } finally {
-      // Memory hygiene
-      if (aesKey != null) {
-        Arrays.fill(aesKey, (byte) 0);
-      }
-      if (iv != null) {
-        Arrays.fill(iv, (byte) 0);
-      }
-      if (salt != null) {
-        Arrays.fill(salt, (byte) 0);
-      }
     }
   }
 
@@ -138,7 +126,7 @@ public final class STSTokenEncryption {
       return encryptedData;
     }
     
-    byte[] aesKey = null;
+    byte[] aesKey;
     try {
       // Decode base64
       final byte[] data = Base64.getDecoder().decode(encryptedData);
@@ -168,17 +156,9 @@ public final class STSTokenEncryption {
       // Decrypt the ciphertext
       final byte[] output = cipher.doFinal(ciphertext);
       
-      // Clear ciphertext array which was created during extraction (memory hygiene)
-      Arrays.fill(ciphertext, (byte) 0);
-      
       return new String(output, StandardCharsets.UTF_8);
     } catch (Exception e) {
       throw new STSTokenEncryptionException("Failed to decrypt sensitive data", e);
-    } finally {
-      // Memory hygiene
-      if (aesKey != null) {
-        Arrays.fill(aesKey, (byte) 0);
-      }
     }
   }
   

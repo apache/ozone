@@ -25,7 +25,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -185,12 +184,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     try {
       final byte[] aad = computeAadBytes();
-      try {
-        return STSTokenEncryption.encrypt(value, encryptionKey, aad);
-      } finally {
-        // Memory hygiene
-        Arrays.fill(aad, (byte) 0);
-      }
+      return STSTokenEncryption.encrypt(value, encryptionKey, aad);
     } catch (STSTokenEncryption.STSTokenEncryptionException e) {
       throw new RuntimeException("Token encryption failed", e);
     }
@@ -209,12 +203,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     try {
       final byte[] aad = computeAadBytes();
-      try {
-        return STSTokenEncryption.decrypt(encryptedValue, encryptionKey, aad);
-      } finally {
-        // Memory hygiene
-        Arrays.fill(aad, (byte) 0);
-      }
+      return STSTokenEncryption.decrypt(encryptedValue, encryptionKey, aad);
     } catch (STSTokenEncryption.STSTokenEncryptionException e) {
       throw new RuntimeException("Token decryption failed", e);
     }
