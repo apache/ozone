@@ -84,7 +84,7 @@ public class TestObjectTaggingDelete {
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
+        null, null, 1, null, null, null, body);
 
 
     ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);
