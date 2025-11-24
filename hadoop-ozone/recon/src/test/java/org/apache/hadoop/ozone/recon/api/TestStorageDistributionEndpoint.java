@@ -101,7 +101,7 @@ class TestStorageDistributionEndpoint {
     assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
     assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedKeyBytes());
 
-    DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getDeletionPendingBytesByStage();
+    DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getPendingDeletionBytes();
     assertEquals(OM_PENDING_TOTAL, deletionBreakdown.getByComponent().get("OM").get("totalBytes"));
     assertEquals(SCM_PENDING, deletionBreakdown.getByComponent().get("SCM").get("pendingBytes"));
     assertEquals(0L, deletionBreakdown.getByComponent().get("DN").get("pendingBytes"));
@@ -130,7 +130,7 @@ class TestStorageDistributionEndpoint {
     assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
     assertEquals(COMMITTED_SIZE, usedSpaceBreakDown.getCommittedKeyBytes());
 
-    DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getDeletionPendingBytesByStage();
+    DeletionPendingBytesByComponent deletionBreakdown = usedSpaceBreakDown.getPendingDeletionBytes();
     assertEquals(OM_PENDING_TOTAL, deletionBreakdown.getByComponent().get("OM").get("totalBytes"));
     assertEquals(0, deletionBreakdown.getByComponent().get("SCM").get("pendingBytes"));
   }
@@ -300,7 +300,7 @@ class TestStorageDistributionEndpoint {
 
     // Verify deletion metrics are still available (SCM didn't timeout)
     DeletionPendingBytesByComponent deletionBreakdown =
-        usedSpaceBreakDown.getDeletionPendingBytesByStage();
+        usedSpaceBreakDown.getPendingDeletionBytes();
     assertEquals(SCM_PENDING, deletionBreakdown.getByComponent().get("SCM").get("pendingBytes"));
   }
 
@@ -350,7 +350,7 @@ class TestStorageDistributionEndpoint {
     assertEquals(OPEN_KEYS_SIZE, usedSpaceBreakDown.getOpenKeyBytes());
 
     DeletionPendingBytesByComponent deletionBreakdown =
-        usedSpaceBreakDown.getDeletionPendingBytesByStage();
+        usedSpaceBreakDown.getPendingDeletionBytes();
     assertEquals(0L, deletionBreakdown.getByComponent().get("SCM").get("pendingBytes"));
   }
 

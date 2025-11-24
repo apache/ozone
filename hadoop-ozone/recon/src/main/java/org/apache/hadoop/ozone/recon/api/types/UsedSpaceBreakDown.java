@@ -72,11 +72,11 @@ public class UsedSpaceBreakDown {
     return committedKeyBytes;
   }
 
-  public long getContainerPreAllocated() {
+  public long getPreAllocatedContainerBytes() {
     return preAllocatedContainerBytes;
   }
 
-  public DeletionPendingBytesByComponent getDeletionPendingBytesByStage() {
+  public DeletionPendingBytesByComponent getPendingDeletionBytes() {
     return pendingDeletionBytes;
   }
 }
