@@ -276,7 +276,7 @@ public class SnapshotDefragService extends BackgroundService
       // the table is less than equal to the highest value then delete the range between bucket prefix
       // and also the highest value.
       if (tableHighestValue != null && tableHighestValue.compareTo(prefixUpperBound) >= 0) {
-        checkpointTable.deleteRange(tableBucketPrefix, tableHighestValue);
+        checkpointTable.deleteRange(prefixUpperBound, tableHighestValue);
         checkpointTable.delete(tableHighestValue);
       }
       // Compact the table completely with kForce to get rid of tombstones.
