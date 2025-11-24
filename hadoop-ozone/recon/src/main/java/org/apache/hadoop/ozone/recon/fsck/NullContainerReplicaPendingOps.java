@@ -42,10 +42,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class NullContainerReplicaPendingOps extends ContainerReplicaPendingOps {
 
-  public NullContainerReplicaPendingOps(Clock clock) {
-    super(clock);
-  }
-
   public NullContainerReplicaPendingOps(Clock clock,
       ReplicationManager.ReplicationManagerConfiguration rmConf) {
     super(clock, rmConf);
