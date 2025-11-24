@@ -37,7 +37,7 @@ public abstract class WithObjectID extends WithMetadata {
     updateID = 0;
   }
 
-  protected WithObjectID(Builder b) {
+  protected WithObjectID(Builder<?> b) {
     super(b);
     objectID = b.objectID;
     updateID = b.updateID;
@@ -71,7 +71,7 @@ public abstract class WithObjectID extends WithMetadata {
   }
 
   /** Builder for {@link WithObjectID}. */
-  public abstract static class Builder extends WithMetadata.Builder {
+  public abstract static class Builder<T extends WithObjectID> extends WithMetadata.Builder {
     private final long initialObjectID;
     private final long initialUpdateID;
     private long objectID;
@@ -96,7 +96,7 @@ public abstract class WithObjectID extends WithMetadata {
      * Object ID are unique and immutable identifier for each object in the
      * System.
      */
-    public Builder setObjectID(long obId) {
+    public Builder<T> setObjectID(long obId) {
       this.objectID = obId;
       return this;
     }
@@ -105,7 +105,7 @@ public abstract class WithObjectID extends WithMetadata {
      * Sets the update ID for this Object. Update IDs are monotonically
      * increasing values which are updated each time there is an update.
      */
-    public Builder setUpdateID(long id) {
+    public Builder<T> setUpdateID(long id) {
       this.updateID = id;
       return this;
     }
@@ -132,6 +132,11 @@ public abstract class WithObjectID extends WithMetadata {
       }
     }
 
-    protected abstract WithObjectID buildMaybeInvalid();
+    protected abstract T buildMaybeInvalid();
+
+    public final T build() {
+      validate();
+      return buildMaybeInvalid();
+    }
   }
 }

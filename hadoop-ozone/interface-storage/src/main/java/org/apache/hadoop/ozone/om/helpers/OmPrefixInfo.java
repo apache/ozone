@@ -96,7 +96,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   /**
    * Builder for OmPrefixInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> {
     private String name;
     private final List<OzoneAcl> acls;
 
@@ -146,15 +146,6 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;
-    }
-
-    /**
-     * Constructs the OmPrefixInfo.
-     * @return instance of OmPrefixInfo.
-     */
-    public OmPrefixInfo build() {
-      validate();
-      return buildMaybeInvalid();
     }
 
     @Override

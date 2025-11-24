@@ -63,7 +63,7 @@ public abstract class WithParentObjectId extends WithObjectID {
   }
 
   /** Builder for {@link WithParentObjectId}. */
-  public abstract static class Builder extends WithObjectID.Builder {
+  public abstract static class Builder<T extends WithParentObjectId> extends WithObjectID.Builder<T> {
     private long parentObjectID;
 
     protected Builder() {
@@ -75,7 +75,7 @@ public abstract class WithParentObjectId extends WithObjectID {
       parentObjectID = obj.getParentObjectID();
     }
 
-    public Builder setParentObjectID(long parentObjectId) {
+    public Builder<T> setParentObjectID(long parentObjectId) {
       this.parentObjectID = parentObjectId;
       return this;
     }

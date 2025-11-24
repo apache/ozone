@@ -500,7 +500,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -695,11 +695,6 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder setExpectedDataGeneration(Long existingGeneration) {
       this.expectedDataGeneration = existingGeneration;
       return this;
-    }
-
-    public OmKeyInfo build() {
-      validate();
-      return buildMaybeInvalid();
     }
 
     @Override

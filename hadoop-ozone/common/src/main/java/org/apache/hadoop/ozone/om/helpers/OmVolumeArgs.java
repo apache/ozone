@@ -277,7 +277,7 @@ public final class OmVolumeArgs extends WithObjectID
   /**
    * Builder for OmVolumeArgs.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmVolumeArgs> {
     private String adminName;
     private String ownerName;
     private String volume;
@@ -390,11 +390,6 @@ public final class OmVolumeArgs extends WithObjectID
           "refCount should not be negative");
       this.refCount = refCount;
       return this;
-    }
-
-    public OmVolumeArgs build() {
-      validate();
-      return buildMaybeInvalid();
     }
 
     @Override

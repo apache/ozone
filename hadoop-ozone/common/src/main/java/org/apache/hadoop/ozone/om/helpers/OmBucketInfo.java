@@ -427,7 +427,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * Builder for OmBucketInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
     private String volumeName;
     private String bucketName;
     private final List<OzoneAcl> acls = new ArrayList<>();
@@ -595,15 +595,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         DefaultReplicationConfig defaultReplConfig) {
       this.defaultReplicationConfig = defaultReplConfig;
       return this;
-    }
-
-    /**
-     * Constructs the OmBucketInfo.
-     * @return instance of OmBucketInfo.
-     */
-    public OmBucketInfo build() {
-      validate();
-      return buildMaybeInvalid();
     }
 
     @Override

@@ -75,7 +75,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
     private String name;
     private String owner;
 
@@ -151,11 +151,6 @@ public class OmDirectoryInfo extends WithParentObjectId
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
       return this;
-    }
-
-    public OmDirectoryInfo build() {
-      validate();
-      return buildMaybeInvalid();
     }
 
     @Override
