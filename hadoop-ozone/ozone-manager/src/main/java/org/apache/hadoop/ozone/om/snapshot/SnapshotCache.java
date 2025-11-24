@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -302,13 +304,20 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         () -> cleanup(snapshotId));
   }
 
+  private OMLockDetails getEmptyOmLockDetails(OMLockDetails lockDetails) {
+    return lockDetails.isLockAcquired() ? EMPTY_DETAILS_LOCK_ACQUIRED : EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+  }
+
   private UncheckedAutoCloseableSupplier<OMLockDetails> lock(Supplier<OMLockDetails> lockFunction,
       Supplier<OMLockDetails> unlockFunction, Supplier<Void> cleanupFunction) {
-    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(lockFunction.get());
+    Supplier<OMLockDetails> emptyLockFunction = () -> getEmptyOmLockDetails(lockFunction.get());
+    Supplier<OMLockDetails> emptyUnlockFunction = () -> getEmptyOmLockDetails(unlockFunction.get());
+
+    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(emptyLockFunction.get());
     if (lockDetails.get().isLockAcquired()) {
       cleanupFunction.get();
       if (!dbMap.isEmpty()) {
-        lockDetails.set(unlockFunction.get());
+        lockDetails.set(emptyUnlockFunction.get());
       }
     }
 
@@ -318,7 +327,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       public void close() {
         lockDetails.updateAndGet((prevLock) -> {
           if (prevLock != null && prevLock.isLockAcquired()) {
-            return unlockFunction.get();
+            return emptyUnlockFunction.get();
           }
           return prevLock;
         });
