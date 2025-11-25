@@ -32,12 +32,16 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A lock manager implementation that manages hierarchical resource locks
@@ -47,7 +51,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  * DAGs (e.g., File System trees or snapshot chains).
  */
 public class PoolBasedHierarchicalResourceLockManager implements HierarchicalResourceLockManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PoolBasedHierarchicalResourceLockManager.class);
+
   private final GenericObjectPool<ReadWriteLock> lockPool;
+  private final ResourceLockTracker<DAGLeveledResource> resourceLockTracker;
   private final Map<DAGLeveledResource, Map<String, LockReferenceCountPair>> lockMap;
 
   public PoolBasedHierarchicalResourceLockManager(OzoneConfiguration conf) {
@@ -61,6 +69,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
     config.setBlockWhenExhausted(true);
     this.lockPool = new GenericObjectPool<>(new ReadWriteLockFactory(), config);
     this.lockMap = new ConcurrentHashMap<>();
+    this.resourceLockTracker = DAGResourceLockTracker.get();
   }
 
   private ReadWriteLock operateOnLock(DAGLeveledResource resource, String key,
@@ -102,8 +111,25 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
     return acquireLock(resource, key, false);
   }
 
+  private String getErrorMessage(IOzoneManagerLock.Resource resource) {
+    return "Thread '" + Thread.currentThread().getName() + "' cannot " +
+        "acquire " + resource.getName() + " lock while holding " +
+        resourceLockTracker.getCurrentLockedResources().map(IOzoneManagerLock.Resource::getName)
+            .collect(Collectors.toList()) + " lock(s).";
+  }
+
+  @Override
+  public Stream<DAGLeveledResource> getCurrentLockedResources() {
+    return resourceLockTracker.getCurrentLockedResources();
+  }
+
   private HierarchicalResourceLock acquireLock(DAGLeveledResource resource, String key, boolean isReadLock)
       throws IOException {
+    if (!resourceLockTracker.canLockResource(resource)) {
+      String errorMessage = getErrorMessage(resource);
+      LOG.error(errorMessage);
+      throw new RuntimeException(errorMessage);
+    }
     ReadWriteLock readWriteLock = operateOnLock(resource, key, LockReferenceCountPair::increment);
     if (readWriteLock == null) {
       throw new IOException("Unable to acquire " + (isReadLock ? "read" : "write") + " lock on resource "
@@ -133,19 +159,20 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
    * class, {@code PoolBasedHierarchicalResourceLockManager}, which oversees
    * the lifecycle of multiple such locks.
    */
-  public class PoolBasedHierarchicalResourceLock implements HierarchicalResourceLock, Closeable {
+  private final class PoolBasedHierarchicalResourceLock implements HierarchicalResourceLock, Closeable {
 
     private boolean isLockAcquired;
     private final Lock lock;
     private final DAGLeveledResource resource;
     private final String key;
 
-    public PoolBasedHierarchicalResourceLock(DAGLeveledResource resource, String key, Lock lock) {
+    private PoolBasedHierarchicalResourceLock(DAGLeveledResource resource, String key, Lock lock) {
       this.isLockAcquired = true;
       this.lock = lock;
       this.resource = resource;
       this.key = key;
       this.lock.lock();
+      resourceLockTracker.lockResource(resource);
     }
 
     @Override
@@ -157,6 +184,7 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
     public synchronized void close() throws IOException {
       if (isLockAcquired) {
         this.lock.unlock();
+        resourceLockTracker.unlockResource(resource);
         operateOnLock(resource, key, (LockReferenceCountPair::decrement));
         isLockAcquired = false;
       }
