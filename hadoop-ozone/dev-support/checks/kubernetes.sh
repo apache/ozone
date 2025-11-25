@@ -19,9 +19,11 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+OZONE_ROOT=$(pwd -P)
+
 export KUBECONFIG
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
+REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/kubernetes"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
@@ -35,10 +37,12 @@ else
 fi
 
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
-DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
+DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
-  echo "Distribution dir is missing.  Please build Ozone first."
+  echo "Error: distribution dir not found: $DIST_DIR"
+  echo "Please build Ozone first."
+  ls -l "${OZONE_ROOT}/hadoop-ozone/dist/target"
   exit 1
 fi
 
