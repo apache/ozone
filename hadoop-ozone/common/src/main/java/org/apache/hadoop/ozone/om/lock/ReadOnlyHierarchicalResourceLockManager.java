@@ -48,12 +48,12 @@ public class ReadOnlyHierarchicalResourceLockManager implements HierarchicalReso
   };
 
   @Override
-  public HierarchicalResourceLock acquireReadLock(FlatResource resource, String key) throws IOException {
+  public HierarchicalResourceLock acquireReadLock(DAGLeveledResource resource, String key) throws IOException {
     return EMPTY_LOCK_ACQUIRED;
   }
 
   @Override
-  public HierarchicalResourceLock acquireWriteLock(FlatResource resource, String key) throws IOException {
+  public HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException {
     return EMPTY_LOCK_NOT_ACQUIRED;
   }
 

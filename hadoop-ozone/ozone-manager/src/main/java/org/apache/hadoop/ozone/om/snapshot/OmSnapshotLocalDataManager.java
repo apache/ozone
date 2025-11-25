@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DA
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_DEFRAG;
 import static org.apache.ozone.rocksdb.util.RdbUtil.getLiveSSTFilesForCFs;
 
@@ -66,7 +67,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -499,8 +499,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
-    HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
-        snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
+    HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(SNAPSHOT_LOCAL_DATA_LOCK,
+        snapId.toString()) : locks.acquireWriteLock(SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
     if (!acquiredLock.isLockAcquired()) {
       throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
     }
