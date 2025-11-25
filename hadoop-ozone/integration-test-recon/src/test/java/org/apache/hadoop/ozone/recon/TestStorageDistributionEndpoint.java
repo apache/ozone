@@ -190,19 +190,27 @@ public class TestStorageDistributionEndpoint {
       }
     }
     waitForKeysCreated(replicationConfig);
-    Thread.sleep(10000);
-    StringBuilder urlBuilder = new StringBuilder();
-    urlBuilder.append(getReconWebAddress(conf))
-        .append(STORAGE_DIST_ENDPOINT);
-    String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-    StorageCapacityDistributionResponse storageResponse =
-        MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(getReconWebAddress(conf))
+            .append(STORAGE_DIST_ENDPOINT);
+        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+        StorageCapacityDistributionResponse storageResponse =
+            MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
 
-    assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
-    assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
-    assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
-    assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
-    assertEquals(3, storageResponse.getDataNodeUsage().size());
+        assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
+        assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
+        assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+        assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
+        assertEquals(3, storageResponse.getDataNodeUsage().size());
+
+        return true;
+      } catch (Exception e) {
+        LOG.debug("Waiting for storage distribution assertions to pass", e);
+        return false;
+      }
+    }, 5000, 30000);
   }
 
   private void verifyBlocksCreated(
