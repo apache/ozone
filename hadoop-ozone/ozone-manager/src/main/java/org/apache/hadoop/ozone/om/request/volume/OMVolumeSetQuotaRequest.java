@@ -134,7 +134,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       OmVolumeArgs omVolumeArgs = builder
           .setModificationTime(setVolumePropertyRequest.getModificationTime())
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       // update cache.

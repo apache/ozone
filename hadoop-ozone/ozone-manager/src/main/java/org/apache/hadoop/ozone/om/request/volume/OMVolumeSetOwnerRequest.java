@@ -154,7 +154,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omVolumeArgs = omVolumeArgs.toBuilder()
           .setOwnerName(newOwner)
           .setModificationTime(setVolumePropertyRequest.getModificationTime())
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       // Update cache.

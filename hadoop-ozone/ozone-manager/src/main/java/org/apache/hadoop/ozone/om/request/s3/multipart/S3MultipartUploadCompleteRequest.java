@@ -528,7 +528,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    return builder.withUpdateID(trxnLogIndex).build();
+    return builder.setUpdateID(trxnLogIndex).build();
   }
 
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,

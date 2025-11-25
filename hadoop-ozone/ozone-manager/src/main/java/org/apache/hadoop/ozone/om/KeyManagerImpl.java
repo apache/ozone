@@ -176,6 +176,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -420,10 +421,14 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
 
-      snapshotDefragService =
-          new SnapshotDefragService(serviceInterval, TimeUnit.MILLISECONDS,
-              serviceTimeout, ozoneManager, conf);
-      snapshotDefragService.start();
+      try {
+        snapshotDefragService =
+            new SnapshotDefragService(serviceInterval, TimeUnit.MILLISECONDS,
+                serviceTimeout, ozoneManager, conf);
+        snapshotDefragService.start();
+      } catch (IOException e) {
+        LOG.error("Error starting Snapshot Defrag Service", e);
+      }
     } else {
       LOG.info("SnapshotDefragService is disabled. Snapshot defragmentation will not run periodically.");
     }

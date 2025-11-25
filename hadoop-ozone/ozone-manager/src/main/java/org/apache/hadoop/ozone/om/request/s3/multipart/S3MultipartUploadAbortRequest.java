@@ -161,7 +161,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
       multipartKeyInfo = multipartKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // When abort uploaded key, we need to subtract the PartKey length from

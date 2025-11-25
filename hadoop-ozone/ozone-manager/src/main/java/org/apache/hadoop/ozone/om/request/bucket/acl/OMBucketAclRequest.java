@@ -121,7 +121,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
               .getModificationTime();
         }
         omBucketInfo = omBucketInfo.toBuilder()
-            .withUpdateID(transactionLogIndex)
+            .setUpdateID(transactionLogIndex)
             .setModificationTime(modificationTime)
             .build();
 
