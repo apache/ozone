@@ -73,7 +73,7 @@ cp $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-linux-aarc
 PROTOBUF_VERSION="2.5.0"
 curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz
 tar xzf protobuf-2.5.0.tar.gz
-cd protobuf-${PROTOBUF_VERSION}
+pushd protobuf-${PROTOBUF_VERSION}
 
 # Open the file `src/google/protobuf/stubs/platform_macros.h` with an editor like vim and append the following lines after line 59 (include the #).  
 # Save the file when complete.
@@ -85,11 +85,11 @@ cd protobuf-${PROTOBUF_VERSION}
 # Execute the following commands to build `protoc`
 ./configure --disable-shared
 make -j
-cd ..
 # Install protoc to the local Maven repository
 mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
 # Workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
 mv $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
+popd
 ```
 
 ## Build Ozone

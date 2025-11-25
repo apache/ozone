@@ -52,6 +52,27 @@ public class OzoneManagerRatisServerConfig {
   )
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
 
+  @Config(key = "read.option",
+      defaultValue = "DEFAULT",
+      type = ConfigType.STRING,
+      tags = {OZONE, OM, RATIS, PERFORMANCE},
+      description = "Select the Ratis server read option." +
+          " Possible values are: " +
+          "   DEFAULT      - Directly query statemachine (non-linearizable). " +
+          "     Only the leader can serve read requests. " +
+          "   LINEARIZABLE - Use ReadIndex (see Raft Paper section 6.4) to maintain linearizability. " +
+          " Both the leader and the followers can serve read requests."
+  )
+  private String readOption;
+
+  @Config(key = "read.leader.lease.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, OM, RATIS, PERFORMANCE},
+      description = "If we enabled the leader lease on Ratis Leader."
+  )
+  private boolean readLeaderLeaseEnabled;
+
   public long getLogAppenderWaitTimeMin() {
     return logAppenderWaitTimeMin;
   }
@@ -66,5 +87,21 @@ public class OzoneManagerRatisServerConfig {
 
   public void setRetryCacheTimeout(Duration duration) {
     this.retryCacheTimeout = duration.toMillis();
+  }
+
+  public String getReadOption() {
+    return readOption;
+  }
+
+  public void setReadOption(String option) {
+    this.readOption = option;
+  }
+
+  public boolean isReadLeaderLeaseEnabled() {
+    return readLeaderLeaseEnabled;
+  }
+
+  public void setReadLeaderLeaseEnabled(boolean readLeaderLeaseEnabled) {
+    this.readLeaderLeaseEnabled = readLeaderLeaseEnabled;
   }
 }

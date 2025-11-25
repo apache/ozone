@@ -146,6 +146,12 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   Map<Integer, String> getTableNames();
 
   /**
+   * Drop the specific table.
+   * @param tableName - Name of the table to truncate.
+   */
+  void dropTable(String tableName) throws RocksDatabaseException;
+
+  /**
    * Get data written to DB since a specific sequence number.
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
@@ -162,4 +168,6 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
    * @return true if the DB is closed.
    */
   boolean isClosed();
+
+  String getSnapshotsParentDir();
 }

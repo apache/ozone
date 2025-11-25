@@ -35,6 +35,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
@@ -983,6 +985,23 @@ public class SCMClientProtocolServer implements
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     return 0;
+  }
+
+  @Nullable
+  @Override
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    try {
+      DeletedBlocksTransactionSummary summary =
+          scm.getScmBlockManager().getDeletedBlockLog().getTransactionSummary();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap));
+      return summary;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap, ex));
+      throw ex;
+    }
   }
 
   /**

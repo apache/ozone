@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
@@ -82,7 +83,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "fso-tree",
     description = "Identify and repair a disconnected FSO tree by marking unreferenced (orphaned) entries for " +
-        "deletion. OM should be stopped while this tool is run."
+        "deletion. OM should be stopped for this tool."
 )
 public class FSORepairTool extends RepairTool {
   private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
@@ -622,7 +623,9 @@ public class FSORepairTool extends RepairTool {
           "not exist or is not a RocksDB directory.", dbPath));
     }
     // Load RocksDB and tables needed.
-    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
+    OmReadOnlyLock omReadOnlyLock = new OmReadOnlyLock();
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1,
+        omReadOnlyLock);
   }
 
   /**

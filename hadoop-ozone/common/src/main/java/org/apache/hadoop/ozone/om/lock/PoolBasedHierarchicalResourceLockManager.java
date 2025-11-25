@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  */
 public class PoolBasedHierarchicalResourceLockManager implements HierarchicalResourceLockManager {
   private final GenericObjectPool<ReadWriteLock> lockPool;
-  private final Map<FlatResource, Map<String, LockReferenceCountPair>> lockMap;
+  private final Map<DAGLeveledResource, Map<String, LockReferenceCountPair>> lockMap;
 
   public PoolBasedHierarchicalResourceLockManager(OzoneConfiguration conf) {
     int softLimit = conf.getInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT,
@@ -63,8 +63,8 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
     this.lockMap = new ConcurrentHashMap<>();
   }
 
-  private ReadWriteLock operateOnLock(FlatResource resource, String key, Consumer<LockReferenceCountPair> function)
-      throws IOException {
+  private ReadWriteLock operateOnLock(DAGLeveledResource resource, String key,
+      Consumer<LockReferenceCountPair> function) throws IOException {
     AtomicReference<IOException> exception = new AtomicReference<>();
     Map<String, LockReferenceCountPair> resourceLockMap =
         this.lockMap.computeIfAbsent(resource, k -> new ConcurrentHashMap<>());
@@ -93,16 +93,16 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
   }
 
   @Override
-  public HierarchicalResourceLock acquireReadLock(FlatResource resource, String key) throws IOException {
+  public HierarchicalResourceLock acquireReadLock(DAGLeveledResource resource, String key) throws IOException {
     return acquireLock(resource, key, true);
   }
 
   @Override
-  public HierarchicalResourceLock acquireWriteLock(FlatResource resource, String key) throws IOException {
+  public HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException {
     return acquireLock(resource, key, false);
   }
 
-  private HierarchicalResourceLock acquireLock(FlatResource resource, String key, boolean isReadLock)
+  private HierarchicalResourceLock acquireLock(DAGLeveledResource resource, String key, boolean isReadLock)
       throws IOException {
     ReadWriteLock readWriteLock = operateOnLock(resource, key, LockReferenceCountPair::increment);
     if (readWriteLock == null) {
@@ -137,10 +137,10 @@ public class PoolBasedHierarchicalResourceLockManager implements HierarchicalRes
 
     private boolean isLockAcquired;
     private final Lock lock;
-    private final FlatResource resource;
+    private final DAGLeveledResource resource;
     private final String key;
 
-    public PoolBasedHierarchicalResourceLock(FlatResource resource, String key, Lock lock) {
+    public PoolBasedHierarchicalResourceLock(DAGLeveledResource resource, String key, Lock lock) {
       this.isLockAcquired = true;
       this.lock = lock;
       this.resource = resource;
