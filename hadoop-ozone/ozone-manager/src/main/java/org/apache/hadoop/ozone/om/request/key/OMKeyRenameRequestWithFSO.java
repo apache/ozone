@@ -289,7 +289,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
     fromKeyValue = fromKeyValue.toBuilder()
-        .withUpdateID(trxnLogIndex)
+        .setUpdateID(trxnLogIndex)
         .build();
     // Set toFileName
     fromKeyValue.setKeyName(toKeyFileName);

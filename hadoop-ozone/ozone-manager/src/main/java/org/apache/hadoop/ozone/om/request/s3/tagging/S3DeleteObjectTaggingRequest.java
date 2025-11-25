@@ -130,7 +130,7 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       omKeyInfo.getTags().clear();
       // Set the UpdateID to the current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Note: Key modification time is not changed because S3 last modified

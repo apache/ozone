@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 
 import net.jcip.annotations.Immutable;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Mixin class to handle ObjectID and UpdateID.
@@ -36,7 +37,7 @@ public abstract class WithObjectID extends WithMetadata {
     updateID = 0;
   }
 
-  protected WithObjectID(Builder b) {
+  protected WithObjectID(Builder<?> b) {
     super(b);
     objectID = b.objectID;
     updateID = b.updateID;
@@ -70,18 +71,24 @@ public abstract class WithObjectID extends WithMetadata {
   }
 
   /** Builder for {@link WithObjectID}. */
-  public static class Builder extends WithMetadata.Builder {
+  public abstract static class Builder<T extends WithObjectID> extends WithMetadata.Builder {
+    private final long initialObjectID;
+    private final long initialUpdateID;
     private long objectID;
     private long updateID;
 
     protected Builder() {
       super();
+      initialObjectID = 0;
+      initialUpdateID = OzoneConsts.DEFAULT_OM_UPDATE_ID;
     }
 
     protected Builder(WithObjectID obj) {
       super(obj);
-      objectID = obj.getObjectID();
-      updateID = obj.getUpdateID();
+      initialObjectID = obj.getObjectID();
+      initialUpdateID = obj.getUpdateID();
+      objectID = initialObjectID;
+      updateID = initialUpdateID;
     }
 
     /**
@@ -89,65 +96,8 @@ public abstract class WithObjectID extends WithMetadata {
      * Object ID are unique and immutable identifier for each object in the
      * System.
      */
-    public Builder setObjectID(long obId) {
+    public Builder<T> setObjectID(long obId) {
       this.objectID = obId;
-      return this;
-    }
-
-    /**
-     * Set the Object ID.
-     * The object ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
-     * deserialized from the protobuf in many places in code. We need to set
-     * this object ID, after it is deserialized.
-     *
-     * @param obId - long
-     */
-    public Builder withObjectID(long obId) {
-      if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
-        throw new UnsupportedOperationException("Attempt to modify object ID " +
-            "which is not zero. Current Object ID is " + this.objectID);
-      }
-      this.objectID = obId;
-      return this;
-    }
-
-    /**
-     * Sets the update ID. For each modification of this object, we will set
-     * this to a value greater than the current value.
-     */
-    public Builder withUpdateID(long newValue) {
-      // Because in non-HA, we have multiple rpc handler threads and
-      // transactionID is generated in OzoneManagerServerSideTranslatorPB.
-
-      // Lets take T1 -> Set Bucket Property
-      // T2 -> Set Bucket Acl
-
-      // Now T2 got lock first, so updateID will be set to 2. Now when T1 gets
-      // executed we will hit the precondition exception. So for OM non-HA with
-      // out ratis we should not have this check.
-
-      // Same can happen after OM restart also.
-
-      // OM Start
-      // T1 -> Create Bucket
-      // T2 -> Set Bucket Property
-
-      // OM restart
-      // T1 -> Set Bucket Acl
-
-      // So when T1 is executing, Bucket will have updateID 2 which is set by T2
-      // execution before restart.
-
-      // Main reason, in non-HA transaction Index after restart starts from 0.
-      // And also because of this same reason we don't do replay checks in non-HA.
-      final long currentValue = getUpdateID();
-      if (newValue < currentValue) {
-        throw new IllegalArgumentException(String.format(
-            "Trying to set updateID to %d which is not greater than the " +
-                "current value of %d for %s", newValue, currentValue,
-            getObjectInfo()));
-      }
-      this.updateID = newValue;
       return this;
     }
 
@@ -155,7 +105,7 @@ public abstract class WithObjectID extends WithMetadata {
      * Sets the update ID for this Object. Update IDs are monotonically
      * increasing values which are updated each time there is an update.
      */
-    public Builder setUpdateID(long id) {
+    public Builder<T> setUpdateID(long id) {
       this.updateID = id;
       return this;
     }
@@ -168,9 +118,25 @@ public abstract class WithObjectID extends WithMetadata {
       return updateID;
     }
 
-    /** Hook method, customized in subclasses. */
-    public String getObjectInfo() {
-      return this.toString();
+    protected void validate() {
+      if (initialObjectID != objectID && initialObjectID != 0 && objectID != OBJECT_ID_RECLAIM_BLOCKS) {
+        throw new UnsupportedOperationException("Attempt to modify object ID " +
+            "which is not zero. Current Object ID is " + initialObjectID);
+      }
+
+      if (updateID < initialUpdateID) {
+        throw new IllegalArgumentException(String.format(
+            "Trying to set updateID to %d which is not greater than the " +
+                "current value of %d for %s", updateID, initialUpdateID,
+            buildObject().getObjectInfo()));
+      }
+    }
+
+    protected abstract T buildObject();
+
+    public final T build() {
+      validate();
+      return buildObject();
     }
   }
 }

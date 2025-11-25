@@ -35,7 +35,7 @@ public interface HierarchicalResourceLockManager extends AutoCloseable {
    * @return a {@code HierarchicalResourceLock} interface to manage the lifecycle of the acquired lock
    * @throws IOException if an I/O error occurs during the process of acquiring the lock
    */
-  HierarchicalResourceLock acquireReadLock(FlatResource resource, String key) throws IOException;
+  HierarchicalResourceLock acquireReadLock(DAGLeveledResource resource, String key) throws IOException;
 
   /**
    * Acquires a write lock on the specified resource using the provided key.
@@ -45,7 +45,7 @@ public interface HierarchicalResourceLockManager extends AutoCloseable {
    * @return a {@code HierarchicalResourceLock} interface to manage the lifecycle of the acquired lock
    * @throws IOException if an I/O error occurs during the process of acquiring the lock
    */
-  HierarchicalResourceLock acquireWriteLock(FlatResource resource, String key) throws IOException;
+  HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException;
 
   /**
    * Interface for managing the lock lifecycle corresponding to a Hierarchical Resource.

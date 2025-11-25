@@ -276,7 +276,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
-            .withUpdateID(trxnLogIndex)
+            .setUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -305,7 +305,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           .setExpectedDataGeneration(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .setDataSize(commitKeyArgs.getDataSize())
           .build();
 

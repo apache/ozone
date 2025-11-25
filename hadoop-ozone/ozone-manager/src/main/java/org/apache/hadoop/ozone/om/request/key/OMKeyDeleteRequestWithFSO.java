@@ -126,7 +126,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
