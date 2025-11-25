@@ -167,7 +167,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
           fail("Second thread failed to acquire lock: " + e.getMessage());
         }
       }, executor);
-
+      latch2.await();
       // Wait for both threads to complete
       future1.get(5, TimeUnit.SECONDS);
       future2.get(5, TimeUnit.SECONDS);
