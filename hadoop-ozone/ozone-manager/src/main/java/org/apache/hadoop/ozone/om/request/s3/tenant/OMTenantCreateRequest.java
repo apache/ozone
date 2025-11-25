@@ -279,8 +279,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
         omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
         omVolumeArgs = omVolumeArgs.toBuilder()
-            .withObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
-            .withUpdateID(transactionLogIndex)
+            .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+            .setUpdateID(transactionLogIndex)
             .build();
 
         omVolumeArgs.incRefCount();

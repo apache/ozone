@@ -277,7 +277,7 @@ public final class OmVolumeArgs extends WithObjectID
   /**
    * Builder for OmVolumeArgs.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmVolumeArgs> {
     private String adminName;
     private String ownerName;
     private String volume;
@@ -298,18 +298,6 @@ public final class OmVolumeArgs extends WithObjectID
     @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
-      return this;
-    }
-
-    @Override
-    public Builder withObjectID(long obId) {
-      super.withObjectID(obId);
-      return this;
-    }
-
-    @Override
-    public Builder withUpdateID(long newValue) {
-      super.withUpdateID(newValue);
       return this;
     }
 
@@ -404,13 +392,18 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
-    public OmVolumeArgs build() {
+    @Override
+    protected void validate() {
+      super.validate();
       Preconditions.checkNotNull(adminName);
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
-      return new OmVolumeArgs(this);
     }
 
+    @Override
+    protected OmVolumeArgs buildObject() {
+      return new OmVolumeArgs(this);
+    }
   }
 
   public VolumeInfo getProtobuf() {

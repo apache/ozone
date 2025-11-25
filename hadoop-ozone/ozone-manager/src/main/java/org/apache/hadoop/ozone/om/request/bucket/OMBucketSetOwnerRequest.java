@@ -150,7 +150,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       OmBucketInfo newOmBucketInfo = omBucketInfo.toBuilder()
           .setOwner(newOwner)
           .setModificationTime(setBucketPropertyRequest.getModificationTime())
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",

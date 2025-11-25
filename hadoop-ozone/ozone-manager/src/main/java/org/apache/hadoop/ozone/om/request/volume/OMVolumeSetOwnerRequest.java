@@ -153,7 +153,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // Set owner with new owner name.
       omVolumeArgs.setOwnerName(newOwner);
       omVolumeArgs = omVolumeArgs.toBuilder()
-          .withUpdateID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
 
       // Update modificationTime.
