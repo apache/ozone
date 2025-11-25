@@ -704,6 +704,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     UUID snap3Id;
     ReclaimableKeyFilter keyFilter;
     SnapshotInfo snapInfo;
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcSnap2 = null;
     // Create snap3 to test snapshot 3 deep cleaning otherwise just run on AOS.
     if (kdsRunningOnAOS) {
       snap3Id = null;
@@ -722,9 +723,10 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       assertTrue(om.getMetadataManager().getSnapshotInfo(volume, bucket, "snap2")
           .isDeepCleanedDeletedDir());
       snapInfo = SnapshotUtils.getSnapshotInfo(om, volume, bucket, "snap2");
+      rcSnap2 = getOmSnapshot(volume, bucket, "snap2");
       keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(),
-          snapInfo, getOmSnapshot(volume, bucket, "snap2").get().getKeyManager(),
+          snapInfo, rcSnap2.get().getKeyManager(),
           om.getMetadataManager().getLock());
     }
 
@@ -774,15 +776,34 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       sds.shutdown();
       GenericTestUtils.waitFor(kdsWaitStarted::get, 1000, 30000);
       client.getObjectStore().deleteSnapshot(volume, bucket, "snap" + snasphotDeleteIndex);
-      sds.runPeriodicalTaskNow();
+      CompletableFuture<Void> sdsFuture = new CompletableFuture<>();
+      CompletableFuture.runAsync(() -> {
+        try {
+          sds.runPeriodicalTaskNow();
+          sdsFuture.complete(null);
+        } catch (Exception e) {
+          sdsFuture.completeExceptionally(e);
+        }
+      });
+      sdsFuture.get();
       om.awaitDoubleBufferFlush();
       if (snasphotDeleteIndex == 2) {
-        sds.runPeriodicalTaskNow();
+        CompletableFuture.runAsync(() -> {
+          try {
+            sds.runPeriodicalTaskNow();
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        }).get();
       }
       assertTrue(sdsLockWaitStarted.get());
       assertTrue(sdsLockAcquired.get());
       assertThrows(IOException.class, () -> SnapshotUtils.getSnapshotInfo(om, volume, bucket,
           "snap" + snasphotDeleteIndex));
+    } finally {
+      if (rcSnap2 != null) {
+        rcSnap2.close();
+      }
     }
   }
 

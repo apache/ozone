@@ -240,10 +240,11 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-              ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
-              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE).getPurgedKeys())
-          .isEmpty();
+      try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
+          keyManager, om.getMetadataManager().getLock())) {
+        assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
+      }
     }
 
     @Test
@@ -325,11 +326,11 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-              ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
-              keyManager, om.getMetadataManager().getLock()),
-          Integer.MAX_VALUE).getPurgedKeys())
-          .isEmpty();
+      try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+          ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
+          keyManager, om.getMetadataManager().getLock())) {
+        assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
+      }
 
       // deletedTable should have deleted key of the snapshot bucket
       assertFalse(metadataManager.getDeletedTable().isEmpty());
@@ -639,6 +640,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       SnapshotChainManager snapshotChainManager = Mockito.mock(SnapshotChainManager.class);
       OmSnapshotManager omSnapshotManager = Mockito.mock(OmSnapshotManager.class);
       when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+      when(omMetadataManager.getLock()).thenReturn(om.getMetadataManager().getLock());
       when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
       when(omMetadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
       when(snapshotChainManager.getTableKey(any(UUID.class)))
