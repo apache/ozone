@@ -81,11 +81,11 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
@@ -153,34 +153,34 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final IOzoneManagerLock lock;
   private final HierarchicalResourceLockManager hierarchicalLockManager;
 
-  private TypedTable<String, PersistedUserVolumeInfo> userTable;
-  private TypedTable<String, OmVolumeArgs> volumeTable;
-  private TypedTable<String, OmBucketInfo> bucketTable;
-  private TypedTable<String, OmKeyInfo> keyTable;
+  private Table<String, PersistedUserVolumeInfo> userTable;
+  private Table<String, OmVolumeArgs> volumeTable;
+  private Table<String, OmBucketInfo> bucketTable;
+  private Table<String, OmKeyInfo> keyTable;
 
-  private TypedTable<String, OmKeyInfo> openKeyTable;
-  private TypedTable<String, OmMultipartKeyInfo> multipartInfoTable;
-  private TypedTable<String, RepeatedOmKeyInfo> deletedTable;
+  private Table<String, OmKeyInfo> openKeyTable;
+  private Table<String, OmMultipartKeyInfo> multipartInfoTable;
+  private Table<String, RepeatedOmKeyInfo> deletedTable;
 
-  private TypedTable<String, OmDirectoryInfo> dirTable;
-  private TypedTable<String, OmKeyInfo> fileTable;
-  private TypedTable<String, OmKeyInfo> openFileTable;
-  private TypedTable<String, OmKeyInfo> deletedDirTable;
+  private Table<String, OmDirectoryInfo> dirTable;
+  private Table<String, OmKeyInfo> fileTable;
+  private Table<String, OmKeyInfo> openFileTable;
+  private Table<String, OmKeyInfo> deletedDirTable;
 
-  private TypedTable<String, S3SecretValue> s3SecretTable;
-  private TypedTable<OzoneTokenIdentifier, Long> dTokenTable;
-  private TypedTable<String, OmPrefixInfo> prefixTable;
-  private TypedTable<String, TransactionInfo> transactionInfoTable;
-  private TypedTable<String, String> metaTable;
+  private Table<String, S3SecretValue> s3SecretTable;
+  private Table<OzoneTokenIdentifier, Long> dTokenTable;
+  private Table<String, OmPrefixInfo> prefixTable;
+  private Table<String, TransactionInfo> transactionInfoTable;
+  private Table<String, String> metaTable;
 
   // Tables required for multi-tenancy
-  private TypedTable<String, OmDBAccessIdInfo> tenantAccessIdTable;
-  private TypedTable<String, OmDBUserPrincipalInfo> principalToAccessIdsTable;
-  private TypedTable<String, OmDBTenantState> tenantStateTable;
+  private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
+  private Table<String, OmDBUserPrincipalInfo> principalToAccessIdsTable;
+  private Table<String, OmDBTenantState> tenantStateTable;
 
-  private TypedTable<String, SnapshotInfo> snapshotInfoTable;
-  private TypedTable<String, String> snapshotRenamedTable;
-  private TypedTable<String, CompactionLogEntry> compactionLogTable;
+  private Table<String, SnapshotInfo> snapshotInfoTable;
+  private Table<String, String> snapshotRenamedTable;
+  private Table<String, CompactionLogEntry> compactionLogTable;
 
   private OzoneManager ozoneManager;
 
@@ -1965,17 +1965,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       this.addCacheMetrics = addCacheMetrics;
     }
 
-    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition)
+    <KEY, VALUE> Table<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition)
         throws IOException {
       return get(definition.getTable(store));
     }
 
-    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
+    <KEY, VALUE> Table<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
         throws IOException {
       return get(definition.getTable(store, cacheType));
     }
 
-    private <KEY, VALUE> TypedTable<KEY, VALUE> get(TypedTable<KEY, VALUE> table) {
+    private <KEY, VALUE> Table<KEY, VALUE> get(Table<KEY, VALUE> table) throws RocksDatabaseException {
       Objects.requireNonNull(table, "table == null");
       final String name = table.getName();
       final Table<?, ?> previousTable = tableMap.put(name, table);
