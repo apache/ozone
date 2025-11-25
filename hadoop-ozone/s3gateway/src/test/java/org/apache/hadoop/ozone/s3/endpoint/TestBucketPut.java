@@ -81,22 +81,6 @@ public class TestBucketPut {
 
     mockHeaders = mock(HttpHeaders.class);
     bucketEndpoint.setHeaders(mockHeaders);
-
-    Class<?> clazz = bucketEndpoint.getClass();
-    Field headersField = null;
-    while (clazz != null) {
-      try {
-        headersField = clazz.getDeclaredField("headers");
-        break;
-      } catch (NoSuchFieldException e) {
-        clazz = clazz.getSuperclass();
-      }
-    }
-    if (headersField == null) {
-      throw new IllegalStateException("Field 'headers' not found on BucketEndpoint hierarchy");
-    }
-    headersField.setAccessible(true);
-    headersField.set(bucketEndpoint, mockHeaders);
   }
 
   @Test
