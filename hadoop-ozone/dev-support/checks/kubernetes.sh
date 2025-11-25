@@ -38,9 +38,8 @@ OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -D
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
-    echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh" -Pcoverage
-    mkdir -p "$REPORT_DIR" # removed by full build
+  echo "Distribution dir is missing.  Please build Ozone first."
+  exit 1
 fi
 
 create_aws_dir
