@@ -584,23 +584,23 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     for (DAGLeveledResource otherResource : resources) {
       String otherResourceName1 = otherResource.getName() + "key";
       String otherResourceName2 = otherResource.getName() + "key";
-      String flatResourceName = dagLeveledResource.getName() + "key";
+      String dagResourceName = dagLeveledResource.getName() + "key";
       try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(otherResource, otherResourceName1);
            HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(otherResource, otherResourceName2)) {
         assertTrue(lock1.isLockAcquired());
         assertTrue(lock2.isLockAcquired());
         if (forbiddenLockOrdering.getOrDefault(dagLeveledResource, Collections.emptySet()).contains(otherResource)) {
           assertThrows(RuntimeException.class,
-              () -> lockManager.acquireWriteLock(dagLeveledResource, flatResourceName),
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
               "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
                   " is already acquired");
           lock1.close();
           assertThrows(RuntimeException.class,
-              () -> lockManager.acquireWriteLock(dagLeveledResource, flatResourceName),
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
               "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
                   " is already acquired even after first lock is released since second lock is still held");
         } else {
-          try (HierarchicalResourceLock lock3 = lockManager.acquireWriteLock(dagLeveledResource, flatResourceName)) {
+          try (HierarchicalResourceLock lock3 = lockManager.acquireWriteLock(dagLeveledResource, dagResourceName)) {
             assertTrue(lock3.isLockAcquired());
           }
         }

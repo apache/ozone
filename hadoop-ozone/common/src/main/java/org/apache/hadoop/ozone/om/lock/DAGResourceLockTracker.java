@@ -25,6 +25,33 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Stream;
 
+/**
+ * Specialized implementation of {@link ResourceLockTracker} to manage locks for
+ * {@link DAGLeveledResource} types. This class enforces hierarchical locking
+ * constraints based on a directed acyclic graph (DAG) structure, ensuring that
+ * resources are locked and unlocked in a consistent manner.
+ *
+ * This tracker maintains an adjacency set representing resource dependencies, wherein
+ * each resource's children in the DAG define locking constraints. The class
+ * populates these constraints at initialization and checks them dynamically when locks
+ * are requested.
+ *
+ * The class is implemented as a singleton to ensure a central mechanism for
+ * managing resource locks across threads. It uses ThreadLocal storage to track the
+ * number of locks held for each resource by the current thread.
+ *
+ * Key Features:
+ * 1. Hierarchical Locking: Resources are locked in the order defined by their DAG
+ *    structure. Violating dependencies will result in denial of the lock request.
+ * 2. Thread-safe: The class guarantees thread safety with synchronized initialization
+ *    and thread-local management of lock counts.
+ * 3. Deadlock Avoidance: Lock dependency constraints prevent circular dependencies
+ *    in resource locking.
+ * 4. Centralized Tracking: Tracks the current locks held across all DAGLeveledResource
+ *    instances and provides utilities to inspect current lock states.
+ *
+ * Thread safety: This class is thread-safe.
+ */
 final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResource> {
 
   private final EnumMap<DAGLeveledResource, ThreadLocal<Integer>> acquiredLocksMap =
@@ -45,6 +72,21 @@ final class DAGResourceLockTracker extends ResourceLockTracker<DAGLeveledResourc
     return instance;
   }
 
+  /**
+   * Performs a Depth-First Search (DFS) traversal on a directed acyclic graph (DAG)
+   * composed of {@code DAGLeveledResource} objects. This method populates a mapping
+   * of resource dependencies while traversing the graph.
+   *
+   * The traversal stops for any resource already visited, avoiding potential cycles
+   * (though cycles should not exist in a valid DAG). Throws an exception if the provided
+   * stack is not empty at the start of the traversal.
+   *
+   * @param resource The starting resource for the DFS traversal.
+   * @param stack A stack used to manage the traversal process. The stack should be empty
+   *              when passed in.
+   * @param visited A set of resources that have already been visited during the traversal
+   *                to ensure each resource is processed only once.
+   */
   private void dfs(DAGLeveledResource resource, Stack<DAGLeveledResource> stack, Set<DAGLeveledResource> visited) {
     if (visited.contains(resource)) {
       return;
