@@ -291,7 +291,10 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    */
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
     return lock(() -> lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK),
-        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK), () -> cleanup(true));
+        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK), () -> {
+        cleanup(true);
+        return dbMap.isEmpty();
+      });
   }
 
   /**
@@ -303,7 +306,10 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock(UUID snapshotId) {
     return lock(() -> lock.acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
         () -> lock.releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
-        () -> cleanup(snapshotId));
+        () -> {
+        cleanup(snapshotId, false);
+        return !dbMap.containsKey(snapshotId);
+      });
   }
 
   private OMLockDetails getEmptyOmLockDetails(OMLockDetails lockDetails) {
@@ -311,14 +317,13 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   private UncheckedAutoCloseableSupplier<OMLockDetails> lock(Supplier<OMLockDetails> lockFunction,
-      Supplier<OMLockDetails> unlockFunction, Supplier<Void> cleanupFunction) {
+      Supplier<OMLockDetails> unlockFunction, Supplier<Boolean> cleanupFunction) {
     Supplier<OMLockDetails> emptyLockFunction = () -> getEmptyOmLockDetails(lockFunction.get());
     Supplier<OMLockDetails> emptyUnlockFunction = () -> getEmptyOmLockDetails(unlockFunction.get());
 
     AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(emptyLockFunction.get());
     if (lockDetails.get().isLockAcquired()) {
-      cleanupFunction.get();
-      if (!dbMap.isEmpty()) {
+      if (!cleanupFunction.get()) {
         lockDetails.set(emptyUnlockFunction.get());
       }
     }
@@ -349,14 +354,19 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private synchronized Void cleanup(boolean force) {
     if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
-        cleanup(evictionKey);
+        cleanup(evictionKey, true);
       }
     }
     return null;
   }
 
-  private synchronized Void cleanup(UUID evictionKey) {
+  private synchronized Void cleanup(UUID evictionKey, boolean expectKeyToBePresent) {
     ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
+
+    if (!expectKeyToBePresent && snapshot == null) {
+      return null;
+    }
+
     if (snapshot != null && snapshot.getTotalRefCount() == 0) {
       try {
         compactSnapshotDB(snapshot.get());

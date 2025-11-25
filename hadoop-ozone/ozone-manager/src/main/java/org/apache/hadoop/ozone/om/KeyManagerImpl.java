@@ -421,10 +421,14 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
 
-      snapshotDefragService =
-          new SnapshotDefragService(serviceInterval, TimeUnit.MILLISECONDS,
-              serviceTimeout, ozoneManager, conf);
-      snapshotDefragService.start();
+      try {
+        snapshotDefragService =
+            new SnapshotDefragService(serviceInterval, TimeUnit.MILLISECONDS,
+                serviceTimeout, ozoneManager, conf);
+        snapshotDefragService.start();
+      } catch (IOException e) {
+        LOG.error("Error starting Snapshot Defrag Service", e);
+      }
     } else {
       LOG.info("SnapshotDefragService is disabled. Snapshot defragmentation will not run periodically.");
     }
