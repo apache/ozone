@@ -19,12 +19,15 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 /**
@@ -50,10 +53,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
-    // Validate that either -d or --in-service-datanodes is specified
+    // Validate that either datanode addresses or --in-service-datanodes is specified
     if ((options.getDatanodes() == null || options.getDatanodes().isEmpty()) 
         && !options.isInServiceDatanodes()) {
-      System.err.println("Error: Either -d/--datanodes or --in-service-datanodes must be specified.");
+      System.err.println("Error: Either datanode address(es) or --in-service-datanodes must be specified.");
       return null;
     }
 
@@ -77,17 +80,44 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     // Execute on all target datanodes and collect results
     List<String> successNodes = new ArrayList<>();
     List<String> failedNodes = new ArrayList<>();
+    List<Object> jsonResults = new ArrayList<>();
     
+    // Execute commands and collect results
     for (String dn : targetDatanodes) {
-      if (executeCommand(dn)) {
+      try {
+        Object result = executeCommand(dn);
         successNodes.add(dn);
-      } else {
+        if (options.isJson()) {
+          jsonResults.add(result);
+        }
+      } catch (Exception e) {
         failedNodes.add(dn);
+        String errorMsg = e.getMessage();
+        if (errorMsg != null && errorMsg.contains("\n")) {
+          errorMsg = errorMsg.split("\n", 2)[0];
+        }
+        if (errorMsg == null || errorMsg.isEmpty()) {
+          errorMsg = e.getClass().getSimpleName();
+        }
+        if (options.isJson()) {
+          // Create error result object in JSON format
+          Map<String, Object> errorResult = createErrorResult(dn, errorMsg);
+          jsonResults.add(errorResult);
+        } else {
+          // Print error messages in non-JSON mode
+          System.err.printf("Error on node [%s]: %s%n", dn, errorMsg);
+        }
       }
     }
     
-    // Display consolidated results
-    displayResults(successNodes, failedNodes);
+    // Output results
+    if (options.isJson()) {
+      if (!jsonResults.isEmpty()) {
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(jsonResults));
+      }
+    } else {
+      displayResults(successNodes, failedNodes);
+    }
     return null;
   }
 
@@ -100,8 +130,16 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
   }
 
   /**
+   * Get the common options for this command.
+   * @return the DiskBalancerCommonOptions instance
+   */
+  protected DiskBalancerCommonOptions getOptions() {
+    return options;
+  }
+
+  /**
    * Get the list of target datanodes to execute the command on.
-   * Either from -d option or by querying SCM for in-service datanodes.
+   * Either from positional arguments or by querying SCM for in-service datanodes.
    */
   private List<String> getTargetDatanodes() {
     if (options.isInServiceDatanodes()) {
@@ -135,18 +173,65 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
   /**
    * Execute the DiskBalancer command on a single hostName.
+   * Return a JSON-serializable object if successful.
+   * The base class handles whether to use it for JSON output or not.
    *
    * @param hostName the hostName in "host:port" format
-   * @return true if successful, false if failed
+   * @return result object for JSON serialization (must not be null)
+   * @throws Exception if execution fails
    */
-  protected abstract boolean executeCommand(String hostName);
+  protected abstract Object executeCommand(String hostName) throws Exception;
 
   /**
    * Display consolidated results after executing on all datanodes.
+   * For JSON mode, this may be called for summary purposes only.
    * 
    * @param successNodes list of nodes where command succeeded
    * @param failedNodes list of nodes where command failed
    */
   protected abstract void displayResults(List<String> successNodes, List<String> failedNodes);
+
+  /**
+   * Get the action name for this command (e.g., "start", "stop", "update", "status", "report").
+   * Used for creating error result objects in JSON format.
+   * 
+   * @return the action name
+   */
+  protected abstract String getActionName();
+
+  /**
+   * Get the configuration map for this command, if any configuration was provided.
+   * Used for creating error result objects in JSON format.
+   * Returns null if no configuration was provided.
+   * 
+   * @return configuration map or null
+   */
+  protected Map<String, Object> getConfigurationMap() {
+    // Default: no configuration
+    return null;
+  }
+
+  /**
+   * Create an error result object in JSON format.
+   * 
+   * @param datanode the datanode address
+   * @param errorMsg the error message
+   * @return error result map
+   */
+  private Map<String, Object> createErrorResult(String datanode, String errorMsg) {
+    Map<String, Object> errorResult = new LinkedHashMap<>();
+    errorResult.put("datanode", datanode);
+    errorResult.put("action", getActionName());
+    errorResult.put("status", "failure");
+    errorResult.put("errorMsg", errorMsg);
+    
+    // Include configuration if it was provided
+    Map<String, Object> configMap = getConfigurationMap();
+    if (configMap != null && !configMap.isEmpty()) {
+      errorResult.put("configuration", configMap);
+    }
+    
+    return errorResult;
+  }
 }
 

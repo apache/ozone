@@ -32,7 +32,7 @@ public abstract class ItemsFromStdin implements Iterable<String> {
   protected static final String FORMAT_DESCRIPTION =
       ": one or more, separated by spaces. To read from stdin, specify '-' and supply one item per line.";
 
-  private List<String> items;
+  private List<String> items = new ArrayList<>();
 
   protected void setItems(List<String> arguments) {
     items = readItemsFromStdinIfNeeded(arguments);

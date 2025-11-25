@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,7 +52,8 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
   private Integer parallelThread;
 
   @Option(names = {"-s", "--stop-after-disk-even"},
-      description = "Stop DiskBalancer automatically after disk utilization is even.")
+      description = "Stop DiskBalancer automatically after disk utilization is even.",
+      arity = "1")
   private Boolean stopAfterDiskEven;
 
   @Override
@@ -63,36 +66,53 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
   }
 
   @Override
-  protected boolean executeCommand(String hostName) {
-    try (DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
-        .getSingleNodeDiskBalancerProxy(hostName)) {
+  protected Object executeCommand(String hostName) throws IOException {
+    DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
+        .getSingleNodeDiskBalancerProxy(hostName);
+    try {
+      HddsProtos.DiskBalancerConfigurationProto config = buildConfigProto();
+      diskBalancerProxy.updateDiskBalancerConfiguration(config);
       
-      HddsProtos.DiskBalancerConfigurationProto.Builder builder =
-          HddsProtos.DiskBalancerConfigurationProto.newBuilder();
-      if (threshold != null) {
-        builder.setThreshold(threshold);
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("datanode", hostName);
+      result.put("action", "update");
+      result.put("status", "success");
+      Map<String, Object> configMap = getConfigurationMap();
+      if (configMap != null && !configMap.isEmpty()) {
+        result.put("configuration", configMap);
       }
-      if (bandwidthInMB != null) {
-        builder.setDiskBandwidthInMB(bandwidthInMB);
-      }
-      if (parallelThread != null) {
-        builder.setParallelThread(parallelThread);
-      }
-      if (stopAfterDiskEven != null) {
-        builder.setStopAfterDiskEven(stopAfterDiskEven);
-      }
-      
-      diskBalancerProxy.updateDiskBalancerConfiguration(builder.build());
-      return true;
-    } catch (IOException e) {
-      System.err.printf("Error on node [%s]: %s%n", hostName, e.getMessage());
-      return false;
+      return result;
+    } finally {
+      diskBalancerProxy.close();
     }
+  }
+
+  private HddsProtos.DiskBalancerConfigurationProto buildConfigProto() {
+    HddsProtos.DiskBalancerConfigurationProto.Builder builder =
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+    if (threshold != null) {
+      builder.setThreshold(threshold);
+    }
+    if (bandwidthInMB != null) {
+      builder.setDiskBandwidthInMB(bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      builder.setParallelThread(parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      builder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    return builder.build();
   }
 
   @Override
   protected void displayResults(List<String> successNodes,
       List<String> failedNodes) {
+    // In JSON mode, results are already written, only show summary if needed
+    if (getOptions().isJson()) {
+      return;
+    }
+
     if (isBatchMode()) {
       // Simpler message for batch mode
       if (!failedNodes.isEmpty()) {
@@ -112,5 +132,28 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
             String.join(", ", failedNodes));
       }
     }
+  }
+
+  @Override
+  protected String getActionName() {
+    return "update";
+  }
+
+  @Override
+  protected Map<String, Object> getConfigurationMap() {
+    Map<String, Object> configMap = new LinkedHashMap<>();
+    if (threshold != null) {
+      configMap.put("threshold", threshold);
+    }
+    if (bandwidthInMB != null) {
+      configMap.put("bandwidthInMB", bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      configMap.put("parallelThread", parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      configMap.put("stopAfterDiskEven", stopAfterDiskEven);
+    }
+    return configMap.isEmpty() ? null : configMap;
   }
 }

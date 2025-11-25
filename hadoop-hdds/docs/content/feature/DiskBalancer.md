@@ -51,67 +51,124 @@ The feature can be **enabled** by setting the following property to `true` in th
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
 
-**注意：**此命令在主帮助消息（“ozone admin datanode --help”）中隐藏。这是因为该功能目前处于实验阶段，默认禁用。不过，对于希望启用和使用该功能的用户来说，该命令功能齐全。
+**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
+is currently considered experimental and is disabled by default. The command is, however, fully functional for those who wish to enable and use the feature.
 
-### **Start DiskBalancer**
-To start diskBalancer on all Datanodes with default configurations :
+### Command Syntax
 
-```shell
-ozone admin datanode diskbalancer start -a
+**Start DiskBalancer:**
+```bash
+ozone admin datanode diskbalancer start [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
 ```
 
-You can also start DiskBalancer with specific options:
-
-```shell
-ozone admin datanode diskbalancer start [options]
+**Stop DiskBalancer:**
+```bash
+ozone admin datanode diskbalancer stop [<datanode-address> ...] [--in-service-datanodes]
 ```
 
-### **Update Configurations**
-To update DiskBalancer configurations you can use following command:
-
-```shell
-ozone admin datanode diskbalancer update [options]
+**Update Configuration:**
+```bash
+ozone admin datanode diskbalancer update [<datanode-address> ...] [OPTIONS] [--in-service-datanodes]
 ```
-**Options include:**
 
-| Options                      | Description                                                                                           |                                                                                                                                                             
-|------------------------------|-------------------------------------------------------------------------------------------------------|
-| `-t, --threshold`            | Percentage deviation from average utilization of the disks after which a datanode will be rebalanced. |
-| `-b, --bandwith-in-mb`       | Maximum bandwidth for DiskBalancer per second.                                                        |
-| `-p, --parallel-thread`      | Max parallelThread for DiskBalancer.                                                                  |
-| `-s, --stop-after-disk-even` | Stop DiskBalancer automatically after disk utilization is even.                                       |
-| `-a, --all`                  | Run commands on all datanodes.                                                                        |
-| `-d, --datanodes`            | Run commands on specific datanodes                                                                    |
-
-### **Stop DiskBalancer**
-To stop DiskBalancer on all Datanodes:
-
-```shell
-ozone admin datanode diskbalancer stop -a
+**Get Status:**
+```bash
+ozone admin datanode diskbalancer status [<datanode-address> ...] [--in-service-datanodes] [--json]
 ```
-You can also stop DiskBalancer on specific Datanodes:
 
-```shell
-ozone admin datanode diskbalancer stop -d <datanode1>
+**Get Report:**
+```bash
+ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-datanodes] [--json]
 ```
-### **DiskBalancer Status**
-To check the status of DiskBalancer on all Datanodes:
 
-```shell
-ozone admin datanode diskbalancer status
-```
-You can also check status of DiskBalancer on specific Datanodes:
+### Command Options
 
-```shell
-ozone admin datanode diskbalancer status -d <datanode1>
-```
-### **DiskBalancer Report**
-To get a **volumeDataDensity** of DiskBalancer of top **N** Datanodes (displayed in descending order),
-by default N=25, if not specified:
+| Option                              | Description                                                                                                                                                                                                                                                                                                                                                         | Example                                        |
+|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| `<datanode-address>`                | One or more datanode addresses as positional arguments. Addresses can be:<br>- Hostname (e.g., `DN-1`) - uses default CLIENT_RPC port (9858)<br>- Hostname with port (e.g., `DN-1:9858`)<br>- IP address (e.g., `192.168.1.10`)<br>- IP address with port (e.g., `192.168.1.10:9858`)<br>- Stdin (`-`) - reads datanode addresses from standard input, one per line | `DN-1`<br>`DN-1:9858`<br>`192.168.1.10`<br>`-` |
+| `--in-service-datanodes`            | It queries SCM for all IN_SERVICE datanodes and executes the command on all of them.                                                                                                                                                                                                                                                                                | `--in-service-datanodes`                       |
+| `--json`                            | Format output as JSON.                                                                                                                                                                                                                                                                                                                                              | `--json`                                       |
+| `-t/--threshold`                    | Volume density threshold percentage (default: 10.0). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                       | `-t 5`<br>`--threshold 5.0`                    |
+| `-b/--bandwidth-in-mb`              | Maximum disk bandwidth in MB/s (default: 10). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                              | `-b 20`<br>`--bandwidth-in-mb 50`              |
+| `-p/--parallel-thread`              | Number of parallel threads (default: 1). Used with `start` and `update` commands.                                                                                                                                                                                                                                                                                   | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even`         | Stop automatically after disks are balanced (default: false). Used with `start` and `update` commands.                                                                                                                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
 
-```shell
-ozone admin datanode diskbalancer report --count <N>
+### Examples
+
+**Start DiskBalancer:**
+```bash
+# Start DiskBalancer on multiple datanodes
+ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
+
+# Start DiskBalancer on all IN_SERVICE datanodes
+ozone admin datanode diskbalancer start --in-service-datanodes
+
+# Start DiskBalancer with configuration parameters
+ozone admin datanode diskbalancer start DN-1 -t 5 -b 20 -p 5
+
+# Read datanode addresses from stdin
+echo -e "DN-1\nDN-2" | ozone admin datanode diskbalancer start -
+
+# Start DiskBalancer with json output
+ozone admin datanode diskbalancer start DN-1 --json
 ```
+
+**Stop DiskBalancer:**
+```bash
+# Stop DiskBalancer on multiple datanodes
+ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
+
+# Stop DiskBalancer on all IN_SERVICE datanodes
+ozone admin datanode diskbalancer stop --in-service-datanodes
+
+# Stop DiskBalancer with json output
+ozone admin datanode diskbalancer stop DN-1 --json
+```
+
+**Update Configuration:**
+```bash
+
+# Update multiple parameters
+ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
+
+# Update on all IN_SERVICE datanodes
+ozone admin datanode diskbalancer update --in-service-datanodes -t 5
+
+# Update with json output
+ozone admin datanode diskbalancer update DN-1 -b 50 --json
+```
+
+**Get Status:**
+```bash
+# Get status from multiple datanodes
+ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
+
+# Get status from all IN_SERVICE datanodes
+ozone admin datanode diskbalancer status --in-service-datanodes
+
+# Get status as JSON
+ozone admin datanode diskbalancer status --in-service-datanodes --json
+```
+
+**Get Report:**
+```bash
+# Get report from multiple datanodes
+ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
+
+# Get report from all IN_SERVICE datanodes
+ozone admin datanode diskbalancer report --in-service-datanodes
+
+# Get report as JSON
+ozone admin datanode diskbalancer report --in-service-datanodes --json
+```
+
+### Authentication and Authorization
+
+* **Authentication**: RPC authentication is required (e.g., via `kinit` in secure clusters). The client's identity is verified by the datanode's RPC layer.
+
+* **Authorization**: Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
+  - **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators`
+  - **Read-only operations** (status, report): Do not require admin privileges
 
 ## **DiskBalancer Configurations**
 
@@ -119,7 +176,7 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 
 | Property                                                    | Default Value                                                                          | Description                                                                                                                                                               |
 |-------------------------------------------------------------|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `hdds.datanode.disk.balancer.enabled`                       | `false`                                                                                | if false, the DiskBalancer service on the Datanode is disabled. Configure it to true for diskBalancer to be enabled.                                                      |                                                            |                                                                                        |                                                                                                                                                                              |
+| `hdds.datanode.disk.balancer.enabled`                       | `false`                                                                                | If false, the DiskBalancer service on the Datanode is disabled. Configure it to true for diskBalancer to be enabled.                                                    |
 | `hdds.datanode.disk.balancer.volume.density.threshold`      | `10.0`                                                                                 | A percentage (0-100). A datanode is considered balanced if for each volume, its utilization differs from the average datanode utilization by no more than this threshold. |
 | `hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec` | `10`                                                                                   | The maximum bandwidth (in MB/s) that the balancer can use for moving data, to avoid impacting client I/O.                                                                 |
 | `hdds.datanode.disk.balancer.parallel.thread`               | `5`                                                                                    | The number of worker threads to use for moving containers in parallel.                                                                                                    |
