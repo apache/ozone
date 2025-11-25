@@ -19,6 +19,11 @@ package org.apache.hadoop.ozone.om.lock;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,9 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -39,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.junit.jupiter.api.AfterEach;
@@ -46,6 +58,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -250,27 +263,6 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     lock.close();
     assertFalse(lock.isLockAcquired());
   }
-
-  /**
-   * Test different resource types can be locked independently.
-   */
-  @Test
-  public void testDifferentResourceTypes() throws Exception {
-
-    List<HierarchicalResourceLock> locks = new ArrayList<>();
-    for (DAGLeveledResource otherResource : DAGLeveledResource.values()) {
-      String key = "test-key";
-      locks.add(lockManager.acquireWriteLock(otherResource, key));
-    }
-    for (HierarchicalResourceLock lock : locks) {
-      assertNotNull(lock);
-      assertTrue(lock.isLockAcquired());
-    }
-    for (HierarchicalResourceLock lock : locks) {
-      lock.close();
-    }
-  }
-
 
   /**
    * Test different keys on same resource type can be locked concurrently.
@@ -578,6 +570,41 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     } catch (Exception e) {
       // If Exception is thrown, it should be properly propagated
       assertNotNull(e.getMessage());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  public void testDAGLockOrderAcquisition(DAGLeveledResource dagLeveledResource) throws IOException {
+    Map<DAGLeveledResource, Set<IOzoneManagerLock.Resource>> forbiddenLockOrdering =
+        ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK),
+            BOOTSTRAP_LOCK, ImmutableSet.of(SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
+                SNAPSHOT_LOCAL_DATA_LOCK));
+    List<DAGLeveledResource> resources = Arrays.stream(DAGLeveledResource.values()).collect(Collectors.toList());
+    for (DAGLeveledResource otherResource : resources) {
+      String otherResourceName1 = otherResource.getName() + "key";
+      String otherResourceName2 = otherResource.getName() + "key";
+      String dagResourceName = dagLeveledResource.getName() + "key";
+      try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(otherResource, otherResourceName1);
+           HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(otherResource, otherResourceName2)) {
+        assertTrue(lock1.isLockAcquired());
+        assertTrue(lock2.isLockAcquired());
+        if (forbiddenLockOrdering.getOrDefault(dagLeveledResource, Collections.emptySet()).contains(otherResource)) {
+          assertThrows(RuntimeException.class,
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
+              "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
+                  " is already acquired");
+          lock1.close();
+          assertThrows(RuntimeException.class,
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
+              "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
+                  " is already acquired even after first lock is released since second lock is still held");
+        } else {
+          try (HierarchicalResourceLock lock3 = lockManager.acquireWriteLock(dagLeveledResource, dagResourceName)) {
+            assertTrue(lock3.isLockAcquired());
+          }
+        }
+      }
     }
   }
 }
