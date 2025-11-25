@@ -97,7 +97,7 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) {
-    map.subMap(beginKey, endKey).clear();
+    throw new UnsupportedOperationException();
   }
 
   @Override

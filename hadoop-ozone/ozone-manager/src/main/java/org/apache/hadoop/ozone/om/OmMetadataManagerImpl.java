@@ -81,7 +81,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -1975,7 +1974,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return get(definition.getTable(store, cacheType));
     }
 
-    private <KEY, VALUE> Table<KEY, VALUE> get(Table<KEY, VALUE> table) throws RocksDatabaseException {
+    private <KEY, VALUE> Table<KEY, VALUE> get(Table<KEY, VALUE> table) {
       Objects.requireNonNull(table, "table == null");
       final String name = table.getName();
       final Table<?, ?> previousTable = tableMap.put(name, table);
