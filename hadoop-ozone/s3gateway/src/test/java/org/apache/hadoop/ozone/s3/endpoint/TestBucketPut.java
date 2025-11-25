@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,7 +40,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -118,16 +121,16 @@ public class TestBucketPut {
     // Create-bucket on an existing bucket fails
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
         bucketName, null, null));
+    assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
-    assertEquals(S3ErrorTable.BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
   }
 
   @Test
   public void testPutAclOnNonExistingBucket() throws Exception {
     OS3Exception e = assertThrows(OS3Exception.class,
         () -> bucketEndpoint.put(bucketName, "acl", null));
+    assertEquals(NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
-    assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
   }
 
   @Test
@@ -157,7 +160,7 @@ public class TestBucketPut {
     assertTrue(cause instanceof OS3Exception);
     OS3Exception os3 = (OS3Exception) cause;
 
-    assertEquals("InvalidRequest", os3.getCode());
+    assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
     assertEquals(400, os3.getHttpCode());
   }
 
@@ -171,7 +174,7 @@ public class TestBucketPut {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> bucketEndpoint.put(bucketName, "acl", null));
 
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
     assertEquals(400, ex.getHttpCode());
   }
 
