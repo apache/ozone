@@ -139,20 +139,20 @@ class TestOzoneManagerLock {
     resources.addAll(Arrays.stream(dagLeveledResource.values()).collect(Collectors.toList()));
     for (Resource otherResource : resources) {
       String[] otherResourceName = generateResourceName(otherResource);
-      String[] flatResourceName = generateResourceName(dagLeveledResource);
+      String[] dagResourceName = generateResourceName(dagLeveledResource);
       lock.acquireWriteLock(otherResource, otherResourceName);
       boolean secondLockAcquired = false;
       try {
         if (forbiddenLockOrdering.getOrDefault(dagLeveledResource, Collections.emptySet()).contains(otherResource)) {
-          assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(dagLeveledResource, flatResourceName));
+          assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(dagLeveledResource, dagResourceName));
         } else {
-          lock.acquireWriteLock(dagLeveledResource, flatResourceName);
+          lock.acquireWriteLock(dagLeveledResource, dagResourceName);
           secondLockAcquired = true;
         }
       } finally {
         lock.releaseWriteLock(otherResource, otherResourceName);
         if (secondLockAcquired) {
-          lock.releaseWriteLock(dagLeveledResource, flatResourceName);
+          lock.releaseWriteLock(dagLeveledResource, dagResourceName);
         }
       }
     }

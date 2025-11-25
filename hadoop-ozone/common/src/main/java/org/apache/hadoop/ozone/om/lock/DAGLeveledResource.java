@@ -29,9 +29,12 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
  * locking at various levels, ensuring consistent access and management of system data.
  * Each resource can optionally define child resources, forming a directed acyclic graph (DAG)
  * structure for hierarchical locking.
- *
  * The enum implements the {@code Resource} interface, providing a name for identification and
  * an associated {@link IOzoneManagerLock.ResourceManager} to manage its locking behavior.
+ * DAGLeveledResource defines the order in which resources can be locked. Attempting to lock the resources out of order
+ * will throw a RuntimeException.
+ * For instance, acquiring SNAPSHOT_DB_CONTENT_LOCK followed by SNAPSHOT_DB_LOCK is allowed; acquiring
+ * SNAPSHOT_LOCAL_DATA_LOCK followed by SNAPSHOT_DB_CONTENT_LOCK is not permitted.
  */
 public enum DAGLeveledResource implements Resource {
   // Background services lock on a Snapshot.
