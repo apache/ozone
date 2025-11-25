@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -44,18 +44,20 @@ import org.slf4j.event.Level;
  */
 public class TestStreamBlockInputStream extends TestInputStreamBase {
   private static final Logger LOG = LoggerFactory.getLogger(TestStreamBlockInputStream.class);
+
   {
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("com"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ipc"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.server.http"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.container"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.ha"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.safemode"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
-    GenericTestUtils.setLogLevel( GrpcXceiverService.class, Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("com"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ipc"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.server.http"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.container"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.ha"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.safemode"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
+    GenericTestUtils.setLogLevel(GrpcXceiverService.class, Level.ERROR);
   }
+
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
@@ -65,11 +67,11 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   private TestBucket bucket;
 
   @Test
-  void testAll() throws Exception {
+  void testReadKey() throws Exception {
     try (MiniOzoneCluster cluster = newCluster()) {
       cluster.waitForClusterToBeReady();
 
-      LOG.info("XXX cluster ready");
+      LOG.info("cluster ready");
 
       OzoneConfiguration conf = cluster.getConf();
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
@@ -80,10 +82,10 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
         inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
-        LOG.info("XXX writeRandomBytes {} bytes", inputData.length);
+        LOG.info("writeRandomBytes {} bytes", inputData.length);
 
         for (int i = 1; i <= 10; i++) {
-          runTestReadKey(keyName, DATA_LENGTH/i);
+          runTestReadKey(keyName, DATA_LENGTH / i);
         }
 
         for (int n = 4; n <= 16 << 10; n <<= 2) {
@@ -94,13 +96,13 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   }
 
   private void runTestReadKey(String key, int bufferSize) throws Exception {
-    LOG.info("XXX ---------------------------------------------------------");
-    LOG.info("XXX read {} bytes with bufferSize {}", DATA_LENGTH, bufferSize);
+    LOG.info("---------------------------------------------------------");
+    LOG.info("read {} bytes with bufferSize {}", DATA_LENGTH, bufferSize);
     // Read the data fully into a large enough byte array
     final byte[] buffer = new byte[bufferSize];
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       int pos = 0;
-      for(; pos < DATA_LENGTH; ) {
+      for (; pos < DATA_LENGTH;) {
         final int read = keyInputStream.read(buffer, 0, buffer.length);
         for (int i = 0; i < read; i++) {
           assertEquals(inputData[pos + i], buffer[i], "pos=" + pos + ", i=" + i);
@@ -108,6 +110,36 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
         pos += read;
       }
       assertEquals(DATA_LENGTH, pos);
+    }
+  }
+
+  @Test
+  void testAll() throws Exception {
+    try (MiniOzoneCluster cluster = newCluster()) {
+      cluster.waitForClusterToBeReady();
+
+      OzoneConfiguration conf = cluster.getConf();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+      clientConfig.setStreamReadBlock(true);
+      OzoneConfiguration copy = new OzoneConfiguration(conf);
+      copy.setFromObject(clientConfig);
+      String keyName = getNewKeyName();
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+        bucket = TestBucket.newBuilder(client).build();
+        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+        testReadKeyFully(keyName);
+        testSeek(keyName);
+        testReadEmptyBlock();
+      }
+      keyName = getNewKeyName();
+      clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
+      copy.setFromObject(clientConfig);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+        bucket = TestBucket.newBuilder(client).build();
+        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+        testReadKeyFully(keyName);
+        testSeek(keyName);
+      }
     }
   }
 

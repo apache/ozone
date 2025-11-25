@@ -905,16 +905,9 @@ public final class ContainerProtocolCalls  {
     return datanodeToResponseMap;
   }
 
-  /**
-   * Calls the container protocol to read a chunk.
-   *
-   * @param blockID ID of the block
-   * @param offset  offset where block starts
-   * @param token   a token for this block (may be null)
-   * @throws IOException if there is an I/O error while performing the call
-   */
-  public static ContainerCommandRequestProto getReadBlockCommand(
-      BlockID blockID, long offset, long length, int responseDataSize, Token<? extends TokenIdentifier> token, Pipeline pipeline)
+  public static ContainerCommandRequestProto buildReadBlockCommandProto(
+      BlockID blockID, long offset, long length, int responseDataSize,
+      Token<? extends TokenIdentifier> token, Pipeline pipeline)
       throws IOException {
     final DatanodeDetails datanode = pipeline.getClosestNode();
     final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());

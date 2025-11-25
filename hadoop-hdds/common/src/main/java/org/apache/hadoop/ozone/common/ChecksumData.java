@@ -126,8 +126,8 @@ public final class ChecksumData {
         // checksum mismatch. throw exception.
         throw new OzoneChecksumException("Checksum mismatched: this.checksums(" + j + ") != that.checksums(" + i
             + "), thisStartIndex=" + thisStartIndex
-            + ",\n  this=" + this
-            + ",\n  that=" + that);
+            + ", this=" + this
+            + ", that=" + that);
       }
     }
   }

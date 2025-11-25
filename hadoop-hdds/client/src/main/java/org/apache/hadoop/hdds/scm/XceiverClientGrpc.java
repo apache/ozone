@@ -35,8 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -54,7 +52,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
@@ -394,8 +391,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return sortDatanodes(getRequestBlockID(request), request.getCmdType());
   }
 
-  List<DatanodeDetails> sortDatanodes(DatanodeBlockID blockID, ContainerProtos.Type cmdType)
-      throws IOException {
+  List<DatanodeDetails> sortDatanodes(DatanodeBlockID blockID, ContainerProtos.Type cmdType) throws IOException {
     List<DatanodeDetails> datanodeList = null;
 
     if (blockID != null) {
@@ -525,19 +521,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
-  static final AtomicInteger idGenerator = new AtomicInteger(0);
-  private final String name = getClass().getSimpleName() + "-" + idGenerator.incrementAndGet();
-
   @Override
-  public void streamRead(ContainerCommandRequestProto request, StreamingReadResponse streamObserver) {
-//    LOG.info("XXX {} -> {}, send onNext request {}",
-//        name, streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReadResponse streamObserver) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("->{}, send onNext request {}",
+          streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
+    }
     streamObserver.getRequestObserver().onNext(request);
   }
 
   @Override
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
-    List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
+    final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -547,7 +543,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         if (stub == null) {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
-//        LOG.info("XXX initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
+        LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
         StreamObserver<ContainerCommandRequestProto> requestObserver = stub
             .withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(streamObserver);

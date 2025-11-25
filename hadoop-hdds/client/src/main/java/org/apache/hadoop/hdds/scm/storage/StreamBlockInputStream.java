@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
@@ -55,8 +57,6 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
-
 /**
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
  * container.
@@ -68,9 +68,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   private final BlockID blockID;
   private final long blockLength;
-  private final int responseDataSize;
-  private final long preReadSize = 32 << 20;
-  private final int bytesPerChecksum;
+  private final int responseDataSize = 1 << 20; // 1 MB
+  private final long preReadSize = 32 << 20; // 32 MB
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -87,15 +86,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private int retries = 0;
 
   public StreamBlockInputStream(
-      BlockID blockID, long blockLength, int responseDataSize, int bytePerChecksum, Pipeline pipeline,
+      BlockID blockID, long length, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
-    this.blockLength = blockLength;
-    this.responseDataSize = responseDataSize;
-    this.bytesPerChecksum = bytePerChecksum;
+    this.blockLength = length;
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -253,7 +250,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     if (r == null) {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
-    xceiverClient.streamRead(ContainerProtocolCalls.getReadBlockCommand(
+    xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
         blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
   }
 
@@ -271,7 +268,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  private boolean hasRemaining () {
+  private boolean hasRemaining() {
     return buffer != null && buffer.hasRemaining();
   }
 
@@ -330,7 +327,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     ReadBlockResponseProto poll() throws IOException {
-      for (; ; ) {
+      while (true) {
         checkError();
         if (future.isDone()) {
           return null; // Stream ended
@@ -358,8 +355,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       final long diff = position + length - requestedLength;
       if (diff > 0) {
         final long rounded = roundUp(diff + preReadSize, responseDataSize);
-//        LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}, withPreRead={}",
-//            position, length, requestedLength, diff, rounded, withPreRead);
+        LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
+            position, length, requestedLength, diff, rounded, preReadSize);
         readBlock(rounded);
         requestedLength += rounded;
       }
@@ -459,10 +456,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       releaseResources();
     }
 
-//    private int i = 0;
     private void offerToQueue(ReadBlockResponseProto item) {
-//      LOG.info("XXX {} offerToQueue {} bytes, numChecksums {}, bytesPerChecksum={}",
-//          i++, item.getData().size(), item.getChecksumData().getChecksumsList().size(), item.getChecksumData().getBytesPerChecksum());
+      if (LOG.isDebugEnabled()) {
+        final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
+        LOG.debug("offerToQueue {} bytes, numChecksums {}, bytesPerChecksum={}",
+            item.getData().size(), checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+      }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);
     }

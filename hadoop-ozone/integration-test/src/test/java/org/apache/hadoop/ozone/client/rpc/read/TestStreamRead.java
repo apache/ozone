@@ -24,7 +24,6 @@ import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.Collections;
 import java.util.concurrent.ThreadLocalRandom;
-
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -52,17 +51,17 @@ import org.slf4j.event.Level;
  */
 public class TestStreamRead {
   {
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("com"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ipc"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.server.http"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.container"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.ha"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.safemode"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.hdds.utils"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
-    GenericTestUtils.setLogLevel( LoggerFactory.getLogger(CodecBuffer.class), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("com"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ipc"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.server.http"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.container"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.ha"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.scm.safemode"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.hdds.utils"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(CodecBuffer.class), Level.ERROR);
   }
 
   static final int CHUNK_SIZE = 1 << 20;          // 1MB
@@ -123,7 +122,7 @@ public class TestStreamRead {
     try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
       cluster.waitForClusterToBeReady();
 
-      System.out.println("XXX cluster ready");
+      System.out.println("cluster ready");
 
       OzoneConfiguration conf = cluster.getConf();
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
@@ -144,14 +143,14 @@ public class TestStreamRead {
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
 
-        for(int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++) {
           final String keyName = "key" + i;
-          System.out.println("XXX ---------------------------------------------------------");
-          System.out.printf("XXX %s with %s bytes and %s bytesPerChecksum%n",
+          System.out.println("---------------------------------------------------------");
+          System.out.printf("%s with %s bytes and %s bytesPerChecksum%n",
               keyName, keySize, bytesPerChecksum);
 
           final String md5 = createKey(bucket.delegate(), keyName, keySize, writeBufferSize);
-          for(SizeInBytes readBufferSize : readBufferSizes) {
+          for (SizeInBytes readBufferSize : readBufferSizes) {
             runTestReadKey(keyName, keySize, readBufferSize, null);
             runTestReadKey(keyName, keySize, readBufferSize, md5);
           }
@@ -163,11 +162,12 @@ public class TestStreamRead {
   static void print(String name, long keySizeByte, long elapsedNanos, SizeInBytes bufferSize, String computedMD5) {
     final double keySizeMb = keySizeByte * 1.0 / (1 << 20);
     final double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
-    System.out.printf("XXX %16s: %8.2f MB/s (%7.3f s, buffer %16s, keySize %8.2f MB, md5=%s)%n",
-        name, keySizeMb/elapsedSeconds, elapsedSeconds, bufferSize, keySizeMb, computedMD5);
+    System.out.printf("%16s: %8.2f MB/s (%7.3f s, buffer %16s, keySize %8.2f MB, md5=%s)%n",
+        name, keySizeMb / elapsedSeconds, elapsedSeconds, bufferSize, keySizeMb, computedMD5);
   }
 
-  static String createKey(OzoneBucket bucket, String keyName, SizeInBytes keySize, SizeInBytes bufferSize) throws Exception {
+  static String createKey(OzoneBucket bucket, String keyName, SizeInBytes keySize, SizeInBytes bufferSize)
+      throws Exception {
     final byte[] buffer = new byte[bufferSize.getSizeInt()];
     ThreadLocalRandom.current().nextBytes(buffer);
 
@@ -175,7 +175,7 @@ public class TestStreamRead {
     final long startTime = System.nanoTime();
     try (OutputStream stream = bucket.createStreamKey(keyName, keySizeByte,
         RatisReplicationConfig.getInstance(THREE), Collections.emptyMap())) {
-      for(long pos = 0; pos < keySizeByte; ) {
+      for (long pos = 0; pos < keySizeByte;) {
         final int writeSize = Math.toIntExact(Math.min(buffer.length, keySizeByte - pos));
         stream.write(buffer, 0, writeSize);
         pos += writeSize;
@@ -184,7 +184,7 @@ public class TestStreamRead {
     final long elapsedNanos = System.nanoTime() - startTime;
 
     final MessageDigest md5 = MessageDigest.getInstance("MD5");
-    for(long pos = 0; pos < keySizeByte; ) {
+    for (long pos = 0; pos < keySizeByte;) {
       final int writeSize = Math.toIntExact(Math.min(buffer.length, keySizeByte - pos));
       md5.update(buffer, 0, writeSize);
       pos += writeSize;
@@ -195,7 +195,8 @@ public class TestStreamRead {
     return computedMD5;
   }
 
-  private void runTestReadKey(String keyName, SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5) throws Exception {
+  private void runTestReadKey(String keyName, SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5)
+      throws Exception {
     final long keySizeByte = keySize.getSize();
     final MessageDigest md5 = MessageDigest.getInstance("MD5");
     // Read the data fully into a large enough byte array
@@ -203,7 +204,7 @@ public class TestStreamRead {
     final long startTime = System.nanoTime();
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       int pos = 0;
-      for (; pos < keySizeByte; ) {
+      for (; pos < keySizeByte;) {
         final int read = keyInputStream.read(buffer, 0, buffer.length);
         if (read == -1) {
           break;

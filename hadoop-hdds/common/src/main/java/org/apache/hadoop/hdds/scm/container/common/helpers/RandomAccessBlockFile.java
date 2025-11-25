@@ -24,14 +24,13 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Objects;
-
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** {@link RandomAccessFile} for blocks. */
 public class RandomAccessBlockFile {
-  private final Logger LOG = LoggerFactory.getLogger(ContainerDispatcher.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RandomAccessBlockFile.class);
 
   private File blockFile;
   private RandomAccessFile raf;
@@ -55,7 +54,7 @@ public class RandomAccessBlockFile {
     Preconditions.assertTrue(isOpen(), "Not opened");
     final long oldPosition = channel.position();
     if (newPosition != oldPosition) {
-      LOG.info("XXX seek {} -> {} for file {}", oldPosition, newPosition, blockFile);
+      LOG.debug("seek {} -> {} for file {}", oldPosition, newPosition, blockFile);
       channel.position(newPosition);
     }
   }

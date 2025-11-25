@@ -89,7 +89,6 @@ import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -112,6 +111,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
@@ -145,7 +145,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
@@ -2073,83 +2072,7 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
-      final ReadBlockRequestProto readBlock = request.getReadBlock();
-      int responseDataSize = readBlock.getResponseDataSize();
-      if (responseDataSize == 0) {
-        responseDataSize = 256 << 10;
-      }
-//      LOG.info("XXX server readBlock {}", TextFormat.shortDebugString(readBlock));
-
-      BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
-      if (!blockFile.isOpen()) {
-        final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
-        blockFile.open(file);
-      }
-
-      // This is a new api the block should always be checked.
-      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
-      BlockUtils.verifyBCSId(kvContainer, blockID);
-
-      BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
-      List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-      // To get the chunksize, check the first chunk. Either there is only 1 chunk and its the largest, or there are
-      // multiple chunks and they are all the same size except the last one.
-      final long bytesPerChunk = chunkInfos.get(0).getLen();
-      // The bytes per checksum is stored in the checksum data of each chunk, so check the first chunk as they all
-      // must be the same.
-      ContainerProtos.ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
-      ChecksumData checksumData = null;
-      int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
-      if (checksumType == ContainerProtos.ChecksumType.NONE) {
-        checksumData = new ChecksumData(checksumType, 0);
-      } else {
-        bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
-      }
-      // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
-      // previous checksum boundary.
-      // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
-      // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
-      // it simplifies the code to always do this.
-      long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % bytesPerChecksum;
-      {
-        final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
-        blockFile.position(adjustedOffset);
-        int totalDataLength = 0;
-        int numResponses = 0;
-        final int numChecksums = responseDataSize / bytesPerChecksum;
-        while (totalDataLength < readBlock.getLength() && blockFile.read(buffer) != -1) {
-          buffer.flip();
-          if (checksumType != ContainerProtos.ChecksumType.NONE) {
-            final List<ByteString> checksums = new ArrayList<>(numChecksums);
-            for (int i = 0; i < numChecksums; i++) {
-              // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
-              // and its offset to pull out the correct checksum bytes for each read.
-              final int n = i * bytesPerChecksum;
-              final long offset = adjustedOffset + n;
-              final int chunkIndex = Math.toIntExact(offset / bytesPerChunk);
-              final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
-              final int checksumIndex = chunkOffset / bytesPerChecksum;
-              final ContainerProtos.ChunkInfo chunk = blockData.getChunks().get(chunkIndex);
-              Preconditions.checkState(chunk.getChecksumData().getBytesPerChecksum() == bytesPerChecksum);
-              final ByteString checksum = chunk.getChecksumData().getChecksums(checksumIndex);
-              checksums.add(checksum);
-            }
-            checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
-          }
-          final ContainerCommandResponseProto response = getReadBlockResponse(request, checksumData, buffer, adjustedOffset);
-          final int dataLength = response.getReadBlock().getData().size();
-          final int responseLength = response.getSerializedSize();
-//          LOG.info("XXX server onNext response {}: dataLength={}, numChecksums={}",
-//              numResponses, dataLength, numChecksums);
-          streamObserver.onNext(response);
-          buffer.clear();
-
-          adjustedOffset += responseDataSize;
-          totalDataLength += dataLength;
-          numResponses++;
-        }
-      }
-//        LOG.info("XXX server response ended: totalDataLength={}, numResponses={}", totalDataLength, numResponses);
+      readBlockImpl(request, blockFile, kvContainer, streamObserver);
       // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -2158,6 +2081,86 @@ public class KeyValueHandler extends Handler {
           new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION), request);
     }
     return responseProto;
+  }
+
+  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessBlockFile blockFile,
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
+      throws IOException {
+    final ReadBlockRequestProto readBlock = request.getReadBlock();
+    int responseDataSize = readBlock.getResponseDataSize();
+    if (responseDataSize == 0) {
+      responseDataSize = 256 << 10;
+    }
+
+    BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    if (!blockFile.isOpen()) {
+      final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
+      blockFile.open(file);
+    }
+
+    // This is a new api the block should always be checked.
+    BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+    BlockUtils.verifyBCSId(kvContainer, blockID);
+
+    BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+    // To get the chunksize, check the first chunk. Either there is only 1 chunk and its the largest, or there are
+    // multiple chunks and they are all the same size except the last one.
+    final long bytesPerChunk = chunkInfos.get(0).getLen();
+    // The bytes per checksum is stored in the checksum data of each chunk, so check the first chunk as they all
+    // must be the same.
+    ContainerProtos.ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
+    ChecksumData checksumData = null;
+    int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
+    if (checksumType == ContainerProtos.ChecksumType.NONE) {
+      checksumData = new ChecksumData(checksumType, 0);
+    } else {
+      bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
+    }
+    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+    // previous checksum boundary.
+    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
+    // it simplifies the code to always do this.
+    long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % bytesPerChecksum;
+
+    final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
+    blockFile.position(adjustedOffset);
+    int totalDataLength = 0;
+    int numResponses = 0;
+    final int numChecksums = responseDataSize / bytesPerChecksum;
+    while (totalDataLength < readBlock.getLength() && blockFile.read(buffer) != -1) {
+      buffer.flip();
+      if (checksumType != ContainerProtos.ChecksumType.NONE) {
+        final List<ByteString> checksums = new ArrayList<>(numChecksums);
+        for (int i = 0; i < numChecksums; i++) {
+          // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
+          // and its offset to pull out the correct checksum bytes for each read.
+          final int n = i * bytesPerChecksum;
+          final long offset = adjustedOffset + n;
+          final int chunkIndex = Math.toIntExact(offset / bytesPerChunk);
+          final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
+          final int checksumIndex = chunkOffset / bytesPerChecksum;
+          final ContainerProtos.ChunkInfo chunk = blockData.getChunks().get(chunkIndex);
+          Preconditions.checkState(chunk.getChecksumData().getBytesPerChecksum() == bytesPerChecksum);
+          final ByteString checksum = chunk.getChecksumData().getChecksums(checksumIndex);
+          checksums.add(checksum);
+        }
+        checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
+      }
+      final ContainerCommandResponseProto response = getReadBlockResponse(
+          request, checksumData, buffer, adjustedOffset);
+      final int dataLength = response.getReadBlock().getData().size();
+      LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
+          numResponses, dataLength, numChecksums);
+      streamObserver.onNext(response);
+      buffer.clear();
+
+      adjustedOffset += responseDataSize;
+      totalDataLength += dataLength;
+      numResponses++;
+
+    }
   }
 
   @Override
