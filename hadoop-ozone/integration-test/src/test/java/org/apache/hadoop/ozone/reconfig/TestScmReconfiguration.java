@@ -94,6 +94,17 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(Duration.ofSeconds(120), config.getInterval());
   }
 
+  @Test
+  void containerSampleLimit() throws ReconfigurationException {
+    ReplicationManagerConfiguration config = replicationManagerConfig();
+
+    getSubject().reconfigurePropertyImpl(
+        "hdds.scm.replication.container.sample.limit",
+        "120");
+
+    assertEquals(120, config.getContainerSampleLimit());
+  }
+
   private ReplicationManagerConfiguration replicationManagerConfig() {
     return cluster().getStorageContainerManager().getReplicationManager()
         .getConfig();

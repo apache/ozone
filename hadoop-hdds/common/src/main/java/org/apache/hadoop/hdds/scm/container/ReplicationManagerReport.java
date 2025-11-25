@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public class ReplicationManagerReport {
 
   public static final int SAMPLE_LIMIT = 100;
+  private int sampleLimit;
   private long reportTimeStamp;
 
   private final Map<String, LongAdder> stats;
@@ -72,7 +73,16 @@ public class ReplicationManagerReport {
   }
 
   public ReplicationManagerReport() {
+    this(SAMPLE_LIMIT);
+  }
+
+  public ReplicationManagerReport(int sampleLimit) {
+    this.sampleLimit = sampleLimit;
     stats = createStatsMap();
+  }
+
+  public int getSampleLimit() {
+    return sampleLimit;
   }
 
   public void increment(HealthState stat) {
@@ -220,7 +230,7 @@ public class ReplicationManagerReport {
     List<ContainerID> list = containerSample
         .computeIfAbsent(stat, k -> new ArrayList<>());
     synchronized (list) {
-      if (list.size() < SAMPLE_LIMIT) {
+      if (list.size() < sampleLimit) {
         list.add(container);
       }
     }
