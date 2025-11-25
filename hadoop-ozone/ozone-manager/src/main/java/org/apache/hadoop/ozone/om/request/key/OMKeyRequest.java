@@ -333,7 +333,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
-    if (keyArgs.getAclsList() != null) {
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
 
@@ -407,7 +407,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
 
     // add acls from clients
-    acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
+      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    }
     acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }

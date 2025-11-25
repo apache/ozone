@@ -117,6 +117,14 @@ public class OmConfig extends ReconfigurableConfig {
   private String groupDefaultRights;
   private Set<ACLType> groupDefaultRightSet;
 
+  @Config(key = "object.creation.ignore.client.acls",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "Ignore ACLs sent by client to OzoneManager during volume/bucket/key creation."
+  )
+  private boolean ignoreClientACLs;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -179,6 +187,14 @@ public class OmConfig extends ReconfigurableConfig {
     return groupDefaultRights == null
         ? Collections.unmodifiableSet(EnumSet.of(ACLType.READ, ACLType.LIST))
         : ACLType.parseList(groupDefaultRights);
+  }
+
+  public boolean ignoreClientACLs() {
+    return ignoreClientACLs;
+  }
+
+  public void setIgnoreClientACLs(boolean ignore) {
+    ignoreClientACLs = ignore;
   }
 
   @PostConstruct
