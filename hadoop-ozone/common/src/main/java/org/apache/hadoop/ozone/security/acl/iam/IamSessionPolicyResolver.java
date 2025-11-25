@@ -17,19 +17,31 @@
 
 package org.apache.hadoop.ozone.security.acl.iam;
 
+import static java.util.Collections.singleton;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 /**
  * Resolves a limited subset of AWS IAM session policies into Ozone ACL grants,
@@ -73,6 +85,12 @@ public final class IamSessionPolicyResolver {
   // JSON length is limited per AWS policy.  See https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
   // under Policy section.
   private static final int MAX_JSON_LENGTH = 2048;
+
+  // Used to group actions into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create*
+  private static final String[] S3_ACTION_PREFIXES = {"s3:Get", "s3:Put", "s3:List", "s3:Delete", "s3:Create"};
+
+  @VisibleForTesting
+  static final Map<String, Set<S3Action>> S3_ACTION_MAP_CI = buildCaseInsensitiveS3ActionMap();
 
   private IamSessionPolicyResolver() {
   }
@@ -276,12 +294,53 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * Builds a case-insensitive S3Action map by lowercasing keys.  This map is used for mapping policy actions to
+   * S3Action enum values.  This map is built once and cached statically.
+   */
+  @VisibleForTesting
+  static Map<String, Set<S3Action>> buildCaseInsensitiveS3ActionMap() {
+    final Map<String, Set<S3Action>> ciMap = new LinkedHashMap<>();
+    for (S3Action sa : S3Action.values()) {
+      // Exact action mapping
+      ciMap.put(sa.name.toLowerCase(), singleton(sa));
+
+      // Group into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create* based on action name prefix
+      for (String prefix : S3_ACTION_PREFIXES) {
+        if (sa.name.startsWith(prefix)) {
+          final String wildcardKey = (prefix + "*").toLowerCase();
+          ciMap.computeIfAbsent(wildcardKey, k -> new LinkedHashSet<>()).add(sa);
+          break;
+        }
+      }
+    }
+    return Collections.unmodifiableMap(ciMap);
+  }
+
+  /**
    * Maps actions from JSON IAM policy to S3Action enum in order to determine what the
    * permissions should be.
    */
-  private static Set<S3Action> mapPolicyActionsToS3Actions(Set<String> actions) {
-    // TODO implement in future PR
-    return Collections.emptySet();
+  @VisibleForTesting
+  static Set<S3Action> mapPolicyActionsToS3Actions(Set<String> actions) {
+    if (actions == null || actions.isEmpty()) {
+      return Collections.emptySet();
+    }
+
+    // Map the actions from the IAM policy to S3Action
+    final Set<S3Action> mappedActions = new LinkedHashSet<>();
+    for (String action : actions) {
+      if ("s3:*".equalsIgnoreCase(action)) {
+        return EnumSet.of(S3Action.ALL_S3);
+      }
+
+      // Unsupported actions are silently ignored
+      final Set<S3Action> s3Actions = S3_ACTION_MAP_CI.get(action.toLowerCase());
+      if (s3Actions != null) {
+        mappedActions.addAll(s3Actions);
+      }
+    }
+
+    return mappedActions;
   }
 
   /**
@@ -321,16 +380,84 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * The type of resource the S3 action applies to.
+   */
+  private enum ActionKind {
+    VOLUME,
+    BUCKET,
+    OBJECT,
+    ALL
+  }
+
+  /**
    * Utility to help categorize IAM policy resources, whether for bucket, key, wildcards, etc.
    */
   private static final class ResourceSpec {
     // TODO implement in future PR
   }
 
-  /**
-   * Represents S3 actions and requisite permissions required and at what level.
-   */
-  private enum S3Action {
-    // TODO implement in future PR
+  @VisibleForTesting
+  enum S3Action {
+    // Volume-scope
+    // Used for ListBuckets api
+    LIST_ALL_MY_BUCKETS("s3:ListAllMyBuckets", ActionKind.VOLUME, EnumSet.of(READ, LIST),
+        EnumSet.noneOf(ACLType.class), EnumSet.noneOf(ACLType.class)),
+
+    // Bucket-scope
+    CREATE_BUCKET("s3:CreateBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(CREATE),
+        EnumSet.noneOf(ACLType.class)),
+    DELETE_BUCKET("s3:DeleteBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(DELETE),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
+    // Used for HeadBucket, ListObjects and ListObjectsV2 apis
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST),
+        EnumSet.noneOf(ACLType.class)),
+    // Used for ListMultipartUploads API
+    LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
+        EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(WRITE_ACL),
+        EnumSet.noneOf(ACLType.class)),
+
+    // Object-scope
+    ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(DELETE)),
+    // Used for DeleteObject (when versionId parameter is not supplied),
+    // DeleteObjects (when versionId parameter is not supplied) APIs
+    DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(DELETE)),
+    DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(DELETE)),
+    // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
+    GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    // Used for ListParts API
+    LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(READ)),
+    // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
+    // CopyObject (for destination bucket), PutObject APIs
+    PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(CREATE, ACLType.WRITE)),
+    PUT_OBJECT_TAGGING("s3:PutObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(ACLType.WRITE)),
+
+    // Wildcard all
+    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
+
+    private final String name;
+    private final ActionKind kind;
+    private final Set<ACLType> volumePerms;
+    private final Set<ACLType> bucketPerms;
+    private final Set<ACLType> objectPerms;
+
+    S3Action(String name, ActionKind kind, Set<ACLType> volumePerms, Set<ACLType> bucketPerms,
+        Set<ACLType> objectPerms) {
+      this.name = name;
+      this.kind = kind;
+      this.volumePerms = volumePerms;
+      this.bucketPerms = bucketPerms;
+      this.objectPerms = objectPerms;
+    }
   }
 }
