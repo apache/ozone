@@ -4422,6 +4422,12 @@
                 "name": "ownerName",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 10,
+                "name": "isEncrypted",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
