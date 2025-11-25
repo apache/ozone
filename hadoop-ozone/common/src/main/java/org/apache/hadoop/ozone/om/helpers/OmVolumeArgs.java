@@ -352,8 +352,6 @@ public final class OmVolumeArgs extends WithObjectID
     }
 
     public Builder setRefCount(long refCount) {
-      Preconditions.checkState(refCount >= 0L,
-          "refCount should not be negative");
       this.refCount = refCount;
       return this;
     }
