@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
@@ -79,7 +81,8 @@ public class RDBStore implements DBStore {
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   boolean readOnly,
-                  String dbJmxBeanName, boolean enableCompactionDag,
+                  String dbJmxBeanName,
+                  boolean enableCompactionDag, Function<Boolean, UncheckedAutoCloseable> differLockSupplier,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
@@ -95,12 +98,14 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionDag) {
+        Preconditions.checkNotNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
+            "compaction dag is enabled");
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR,
             DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
-            configuration);
+            configuration, differLockSupplier);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;

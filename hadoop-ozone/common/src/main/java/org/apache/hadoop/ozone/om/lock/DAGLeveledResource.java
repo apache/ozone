@@ -46,7 +46,11 @@ public enum DAGLeveledResource implements Resource {
   // Lock acquired on a Snapshot's RocksDB contents. (This lock should be always acquired before opening a snapshot
   // which acquires a SNAPSHOT_DB_LOCK)
   SNAPSHOT_DB_CONTENT_LOCK("SNAPSHOT_DB_CONTENT_LOCK",
-      new DAGLeveledResource[] {SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK});
+      new DAGLeveledResource[] {SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK}),
+  // Bootstrap lock for OM. (Bootstrap lock should be acquired before any other lock).
+  BOOTSTRAP_LOCK("BOOTSTRAP_LOCK",
+      new DAGLeveledResource[] {SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
+          SNAPSHOT_LOCAL_DATA_LOCK});
 
   private Set<DAGLeveledResource> children;
   private String name;

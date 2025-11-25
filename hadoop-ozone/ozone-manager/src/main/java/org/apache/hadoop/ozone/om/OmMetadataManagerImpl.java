@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -277,7 +278,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .disableDefaultCFAutoCompaction(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
-        .setEnableCompactionDag(false)
+        .setEnableCompactionDag(false, null)
         .setCreateCheckpointDirs(false)
         .setEnableRocksDbMetrics(true)
         .build();
@@ -303,7 +304,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           .setOpenReadOnly(false)
           .disableDefaultCFAutoCompaction(true)
           .setMaxNumberOfOpenFiles(maxOpenFiles)
-          .setEnableCompactionDag(false)
+          .setEnableCompactionDag(false, null)
           .setCreateCheckpointDirs(false)
           .setEnableRocksDbMetrics(enableRocksDBMetrics)
           .build();
@@ -422,7 +423,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
 
-      this.store = loadDB(configuration, metaDir, maxOpenFiles);
+      this.store = loadDB(configuration, metaDir, maxOpenFiles, lock);
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -430,10 +431,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles,
+      IOzoneManagerLock ozoneManagerLock) throws IOException {
     return newDBStoreBuilder(configuration, null, metaDir)
         .setOpenReadOnly(false)
-        .setEnableCompactionDag(true)
+        .setEnableCompactionDag(true,
+            (readLock) -> ozoneManagerLock.acquireLock(BOOTSTRAP_LOCK, "rocksdbCheckpointDifferAOS", readLock))
         .setCreateCheckpointDirs(true)
         .setEnableRocksDbMetrics(true)
         .setMaxNumberOfOpenFiles(maxOpenFiles)
