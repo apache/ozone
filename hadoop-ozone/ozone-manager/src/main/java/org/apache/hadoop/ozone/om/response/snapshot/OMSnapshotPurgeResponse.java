@@ -91,7 +91,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       if (snapshotInfo == null) {
         continue;
       }
-
+      OmSnapshotManager omSnapshotManager = metadataManager.getOzoneManager().getOmSnapshotManager();
+      // Remove and close snapshot's RocksDB instance from SnapshotCache.
+      omSnapshotManager.invalidateCacheEntry(snapshotInfo.getSnapshotId());
       // Remove the snapshot from snapshotId to snapshotTableKey map.
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
@@ -102,7 +104,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       // snapshot purged txn is flushed to rocksdb.
       updateLocalData(snapshotLocalDataManager, snapshotInfo);
       // Delete Snapshot checkpoint directory.
-      OmSnapshotManager omSnapshotManager = metadataManager.getOzoneManager().getOmSnapshotManager();
+
       omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotInfo.getSnapshotId(), -1);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
