@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import static com.google.common.graph.Graphs.hasCycle;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
@@ -38,6 +38,6 @@ public class TestDAGLeveledResource {
     for (DAGLeveledResource resource : DAGLeveledResource.values()) {
       resource.getChildren().forEach(child -> graph.putEdge(resource, child));
     }
-    assertFalse("DAGLeveledResource has one or more cycles and it needs to be DAG", hasCycle(graph));
+    assertFalse(hasCycle(graph), "DAGLeveledResource has one or more cycles and it needs to be DAG");
   }
 }
