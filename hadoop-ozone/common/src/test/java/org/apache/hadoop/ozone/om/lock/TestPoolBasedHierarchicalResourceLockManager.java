@@ -223,10 +223,60 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       // Wait for both threads to complete
       future1.get(5, TimeUnit.SECONDS);
       future2.get(5, TimeUnit.SECONDS);
-
+      latch2.await();
       // Second lock should have been acquired after first was released
       assertTrue(secondLockAcquired.get());
 
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  /**
+   * Test write lock exclusivity - only one write lock can be acquired at a time.
+   */
+  @ParameterizedTest
+  @Timeout(10)
+  @ValueSource(booleans = {true, false})
+  public void testResouceLockExclusivityBeforeResourceLock(boolean readLock) throws Exception {
+    String key = "test-key-4";
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    AtomicBoolean lockAcquired = new AtomicBoolean(false);
+    AtomicBoolean lock2Acquired = new AtomicBoolean(false);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // First thread tries to acquire resource key lock
+      CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
+        try (HierarchicalResourceLock lock = readLock ? lockManager.acquireReadLock(SNAPSHOT_DB_LOCK, key) :
+            lockManager.acquireWriteLock(SNAPSHOT_DB_LOCK, key)) {
+          latch1.countDown();
+          lockAcquired.set(true);
+          latch2.await();
+        } catch (Exception e) {
+          fail("Second thread failed to acquire lock: " + e.getMessage());
+        }
+      }, executor);
+      latch1.await();
+      // Second thread acquires resource write lock
+      CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
+        latch2.countDown();
+        try (HierarchicalResourceLock lock = lockManager.acquireResourceWriteLock(SNAPSHOT_DB_LOCK)) {
+          // Hold lock for a short time
+          assertTrue(lockAcquired.get());
+          lock2Acquired.set(true);
+          Thread.sleep(100);
+        } catch (Exception e) {
+          fail("First thread failed to acquire lock: " + e.getMessage());
+        }
+      }, executor);
+
+      // Wait for both threads to complete
+      future1.get(5, TimeUnit.SECONDS);
+      future2.get(5, TimeUnit.SECONDS);
+      latch2.await();
+      // Second lock should have been acquired after first was released
+      assertTrue(lock2Acquired.get());
     } finally {
       executor.shutdown();
     }
