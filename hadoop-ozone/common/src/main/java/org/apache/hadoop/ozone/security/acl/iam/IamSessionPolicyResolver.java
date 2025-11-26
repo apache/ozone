@@ -524,8 +524,15 @@ public final class IamSessionPolicyResolver {
       // bucket name of "*".  To align with AWS, make sure that in this
       // specific case we also grant the volume-level permissions for volume-scoped
       // actions (currently s3:ListAllMyBuckets).
-      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3 ||
-          (action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket))) { // this handles s3:ListAllMyBuckets
+      if (action.kind == ActionKind.BUCKET) {
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the bucket level; grant READ at volume for navigation
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      } else if (action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket)) {
+        // this handles s3:ListAllMyBuckets with wildcard bucket resource
         addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
@@ -539,9 +546,14 @@ public final class IamSessionPolicyResolver {
   private static void processObjectExactResource(String volumeName, Set<S3Action> mappedS3Actions,
       ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
-      if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
+      if (action.kind == ActionKind.OBJECT) {
         addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+        addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the object level; grant READ at parent levels for navigation
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
         addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
       }
     }
@@ -557,21 +569,25 @@ public final class IamSessionPolicyResolver {
       Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
       // Object actions apply to prefix/key resources
-      if (action.kind == ActionKind.OBJECT || action == S3Action.ALL_S3) {
+      if (action.kind == ActionKind.OBJECT) {
         addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the object/prefix level; grant READ at parent levels for navigation
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
+      }
 
-        if (prefixes != null && !prefixes.isEmpty()) {
-          // Handle specific prefixes from conditions
-          for (String prefix : prefixes) {
-            createObjectResourcesFromConditionPrefix(
-                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, action.objectPerms);
-          }
-        } else {
-          // Handle the resource prefix itself (e.g., my-bucket/*)
-          createObjectResourcesFromResourcePrefix(
-              volumeName, authorizerType, resourceSpec, objToAclsMap, action.objectPerms);
+      if (prefixes != null && !prefixes.isEmpty()) {
+        // Handle specific prefixes from conditions
+        for (String prefix : prefixes) {
+          createObjectResourcesFromConditionPrefix(
+              volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, action.objectPerms);
         }
+      } else {
+        // Handle the resource prefix itself (e.g., my-bucket/*)
+        createObjectResourcesFromResourcePrefix(
+            volumeName, authorizerType, resourceSpec, objToAclsMap, action.objectPerms);
       }
     }
   }
