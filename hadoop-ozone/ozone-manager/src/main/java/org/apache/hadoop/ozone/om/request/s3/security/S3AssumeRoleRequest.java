@@ -42,7 +42,19 @@ import org.apache.hadoop.security.UserGroupInformation;
  */
 public class S3AssumeRoleRequest extends OMClientRequest {
 
-  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final SecureRandom SECURE_RANDOM;
+
+  static {
+    SecureRandom secureRandom;
+    try {
+      // Prefer non-blocking native PRNG where available
+      secureRandom = SecureRandom.getInstance("NativePRNGNonBlocking");
+    } catch (Exception e) {
+      // Fallback to default SecureRandom implementation
+      secureRandom = new SecureRandom();
+    }
+    SECURE_RANDOM = secureRandom;
+  }
 
   private static final int MIN_TOKEN_EXPIRATION_SECONDS = 900;    // 15 minutes in seconds
   private static final int MAX_TOKEN_EXPIRATION_SECONDS = 43200;  // 12 hours in seconds
