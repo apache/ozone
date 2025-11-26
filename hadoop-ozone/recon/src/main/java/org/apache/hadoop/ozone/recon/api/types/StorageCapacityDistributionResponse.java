@@ -46,6 +46,9 @@ public class StorageCapacityDistributionResponse {
   @JsonProperty("dataNodeUsage")
   private List<DatanodeStorageReport> dataNodeUsage;
 
+  public StorageCapacityDistributionResponse() {
+  }
+
   public StorageCapacityDistributionResponse(Builder builder) {
     this.globalStorage = builder.globalStorage;
     this.globalNamespace = builder.globalNamespace;

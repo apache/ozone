@@ -25,38 +25,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
-import org.apache.hadoop.ozone.recon.api.types.DeletionPendingBytesByComponent;
 import org.apache.hadoop.ozone.recon.api.types.GlobalNamespaceReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
-import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
-import org.apache.hadoop.ozone.recon.tasks.JmxMetricsCollectorTask;
-import org.apache.hadoop.ozone.recon.tasks.JmxMetricsCollectorTaskResult;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,32 +67,24 @@ import org.slf4j.LoggerFactory;
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final NSSummaryEndpoint nsSummaryEndpoint;
-  private final StorageContainerLocationProtocol scmClient;
   private static final Logger LOG = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
-  private final Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
-  private final OzoneConfiguration conf;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
-                                     StorageContainerLocationProtocol scmClient,
-                                     ReconGlobalMetricsService reconGlobalMetricsService,
-                                     OzoneConfiguration conf) {
+                                     ReconGlobalMetricsService reconGlobalMetricsService) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
-    this.scmClient = scmClient;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
-    this.conf = conf;
   }
 
   @GET
   public Response getStorageDistribution() {
     try {
-      initializeBlockDeletionMetricsMap();
       List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
       GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
 
@@ -155,7 +134,7 @@ public class StorageDistributionEndpoint {
 
   private Map<String, Long> calculateNamespaceMetrics() throws IOException {
     Map<String, Long> metrics = new HashMap<>();
-    Map<String, Long> totalPendingAtOmSide = calculatePendingSizes();
+    Map<String, Long> totalPendingAtOmSide = reconGlobalMetricsService.calculatePendingSizes();
     long totalOpenKeySize = calculateOpenKeySizes();
     long totalCommittedSize = calculateCommittedSize();
     long pendingDirectorySize = totalPendingAtOmSide.getOrDefault("pendingDirectorySize", 0L);
@@ -176,8 +155,6 @@ public class StorageDistributionEndpoint {
       totalKeys += fileRecord.getValue();
     }
 
-    metrics.put("pendingDirectorySize", pendingDirectorySize);
-    metrics.put("pendingKeySize", pendingKeySize);
     metrics.put("totalOpenKeySize", totalOpenKeySize);
     metrics.put("totalCommittedSize", totalCommittedSize);
     metrics.put("totalUsedNamespace", totalUsedNamespace);
@@ -189,26 +166,6 @@ public class StorageDistributionEndpoint {
           List<DatanodeStorageReport> nodeStorageReports,
           GlobalStorageReport storageMetrics,
           Map<String, Long> namespaceMetrics) {
-    DeletedBlocksTransactionSummary scmSummary = null;
-    try {
-      scmSummary = scmClient.getDeletedBlockSummary();
-    } catch (IOException e) {
-      LOG.error("Failed to get deleted block summary from SCM", e);
-    }
-
-    long totalPendingAtDnSide = 0L;
-    try {
-      totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
-    } catch (Exception e) {
-      LOG.error("Error calculating pending deletion metrics", e);
-    }
-
-    DeletionPendingBytesByComponent deletionPendingBytesByStage =
-            createDeletionPendingBytesByStage(
-                    namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
-                    namespaceMetrics.getOrDefault("pendingKeySize", 0L),
-                    scmSummary != null ? scmSummary.getTotalBlockReplicatedSize() : 0L,
-                    totalPendingAtDnSide);
 
     // Safely get values from namespaceMetrics with null checks
     Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
@@ -227,8 +184,7 @@ public class StorageDistributionEndpoint {
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
                     totalOpenKeySize != null ? totalOpenKeySize : 0L,
-                    totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated,
-                    deletionPendingBytesByStage))
+                    totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated))
             .build();
   }
 
@@ -237,15 +193,6 @@ public class StorageDistributionEndpoint {
         .map(this::getStorageReport)
         .filter(Objects::nonNull) // Filter out null reports
         .collect(Collectors.toList());
-  }
-
-  private Map<String, Long> calculatePendingSizes() {
-    Map<String, Long> result = new HashMap<>();
-    KeyInsightInfoResponse response = reconGlobalMetricsService.getPendingForDeletionDirInfo(-1, "");
-    Map<String, Long> pendingKeySize = reconGlobalMetricsService.getDeletedKeySummary();
-    result.put("pendingDirectorySize", response.getReplicatedDataSize());
-    result.put("pendingKeySize", pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L));
-    return result;
   }
 
   private long calculateOpenKeySizes() {
@@ -271,46 +218,6 @@ public class StorageDistributionEndpoint {
     }
   }
 
-  private DeletionPendingBytesByComponent createDeletionPendingBytesByStage(long pendingDirectorySize,
-                                                                        long pendingKeySize,
-                                                                        long totalPendingAtScmSide,
-                                                                        long totalPendingAtDnSide) {
-    long totalPending = pendingDirectorySize + pendingKeySize + totalPendingAtScmSide + totalPendingAtDnSide;
-    Map<String, Map<String, Long>> stageItems = new HashMap<>();
-    Map<String, Long> omMap = new HashMap<>();
-    omMap.put("totalBytes", pendingDirectorySize + pendingKeySize);
-    omMap.put("pendingDirectoryBytes", pendingDirectorySize);
-    omMap.put("pendingKeyBytes", pendingKeySize);
-    Map<String, Long> scmMap = new HashMap<>();
-    scmMap.put("pendingBytes", totalPendingAtScmSide);
-    Map<String, Long> dnMap = new HashMap<>();
-    dnMap.put("pendingBytes", totalPendingAtDnSide);
-    stageItems.put("OM", omMap);
-    stageItems.put("SCM", scmMap);
-    stageItems.put("DN", dnMap);
-    return new DeletionPendingBytesByComponent(totalPending, stageItems);
-  }
-
-  private void initializeBlockDeletionMetricsMap() {
-    List<JmxMetricsCollectorTask> tasks = nodeManager.getNodeStats().keySet().stream().map(dn ->
-      new JmxMetricsCollectorTask(conf, dn, "HddsDatanode",
-          "BlockDeletingService", "TotalPendingBlockBytes"))
-        .collect(Collectors.toList());
-    try {
-      int threadPoolSize = conf.getInt(
-          ReconConfigKeys.OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE,
-          ReconConfigKeys.OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE_DEFAULT);
-      ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
-      List<Future<JmxMetricsCollectorTaskResult>> results = executor.invokeAll(tasks);
-
-      for (Future<JmxMetricsCollectorTaskResult> result : results) {
-        blockDeletionMetricsMap.put(result.get().getDatanodeDetails(), result.get().getPendingBytes());
-      }
-    } catch (InterruptedException | ExecutionException e) {
-      LOG.error("Error initializing block deletion metrics map", e);
-    }
-  }
-
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     try {
       SCMNodeMetric nodeMetric = nodeManager.getNodeStat(datanode);
@@ -329,18 +236,13 @@ public class StorageDistributionEndpoint {
       long used = nodeStat.getScmUsed() != null ? nodeStat.getScmUsed().get() : 0L;
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
-      long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
       long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
-      if (pendingDeletion < 0) {
-        LOG.warn("Block deletion metrics unavailable for datanode: {}", datanode);
-        pendingDeletion = 0L;
-      }
+
       return DatanodeStorageReport.newBuilder()
           .setCapacity(capacity)
           .setUsed(used)
           .setRemaining(remaining)
           .setCommitted(committed)
-          .setPendingDeletion(pendingDeletion)
           .setMinimumFreeSpace(minFreeSpace)
           .setDatanodeUuid(datanode.getUuidString())
           .setHostName(datanode.getHostName())

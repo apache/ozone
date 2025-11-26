@@ -31,8 +31,10 @@ public final class DatanodeStorageReport {
   private long used;
   private long remaining;
   private long committed;
-  private long pendingDeletion;
   private long minimumFreeSpace;
+
+  public DatanodeStorageReport() {
+  }
 
   private DatanodeStorageReport(Builder builder) {
     this.datanodeUuid = builder.datanodeUuid;
@@ -41,7 +43,6 @@ public final class DatanodeStorageReport {
     this.used = builder.used;
     this.remaining = builder.remaining;
     this.committed = builder.committed;
-    this.pendingDeletion = builder.pendingDeletion;
     this.minimumFreeSpace = builder.minimumFreeSpace;
   }
 
@@ -69,10 +70,6 @@ public final class DatanodeStorageReport {
     return committed;
   }
 
-  public long getPendingDeletion() {
-    return pendingDeletion;
-  }
-
   public long getMinimumFreeSpace() {
     return minimumFreeSpace;
   }
@@ -91,7 +88,6 @@ public final class DatanodeStorageReport {
     private long used = 0;
     private long remaining = 0;
     private long committed = 0;
-    private long pendingDeletion = 0;
     private long minimumFreeSpace = 0;
 
     private static final Logger LOG =
@@ -130,11 +126,6 @@ public final class DatanodeStorageReport {
       return this;
     }
 
-    public Builder setPendingDeletion(long pendingDeletion) {
-      this.pendingDeletion = pendingDeletion;
-      return this;
-    }
-
     public Builder setMinimumFreeSpace(long minimumFreeSpace) {
       this.minimumFreeSpace = minimumFreeSpace;
       return this;
@@ -154,9 +145,6 @@ public final class DatanodeStorageReport {
       }
       if (committed < 0) {
         throw new IllegalArgumentException("committed cannot be negative");
-      }
-      if (pendingDeletion < 0) {
-        throw new IllegalArgumentException("pendingDeletion cannot be negative");
       }
       // Logical consistency checks
       if (used + remaining > capacity) {

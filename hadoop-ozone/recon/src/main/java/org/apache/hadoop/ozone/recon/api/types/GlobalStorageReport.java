@@ -38,6 +38,9 @@ public class GlobalStorageReport {
   @JsonProperty("totalCapacity")
   private long totalCapacity;
 
+  public GlobalStorageReport() {
+  }
+
   public GlobalStorageReport(long totalUsedSpace, long totalFreeSpace, long totalCapacity) {
     this.totalUsedSpace = totalUsedSpace;
     this.totalFreeSpace = totalFreeSpace;

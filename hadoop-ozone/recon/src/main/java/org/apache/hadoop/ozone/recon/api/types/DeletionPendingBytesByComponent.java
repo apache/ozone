@@ -34,6 +34,9 @@ public class DeletionPendingBytesByComponent {
   @JsonProperty("byComponent")
   private Map<String, Map<String, Long>> byComponent;
 
+  public DeletionPendingBytesByComponent() {
+  }
+
   public DeletionPendingBytesByComponent(long total, Map<String, Map<String, Long>> byComponent) {
     this.total = total;
     this.byComponent = byComponent;

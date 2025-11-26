@@ -37,6 +37,9 @@ public class GlobalNamespaceReport {
   @JsonProperty("totalKeys")
   private long totalKeys;
 
+  public GlobalNamespaceReport() {
+  }
+
   public GlobalNamespaceReport(long totalUsedSpace, long totalKeys) {
     this.totalUsedSpace = totalUsedSpace;
     this.totalKeys = totalKeys;

@@ -217,6 +217,16 @@ public class ReconGlobalMetricsService {
     return deletedDirInsightInfo;
   }
 
+  public Map<String, Long> calculatePendingSizes() {
+    Map<String, Long> result = new HashMap<>();
+    KeyInsightInfoResponse response = getPendingForDeletionDirInfo(-1, "");
+    Map<String, Long> pendingKeySize = getDeletedKeySummary();
+    result.put("pendingDirectorySize", response.getReplicatedDataSize());
+    result.put("pendingKeySize", pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L));
+    result.put("totalSize", result.get("pendingDirectorySize") + result.get("pendingKeySize"));
+    return result;
+  }
+
   private Long getValueFromId(GlobalStatsValue record) {
     // If the record is null, return 0
     return record != null ? record.getValue() : 0L;
