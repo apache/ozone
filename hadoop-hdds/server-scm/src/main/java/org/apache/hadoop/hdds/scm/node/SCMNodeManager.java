@@ -1371,7 +1371,6 @@ public class SCMNodeManager implements NodeManager {
 
   private void nodeReadOnlyStatistics(Map<String, String> nodeStatics) {
     List<DatanodeInfo> allNodes = getAllNodes();
-    int readOnlyCount = 0;
     long blockSize = (long) conf.getStorageSize(
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1385,18 +1384,19 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
-    for (DatanodeInfo dnInfo : allNodes) {
-      boolean hasWritableContainer = hasContainerWithSpace(dnInfo, blockSize, containerSize);
-      if (hasWritableContainer) {
-        continue;
-      }
+    int readOnlyCount = (int) allNodes.parallelStream()
+        .filter(dnInfo -> {
+          boolean hasWritableContainer = hasContainerWithSpace(dnInfo, blockSize, containerSize);
+          if (hasWritableContainer) {
+            return false;
+          }
 
-      boolean canAllocateNewContainers = SCMCommonPlacementPolicy.hasEnoughSpace(
-          dnInfo, minRatisVolumeSizeBytes, containerSize, conf);
-      if (!canAllocateNewContainers) {
-        readOnlyCount++;
-      }
-    }
+          boolean canAllocateNewContainers = SCMCommonPlacementPolicy.hasEnoughSpace(
+              dnInfo, minRatisVolumeSizeBytes, containerSize, conf);
+          return !canAllocateNewContainers;
+        })
+        .count();
+
     nodeStatics.put("ReadOnlyNodes", String.valueOf(readOnlyCount));
   }
   
