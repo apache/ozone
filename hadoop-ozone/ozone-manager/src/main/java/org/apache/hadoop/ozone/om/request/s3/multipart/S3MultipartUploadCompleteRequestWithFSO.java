@@ -94,7 +94,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        multipartOpenKey, omKeyInfo,
         keyName, transactionLogIndex);
 
   }

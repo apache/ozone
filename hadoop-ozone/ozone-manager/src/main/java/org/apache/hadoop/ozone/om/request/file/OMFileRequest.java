@@ -463,12 +463,11 @@ public final class OMFileRequest {
    * @param omMetadataManager OM Metadata Manager
    * @param dbOpenFileName    open file name key
    * @param omFileInfo        key info
-   * @param fileName          file name
    * @param trxnLogIndex      transaction log index
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String fileName, String keyName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String keyName, long trxnLogIndex) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
