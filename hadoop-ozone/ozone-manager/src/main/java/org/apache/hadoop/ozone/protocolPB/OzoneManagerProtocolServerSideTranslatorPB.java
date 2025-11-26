@@ -186,12 +186,22 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws ServiceException {
     // Get current OM's role
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-    // Read from leader or followers using linearizable read
-    if (omRatisServer.isLinearizableRead() && raftServerStatus == NOT_LEADER) {
+    // === 1. Follower linearizable read ===
+    if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
       return ozoneManager.getOmExecutionFlow().submit(request, false);
     }
-    if (raftServerStatus == LEADER_AND_READY ||
-        request.getCmdType().equals(PrepareStatus)) {
+    // === 2. Leader local read (skip ReadIndex if allowed) ===
+    if (raftServerStatus == LEADER_AND_READY || request.getCmdType().equals(PrepareStatus)) {
+      if (ozoneManager.isAllowLeaderNonLinearizableRead()) {
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+      // otherwise use linearizable path when enabled
+      if (omRatisServer.isLinearizableRead()) {
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      }
+
+      // fallback to local read
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);

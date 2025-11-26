@@ -56,6 +56,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOW_LEADER_NON_LINEARIZABLE_READ;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOW_LEADER_NON_LINEARIZABLE_READ_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -505,6 +507,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
 
+  private boolean allowLeaderNonLinearizableRead;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -581,6 +585,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
+    this.allowLeaderNonLinearizableRead = conf.getBoolean(OZONE_OM_ALLOW_LEADER_NON_LINEARIZABLE_READ,
+        OZONE_OM_ALLOW_LEADER_NON_LINEARIZABLE_READ_DEFAULT);
 
     String defaultBucketLayoutString =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -1109,6 +1115,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public boolean isTestSecureOmFlag() {
     return testSecureOmFlag;
+  }
+
+  public boolean isAllowLeaderNonLinearizableRead() {
+    return allowLeaderNonLinearizableRead;
   }
 
   private KeyProviderCryptoExtension createKeyProviderExt(
