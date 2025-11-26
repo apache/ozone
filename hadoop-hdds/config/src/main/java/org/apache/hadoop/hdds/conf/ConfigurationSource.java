@@ -98,6 +98,10 @@ public interface ConfigurationSource {
 
   default String[] getTrimmedStrings(String name) {
     String valueString = get(name);
+    return getValueTrimmedStrings(valueString);
+  }
+
+  static String[] getValueTrimmedStrings(String valueString) {
     if (null == valueString) {
       return EMPTY_STRING_ARRAY;
     }

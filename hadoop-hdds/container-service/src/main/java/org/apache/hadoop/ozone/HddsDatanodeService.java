@@ -652,8 +652,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigBlockDeleteThreadMax(String value) {
-    getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
-
     DeleteBlocksCommandHandler handler =
         (DeleteBlocksCommandHandler) getDatanodeStateMachine()
             .getCommandDispatcher().getDeleteBlocksCommandHandler();
@@ -664,25 +662,20 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private String reconfigDeletingServiceWorkers(String value) {
     Preconditions.checkArgument(Integer.parseInt(value) >= 0,
         OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
     return value;
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
-    getConf().set(REPLICATION_STREAMS_LIMIT_KEY, value);
-
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
   }
 
   private String reconfigBlockDeletingServiceInterval(String value) {
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
     return value;
   }
 
   private String reconfigBlockDeletingServiceTimeout(String value) {
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
     return value;
   }
 
