@@ -156,7 +156,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       return false;
     }
     initialize();
-    return fillBuffer(length);
+
+    if (hasRemaining()) {
+      return true;
+    }
+    buffer = streamingReader.read(length);
+    return hasRemaining();
   }
 
   @Override
@@ -268,16 +273,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  private boolean hasRemaining() {
+  private synchronized boolean hasRemaining() {
     return buffer != null && buffer.hasRemaining();
-  }
-
-  private boolean fillBuffer(int length) throws IOException {
-    if (hasRemaining()) {
-      return true;
-    }
-    buffer = streamingReader.read(length);
-    return hasRemaining();
   }
 
   protected synchronized void releaseClient() {
@@ -346,7 +343,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       }
     }
 
-    private ByteBuffer read(int length) throws IOException {
+    private synchronized ByteBuffer read(int length) throws IOException {
       checkError();
       if (future.isDone()) {
         return null; // Stream ended

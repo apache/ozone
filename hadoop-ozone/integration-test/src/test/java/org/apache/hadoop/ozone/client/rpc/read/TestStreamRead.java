@@ -50,6 +50,8 @@ import org.slf4j.event.Level;
  * Tests {@link StreamBlockInputStream}.
  */
 public class TestStreamRead {
+  private TestBucket bucket;
+
   {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("com"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ipc"), Level.ERROR);
@@ -93,12 +95,6 @@ public class TestStreamRead {
         .setNumDatanodes(3)
         .build();
   }
-
-  /**
-   * Run the tests as a single test method to avoid needing a new mini-cluster
-   * for each test.
-   */
-  private TestBucket bucket;
 
   @Test
   void testReadKey512() throws Exception {
