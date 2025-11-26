@@ -127,16 +127,11 @@ public class OmTableInsightTask implements ReconOmTask {
       try {
         if (tableHandlers.containsKey(tableName)) {
           Table<String, ?> stringTable = (Table<String, ?>) table;
-          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = stringTable.iterator()) {
-            Triple<Long, Long, Long> details =
-                tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-            objectCountMap.put(getTableCountKeyFromTable(tableName),
-                details.getLeft());
-            unReplicatedSizeMap.put(
-                getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-            replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
-                details.getRight());
+          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = stringTable.iterator()) {
+            Triple<Long, Long, Long> details = tableHandlers.get(tableName).getTableSizeAndCount(iterator);
+            objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
+            unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+            replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
           }
         } else {
           if (usesNonStringKeys(tableName)) {
@@ -186,8 +181,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * Used for tables with non-String keys or as fallback.
    */
   private void processTableSequentially(String tableName, Table<?, ?> table) throws IOException {
-    LOG.info("{}: Processing table {} sequentially (non-String keys)", 
-        getTaskName(), tableName);
+    LOG.info("{}: Processing table {} sequentially (non-String keys)", getTaskName(), tableName);
     
     Table<String, ?> stringTable = (Table<String, ?>) table;
     try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = stringTable.iterator()) {
