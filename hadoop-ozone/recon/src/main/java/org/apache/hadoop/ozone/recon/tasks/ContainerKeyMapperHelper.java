@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -148,8 +147,6 @@ public abstract class ContainerKeyMapperHelper {
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
       ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-      // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
-      AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
       
       // Use parallel table iteration
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
@@ -163,18 +160,13 @@ public abstract class ContainerKeyMapperHelper {
           }
           omKeyCount.incrementAndGet();
           
-          // Only one thread should attempt flush to avoid blocking all workers
-          if (localContainerKeyMap.size() >= containerKeyFlushToDBMaxThreshold &&
-              isFlushingInProgress.compareAndSet(false, true)) {
+          // Check if flush is needed
+          if (localContainerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
             try {
               lock.writeLock().lock();
-              try {
-                if (!checkAndCallFlushToDB(localContainerKeyMap, containerKeyFlushToDBMaxThreshold,
-                    reconContainerMetadataManager)) {
-                  throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
-                }
-              } finally {
-                isFlushingInProgress.set(false);  // Reset flag after flush completes
+              if (!checkAndCallFlushToDB(localContainerKeyMap, containerKeyFlushToDBMaxThreshold,
+                  reconContainerMetadataManager)) {
+                throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
               }
             } finally {
               lock.writeLock().unlock();

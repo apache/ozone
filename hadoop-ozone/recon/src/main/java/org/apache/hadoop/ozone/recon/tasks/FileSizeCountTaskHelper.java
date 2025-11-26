@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -163,8 +162,6 @@ public abstract class FileSizeCountTaskHelper {
 
     // LOCAL lock (task-specific) - coordinates worker threads within this task only
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-    // Flag to coordinate flush attempts - prevents all threads from queuing for write lock
-    AtomicBoolean isFlushingInProgress = new AtomicBoolean(false);
     final int FLUSH_THRESHOLD = 200000;
     
     // Use parallel table iteration
@@ -176,26 +173,18 @@ public abstract class FileSizeCountTaskHelper {
         lock.readLock().unlock();
       }
       
-      // Only one thread should attempt flush to avoid blocking all workers
-      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD &&
-          // If current value is false: Set to true and return true
-          // If current value is true: Do nothing and return false
-          isFlushingInProgress.compareAndSet(false, true)) {
+      // Check if flush is needed
+      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
         try {
           lock.writeLock().lock();
-          try {
-            // Double-check size after acquiring write lock
-            if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
-              LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-              writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-              fileSizeCountMap.clear();
-            }
-          } finally {
-            isFlushingInProgress.set(false);
-            lock.writeLock().unlock();
+          // Double-check size after acquiring write lock
+          if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
+            LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
+            writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+            fileSizeCountMap.clear();
           }
-        } catch (Exception e) {
-          throw new RuntimeException("Failed to flush file size counts", e);
+        } finally {
+          lock.writeLock().unlock();
         }
       }
       return null;
