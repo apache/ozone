@@ -98,6 +98,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -2089,10 +2090,10 @@ public class KeyValueHandler extends Handler {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
     if (responseDataSize == 0) {
-      responseDataSize = 256 << 10;
+      responseDataSize = 1 << 20;
     }
 
-    BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
     if (!blockFile.isOpen()) {
       final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
       blockFile.open(file);
@@ -2102,14 +2103,10 @@ public class KeyValueHandler extends Handler {
     BlockUtils.verifyReplicaIdx(kvContainer, blockID);
     BlockUtils.verifyBCSId(kvContainer, blockID);
 
-    BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
-    List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-    // To get the chunksize, check the first chunk. Either there is only 1 chunk and its the largest, or there are
-    // multiple chunks and they are all the same size except the last one.
+    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
     final long bytesPerChunk = chunkInfos.get(0).getLen();
-    // The bytes per checksum is stored in the checksum data of each chunk, so check the first chunk as they all
-    // must be the same.
-    ContainerProtos.ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
+    final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
     ChecksumData checksumData = null;
     int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
     if (checksumType == ContainerProtos.ChecksumType.NONE) {
@@ -2159,7 +2156,6 @@ public class KeyValueHandler extends Handler {
       adjustedOffset += responseDataSize;
       totalDataLength += dataLength;
       numResponses++;
-
     }
   }
 

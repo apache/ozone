@@ -151,17 +151,21 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     return read > 0 ? read : EOF;
   }
 
-  private boolean dataAvailableToRead(int length) throws IOException {
+  private synchronized boolean dataAvailableToRead(int length) throws IOException {
     if (position >= blockLength) {
       return false;
     }
     initialize();
 
-    if (hasRemaining()) {
+    if (bufferHasRemaining()) {
       return true;
     }
     buffer = streamingReader.read(length);
-    return hasRemaining();
+    return bufferHasRemaining();
+  }
+
+  private synchronized boolean bufferHasRemaining() {
+    return buffer != null && buffer.hasRemaining();
   }
 
   @Override
@@ -227,7 +231,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         throw new IOException("Failed to acquire client for " + pipeline);
       }
       if (!(client instanceof XceiverClientGrpc)) {
-        throw new IOException("Unexpected client class: " + client.getClass().getName() + ", " + pipeline.toString());
+        throw new IOException("Unexpected client class: " + client.getClass().getName() + ", " + pipeline);
       }
 
       xceiverClient =  (XceiverClientGrpc) client;
@@ -271,10 +275,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     } else {
       throw cause;
     }
-  }
-
-  private synchronized boolean hasRemaining() {
-    return buffer != null && buffer.hasRemaining();
   }
 
   protected synchronized void releaseClient() {

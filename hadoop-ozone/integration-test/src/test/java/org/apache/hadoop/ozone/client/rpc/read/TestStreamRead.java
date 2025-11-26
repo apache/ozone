@@ -71,6 +71,7 @@ public class TestStreamRead {
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
 
   static final int BLOCK_SIZE = 128 << 20;
+  final SizeInBytes KEY_SIZE = SizeInBytes.valueOf("256M");
 
   static MiniOzoneCluster newCluster(int bytesPerChecksum) throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -99,22 +100,22 @@ public class TestStreamRead {
   @Test
   void testReadKey512() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf(512);
-    runTestReadKey(bytesPerChecksum);
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }
 
   @Test
   void testReadKey16k() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("16k");
-    runTestReadKey(bytesPerChecksum);
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }
 
   @Test
   void testReadKey256k() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
-    runTestReadKey(bytesPerChecksum);
+    runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }
 
-  void runTestReadKey(SizeInBytes bytesPerChecksum) throws Exception {
+  void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(bytesPerChecksum.getSizeInt())) {
       cluster.waitForClusterToBeReady();
 
@@ -134,7 +135,6 @@ public class TestStreamRead {
           SizeInBytes.valueOf("8M"),
           SizeInBytes.valueOf("32M"),
       };
-      final SizeInBytes keySize = SizeInBytes.valueOf("1G");
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
