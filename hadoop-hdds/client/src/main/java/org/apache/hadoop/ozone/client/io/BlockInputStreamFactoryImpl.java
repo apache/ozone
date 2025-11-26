@@ -90,9 +90,8 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
     } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
-      return new StreamBlockInputStream(
-          blockInfo.getBlockID(), blockInfo.getLength(),
-          pipeline, token, xceiverFactory, refreshFunction, config);
+      return new StreamBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(), pipeline, token, xceiverFactory,
+          refreshFunction, config);
     } else {
       return new BlockInputStream(blockInfo,
           pipeline, token, xceiverFactory, refreshFunction,
@@ -104,8 +103,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() <
-          STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
         return false;
       }
     }

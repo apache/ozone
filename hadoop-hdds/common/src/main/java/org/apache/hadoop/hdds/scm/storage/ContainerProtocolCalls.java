@@ -56,13 +56,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -911,23 +911,18 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient  client to perform call
    * @param offset         offset where block starts
-   * @param len            length of data to read
    * @param blockID        ID of the block
-   * @param validators     functions to validate the response
    * @param token          a token for this block (may be null)
-   * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public static ContainerProtos.ReadBlockResponseProto readBlock(
-      XceiverClientSpi xceiverClient, long offset, long len, BlockID blockID,
-      List<Validator> validators, Token<? extends TokenIdentifier> token,
-      Map<DatanodeDetails, Integer> replicaIndexes, boolean verifyChecksum) throws IOException {
+  public static void readBlock(
+      XceiverClientSpi xceiverClient, long offset, BlockID blockID, Token<? extends TokenIdentifier> token,
+      Map<DatanodeDetails, Integer> replicaIndexes, StreamingReaderSpi streamObserver)
+      throws IOException, InterruptedException {
     final ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
-            .setOffset(offset)
-            .setVerifyChecksum(verifyChecksum)
-            .setLen(len);
+            .setOffset(offset);
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
             .setContainerID(blockID.getContainerID());
@@ -935,18 +930,14 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    return tryEachDatanode(xceiverClient.getPipeline(),
-        d -> readBlock(xceiverClient,
-            validators, blockID, builder, readBlockRequest, d, replicaIndexes),
-        d -> toErrorMessage(blockID, d));
+    readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
+        replicaIndexes, streamObserver);
   }
 
-  private static ReadBlockResponseProto readBlock(XceiverClientSpi xceiverClient,
-                                                  List<Validator> validators, BlockID blockID,
-                                                  ContainerCommandRequestProto.Builder builder,
-                                                  ReadBlockRequestProto.Builder readBlockBuilder,
-                                                  DatanodeDetails datanode,
-                                                  Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+  private static void readBlock(XceiverClientSpi xceiverClient,
+      BlockID blockID, ContainerCommandRequestProto.Builder builder, ReadBlockRequestProto.Builder readBlockBuilder,
+      DatanodeDetails datanode, Map<DatanodeDetails, Integer> replicaIndexes,
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
     int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
     if (replicaIndex > 0) {
@@ -956,8 +947,6 @@ public final class ContainerProtocolCalls  {
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(datanode.getUuidString())
         .setReadBlock(readBlockBuilder).build();
-    ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, validators);
-    return response.getReadBlock();
+    xceiverClient.streamRead(request, streamObserver);
   }
 }

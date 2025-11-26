@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -65,6 +63,7 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -386,25 +385,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         });
   }
 
-  private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<Validator> validators)
-      throws IOException {
-    ContainerCommandResponseProto responseProto = null;
-    IOException ioException = null;
-
-    // In case of an exception or an error, we will try to read from the
-    // datanodes in the pipeline in a round-robin fashion.
-    XceiverClientReply reply = new XceiverClientReply(null);
+  private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
     List<DatanodeDetails> datanodeList = null;
-
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
+    DatanodeBlockID blockID = getRequestBlockID(request);
 
     if (blockID != null) {
       if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
@@ -442,6 +425,33 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     if (!allInService) {
       datanodeList = sortDatanodeByOperationalState(datanodeList);
     }
+    return datanodeList;
+  }
+
+  private static DatanodeBlockID getRequestBlockID(ContainerCommandRequestProto request) {
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
+      blockID = request.getReadBlock().getBlockID();
+    }
+    return blockID;
+  }
+
+  private XceiverClientReply sendCommandWithRetry(
+      ContainerCommandRequestProto request, List<Validator> validators)
+      throws IOException {
+    ContainerCommandResponseProto responseProto = null;
+    IOException ioException = null;
+
+    // In case of an exception or an error, we will try to read from the
+    // datanodes in the pipeline in a round-robin fashion.
+    XceiverClientReply reply = new XceiverClientReply(null);
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
 
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -453,11 +463,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
-          responseProto = sendCommandReadBlock(request, dn).getResponse().get();
-        } else {
-          responseProto = sendCommandAsync(request, dn).getResponse().get();
-        }
+        responseProto = sendCommandAsync(request, dn).getResponse().get();
         if (validators != null && !validators.isEmpty()) {
           for (Validator validator : validators) {
             validator.accept(request, responseProto);
@@ -508,6 +514,66 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
       throw ioException;
     }
+  }
+
+  /**
+   * Starts a streaming read operation, intended to read entire blocks from the datanodes. This method expects a
+   * {@link StreamingReaderSpi} to be passed in, which will be used to receive the streamed data from the datanode.
+   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is set into the pass StreamObserver,
+   * which contains information about the datanode used for the read, and the request observer that can be used to
+   * manage the stream (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent
+   * streaming reads so upon successful return of this method, the caller must ensure to call
+   * {@link #completeStreamRead(StreamingReadResponse)} to release the semaphore once the streaming read is complete.
+   * @param request The container command request to initiate the streaming read.
+   * @param streamObserver The observer that will handle the streamed responses.=
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Override
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
+    IOException lastException = null;
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        checkOpen(dn);
+        semaphore.acquire();
+        XceiverClientProtocolServiceStub stub = asyncStubs.get(dn.getID());
+        if (stub == null) {
+          throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executing command {} on datanode {}", processForDebug(request), dn);
+        }
+        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
+            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(streamObserver);
+        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
+            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
+        requestObserver.onNext(request);
+        requestObserver.onCompleted();
+        return;
+      } catch (IOException e) {
+        LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+        semaphore.release();
+        lastException = e;
+      }
+    }
+    if (lastException != null) {
+      throw lastException;
+    } else {
+      throw new IOException("Failed to start streaming read to any available DataNodes");
+    }
+  }
+
+  /**
+   * This method should be called to indicate the end of streaming read. Its primary purpose is to release the
+   * semaphore acquired when starting the streaming read, but is also used to update any metrics or debug logs as
+   * needed.
+   */
+  @Override
+  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+    semaphore.release();
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(
@@ -627,69 +693,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     requestObserver.onNext(request);
     requestObserver.onCompleted();
     return new XceiverClientReply(replyFuture);
-  }
-
-  public XceiverClientReply sendCommandReadBlock(
-      ContainerCommandRequestProto request, DatanodeDetails dn)
-      throws IOException, InterruptedException {
-
-    CompletableFuture<ContainerCommandResponseProto> future =
-        new CompletableFuture<>();
-    ContainerCommandResponseProto.Builder response =
-        ContainerCommandResponseProto.newBuilder();
-    ContainerProtos.ReadBlockResponseProto.Builder readBlock =
-        ContainerProtos.ReadBlockResponseProto.newBuilder();
-    checkOpen(dn);
-    DatanodeID dnId = dn.getID();
-    Type cmdType = request.getCmdType();
-    semaphore.acquire();
-    long requestTime = System.currentTimeMillis();
-    metrics.incrPendingContainerOpsMetrics(cmdType);
-
-    final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(new StreamObserver<ContainerCommandResponseProto>() {
-              @Override
-              public void onNext(
-                  ContainerCommandResponseProto responseProto) {
-                if (responseProto.getResult() == Result.SUCCESS) {
-                  readBlock.addReadChunk(responseProto.getReadChunk());
-                } else {
-                  future.complete(
-                      ContainerCommandResponseProto.newBuilder(responseProto)
-                          .setCmdType(Type.ReadBlock).build());
-                }
-              }
-
-              @Override
-              public void onError(Throwable t) {
-                future.completeExceptionally(t);
-                metrics.decrPendingContainerOpsMetrics(cmdType);
-                metrics.addContainerOpsLatency(
-                    cmdType, Time.monotonicNow() - requestTime);
-                semaphore.release();
-              }
-
-              @Override
-              public void onCompleted() {
-                if (readBlock.getReadChunkCount() > 0) {
-                  future.complete(response.setReadBlock(readBlock)
-                      .setCmdType(Type.ReadBlock).setResult(Result.SUCCESS).build());
-                }
-                if (!future.isDone()) {
-                  future.completeExceptionally(new IOException(
-                      "Stream completed but no reply for request " +
-                          processForDebug(request)));
-                }
-                metrics.decrPendingContainerOpsMetrics(cmdType);
-                metrics.addContainerOpsLatency(
-                    cmdType, System.currentTimeMillis() - requestTime);
-                semaphore.release();
-              }
-            });
-    requestObserver.onNext(request);
-    requestObserver.onCompleted();
-    return new XceiverClientReply(future);
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)

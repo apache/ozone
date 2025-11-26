@@ -17,46 +17,36 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamingReadResponse;
+import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,31 +56,26 @@ import org.slf4j.LoggerFactory;
  */
 public class StreamBlockInputStream extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(StreamBlockInputStream.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
+  private static final int EOF = -1;
+  private static final Throwable CANCELLED_EXCEPTION = new Throwable("Cancelled by client");
+
   private final BlockID blockID;
   private final long blockLength;
-  private final AtomicReference<Pipeline> pipelineRef =
-      new AtomicReference<>();
-  private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef =
-      new AtomicReference<>();
+  private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
+  private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
 
-  private List<Long> bufferOffsets;
-  private int bufferIndex;
-  private long blockPosition = -1;
-  private List<ByteBuffer> buffers;
-  // Checks if the StreamBlockInputStream has already read data from the container.
-  private boolean allocated = false;
-  private long bufferOffsetWrtBlockData;
-  private long buffersSize;
-  private static final int EOF = -1;
-  private final List<XceiverClientSpi.Validator> validators;
+  private ByteBuffer buffer;
+  private long position = 0;
+  private boolean initialized = false;
+  private StreamingReader streamingReader;
+
   private final boolean verifyChecksum;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final RetryPolicy retryPolicy;
-  private int retries;
+  private int retries = 0;
 
   public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
@@ -100,17 +85,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
     this.blockLength = length;
-    setPipeline(pipeline);
+    pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
-    this.validators = ContainerProtocolCalls.toValidatorList(
-        (request, response) -> validateBlock(response));
     this.verifyChecksum = config.isChecksumVerify();
+    this.retryPolicy = getReadRetryPolicy(config);
     this.refreshFunction = refreshFunction;
-    this.retryPolicy =
-        HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
-            TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
-
   }
 
   @Override
@@ -125,170 +105,54 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized long getPos() {
-    if (blockLength == 0) {
-      return 0;
-    }
-    if (blockPosition >= 0) {
-      return blockPosition;
-    }
-
-    if (buffersHaveData()) {
-      // BufferOffset w.r.t to BlockData + BufferOffset w.r.t buffers +
-      // Position of current Buffer
-      return bufferOffsetWrtBlockData + bufferOffsets.get(bufferIndex) +
-          buffers.get(bufferIndex).position();
-    }
-    if (allocated && !dataRemainingInBlock()) {
-      Preconditions.checkState(
-          bufferOffsetWrtBlockData + buffersSize == blockLength,
-          "EOF detected but not at the last byte of the chunk");
-      return blockLength;
-    }
-    if (buffersAllocated()) {
-      return bufferOffsetWrtBlockData + buffersSize;
-    }
-    return 0;
+    return position;
   }
 
   @Override
   public synchronized int read() throws IOException {
-    int dataout = EOF;
-    int len = 1;
-    int available;
-    while (len > 0) {
-      try {
-        acquireClient();
-        available = prepareRead(1);
-        retries = 0;
-      } catch (SCMSecurityException ex) {
-        throw ex;
-      } catch (StorageContainerException e) {
-        handleStorageContainerException(e);
-        continue;
-      } catch (IOException ioe) {
-        handleIOException(ioe);
-        continue;
-      }
-      if (available == EOF) {
-        // There is no more data in the chunk stream. The buffers should have
-        // been released by now
-        Preconditions.checkState(buffers == null);
-      } else {
-        dataout = Byte.toUnsignedInt(buffers.get(bufferIndex).get());
-      }
-
-      len -= available;
-      if (bufferEOF()) {
-        releaseBuffers(bufferIndex);
-      }
+    checkOpen();
+    if (!dataAvailableToRead()) {
+      return EOF;
     }
-
-
-    return dataout;
-
-
+    position++;
+    return buffer.get();
   }
 
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    // According to the JavaDocs for InputStream, it is recommended that
-    // subclasses provide an override of bulk read if possible for performance
-    // reasons.  In addition to performance, we need to do it for correctness
-    // reasons.  The Ozone REST service uses PipedInputStream and
-    // PipedOutputStream to relay HTTP response data between a Jersey thread and
-    // a Netty thread.  It turns out that PipedInputStream/PipedOutputStream
-    // have a subtle dependency (bug?) on the wrapped stream providing separate
-    // implementations of single-byte read and bulk read.  Without this, get key
-    // responses might close the connection before writing all of the bytes
-    // advertised in the Content-Length.
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
-      return 0;
-    }
-    int total = 0;
-    int available;
-    while (len > 0) {
-      try {
-        acquireClient();
-        available = prepareRead(len);
-        retries = 0;
-      } catch (SCMSecurityException ex) {
-        throw ex;
-      } catch (StorageContainerException e) {
-        handleStorageContainerException(e);
-        continue;
-      } catch (IOException ioe) {
-        handleIOException(ioe);
-        continue;
-      }
-      if (available == EOF) {
-        // There is no more data in the block stream. The buffers should have
-        // been released by now
-        Preconditions.checkState(buffers == null);
-        return total != 0 ? total : EOF;
-      }
-      buffers.get(bufferIndex).get(b, off + total, available);
-      len -= available;
-      total += available;
-
-      if (bufferEOF()) {
-        releaseBuffers(bufferIndex);
-      }
-    }
-    return total;
-
+    ByteBuffer tmpBuffer = ByteBuffer.wrap(b, off, len);
+    return read(tmpBuffer);
   }
 
   @Override
-  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    if (byteBuffer == null) {
-      throw new NullPointerException();
-    }
-    int len = byteBuffer.remaining();
-    if (len == 0) {
-      return 0;
-    }
-    int total = 0;
-    int available;
-    while (len > 0) {
-      try {
-        acquireClient();
-        available = prepareRead(len);
-        retries = 0;
-      } catch (SCMSecurityException ex) {
-        throw ex;
-      } catch (StorageContainerException e) {
-        handleStorageContainerException(e);
-        continue;
-      } catch (IOException ioe) {
-        handleIOException(ioe);
-        continue;
+  public synchronized int read(ByteBuffer targetBuf) throws IOException {
+    checkOpen();
+    int read = 0;
+    while (targetBuf.hasRemaining()) {
+      if (!dataAvailableToRead()) {
+        break;
       }
-      if (available == EOF) {
-        // There is no more data in the block stream. The buffers should have
-        // been released by now
-        Preconditions.checkState(buffers == null);
-        return total != 0 ? total : EOF;
-      }
-      ByteBuffer readBuf = buffers.get(bufferIndex);
-      ByteBuffer tmpBuf = readBuf.duplicate();
-      tmpBuf.limit(tmpBuf.position() + available);
-      byteBuffer.put(tmpBuf);
-      readBuf.position(tmpBuf.position());
+      int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
+      ByteBuffer tmpBuf = buffer.duplicate();
+      tmpBuf.limit(tmpBuf.position() + toCopy);
+      targetBuf.put(tmpBuf);
+      buffer.position(tmpBuf.position());
+      position += toCopy;
+      read += toCopy;
+    }
+    return read > 0 ? read : EOF;
+  }
 
-      len -= available;
-      total += available;
-
-      if (bufferEOF()) {
-        releaseBuffers(bufferIndex);
-      }
+  private boolean dataAvailableToRead() throws IOException {
+    if (position >= blockLength) {
+      return false;
     }
-    return total;
+    initialize();
+    if (buffer == null || buffer.remaining() == 0) {
+      int loaded = fillBuffer();
+      return loaded != EOF;
+    }
+    return true;
   }
 
   @Override
@@ -298,62 +162,44 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (pos == 0 && blockLength == 0) {
-      // It is possible for length and pos to be zero in which case
-      // seek should return instead of throwing exception
+    checkOpen();
+    if (pos < 0) {
+      throw new IOException("Cannot seek to negative offset");
+    }
+    if (pos > blockLength) {
+      throw new IOException("Cannot seek after the end of the block");
+    }
+    if (pos == position) {
       return;
     }
-    if (pos < 0 || pos > blockLength) {
-      throw new EOFException("EOF encountered at pos: " + pos + " for block: " + blockID);
-    }
-
-    if (buffersHavePosition(pos)) {
-      // The bufferPosition is w.r.t the current block.
-      // Adjust the bufferIndex and position to the seeked position.
-      adjustBufferPosition(pos - bufferOffsetWrtBlockData);
-    } else {
-      blockPosition = pos;
-    }
+    closeStream();
+    position = pos;
   }
 
   @Override
+  // The seekable interface indicates that seekToNewSource should seek to a new source of the data,
+  // ie a different datanode. This is not supported for now.
   public synchronized boolean seekToNewSource(long l) throws IOException {
     return false;
   }
 
   @Override
   public synchronized void unbuffer() {
-    blockPosition = getPos();
     releaseClient();
-    releaseBuffers();
   }
 
-  private void setPipeline(Pipeline pipeline) throws IOException {
-    if (pipeline == null) {
-      return;
+  private void closeStream() {
+    if (streamingReader != null) {
+      streamingReader.cancel();
+      streamingReader = null;
     }
-    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
-
-    if (replicaIndexes > 1) {
-      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
-          pipeline));
-    }
-
-    // irrespective of the container state, we will always read via Standalone
-    // protocol.
-    boolean okForRead =
-        pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
-            || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead().toBuilder()
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-            getLegacyFactor(pipeline.getReplicationConfig())))
-        .build();
-    pipelineRef.set(readPipeline);
+    initialized = false;
+    buffer = null;
   }
 
   protected synchronized void checkOpen() throws IOException {
     if (xceiverClientFactory == null) {
-      throw new IOException("StreamBlockInputStream has been closed.");
+      throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED + " Block: " + blockID);
     }
   }
 
@@ -364,384 +210,234 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       try {
         xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
-        LOG.warn("Failed to acquire client for pipeline {}, block {}",
-            pipeline, blockID);
+        LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
       }
     }
   }
 
-  private synchronized int prepareRead(int len) throws IOException {
-    for (;;) {
-      if (blockPosition >= 0) {
-        if (buffersHavePosition(blockPosition)) {
-          // The current buffers have the seeked position. Adjust the buffer
-          // index and position to point to the buffer position.
-          adjustBufferPosition(blockPosition - bufferOffsetWrtBlockData);
-        } else {
-          // Read a required block data to fill the buffers with seeked
-          // position data
-          readDataFromContainer(len);
-        }
+  private void initialize() throws IOException {
+    if (initialized) {
+      return;
+    }
+    while (true) {
+      try {
+        acquireClient();
+        streamingReader = new StreamingReader();
+        ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
+            pipelineRef.get().getReplicaIndexes(), streamingReader);
+        initialized = true;
+        return;
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        handleExceptions(new IOException("Interrupted", ie));
+      } catch (IOException ioe) {
+        handleExceptions(ioe);
       }
-      if (buffersHaveData()) {
-        // Data is available from buffers
-        ByteBuffer bb = buffers.get(bufferIndex);
-        return Math.min(len, bb.remaining());
-      } else if (dataRemainingInBlock()) {
-        // There is more data in the block stream which has not
-        // been read into the buffers yet.
-        readDataFromContainer(len);
+    }
+  }
+
+  private void handleExceptions(IOException cause) throws IOException {
+    if (cause instanceof StorageContainerException || isConnectivityIssue(cause)) {
+      if (shouldRetryRead(cause, retryPolicy, retries++)) {
+        releaseClient();
+        refreshBlockInfo(cause);
+        LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
       } else {
-        // All available input from this block stream has been consumed.
-        return EOF;
-      }
-    }
-
-
-  }
-
-  private boolean buffersHavePosition(long pos) {
-    // Check if buffers have been allocated
-    if (buffersAllocated()) {
-      // Check if the current buffers cover the input position
-      // Released buffers should not be considered when checking if position
-      // is available
-      return pos >= bufferOffsetWrtBlockData +
-          bufferOffsets.get(0) &&
-          pos < bufferOffsetWrtBlockData + buffersSize;
-    }
-    return false;
-  }
-
-  /**
-   * Check if the buffers have been allocated data and false otherwise.
-   */
-  @VisibleForTesting
-  protected boolean buffersAllocated() {
-    return buffers != null && !buffers.isEmpty();
-  }
-
-  /**
-   * Adjust the buffers position to account for seeked position and/ or checksum
-   * boundary reads.
-   * @param bufferPosition the position to which the buffers must be advanced
-   */
-  private void adjustBufferPosition(long bufferPosition) {
-    // The bufferPosition is w.r.t the current buffers.
-    // Adjust the bufferIndex and position to the seeked bufferPosition.
-    bufferIndex = Collections.binarySearch(bufferOffsets, bufferPosition);
-    // bufferIndex is negative if bufferPosition isn't found in bufferOffsets
-    // count (bufferIndex = -bufferIndex - 2) to get bufferPosition is between which offsets.
-    if (bufferIndex < 0) {
-      bufferIndex = -bufferIndex - 2;
-    }
-
-    buffers.get(bufferIndex).position(
-        (int) (bufferPosition - bufferOffsets.get(bufferIndex)));
-
-    // Reset buffers > bufferIndex to position 0. We do this to reset any
-    // previous reads/ seeks which might have updated any buffer position.
-    // For buffers < bufferIndex, we do not need to reset the position as it
-    // not required for this read. If a seek was done to a position in the
-    // previous indices, the buffer position reset would be performed in the
-    // seek call.
-    for (int i = bufferIndex + 1; i < buffers.size(); i++) {
-      buffers.get(i).position(0);
-    }
-
-    // Reset the blockPosition as chunk stream has been initialized i.e. the
-    // buffers have been allocated.
-    blockPosition = -1;
-  }
-
-  /**
-   * Reads full or partial Chunk from DN Container based on the current
-   * position of the ChunkInputStream, the number of bytes of data to read
-   * and the checksum boundaries.
-   * If successful, then the read data in saved in the buffers so that
-   * subsequent read calls can utilize it.
-   * @param len number of bytes of data to be read
-   * @throws IOException if there is an I/O error while performing the call
-   * to Datanode
-   */
-  private synchronized void readDataFromContainer(int len) throws IOException {
-    // index of first byte to be read from the block
-    long startByteIndex;
-    if (blockPosition >= 0) {
-      // If seek operation was called to advance the buffer position, the
-      // chunk should be read from that position onwards.
-      startByteIndex = blockPosition;
-    } else {
-      // Start reading the block from the last blockPosition onwards.
-      startByteIndex = bufferOffsetWrtBlockData + buffersSize;
-    }
-
-    // bufferOffsetWrtChunkData and buffersSize are updated after the data
-    // is read from Container and put into the buffers, but if read fails
-    // and is retried, we need the previous position.  Position is reset after
-    // successful read in adjustBufferPosition()
-    blockPosition = getPos();
-    bufferOffsetWrtBlockData = readData(startByteIndex, len);
-    long tempOffset = 0L;
-    buffersSize = 0L;
-    bufferOffsets = new ArrayList<>(buffers.size());
-    for (ByteBuffer buffer : buffers) {
-      bufferOffsets.add(tempOffset);
-      tempOffset += buffer.limit();
-      buffersSize += buffer.limit();
-
-    }
-    bufferIndex = 0;
-    allocated = true;
-    adjustBufferPosition(startByteIndex - bufferOffsetWrtBlockData);
-
-  }
-
-  @VisibleForTesting
-  protected long readData(long startByteIndex, long len)
-      throws IOException {
-    Pipeline pipeline = pipelineRef.get();
-    buffers = new ArrayList<>();
-    ReadBlockResponseProto response =
-        ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
-        len, blockID, validators, tokenRef.get(), pipeline.getReplicaIndexes(), verifyChecksum);
-    List<ReadChunkResponseProto> readBlocks = response.getReadChunkList();
-
-    for (ReadChunkResponseProto readBlock : readBlocks) {
-      if (readBlock.hasDataBuffers()) {
-        buffers.addAll(BufferUtils.getReadOnlyByteBuffers(
-            readBlock.getDataBuffers().getBuffersList()));
-      } else {
-        throw new IOException("Unexpected error while reading chunk data " +
-            "from container. No data returned.");
-      }
-    }
-    return response.getReadChunk(0)
-        .getChunkData().getOffset();
-  }
-
-  /**
-   * Check if the buffers have any data remaining between the current
-   * position and the limit.
-   */
-  private boolean buffersHaveData() {
-    boolean hasData = false;
-    if (buffersAllocated()) {
-      int buffersLen = buffers.size();
-      while (bufferIndex < buffersLen) {
-        ByteBuffer buffer = buffers.get(bufferIndex);
-        if (buffer != null && buffer.hasRemaining()) {
-          // current buffer has data
-          hasData = true;
-          break;
-        } else {
-          if (bufferIndex < buffersLen - 1) {
-            // move to next available buffer
-            ++bufferIndex;
-            Preconditions.checkState(bufferIndex < buffers.size());
-          } else {
-            // no more buffers remaining
-            break;
-          }
-        }
-      }
-    }
-
-    return hasData;
-  }
-
-  /**
-   * Check if there is more data in the chunk which has not yet been read
-   * into the buffers.
-   */
-  private boolean dataRemainingInBlock() {
-    long bufferPos;
-    if (blockPosition >= 0) {
-      bufferPos = blockPosition;
-    } else {
-      bufferPos = bufferOffsetWrtBlockData + buffersSize;
-    }
-
-    return bufferPos < blockLength;
-  }
-
-  /**
-   * Check if current buffer had been read till the end.
-   */
-  private boolean bufferEOF() {
-    return allocated && buffersAllocated() && !buffers.get(bufferIndex).hasRemaining();
-  }
-
-  /**
-   * Release the buffers upto the given index.
-   * @param releaseUptoBufferIndex bufferIndex (inclusive) upto which the
-   *                               buffers must be released
-   */
-  private void releaseBuffers(int releaseUptoBufferIndex) {
-    int buffersLen = buffers.size();
-    if (releaseUptoBufferIndex == buffersLen - 1) {
-      // Before releasing all the buffers, if block EOF is not reached, then
-      // blockPosition should be set to point to the last position of the
-      // buffers. This should be done so that getPos() can return the current
-      // block position
-      blockPosition = bufferOffsetWrtBlockData +
-          bufferOffsets.get(releaseUptoBufferIndex) +
-          buffers.get(releaseUptoBufferIndex).capacity();
-      // Release all the buffers
-      releaseBuffers();
-    } else {
-      buffers = buffers.subList(releaseUptoBufferIndex + 1, buffersLen);
-      bufferOffsets = bufferOffsets.subList(
-          releaseUptoBufferIndex + 1, buffersLen);
-      bufferIndex = 0;
-    }
-  }
-
-  /**
-   * If EOF is reached, release the buffers.
-   */
-  private void releaseBuffers() {
-    buffers = null;
-    bufferIndex = 0;
-    // We should not reset bufferOffsetWrtBlockData and buffersSize here
-    // because when getPos() is called we use these
-    // values and determine whether chunk is read completely or not.
-  }
-
-  protected synchronized void releaseClient() {
-    if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
-      xceiverClient = null;
-    }
-  }
-
-  private void validateBlock(
-      ContainerProtos.ContainerCommandResponseProto response
-  ) throws IOException {
-
-    ReadBlockResponseProto readBlock = response.getReadBlock();
-    for (ReadChunkResponseProto readChunk : readBlock.getReadChunkList()) {
-      List<ByteString> byteStrings;
-
-      ContainerProtos.ChunkInfo chunkInfo =
-          readChunk.getChunkData();
-      if (chunkInfo.getLen() <= 0) {
-        throw new IOException("Failed to get chunk: chunkName == "
-            + chunkInfo.getChunkName() + "len == " + chunkInfo.getLen());
-      }
-      byteStrings = readChunk.getDataBuffers().getBuffersList();
-      long buffersLen = BufferUtils.getBuffersLen(byteStrings);
-      if (buffersLen != chunkInfo.getLen()) {
-        // Bytes read from chunk should be equal to chunk size.
-        throw new OzoneChecksumException(String.format(
-            "Inconsistent read for chunk=%s len=%d bytesRead=%d",
-            chunkInfo.getChunkName(), chunkInfo.getLen(),
-            buffersLen));
-      }
-
-
-      if (verifyChecksum) {
-        ChecksumData checksumData = ChecksumData.getFromProtoBuf(
-            chunkInfo.getChecksumData());
-        int startIndex = (int) readChunk.getChunkData().getOffset() / checksumData.getBytesPerChecksum();
-
-        // ChecksumData stores checksum for each 'numBytesPerChecksum'
-        // number of bytes in a list. Compute the index of the first
-        // checksum to match with the read data
-
-        Checksum.verifyChecksum(byteStrings, checksumData, startIndex);
-      }
-    }
-  }
-
-  @VisibleForTesting
-  protected synchronized void setBuffers(List<ByteBuffer> buffers) {
-    this.buffers = buffers;
-  }
-
-  private boolean shouldRetryRead(IOException cause) throws IOException {
-    RetryPolicy.RetryAction retryAction;
-    try {
-      retryAction = retryPolicy.shouldRetry(cause, ++retries, 0, true);
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-    return retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
-  }
-
-  @VisibleForTesting
-  public boolean isVerifyChecksum() {
-    return verifyChecksum;
-  }
-
-  private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
-        blockID, pipelineRef.get().getId(), cause.getMessage());
-    if (refreshFunction != null) {
-      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
-      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
-      if (blockLocationInfo == null) {
-        LOG.warn("No new block location info for block {}", blockID);
-      } else {
-        setPipeline(blockLocationInfo.getPipeline());
-        LOG.info("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
-
-        tokenRef.set(blockLocationInfo.getToken());
-        if (blockLocationInfo.getToken() != null) {
-          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
-          LOG.info("A new token is added for block {}. Expiry: {}",
-              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
-        }
+        throw cause;
       }
     } else {
       throw cause;
     }
   }
 
-  @VisibleForTesting
-  public synchronized ByteBuffer[] getCachedBuffers() {
-    return buffers == null ? null :
-        BufferUtils.getReadOnlyByteBuffers(buffers.toArray(new ByteBuffer[0]));
+  private int fillBuffer() throws IOException {
+    if (!streamingReader.hasNext()) {
+      return EOF;
+    }
+    buffer = streamingReader.readNext();
+    return buffer == null ? EOF : buffer.limit();
   }
 
-  /**
-   * Check if this exception is because datanodes are not reachable.
-   */
-  private boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  protected synchronized void releaseClient() {
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      closeStream();
+      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
+      xceiverClient = null;
+    }
   }
 
   @Override
   public synchronized void close() throws IOException {
     releaseClient();
-    releaseBuffers();
     xceiverClientFactory = null;
   }
 
-  private void handleStorageContainerException(StorageContainerException e) throws IOException {
-    if (shouldRetryRead(e)) {
-      releaseClient();
-      refreshBlockInfo(e);
-    } else {
-      throw e;
+  private void refreshBlockInfo(IOException cause) throws IOException {
+    refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+  }
+
+  private synchronized void releaseStreamResources(StreamingReadResponse response) {
+    if (xceiverClient != null) {
+      xceiverClient.completeStreamRead(response);
     }
   }
 
-  private void handleIOException(IOException ioe) throws IOException {
-    if (shouldRetryRead(ioe)) {
-      if (isConnectivityIssue(ioe)) {
-        releaseClient();
-        refreshBlockInfo(ioe);
-      } else {
-        releaseClient();
+  /**
+   * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
+   */
+  public class StreamingReader implements StreamingReaderSpi {
+
+    private final BlockingQueue<ContainerProtos.ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>(1);
+    private final AtomicBoolean completed = new AtomicBoolean(false);
+    private final AtomicBoolean failed = new AtomicBoolean(false);
+    private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
+    private final AtomicReference<Throwable> error = new AtomicReference<>();
+    private volatile StreamingReadResponse response;
+
+    public boolean hasNext() {
+      return !responseQueue.isEmpty() || !completed.get();
+    }
+
+    public ByteBuffer readNext() throws IOException {
+      if (failed.get()) {
+        Throwable cause = error.get();
+        throw new IOException("Streaming read failed", cause);
       }
-    } else {
-      throw ioe;
+
+      if (completed.get() && responseQueue.isEmpty()) {
+        return null; // Stream ended
+      }
+
+      ReadBlockResponseProto readBlock;
+      try {
+        readBlock = responseQueue.poll(30, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted while waiting for response", e);
+      }
+      if (readBlock == null) {
+        if (failed.get()) {
+          Throwable cause = error.get();
+          throw new IOException("Streaming read failed", cause);
+        } else if (completed.get()) {
+          return null; // Stream ended
+        } else {
+          throw new IOException("Timed out waiting for response");
+        }
+      }
+      // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
+      // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
+      // If the reader position is behind
+      ByteBuffer buf = readBlock.getData().asReadOnlyByteBuffer();
+      long blockOffset = readBlock.getOffset();
+      long pos = getPos();
+      if (pos < blockOffset) {
+        // This should not happen, and if it does, we have a bug.
+        throw new IOException("Received data out of order. Position is " + pos + " but received data at "
+            + blockOffset);
+      }
+      if (pos > readBlock.getOffset()) {
+        int offset = (int)(pos - readBlock.getOffset());
+        buf.position(offset);
+      }
+      return buf;
+    }
+
+    private void releaseResources() {
+      boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
+      if (wasNotYetComplete) {
+        releaseStreamResources(response);
+      }
+    }
+
+    @Override
+    public void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
+      try {
+        ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
+        ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
+        if (verifyChecksum) {
+          ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
+          Checksum.verifyChecksum(data, checksumData, 0);
+        }
+        offerToQueue(readBlock);
+      } catch (OzoneChecksumException e) {
+        LOG.warn("Checksum verification failed for block {} from datanode {}",
+            getBlockID(), response.getDatanodeDetails(), e);
+        cancelDueToError(e);
+      }
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      if (throwable instanceof StatusRuntimeException) {
+        if (((StatusRuntimeException) throwable).getStatus().getCode().name().equals("CANCELLED")) {
+          // This is expected when the client cancels the stream.
+          setCompleted();
+        }
+      } else {
+        setFailed(throwable);
+      }
+      releaseResources();
+    }
+
+    @Override
+    public void onCompleted() {
+      setCompleted();
+      releaseResources();
+    }
+
+    /**
+     * By calling cancel, the client will send a cancel signal to the server, which will stop sending more data and
+     * cause the onError() to be called in this observer with a CANCELLED exception.
+     */
+    public void cancel() {
+      if (response != null && response.getRequestObserver() != null) {
+        response.getRequestObserver().cancel("Cancelled by client", CANCELLED_EXCEPTION);
+        setCompleted();
+        releaseResources();
+      }
+    }
+
+    public void cancelDueToError(Throwable exception) {
+      if (response != null && response.getRequestObserver() != null) {
+        response.getRequestObserver().onError(exception);
+        setFailed(exception);
+        releaseResources();
+      }
+    }
+
+    private void setFailed(Throwable throwable) {
+      if (completed.get()) {
+        throw new IllegalArgumentException("Cannot mark a completed stream as failed");
+      }
+      failed.set(true);
+      error.set(throwable);
+    }
+
+    private void setCompleted() {
+      if (!failed.get()) {
+        completed.set(true);
+      }
+    }
+
+    private void offerToQueue(ReadBlockResponseProto item) {
+      while (!completed.get() && !failed.get()) {
+        try {
+          if (responseQueue.offer(item, 100, TimeUnit.MILLISECONDS)) {
+            return;
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
+    }
+
+    @Override
+    public void setStreamingReadResponse(StreamingReadResponse streamingReadResponse) {
+      response = streamingReadResponse;
     }
   }
+
 }
