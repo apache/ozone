@@ -71,7 +71,7 @@ public class TestStreamRead {
   static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
 
   static final int BLOCK_SIZE = 128 << 20;
-  final SizeInBytes KEY_SIZE = SizeInBytes.valueOf("256M");
+  static final SizeInBytes KEY_SIZE = SizeInBytes.valueOf("256M");
 
   static MiniOzoneCluster newCluster(int bytesPerChecksum) throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();

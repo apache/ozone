@@ -251,7 +251,18 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  synchronized void readBlock(long length) throws IOException {
+  synchronized void readBlock(int length) throws IOException {
+    final long diff = position + length - requestedLength;
+    if (diff > 0) {
+      final long rounded = roundUp(diff + preReadSize, responseDataSize);
+      LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
+          position, length, requestedLength, diff, rounded, preReadSize);
+      readBlockImpl(rounded);
+      requestedLength += rounded;
+    }
+  }
+
+  synchronized void readBlockImpl(long length) throws IOException {
     if (streamingReader == null) {
       throw new IOException("Uninitialized StreamingReader: " + blockID);
     }
@@ -301,6 +312,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
@@ -343,20 +355,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       }
     }
 
-    private synchronized ByteBuffer read(int length) throws IOException {
+    private ByteBuffer read(int length) throws IOException {
       checkError();
       if (future.isDone()) {
         return null; // Stream ended
       }
 
-      final long diff = position + length - requestedLength;
-      if (diff > 0) {
-        final long rounded = roundUp(diff + preReadSize, responseDataSize);
-        LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
-            position, length, requestedLength, diff, rounded, preReadSize);
-        readBlock(rounded);
-        requestedLength += rounded;
-      }
+      readBlock(length);
 
       final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
