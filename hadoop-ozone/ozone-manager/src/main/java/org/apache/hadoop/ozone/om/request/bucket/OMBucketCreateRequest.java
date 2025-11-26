@@ -253,9 +253,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      omBucketInfo.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      omBucketInfo = omBucketInfo.toBuilder()
+          .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
 
@@ -263,7 +264,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
       checkQuotaInNamespace(omVolumeArgs, 1L);
 
       // update used namespace for volume
-      omVolumeArgs.incrUsedNamespace(1L);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .incrUsedNamespace(1L)
+          .build();
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),

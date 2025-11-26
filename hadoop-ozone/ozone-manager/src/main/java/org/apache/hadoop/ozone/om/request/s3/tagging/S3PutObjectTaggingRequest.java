@@ -131,7 +131,9 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
       omKeyInfo.getTags().clear();
       omKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()));
       // Set the UpdateID to the current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Note: Key modification time is not changed because S3 last modified
       // time only changes when there are changes in the object content

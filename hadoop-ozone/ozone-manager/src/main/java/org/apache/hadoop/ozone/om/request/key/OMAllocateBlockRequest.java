@@ -236,7 +236,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex);
+      openKeyInfo = openKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

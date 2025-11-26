@@ -19,6 +19,11 @@ package org.apache.hadoop.ozone.om.lock;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,9 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -39,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.junit.jupiter.api.AfterEach;
@@ -46,6 +58,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -79,7 +92,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   public void testBasicReadLockAcquisition() throws Exception {
     String key = "test-key-1";
 
-    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -92,7 +105,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   public void testBasicWriteLockAcquisition() throws Exception {
     String key = "test-key-2";
 
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -105,8 +118,8 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   public void testMultipleReadLocks() throws Exception {
     String key = "test-key-3";
 
-    try (HierarchicalResourceLock lock1 = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key);
-         HierarchicalResourceLock lock2 = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+    try (HierarchicalResourceLock lock1 = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key);
+         HierarchicalResourceLock lock2 = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
 
       assertNotNull(lock1);
       assertNotNull(lock2);
@@ -131,7 +144,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     try {
       // First thread acquires write lock
       CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
-        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_DB_LOCK, key)) {
+        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
           latch1.countDown();
           // Hold lock for a short time
           Thread.sleep(100);
@@ -145,7 +158,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
 
       // Second thread tries to acquire write lock
       CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
-        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_DB_LOCK, key)) {
+        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
           secondLockAcquired.set(true);
           latch2.countDown();
         } catch (Exception e) {
@@ -181,7 +194,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     try {
       // First thread acquires write lock
       CompletableFuture<Void> future1 = CompletableFuture.runAsync(() -> {
-        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+        try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
           writeLockAcquired.countDown();
           // Hold lock for a short time
           Thread.sleep(200);
@@ -198,7 +211,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
         try {
           // This should block until write lock is released
           readLockBlocked.set(true);
-          try (HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+          try (HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
             readLockAcquired.countDown();
           }
         } catch (Exception e) {
@@ -225,7 +238,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   public void testLockStateAfterClose() throws Exception {
     String key = "test-key-6";
 
-    HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, key);
+    HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key);
     assertTrue(lock.isLockAcquired());
 
     lock.close();
@@ -239,7 +252,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   public void testDoubleClose() throws Exception {
     String key = "test-key-7";
 
-    HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_GC_LOCK, key);
+    HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key);
     assertTrue(lock.isLockAcquired());
 
     // First close
@@ -252,27 +265,6 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   }
 
   /**
-   * Test different resource types can be locked independently.
-   */
-  @Test
-  public void testDifferentResourceTypes() throws Exception {
-
-    List<HierarchicalResourceLock> locks = new ArrayList<>();
-    for (FlatResource otherResource : FlatResource.values()) {
-      String key = "test-key";
-      locks.add(lockManager.acquireWriteLock(otherResource, key));
-    }
-    for (HierarchicalResourceLock lock : locks) {
-      assertNotNull(lock);
-      assertTrue(lock.isLockAcquired());
-    }
-    for (HierarchicalResourceLock lock : locks) {
-      lock.close();
-    }
-  }
-
-
-  /**
    * Test different keys on same resource type can be locked concurrently.
    */
   @Test
@@ -280,8 +272,8 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     String key1 = "test-key-8a";
     String key2 = "test-key-8b";
 
-    try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_GC_LOCK, key1);
-         HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_GC_LOCK, key2)) {
+    try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key1);
+         HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key2)) {
 
       assertNotNull(lock1);
       assertNotNull(lock2);
@@ -308,7 +300,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       assertNotNull(customLockManager);
       for (int i = 0; i < 500; i++) {
         try {
-          locks.add(customLockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, "test" + i));
+          locks.add(customLockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, "test" + i));
         } catch (IOException e) {
           fail("Lock acquisition failed with custom configuration: " + e.getMessage());
         }
@@ -317,7 +309,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         // Basic functionality test with custom configuration
         latch.countDown();
-        try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK,
+        try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK,
             "test" + 501)) {
           assertTrue(lock.isLockAcquired());
         } catch (Exception e) {
@@ -357,7 +349,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
           try {
             for (int j = 0; j < operationsPerThread; j++) {
               String key = "thread-" + threadId + "-op-" + j;
-              FlatResource resource = FlatResource.values()[j % FlatResource.values().length];
+              DAGLeveledResource resource = DAGLeveledResource.values()[j % DAGLeveledResource.values().length];
 
               // Randomly choose read or write lock
               boolean isReadLock = (j % 2 == 0);
@@ -432,7 +424,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
                 String key = "stress-" + threadId + "-" + j;
 
                 try (HierarchicalResourceLock lock =
-                     stressLockManager.acquireWriteLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+                     stressLockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
 
                   assertTrue(lock.isLockAcquired());
 
@@ -475,7 +467,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     String key = "test-key-close";
 
     // Acquire a lock
-    HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, key);
+    HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key);
     assertTrue(lock.isLockAcquired());
 
     // Close the lock
@@ -495,7 +487,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   @Test
   public void testNullKey() {
     assertThrows(NullPointerException.class, () -> {
-      lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, null);
+      lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, null);
     });
   }
 
@@ -515,7 +507,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   @Test
   public void testEmptyKey() throws Exception {
     // Empty key should be allowed
-    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, "")) {
+    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, "")) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -529,7 +521,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       "key.with.dots", "key/with/slashes", "123456789",
       "key with spaces", "very-long-key-name-that-exceeds-normal-length-expectations"})
   public void testVariousKeyFormats(String key) throws Exception {
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(FlatResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
     }
@@ -543,11 +535,11 @@ public class TestPoolBasedHierarchicalResourceLockManager {
     String key = "reentrant-test";
 
     // Acquire first lock
-    try (HierarchicalResourceLock lock1 = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+    try (HierarchicalResourceLock lock1 = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
       assertTrue(lock1.isLockAcquired());
 
       // Acquire second lock on same resource from same thread
-      try (HierarchicalResourceLock lock2 = lockManager.acquireReadLock(FlatResource.SNAPSHOT_GC_LOCK, key)) {
+      try (HierarchicalResourceLock lock2 = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_GC_LOCK, key)) {
         assertTrue(lock2.isLockAcquired());
 
         // Both locks should be active
@@ -571,13 +563,48 @@ public class TestPoolBasedHierarchicalResourceLockManager {
 
     String key = "exception-test";
 
-    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, key)) {
+    try (HierarchicalResourceLock lock = lockManager.acquireReadLock(DAGLeveledResource.SNAPSHOT_DB_LOCK, key)) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
       // If we reach here, no IOException was thrown, which is expected for normal operation
     } catch (Exception e) {
       // If Exception is thrown, it should be properly propagated
       assertNotNull(e.getMessage());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  public void testDAGLockOrderAcquisition(DAGLeveledResource dagLeveledResource) throws IOException {
+    Map<DAGLeveledResource, Set<IOzoneManagerLock.Resource>> forbiddenLockOrdering =
+        ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK),
+            BOOTSTRAP_LOCK, ImmutableSet.of(SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
+                SNAPSHOT_LOCAL_DATA_LOCK));
+    List<DAGLeveledResource> resources = Arrays.stream(DAGLeveledResource.values()).collect(Collectors.toList());
+    for (DAGLeveledResource otherResource : resources) {
+      String otherResourceName1 = otherResource.getName() + "key";
+      String otherResourceName2 = otherResource.getName() + "key";
+      String dagResourceName = dagLeveledResource.getName() + "key";
+      try (HierarchicalResourceLock lock1 = lockManager.acquireWriteLock(otherResource, otherResourceName1);
+           HierarchicalResourceLock lock2 = lockManager.acquireWriteLock(otherResource, otherResourceName2)) {
+        assertTrue(lock1.isLockAcquired());
+        assertTrue(lock2.isLockAcquired());
+        if (forbiddenLockOrdering.getOrDefault(dagLeveledResource, Collections.emptySet()).contains(otherResource)) {
+          assertThrows(RuntimeException.class,
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
+              "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
+                  " is already acquired");
+          lock1.close();
+          assertThrows(RuntimeException.class,
+              () -> lockManager.acquireWriteLock(dagLeveledResource, dagResourceName),
+              "Lock acquisition of " + dagLeveledResource + " should fail when " + otherResource +
+                  " is already acquired even after first lock is released since second lock is still held");
+        } else {
+          try (HierarchicalResourceLock lock3 = lockManager.acquireWriteLock(dagLeveledResource, dagResourceName)) {
+            assertTrue(lock3.isLockAcquired());
+          }
+        }
+      }
     }
   }
 }

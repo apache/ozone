@@ -17,8 +17,7 @@
 
 package org.apache.hadoop.ozone.lock;
 
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Bootstrap state handler interface. */
@@ -28,12 +27,15 @@ public interface BootstrapStateHandler {
   /** Bootstrap state handler lock implementation. Should be always acquired before opening any snapshot to avoid
    * deadlocks*/
   class Lock {
-    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+
+    private final Function<Boolean, UncheckedAutoCloseable> lockSupplier;
+
+    public Lock(Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
+      this.lockSupplier = lockSupplier;
+    }
 
     private UncheckedAutoCloseable lock(boolean readLock) {
-      java.util.concurrent.locks.Lock lock = readLock ? readWriteLock.readLock() : readWriteLock.writeLock();
-      lock.lock();
-      return lock::unlock;
+      return lockSupplier.apply(readLock);
     }
 
     public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {

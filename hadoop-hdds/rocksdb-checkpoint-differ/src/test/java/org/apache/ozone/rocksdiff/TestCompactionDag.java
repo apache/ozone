@@ -55,7 +55,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -169,11 +172,21 @@ public class TestCompactionDag {
              Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
       mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary)
           .thenReturn(true);
+      ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+      Function<Boolean, UncheckedAutoCloseable> dummyLock = (readLock) -> {
+        if (readLock) {
+          readWriteLock.readLock().lock();
+          return (UncheckedAutoCloseable) () -> readWriteLock.readLock().unlock();
+        } else {
+          readWriteLock.writeLock().lock();
+          return (UncheckedAutoCloseable) () -> readWriteLock.writeLock().unlock();
+        }
+      };
       rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
           SST_BACK_UP_DIR_NAME,
           COMPACTION_LOG_DIR_NAME,
           ACTIVE_DB_DIR_NAME,
-          config);
+          config, dummyLock);
     }
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();

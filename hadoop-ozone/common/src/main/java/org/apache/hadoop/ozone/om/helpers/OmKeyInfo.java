@@ -500,7 +500,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -676,6 +676,12 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setTags(Map<String, String> tags) {
+      this.tags.clear();
+      addAllTags(tags);
+      return this;
+    }
+
     public Builder addTag(String key, String value) {
       tags.put(key, value);
       return this;
@@ -691,7 +697,8 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public OmKeyInfo build() {
+    @Override
+    protected OmKeyInfo buildObject() {
       return new OmKeyInfo(this);
     }
   }
@@ -939,13 +946,13 @@ public final class OmKeyInfo extends WithParentObjectId
     return Objects.hash(volumeName, bucketName, keyName, getParentObjectID());
   }
 
-  /**
-   * Return a new copy of the object.
-   */
   public Builder toBuilder() {
     return new Builder(this);
   }
 
+  /**
+   * Return a new copy of the object.
+   */
   @Override
   public OmKeyInfo copyObject() {
     return new Builder(this).build();

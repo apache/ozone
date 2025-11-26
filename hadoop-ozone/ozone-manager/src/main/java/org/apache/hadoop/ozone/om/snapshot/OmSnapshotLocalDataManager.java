@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DA
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_DEFRAG;
 import static org.apache.ozone.rocksdb.util.RdbUtil.getLiveSSTFilesForCFs;
 
@@ -66,7 +67,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -181,11 +181,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   public void createNewOmSnapshotLocalDataFile(RDBStore snapshotStore, SnapshotInfo snapshotInfo) throws IOException {
     try (WritableOmSnapshotLocalDataProvider snapshotLocalData =
              new WritableOmSnapshotLocalDataProvider(snapshotInfo.getSnapshotId(),
-                 () -> Pair.of(new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
-                         getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
-                             COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT),
-                         snapshotInfo.getPathPreviousSnapshotId(), null),
-                     null))) {
+                 () -> {
+                   List<LiveFileMetaData> lfms = getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
+                       COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+                   long dbTxnSeqNumber = lfms.stream().mapToLong(LiveFileMetaData::largestSeqno).max().orElse(0L);
+                   OmSnapshotLocalData localData = new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
+                       lfms, snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
+                   return Pair.of(localData, null);
+                 })) {
       snapshotLocalData.commit();
     }
   }
@@ -263,16 +266,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // Create a yaml file for snapshots which are missing
         if (!snapshotLocalDataFile.exists()) {
           List<LiveFileMetaData> sstList = Collections.emptyList();
+          long dbTxnSeqNumber = 0L;
           if (snapshotInfo.getSnapshotStatus() == SNAPSHOT_ACTIVE) {
             try (OmMetadataManagerImpl snapshotMetadataManager = defaultSnapProvider.apply(snapshotInfo)) {
               ManagedRocksDB snapDB = ((RDBStore)snapshotMetadataManager.getStore()).getDb().getManagedRocksDb();
               sstList = getLiveSSTFilesForCFs(snapDB, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+              dbTxnSeqNumber = sstList.stream().mapToLong(LiveFileMetaData::largestSeqno).max().orElse(0L);
             } catch (Exception e) {
               throw new IOException(e);
             }
           }
           OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapshotId, sstList,
-              snapshotInfo.getPathPreviousSnapshotId(), null);
+              snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
           // Set needsDefrag to true to indicate that the snapshot needs to be defragmented, since the snapshot has
           // never been defragmented before.
           snapshotLocalData.setNeedsDefrag(true);
@@ -494,8 +499,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
-    HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
-        snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
+    HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(SNAPSHOT_LOCAL_DATA_LOCK,
+        snapId.toString()) : locks.acquireWriteLock(SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
     if (!acquiredLock.isLockAcquired()) {
       throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
     }
