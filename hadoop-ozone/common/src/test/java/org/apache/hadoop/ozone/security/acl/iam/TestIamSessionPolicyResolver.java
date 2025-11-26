@@ -718,6 +718,30 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testCreatePathsAndPermissionsWithBucketsWildcardResourceAll() {
+    // For AWS IAM, s3:ListAllMyBuckets supports both "*" and "arn:aws:s3:::*" as
+    // Resource values.  The "*" case is covered by testCreatePathsAndPermissionsWithResourceAny.
+    // This test ensures that "arn:aws:s3:::*" (parsed as BUCKET_WILDCARD with bucket="*")
+    // also grants the expected volume-level permissions for ListAllMyBuckets.
+    final Set<S3Action> actions = Stream.of(S3Action.LIST_ALL_MY_BUCKETS, S3Action.LIST_BUCKET)
+        .collect(Collectors.toSet());
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET_WILDCARD, "*", null, null));
+
+    expectIllegalArgumentException(
+        () -> createPathsAndPermissions(VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet()),
+        "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+
+    // Both the volume and the wildcard bucket should end up with READ + LIST permissions.
+    final Set<IOzoneObj> readAndListObjects = objSet(volume(), bucket("*"));
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readAndListObjects, acls(READ, LIST)));
+  }
+
+  @Test
   public void testCreatePathsAndPermissionsWithObjectExactResource() {
     final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(

@@ -393,9 +393,6 @@ public final class IamSessionPolicyResolver {
       }
 
       ResourceSpec spec = parseResourceSpec(suffix);
-      if (spec.type == S3ResourceType.BUCKET_WILDCARD) {
-        validateNativeAuthorizerBucketPattern(authorizerType, spec.bucket);
-      }
 
       // This scenario can happen in the case of arn:aws:s3:::*/* or arn:aws:s3:::*/test.txt for
       // examples
@@ -515,12 +512,20 @@ public final class IamSessionPolicyResolver {
 
   /**
    * Handles BUCKET and BUCKET_WILDCARD resource types.
-   * Example: "Resource": "arn:aws:s3:::my-bucket"
+   * Example: "Resource": "arn:aws:s3:::my-bucket" or "Resource": "arn:aws:s3:::my-bucket*" or
+   *          "Resource": "arn:aws:s3:::*"
    */
   private static void processBucketResource(String volumeName, Set<S3Action> mappedS3Actions,
       ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
-      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3) {
+      // The s3:ListAllMyBuckets action can use either "*" or
+      // "arn:aws:s3:::*" as its Resource.  The former is already handled via the
+      // ResourceSpec.ANY path.  The latter is parsed as a BUCKET_WILDCARD with a
+      // bucket name of "*".  To align with AWS, make sure that in this
+      // specific case we also grant the volume-level permissions for volume-scoped
+      // actions (currently s3:ListAllMyBuckets).
+      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3 ||
+          (action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket))) { // this handles s3:ListAllMyBuckets
         addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
