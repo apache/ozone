@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -168,11 +169,39 @@ public abstract class OMClientRequest implements RequestAuditor {
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // If S3 Authentication is set, determine user based on access ID.
+    // If S3 Authentication is set, determine user based on STS token first,
+    // falling back to accessId if session token not present.
     if (omRequest.hasS3Authentication()) {
-      String principal = OzoneAclUtils.accessIdToUserPrincipal(
-          omRequest.getS3Authentication().getAccessId());
-      userInfo.setUserName(principal);
+      final String accessKeyId = omRequest.getS3Authentication().getAccessId();
+      if (accessKeyId.startsWith("ASIA") && !omRequest.getS3Authentication().hasSessionToken()) {
+        throw new IOException("Error with STS token", new AuthenticationException(
+            "Missing session token for accessKeyId: " + accessKeyId));
+      }
+      if (omRequest.getS3Authentication().hasSessionToken()) {
+        try {
+          final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+          if (stsTokenIdentifier != null) {
+            final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+            final String principal;
+            if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
+              principal = OzoneAclUtils.accessIdToUserPrincipal(originalAccessKeyId);
+              userInfo.setUserName(principal);
+            } else {
+              throw new AuthenticationException(
+                  "Invalid STS Token - originalAccessKeyId was null or empty: " + originalAccessKeyId);
+            }
+          } else {
+            throw new AuthenticationException(
+                "OMClientRequest has session token but no token identifier in OzoneManager");
+          }
+        } catch (Exception e) {
+          throw new IOException("Error with STS Token", e);
+        }
+      } else {
+        String principal = OzoneAclUtils.accessIdToUserPrincipal(
+            omRequest.getS3Authentication().getAccessId());
+        userInfo.setUserName(principal);
+      }
     } else if (user != null) {
       // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());

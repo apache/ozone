@@ -307,6 +307,7 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslat
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.STSTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -377,6 +378,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // and it is reset when read request is processed.
   private static final ThreadLocal<S3Authentication> S3_AUTH =
       new ThreadLocal<>();
+
+  // STS token (if present)
+  private static final ThreadLocal<STSTokenIdentifier> STS_TOKEN = new ThreadLocal<>();
 
   private static boolean securityEnabled = false;
 
@@ -858,6 +862,42 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return S3_AUTH.get();
   }
 
+  /**
+   * Set the STS token identifier for the current RPC handler thread.
+   */
+  public static void setStsTokenIdentifier(STSTokenIdentifier val) {
+    STS_TOKEN.set(val);
+  }
+
+  /**
+   * Get the STS token identifier for the current RPC handler thread.
+   */
+  public static STSTokenIdentifier getStsTokenIdentifier() {
+    return STS_TOKEN.get();
+  }
+
+  /**
+   * Returns the effective accessId for the current request.  If STS temporary credentials are being used,
+   * the access key id will be the original access key id (i.e. the creator of the token).
+   */
+  public static String getS3AuthEffectiveAccessId() throws OMException {
+    final S3Authentication s3Auth = getS3Auth();
+    if (s3Auth == null) {
+      return null;
+    }
+
+    // If session token is present, try to resolve originalAccessKeyId from token
+    if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
+      final String originalAccessKeyId = getStsTokenIdentifier().getOriginalAccessKeyId();
+      if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
+        return originalAccessKeyId;
+      } else {
+        throw new OMException("Invalid STS Token format - could not find originalAccessKeyId", INVALID_REQUEST);
+      }
+    }
+    return s3Auth.getAccessId();
+  }
+
   /** Returns the ThreadName prefix for the current OM. */
   public String getThreadNamePrefix() {
     return threadPrefix;
@@ -1267,6 +1307,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // as it uses the shared secret key client
       LOG.info("Stopping OM STS token secret manager.");
     }
+  }
+
+  /**
+   * Get the secret key client for this OzoneManager.
+   *
+   * @return the secret key client
+   */
+  public SecretKeyClient getSecretKeyClient() {
+    return secretKeyClient;
   }
 
   @Override
@@ -3836,7 +3885,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             s3Volume);
       }
     } else {
-      String accessId = s3Auth.getAccessId();
+      // If this S3 request is authenticated with an STS session token, map
+      // the request to the *original* long-lived access ID so that the
+      // temporary credentials inherit that user's ACLs. Otherwise, fall back
+      // to the accessId included directly in the S3Authentication.
+      final String accessId = getS3AuthEffectiveAccessId();
+
       // If S3 Multi-Tenancy is not enabled, all S3 requests will be redirected
       // to the default s3v for compatibility
       final Optional<String> optionalTenantId = isS3MultiTenancyEnabled() ?
@@ -4621,8 +4675,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (aclEnabled) {
       UserGroupInformation ugi = getRemoteUser();
       if (getS3Auth() != null) {
-        ugi = UserGroupInformation.createRemoteUser(
-            OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId()));
+        final String principal = OzoneAclUtils.accessIdToUserPrincipal(getS3AuthEffectiveAccessId());
+        ugi = UserGroupInformation.createRemoteUser(principal);
       }
       InetAddress remoteIp = Server.getRemoteIp();
       resolved = resolveBucketLink(requested, new HashSet<>(),

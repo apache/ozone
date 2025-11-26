@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInf
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -47,6 +48,8 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -160,6 +163,124 @@ public class TestOMClientRequestWithUserInfo {
       assertEquals("hostname", userInfo.getHostName());
       assertEquals("172.5.3.5", userInfo.getRemoteAddress());
       assertEquals("AccessId", userInfo.getUserName());
+    }
+  }
+
+  @Test
+  public void testUserInfoWithSTSToken() throws IOException {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+    final String originalAccessKeyId = "AKIAORIGINAL";
+
+    final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
+    when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn(originalAccessKeyId);
+
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+
+    try {
+      final OMRequest.Builder omRequestBuilder = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setS3Authentication(S3Authentication.newBuilder()
+              .setAccessId(accessId)
+              .setSignature(signature)
+              .setStringToSign(stringToSign)
+              .setSessionToken(sessionToken)
+              .build());
+
+      final OMRequest omRequest = omRequestBuilder.build();
+      final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+
+      final OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserInfo();
+      assertEquals(originalAccessKeyId, userInfo.getUserName());
+    } finally {
+      OzoneManager.setStsTokenIdentifier(null);
+    }
+  }
+
+  @Test
+  public void testUserInfoWithSTSAccessKeyMissingSessionToken() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId(accessId)
+            .setSignature(signature)
+            .setStringToSign(stringToSign)
+            .build())
+        .build();
+
+    final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+    final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+    assertEquals("Error with STS token", ex.getMessage());
+    assertEquals("Missing session token for accessKeyId: " + accessId, ex.getCause().getMessage());
+  }
+
+  @Test
+  public void testUserInfoWithSessionTokenButNoStsTokenIdentifier() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId(accessId)
+            .setSignature(signature)
+            .setStringToSign(stringToSign)
+            .setSessionToken(sessionToken)
+            .build())
+        .build();
+
+    OzoneManager.setStsTokenIdentifier(null);
+
+    final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+    final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+    assertEquals("Error with STS Token", ex.getMessage());
+    assertEquals(
+        "OMClientRequest has session token but no token identifier in OzoneManager", ex.getCause().getMessage());
+  }
+
+  @Test
+  public void testUserInfoWithSessionTokenButEmptyOriginalAccessKeyId() {
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
+    when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn("");
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+
+    try {
+      final OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setS3Authentication(S3Authentication.newBuilder()
+              .setAccessId(accessId)
+              .setSignature(signature)
+              .setStringToSign(stringToSign)
+              .setSessionToken(sessionToken)
+              .build())
+          .build();
+
+      final OMClientRequest omClientRequest = new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+      final IOException ex = assertThrows(IOException.class, omClientRequest::getUserInfo);
+
+      assertEquals("Error with STS Token", ex.getMessage());
+      assertEquals("Invalid STS Token - originalAccessKeyId was null or empty: ", ex.getCause().getMessage());
+    } finally {
+      OzoneManager.setStsTokenIdentifier(null);
     }
   }
 

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ShortLivedTokenSecretManager;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 
 /**
@@ -47,6 +48,25 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   public STSTokenSecretManager(SecretKeySignerClient secretKeyClient) {
     super(TOKEN_MAX_LIFETIME, secretKeyClient);
     this.secretKeyClient = secretKeyClient;
+  }
+
+  /**
+   * Override token generation so that we first compute the identifier bytes, then sign exactly those bytes, and
+   * return a Token that contains those same identifier bytes. This avoids non-determinism from multiple serializations
+   * which would break unit tests.  If we used the inherited generateToken() in ShortLivedTokenSecretManager, it
+   * would have made two serialization calls:
+   *   1) in the call to secretKey.sign() in the createPassword() method
+   *   2) in the call to tokenIdentifier.getBytes() for the Token constructor
+   * These two calls would produce different secretAccessKey encrypted values because of the random initialization
+   * vector and random salt and hence give non-deterministic return value, so here we are only serializing once.
+   */
+  @Override
+  public Token<STSTokenIdentifier> generateToken(STSTokenIdentifier tokenIdentifier) {
+    final ManagedSecretKey secretKey = secretKeyClient.getCurrentSecretKey();
+    tokenIdentifier.setSecretKeyId(secretKey.getId());
+    final byte[] identifierBytes = tokenIdentifier.getBytes();
+    final byte[] password = secretKey.sign(identifierBytes);
+    return new Token<>(identifierBytes, password, tokenIdentifier.getKind(), new Text(tokenIdentifier.getService()));
   }
 
   /**

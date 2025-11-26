@@ -27,6 +27,8 @@ public class S3Auth {
   public static final String S3_AUTH_CHECK = "ozone.s3.auth.check";
   // User principal to be used for KMS encryption and decryption
   private String userPrincipal;
+  // Optional STS session token when using temporary credentials
+  private String sessionToken;
 
   public S3Auth(final String stringToSign,
                 final String signature,
@@ -56,5 +58,13 @@ public class S3Auth {
 
   public void setUserPrincipal(String userPrincipal) {
     this.userPrincipal = userPrincipal;
+  }
+
+  public String getSessionToken() {
+    return sessionToken;
+  }
+
+  public void setSessionToken(String sessionToken) {
+    this.sessionToken = sessionToken;
   }
 }

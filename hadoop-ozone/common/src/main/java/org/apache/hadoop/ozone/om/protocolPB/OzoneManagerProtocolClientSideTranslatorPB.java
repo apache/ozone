@@ -314,15 +314,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
     if (getThreadLocalS3Auth() != null) {
-      builder.setS3Authentication(
+      final S3Authentication.Builder s3AuthBuilder =
           S3Authentication.newBuilder()
               .setSignature(
                   threadLocalS3Auth.get().getSignature())
               .setStringToSign(
                   threadLocalS3Auth.get().getStringTosSign())
               .setAccessId(
-                  threadLocalS3Auth.get().getAccessID())
-              .build());
+                  threadLocalS3Auth.get().getAccessID());
+
+      // Include STS session token if present so OM can validate it
+      if (threadLocalS3Auth.get().getSessionToken() != null) {
+        s3AuthBuilder.setSessionToken(threadLocalS3Auth.get().getSessionToken());
+      }
+
+      builder.setS3Authentication(s3AuthBuilder.build());
     }
     if (s3AuthCheck && getThreadLocalS3Auth() == null) {
       throw new IllegalArgumentException("S3 Auth expected to " +

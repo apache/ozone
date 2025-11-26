@@ -54,6 +54,19 @@ public final class S3SecurityUtil {
   public static void validateS3Credential(OMRequest omRequest,
       OzoneManager ozoneManager) throws ServiceException, OMException {
     if (ozoneManager.isSecurityEnabled()) {
+      // If STS session token is present, decode, decrypt and validate it once and save in thread-local
+      if (omRequest.getS3Authentication().hasSessionToken()) {
+        final String token = omRequest.getS3Authentication().getSessionToken();
+        if (!token.isEmpty()) {
+          final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+              token, ozoneManager.getSecretKeyClient());
+          // HMAC signature and expiration were validated above.  Now validate AWS signature.
+          validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
+          OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
+          return;
+        }
+      }
+
       OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
       try {
         // authenticate user with signature verification through
@@ -88,5 +101,23 @@ public final class S3SecurityUtil {
     s3Token.setAwsAccessId(auth.getAccessId());
     s3Token.setOwner(new Text(auth.getAccessId()));
     return s3Token;
+  }
+
+  /**
+   * Validates the AWS signature of an STSTokenIdentifier that has already been decrypted.
+   * @param stsTokenIdentifier      the decrypted STS token
+   * @param omRequest               the OMRequest containing STS token
+   * @throws OMException            if the AWS signature validation fails
+   */
+  private static void validateSTSTokenAwsSignature(STSTokenIdentifier stsTokenIdentifier, OMRequest omRequest)
+      throws OMException {
+    final String secretAccessKey = stsTokenIdentifier.getSecretAccessKey();
+    final S3Authentication s3Authentication = omRequest.getS3Authentication();
+    if (AWSV4AuthValidator.validateRequest(
+        s3Authentication.getStringToSign(), s3Authentication.getSignature(), secretAccessKey)) {
+      return;
+    }
+    throw new OMException(
+        "STS token validation failed for token: " + omRequest.getS3Authentication().getSessionToken(), INVALID_TOKEN);
   }
 }
