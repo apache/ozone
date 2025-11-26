@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -184,16 +183,14 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  public void testContainerSpaceRequirementMultiplier() throws IOException {
+  public void testContainerSpaceRequirement() throws IOException {
     long sizeRequired = 256 * 1024 * 1024;
-    double multiplier = 2.0;
     long containerSize = 5L * 1024 * 1024 * 1024;
-    long expectedSpaceRequirement = (long) (containerSize * multiplier);
+    long expectedSpaceRequirement = 2 * containerSize;
 
     PipelineManager spyPipelineManager = spy(pipelineManager);
     File tempDir = new File(testDir, "tempDir");
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
-    conf.setDouble(ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER, multiplier);
 
     ContainerManager manager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, spyPipelineManager,

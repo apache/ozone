@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +63,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   private final ConfigurationSource conf;
   private final PlacementPolicy placementPolicy;
   private final long containerSizeBytes;
-  private final long containerSpaceRequirement;
 
   public ECPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
@@ -74,10 +74,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     this.containerSizeBytes = (long) this.conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    double multiplier = conf.getDouble(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
-    this.containerSpaceRequirement = (long) (containerSizeBytes * multiplier);
   }
 
   @Override
@@ -91,9 +87,10 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   protected Pipeline create(ECReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
+    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes);
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
-            replicationConfig.getRequiredNodes(), 0, this.containerSpaceRequirement);
+            replicationConfig.getRequiredNodes(), 0, requiredSpace);
     return create(replicationConfig, dns);
   }
 

@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
@@ -82,7 +83,6 @@ public class ContainerManagerImpl implements ContainerManager {
   private final Random random = new Random();
 
   private final long maxContainerSize;
-  private final long containerSpaceRequirement;
 
   /**
    *
@@ -115,11 +115,6 @@ public class ContainerManagerImpl implements ContainerManager {
 
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-
-    double multiplier = conf.getDouble(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
-    this.containerSpaceRequirement = (long) (maxContainerSize * multiplier);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -358,23 +353,25 @@ public class ContainerManagerImpl implements ContainerManager {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          if (pipelineManager.hasEnoughSpace(pipeline, containerSpaceRequirement)) {
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize);
+          if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, containerSpaceRequirement);
+                pipeline, requiredSpace);
           }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          if (pipelineManager.hasEnoughSpace(pipeline, containerSpaceRequirement)) {
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize);
+          if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             containerInfo = allocateContainer(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, containerSpaceRequirement);
+                pipeline, requiredSpace);
           }
         }
         return containerInfo;

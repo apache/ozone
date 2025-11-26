@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy.DnWithPipelin
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -65,7 +66,6 @@ public class RatisPipelineProvider
   private final LeaderChoosePolicy leaderChoosePolicy;
   private final SCMContext scmContext;
   private final long containerSizeBytes;
-  private final long containerSpaceRequirement;
   private final long minRatisVolumeSizeBytes;
 
   @VisibleForTesting
@@ -90,10 +90,6 @@ public class RatisPipelineProvider
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    double multiplier = conf.getDouble(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
-    this.containerSpaceRequirement = (long) (containerSizeBytes * multiplier);
     this.minRatisVolumeSizeBytes = (long) this.conf.getStorageSize(
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
@@ -167,10 +163,11 @@ public class RatisPipelineProvider
 
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
+    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes);
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSpaceRequirement, conf);
+          requiredSpace, conf);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
@@ -183,7 +180,7 @@ public class RatisPipelineProvider
       }
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSpaceRequirement);
+          requiredSpace);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());

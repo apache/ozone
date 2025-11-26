@@ -79,10 +79,7 @@ public class TestECPipelineProvider {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    double multiplier = conf.getDouble(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
-    this.containerSpaceRequirement = (long) (containerSizeBytes * multiplier);
+    this.containerSpaceRequirement = 2 * containerSizeBytes;
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),
