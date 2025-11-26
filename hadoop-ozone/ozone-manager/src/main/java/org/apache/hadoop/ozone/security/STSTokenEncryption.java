@@ -47,11 +47,26 @@ public final class STSTokenEncryption {
   
   // AES-GCM parameters
   private static final int GCM_IV_LENGTH = 12; // 96 bits
+  private static final int GCM_AUTHENTICATION_TAG_LENGTH_IN_BITS = 128;
+  private static final String AES_ALGORITHM = "AES";
+  private static final String AES_CIPHER_TRANSFORMATION = "AES/GCM/NoPadding";
   
-  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final SecureRandom SECURE_RANDOM;
   private static final BouncyCastleProvider BC_PROVIDER = new BouncyCastleProvider();
   
   private STSTokenEncryption() {
+  }
+
+  static {
+    SecureRandom secureRandom;
+    try {
+      // Prefer non-blocking native PRNG where available
+      secureRandom = SecureRandom.getInstance("NativePRNGNonBlocking");
+    } catch (Exception e) {
+      // Fallback to default SecureRandom implementation
+      secureRandom = new SecureRandom();
+    }
+    SECURE_RANDOM = secureRandom;
   }
 
   /**
@@ -89,9 +104,9 @@ public final class STSTokenEncryption {
       SECURE_RANDOM.nextBytes(iv);
 
       // Initialize AES-GCM cipher
-      final Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding", BC_PROVIDER);
-      final GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-      cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(aesKey, "AES"), spec);
+      final Cipher cipher = Cipher.getInstance(AES_CIPHER_TRANSFORMATION, BC_PROVIDER);
+      final GCMParameterSpec spec = new GCMParameterSpec(GCM_AUTHENTICATION_TAG_LENGTH_IN_BITS, iv);
+      cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(aesKey, AES_ALGORITHM), spec);
       cipher.updateAAD(aad);
       
       // Encrypt the plaintext
@@ -148,9 +163,9 @@ public final class STSTokenEncryption {
       aesKey = deriveKey(secretKeyBytes, salt);
       
       // Initialize AES-GCM cipher
-      final Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding", BC_PROVIDER);
-      final GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-      cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(aesKey, "AES"), spec);
+      final Cipher cipher = Cipher.getInstance(AES_CIPHER_TRANSFORMATION, BC_PROVIDER);
+      final GCMParameterSpec spec = new GCMParameterSpec(GCM_AUTHENTICATION_TAG_LENGTH_IN_BITS, iv);
+      cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(aesKey, AES_ALGORITHM), spec);
       cipher.updateAAD(aad);
       
       // Decrypt the ciphertext

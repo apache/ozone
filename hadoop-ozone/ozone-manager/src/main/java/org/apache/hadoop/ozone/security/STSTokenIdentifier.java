@@ -175,9 +175,6 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * Encrypt a sensitive field using the configured encryption key.
    */
   private String encryptSensitiveField(String value) {
-    if (value == null || value.isEmpty()) {
-      return value != null ? value : "";
-    }
     if (encryptionKey == null) {
       throw new IllegalStateException("Encryption key must be set before encrypting sensitive fields");
     }
@@ -194,9 +191,6 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * Decrypt a sensitive field using the configured encryption key.
    */
   private String decryptSensitiveField(String encryptedValue) {
-    if (encryptedValue == null || encryptedValue.isEmpty()) {
-      return encryptedValue != null ? encryptedValue : "";
-    }
     if (encryptionKey == null) {
       throw new IllegalStateException("Encryption key must be set before decrypting sensitive fields");
     }
