@@ -345,7 +345,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     private void releaseResources() {
-      boolean wasNotYetComplete = semaphoreReleased.getAndSet(true);
+      boolean wasNotYetComplete = !semaphoreReleased.getAndSet(true);
       if (wasNotYetComplete) {
         releaseStreamResources(response);
       }
