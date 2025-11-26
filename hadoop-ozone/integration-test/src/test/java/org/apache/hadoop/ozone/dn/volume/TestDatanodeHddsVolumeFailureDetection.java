@@ -156,7 +156,8 @@ class TestDatanodeHddsVolumeFailureDetection {
         // refer to HddsVolume.check()
         DatanodeTestUtils.simulateBadVolume(vol0);
 
-        // close container to trigger checkVolumeAsync
+        // close container to trigger checkVolumeAsync after 2 seconds as minGap to check
+        Thread.sleep(2000);
         assertThrows(IOException.class, c1::close);
 
         // should trigger CheckVolumeAsync and
