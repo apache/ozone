@@ -312,7 +312,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
