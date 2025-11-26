@@ -101,7 +101,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     this.safeModeLogIntervalMs = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT,
-        java.util.concurrent.TimeUnit.MILLISECONDS);
+        TimeUnit.MILLISECONDS);
 
     SafeModeRuleFactory.initialize(conf, scmContext, eventQueue,
         pipelineManager, containerManager, nodeManager);
