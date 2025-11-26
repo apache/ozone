@@ -41,7 +41,9 @@ export COMPOSE_PARALLEL_LIMIT=1
 if [ ! -d "$DIST_DIR" ]; then
   echo "Error: distribution dir not found: $DIST_DIR"
   echo "Please build Ozone first."
-  ls -l "${OZONE_ROOT}/hadoop-ozone/dist/target"
+  if [[ "${CI:-}" == "true" ]]; then
+    ls -la "${OZONE_ROOT}/hadoop-ozone/dist/target"
+  fi
   exit 1
 fi
 
