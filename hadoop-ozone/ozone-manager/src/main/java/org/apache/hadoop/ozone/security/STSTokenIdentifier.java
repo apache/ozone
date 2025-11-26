@@ -208,8 +208,13 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * Includes token type, ownerId, expiry millis, and secretKeyId.
    */
   private byte[] computeAadBytes() {
-    final String aad = "v1|S3_STS_TOKEN|" + getOwnerId() + "|" + getExpiry().toEpochMilli() + "|" +
-        getSecretKeyId().toString();
+    final StringBuilder stringBuilder = new StringBuilder("v1|S3_STS_TOKEN|");
+    stringBuilder.append(getOwnerId());
+    stringBuilder.append('|');
+    stringBuilder.append(getExpiry().toEpochMilli());
+    stringBuilder.append('|');
+    stringBuilder.append(getSecretKeyId().toString());
+    final String aad = stringBuilder.toString();
     return aad.getBytes(StandardCharsets.UTF_8);
   }
 
