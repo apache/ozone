@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -99,6 +100,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -110,6 +112,9 @@ public class TestOMRatisSnapshots {
   private static final int SNAPSHOTS_TO_CREATE = 100;
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final int NUM_OF_OMS = 3;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -960,8 +965,17 @@ public class TestOMRatisSnapshots {
     // followerOM is already ahead of that transactionLogIndex and the OM
     // state should be reloaded.
     TermIndex followerTermIndex = followerRatisServer.getLastAppliedTermIndex();
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path parent = leaderCheckpointLocation.getParent();
+    assertNotNull(parent);
+    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+    assertNotNull(checkpointDataDir);
+    assertTrue(checkpointDataDir.toFile().mkdirs());
+    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    assertTrue(leaderCheckpointLocation.toFile().renameTo(omDbPath.toFile()));
     TermIndex newTermIndex = followerOM.installCheckpoint(
-        leaderOMNodeId, leaderDbCheckpoint);
+        leaderOMNodeId, checkpointDataDir);
 
     String errorMsg = "Cannot proceed with InstallSnapshot as OM is at " +
         "TermIndex " + followerTermIndex + " and checkpoint has lower " +
@@ -1001,7 +1015,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
+    assertNotNull(leaderCheckpointLocation);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
@@ -1025,7 +1039,15 @@ public class TestOMRatisSnapshots {
     LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
     followerOM.setExitManagerForTesting(new DummyExitManager());
     // Install corrupted checkpoint
-    followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+    Path parent = leaderCheckpointLocation.getParent();
+    assertNotNull(parent);
+    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+    assertNotNull(checkpointDataDir);
+    assertTrue(checkpointDataDir.toFile().mkdirs());
+    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    assertTrue(leaderCheckpointLocation.toFile().renameTo(omDbPath.toFile()));
+
+    followerOM.installCheckpoint(leaderOMNodeId, checkpointDataDir,
         leaderCheckpointTrxnInfo);
 
     // Wait checkpoint installation to be finished.
@@ -1157,11 +1179,16 @@ public class TestOMRatisSnapshots {
       // tarballs.
       if (count == 1) {
         long sstSize = getSizeOfSstFiles(tarball);
+        LOG.info("Setting ozone.om.ratis.snapshot.max.total.sst.size to {}", sstSize);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
         // process from the beginning.
         createEmptyTarball(tarball);
+        Path parentDir = tempDir.getParent();
+        assertNotNull(parentDir);
+        Path checkpointDataDir = Paths.get(parentDir.toString(), OM_CHECKPOINT_DATA_DIR);
+        FileUtils.deleteDirectory(checkpointDataDir.toFile());
       } else {
         // Each time we get a new tarball add a set of
         // its sst file to the list, (i.e. one per tarball.)
@@ -1173,14 +1200,23 @@ public class TestOMRatisSnapshots {
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
       OmSnapshotUtils.createHardLinks(tempDir, true);
-      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
+      Path parentDir = tempDir.getParent();
+      assertNotNull(parentDir);
+      Path checkpointDataDir = Paths.get(parentDir.toString(), OM_CHECKPOINT_DATA_DIR);
+      assertNotNull(checkpointDataDir);
+      Path omDbDir = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+      assertNotNull(omDbDir);
+      List<Path> sstPaths = Files.list(omDbDir).collect(Collectors.toList());
       long totalFileSize = 0;
+      int numFiles = 0;
       for (Path sstPath : sstPaths) {
         File file = sstPath.toFile();
         if (file.isFile() && file.getName().endsWith(".sst")) {
           totalFileSize += Files.size(sstPath);
+          numFiles++;
         }
       }
+      LOG.info("Total num files {}",  numFiles);
       return totalFileSize;
     }
 

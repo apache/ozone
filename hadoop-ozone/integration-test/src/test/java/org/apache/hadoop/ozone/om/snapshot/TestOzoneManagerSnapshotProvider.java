@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -26,6 +29,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -117,12 +121,21 @@ public class TestOzoneManagerSnapshotProvider {
 
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    assertNotNull(checkpointLocation);
 
-    OmSnapshotUtils.createHardLinks(dbCheckpoint.getCheckpointLocation(), true);
+    OmSnapshotUtils.createHardLinks(checkpointLocation, true);
+    Path parent = checkpointLocation.getParent();
+    assertNotNull(parent);
+
+    Path omDbLocation = Paths.get(parent.toString(),
+        OzoneConsts.OM_CHECKPOINT_DATA_DIR,
+        OzoneConsts.OM_DB_NAME
+    );
 
     TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
-            dbCheckpoint.getCheckpointLocation());
+            omDbLocation);
 
     return trxnInfoFromCheckpoint.getTransactionIndex();
   }

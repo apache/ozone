@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -74,5 +75,45 @@ public class TestOmSnapshotUtils {
         map(Path::toString).collect(Collectors.toSet());
 
     assertEquals(tree1Files, tree2Files);
+  }
+
+  /**
+   * Test createHardLinks().
+   */
+  @Test
+  public void testCreateHardLinksWithOmDbPrefix(@TempDir File tempDir) throws Exception {
+    // Create a test dir inside temp dir
+    File testDir  = new File(tempDir, "testDir");
+    assertTrue(testDir.mkdir(), "Failed to create test dir");
+    // Create source file
+    File sourceFile = new File(testDir, "source.sst");
+    File checkpointDataDir = new File(testDir.getParent(), OzoneConsts.OM_CHECKPOINT_DATA_DIR);
+    Files.write(sourceFile.toPath(), "test content".getBytes(UTF_8));
+
+    // Create hardlink file with "om.db/" prefixed paths
+    File hardlinkFile = new File(testDir, "hardLinkFile"); // OmSnapshotManager.OM_HARDLINK_FILE
+    String hardlinkContent =
+        "om.db/target1.sst\tsource.sst\n" +  // Should strip om.db/ prefix
+            "target2.sst\tsource.sst\n";         // Should remain unchanged
+    Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
+
+    // Execute createHardLinks
+    OmSnapshotUtils.createHardLinks(testDir.toPath(), false);
+
+    assertTrue(checkpointDataDir.exists());
+    // Verify hard links created correctly
+    File target1 = new File(checkpointDataDir, "om.db/target1.sst");
+    File target2 = new File(checkpointDataDir, "target2.sst");
+
+    assertTrue(target1.exists(),
+        "Hard link should be created");
+    assertTrue(target2.exists(),
+        "Hard link should be created");
+
+    // Verify content is same using inode comparison
+    assertEquals(getINode(sourceFile.toPath()), getINode(target1.toPath()),
+        "Hard links should have same inode as source");
+    assertEquals(getINode(sourceFile.toPath()), getINode(target2.toPath()),
+        "Hard links should have same inode as source");
   }
 }

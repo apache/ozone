@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -362,7 +363,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }).collect(Collectors.toList());
 
       for (String yamlRelativePath : yamlRelativePaths) {
-        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
+        String yamlFileName = Paths.get(newDbDir.getParent(), OzoneConsts.OM_CHECKPOINT_DATA_DIR,
+            yamlRelativePath).toString();
         assertTrue(Files.exists(Paths.get(yamlFileName)));
       }
     }
@@ -399,8 +401,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
-    Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(), OM_SNAPSHOT_CHECKPOINT_DIR,
-        OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
+    Path snapshotDbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,
+        OM_SNAPSHOT_CHECKPOINT_DIR, OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
@@ -587,9 +589,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot1DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     assertTrue(purgeEndTime.get() >= checkpointEndTime.get(),
         "Purge should complete after checkpoint releases snapshot cache lock");
@@ -812,9 +814,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot1DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getParent(), OM_CHECKPOINT_DATA_DIR,  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     boolean snapshot1IncludedInCheckpoint = Files.exists(snapshot1DbDir);
     boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);
@@ -958,13 +960,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         String path  = metadataDir.relativize(p).toString();
         if (path.contains(OM_CHECKPOINT_DIR)) {
           path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
-        }
-        if (path.startsWith(OM_DB_NAME)) {
-          Path fileName = Paths.get(path).getFileName();
-          // fileName will not be null, added null check for findbugs
-          if (fileName != null) {
-            path = fileName.toString();
-          }
         }
         hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
         inodesFromOmDbCheckpoint.add(inode);

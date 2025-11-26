@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
 import java.io.File;
@@ -27,11 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,7 @@ public final class OmSnapshotUtils {
   public static final String DATA_SUFFIX = "txt";
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotUtils.class);
+  public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
 
@@ -122,7 +124,17 @@ public final class OmSnapshotUtils {
   public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
-    List<Path> filesToDelete = new ArrayList<>();
+    Path dbPathParent = dbPath.getParent();
+    if (dbPathParent == null) {
+      throw new IOException("Invalid dbPath: parent is null: " + dbPath);
+    }
+    Path checkpointDataDirPath = Paths.get(dbPathParent.toString(), OM_CHECKPOINT_DATA_DIR);
+    if (!checkpointDataDirPath.toFile().exists()) {
+      boolean dirCreated = checkpointDataDirPath.toFile().mkdirs();
+      if (!dirCreated) {
+        LOG.error("Failed to create directory: {}", checkpointDataDirPath);
+      }
+    }
     if (hardLinkFile.exists()) {
       // Read file.
       try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
@@ -138,8 +150,7 @@ public final class OmSnapshotUtils {
           String from = parts[1];
           String to = parts[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
-          filesToDelete.add(fullFromPath);
-          Path fullToPath = Paths.get(dbPath.toString(), to);
+          Path fullToPath = Paths.get(checkpointDataDirPath.toString(), to);
           // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();
           if ((parent != null) && (!parent.toFile().exists())) {
@@ -154,15 +165,11 @@ public final class OmSnapshotUtils {
           throw new IOException("Failed to delete: " + hardLinkFile);
         }
       }
+    } else  {
+      LOG.error("Hardlink file : {} does not exist.", hardLinkFile);
     }
     if (deleteSourceFiles) {
-      for (Path fileToDelete : filesToDelete) {
-        try {
-          Files.deleteIfExists(fileToDelete);
-        } catch (IOException e) {
-          LOG.warn("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
-        }
-      }
+      FileUtil.fullyDelete(dbPath.toFile());
     }
   }
 

@@ -42,6 +42,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
@@ -151,6 +153,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -4046,7 +4049,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       // Install hard links.
       OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation(), false);
-      termIndex = installCheckpoint(leaderId, omDBCheckpoint);
+      Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
+      if (checkpointLocation == null) {
+        throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
+      }
+      Path parent = checkpointLocation.getParent();
+      if (parent == null) {
+        throw new IOException("Cannot install checkpoint from leader " + leaderId +
+            ": checkpointLocation has no parent: " + checkpointLocation);
+      }
+      Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+      termIndex = installCheckpoint(leaderId, checkpointDataDir);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
@@ -4072,10 +4085,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
   }
 
-  TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
+  /**
+   * Install checkpoint obtained from leader using the dbCheckpoint endpoint.
+   * The unpacked directory after installing hardlinks would contain a
+   * checkpoint_data dir that comprises of both active OM DB dir and the
+   * db.snapshots directory.
+   */
+  TermIndex installCheckpoint(String leaderId, Path checkpointDataDir)
+      throws Exception {
+    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
+        .getTrxnInfoFromCheckpoint(configuration, omDbPath);
+    LOG.info("Installing checkpoint with OMTransactionInfo {}",
+        checkpointTrxnInfo);
+    return installCheckpoint(leaderId, checkpointDataDir, checkpointTrxnInfo);
+  }
+
+  TermIndex installCheckpoint(String leaderId, Path checkpointDataDir,
       TransactionInfo checkpointTrxnInfo) throws Exception {
     long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
+    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
     try {
       // Stop Background services
       keyManager.stop();
@@ -4106,7 +4136,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // server so that the OM state can be re-initialized. If no then do not
     // proceed with installSnapshot.
     boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
-        checkpointTrxnInfo, lastAppliedIndex, leaderId, checkpointLocation);
+        checkpointTrxnInfo, lastAppliedIndex, leaderId, omDbPath);
 
     boolean oldOmMetadataManagerStopped = false;
     boolean newMetadataManagerStarted = false;
@@ -4117,15 +4147,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRpcServer.stop();
       isOmRpcServerRunning = false;
       omRpcServerStopped = true;
-      LOG.info("RPC server is stopped. Spend " +
-          (Time.monotonicNow() - time) + " ms.");
+      LOG.info("RPC server is stopped. Spend {} ms.", Time.monotonicNow() - time);
       try {
         // Stop old metadataManager before replacing DB Dir
         time = Time.monotonicNow();
         metadataManager.stop();
         oldOmMetadataManagerStopped = true;
-        LOG.info("metadataManager is stopped. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("metadataManager is stopped. Spend {} ms.", Time.monotonicNow() - time);
       } catch (Exception e) {
         String errorMsg = "Failed to stop metadataManager. Cannot proceed " +
             "with installing the new checkpoint.";
@@ -4134,8 +4162,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try {
         time = Time.monotonicNow();
-        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex,
-            oldDBLocation, checkpointLocation);
+        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation, checkpointDataDir);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
@@ -4190,8 +4217,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcServer = getRpcServer(configuration);
         omRpcServer.start();
         isOmRpcServerRunning = true;
-        LOG.info("RPC server is re-started. Spend " +
-            (Time.monotonicNow() - time) + " ms.");
+        LOG.info("RPC server is re-started. Spend {} ms.", Time.monotonicNow() - time);
       } catch (Exception e) {
         String errorMsg = "Failed to start RPC Server.";
         exitManager.exitSystem(1, errorMsg, e, LOG);
@@ -4243,11 +4269,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Replace the current OM DB with the new DB checkpoint.
    *
    * @param lastAppliedIndex the last applied index in the current OM DB.
-   * @param checkpointPath   path to the new DB checkpoint
+   * @param checkpointDataDir   path to the checkpoint_data dir consisting of om.db and db.snapshots
    * @return location of backup of the original DB
    */
   File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
-      Path checkpointPath) throws IOException {
+      Path checkpointDataDir) throws IOException {
 
     // Take a backup of the current DB
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
@@ -4269,16 +4295,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           dbSnapshotsBackup.toPath());
     }
 
-    moveCheckpointFiles(oldDB, checkpointPath, dbDir, dbBackup, dbSnapshotsDir,
+    moveCheckpointFiles(oldDB, checkpointDataDir, dbDir, dbBackup, dbSnapshotsDir,
         dbSnapshotsBackup);
     return dbBackupDir;
   }
 
-  private void moveCheckpointFiles(File oldDB, Path checkpointPath, File dbDir,
+  private void moveCheckpointFiles(File oldDB, Path checkpointDataDir, File dbDir,
                                    File dbBackup, File dbSnapshotsDir,
                                    File dbSnapshotsBackup) throws IOException {
-    // Move the new DB checkpoint into the om metadata dir
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
+    Path newDb = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    Path newDbSnapshotsDir = Paths.get(checkpointDataDir.toString(), OM_SNAPSHOT_DIR);
+    // Now that we have backed up the old DB data, we just need to move the
+    // directories in checkpoint_data to the main path
+    // 1. replace oldDb with newDb
+    // 2. replace dbSnapshotsDir with newDbSnapshotsDir
     try {
       // Create a Transient Marker file. This file will be deleted if the
       // checkpoint DB is successfully moved to the old DB location or if the
@@ -4286,17 +4317,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // an inconsistent state and this marker file will fail OM from
       // starting up.
       Files.createFile(markerFile);
-      // Link each of the candidate DB files to real DB directory.  This
-      // preserves the links that already exist between files in the
-      // candidate db.
-      OmSnapshotUtils.linkFiles(checkpointPath.toFile(),
-          oldDB);
-      moveOmSnapshotData(oldDB.toPath(), dbSnapshotsDir.toPath());
+      // replace the dbDir and dbSnapshotDir
+      replaceDir(oldDB, newDb);
+      replaceDir(dbSnapshotsDir, newDbSnapshotsDir);
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
-              "directory {}. Exception: {}. Resetting to original DB.",
-          checkpointPath, oldDB.toPath(), e);
+              "directory . Exception: {}. Resetting to original DB.",
+          checkpointDataDir, oldDB.toPath(), e);
       try {
         FileUtil.fullyDelete(oldDB);
         Files.move(dbBackup.toPath(), oldDB.toPath());
@@ -4313,13 +4341,37 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  // Move the new snapshot directory into place.
-  private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
-      throws IOException {
-    Path incomingSnapshotsDir = Paths.get(dbPath.toString(),
-        OM_SNAPSHOT_DIR);
-    if (incomingSnapshotsDir.toFile().exists()) {
-      Files.move(incomingSnapshotsDir, dbSnapshotsDir);
+  /**
+   * Replaces the contents of the target directory with contents from the source directory.
+   * Deletes all existing files in dbDir and moves all files from newDbDir into dbDir.
+   *
+   * @param dbDir target directory whose contents will be replaced
+   * @param newDbDir source directory containing new contents to move
+   * @throws IOException if file operations fail
+   */
+  private void replaceDir(File dbDir, Path newDbDir) throws IOException {
+    // First, delete all existing content in the target directory
+    if (dbDir.exists()) {
+      // Delete all files and subdirectories in dbDir, but keep the directory itself
+      File[] files = dbDir.listFiles();
+      if (files != null) {
+        for (File file : files) {
+          FileUtil.fullyDelete(file);
+        }
+      }
+    } else {
+      // Create the directory if it doesn't exist
+      Files.createDirectories(dbDir.toPath());
+    }
+
+    // Move all content from newDbDir to dbDir
+    if (Files.exists(newDbDir) && Files.isDirectory(newDbDir)) {
+      try (Stream<Path> files = Files.list(newDbDir)) {
+        for (Path sourceFile : files.collect(Collectors.toList())) {
+          Path targetFile = dbDir.toPath().resolve(sourceFile.getFileName());
+          Files.move(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+      }
     }
   }
 
