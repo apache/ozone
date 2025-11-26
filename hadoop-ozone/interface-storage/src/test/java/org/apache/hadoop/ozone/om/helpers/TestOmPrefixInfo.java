@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -94,13 +95,17 @@ public class TestOmPrefixInfo {
 
     assertEquals(omPrefixInfo, clonePrefixInfo);
 
+    OmPrefixInfo modifiedPrefixInfo = new OmPrefixInfo.Builder(omPrefixInfo)
+        .addAcls(Collections.singletonList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, username,
+            ACCESS, IAccessAuthorizer.ACLType.READ)))
+        .build();
 
-    // Change acls and check.
-    omPrefixInfo.addAcl(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER, username,
-        ACCESS, IAccessAuthorizer.ACLType.READ));
-
-    assertNotEquals(omPrefixInfo, clonePrefixInfo);
+    assertNotEquals(modifiedPrefixInfo, clonePrefixInfo);
+    assertThrows(UnsupportedOperationException.class,
+        () -> omPrefixInfo.getAcls().add(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, username,
+            ACCESS, IAccessAuthorizer.ACLType.READ)));
 
   }
 
