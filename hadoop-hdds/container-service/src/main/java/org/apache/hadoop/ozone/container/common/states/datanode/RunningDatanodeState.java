@@ -131,6 +131,11 @@ public class RunningDatanodeState implements DatanodeState {
     this.ecs = e;
   }
 
+  @VisibleForTesting
+  public void setExecutingEndpointCount(int executingEndpointCount) {
+    this.executingEndpointCount = executingEndpointCount;
+  }
+
   private Callable<EndPointStates> buildEndPointTask(
       EndpointStateMachine endpoint) {
     switch (endpoint.getState()) {
