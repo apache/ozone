@@ -681,10 +681,10 @@ public final class RocksDatabase implements Closeable {
             break;
           }
         }
+        columnFamily.getHandle().close();
         if (descriptor != null) {
           RocksDatabase.close(descriptor);
         }
-        columnFamily.getHandle().close();
         columnFamilies.remove(tableName);
       } catch (RocksDBException e) {
         throw new RocksDatabaseException("Failed to drop " + tableName, e);

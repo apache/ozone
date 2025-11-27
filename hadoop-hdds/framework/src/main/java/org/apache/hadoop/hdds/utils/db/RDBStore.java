@@ -76,7 +76,6 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
-  private final boolean readOnly;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -114,7 +113,6 @@ public class RDBStore implements DBStore {
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
-      this.readOnly = readOnly;
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
@@ -255,9 +253,7 @@ public class RDBStore implements DBStore {
     }
     try {
       // Flush to ensure all data is persisted to disk before closing.
-      if (!readOnly) {
-        flushDB();
-      }
+      flushDB();
       LOG.debug("Successfully flushed DB before close");
     } catch (Exception e) {
       LOG.warn("Failed to flush DB before close", e);
