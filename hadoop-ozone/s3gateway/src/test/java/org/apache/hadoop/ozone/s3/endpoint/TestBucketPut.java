@@ -208,4 +208,29 @@ public class TestBucketPut {
          .orElseThrow(() -> new AssertionError("owner-id ACL not found"));
   }
 
+  @Test
+  public void testPutAclWithEmptyGrantHeaderValue() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn(""); // empty
+
+    Response resp = bucketEndpoint.put(bucketName, "acl", null);
+
+    assertEquals(200, resp.getStatus());
+  }
+
+  @Test
+  public void testPutAclWithWhitespaceGrantHeaderValue() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn("  "); // whitespace only
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put(bucketName, "acl", null));
+
+    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals(400, ex.getHttpCode());
+  }
 }
