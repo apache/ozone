@@ -98,17 +98,12 @@ public interface ConfigurationSource {
 
   default String[] getTrimmedStrings(String name) {
     String valueString = get(name);
-    return getValueTrimmedStrings(valueString);
-  }
-
-  static String[] getValueTrimmedStrings(String valueString) {
     if (null == valueString) {
       return EMPTY_STRING_ARRAY;
     }
 
     return valueString.trim().split("\\s*[,\n]\\s*");
   }
-
   /**
    * Gets the configuration entries where the key contains the prefix. This
    * method will strip the prefix from the key in the return Map.
