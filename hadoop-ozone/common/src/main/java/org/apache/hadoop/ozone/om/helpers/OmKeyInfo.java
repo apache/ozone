@@ -500,7 +500,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -624,18 +624,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    @Override
-    public Builder withObjectID(long obId) {
-      super.withObjectID(obId);
-      return this;
-    }
-
-    @Override
-    public Builder withUpdateID(long newValue) {
-      super.withUpdateID(newValue);
-      return this;
-    }
-
     public Builder setFileEncryptionInfo(FileEncryptionInfo feInfo) {
       this.encInfo = feInfo;
       return this;
@@ -710,7 +698,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     @Override
-    public OmKeyInfo build() {
+    protected OmKeyInfo buildObject() {
       return new OmKeyInfo(this);
     }
   }
@@ -958,14 +946,13 @@ public final class OmKeyInfo extends WithParentObjectId
     return Objects.hash(volumeName, bucketName, keyName, getParentObjectID());
   }
 
-  /**
-   * Return a new copy of the object.
-   */
-  @Override
   public Builder toBuilder() {
     return new Builder(this);
   }
 
+  /**
+   * Return a new copy of the object.
+   */
   @Override
   public OmKeyInfo copyObject() {
     return new Builder(this).build();

@@ -237,7 +237,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       // Set the UpdateID to current transactionLogIndex
       openKeyInfo = openKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Add to cache.
