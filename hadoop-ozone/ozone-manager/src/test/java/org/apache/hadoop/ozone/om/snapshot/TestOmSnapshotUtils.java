@@ -93,8 +93,8 @@ public class TestOmSnapshotUtils {
     // Create hardlink file with "om.db/" prefixed paths
     File hardlinkFile = new File(testDir, "hardLinkFile"); // OmSnapshotManager.OM_HARDLINK_FILE
     String hardlinkContent =
-        "om.db/target1.sst\tsource.sst\n" +  // Should strip om.db/ prefix
-            "target2.sst\tsource.sst\n";         // Should remain unchanged
+        "om.db/target1.sst\tsource.sst\n" +
+            "target2.sst\tsource.sst\n";
     Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
 
     // Execute createHardLinks

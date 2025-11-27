@@ -52,4 +52,10 @@ public interface DBCheckpoint {
    * @throws IOException if I/O error happens
    */
   void cleanupCheckpoint() throws IOException;
+
+  /**
+   * Get location of the checkpoint_data directory that contains
+   * om.db and db.snapshots.
+   */
+  Path getCheckpointDataDir() throws IOException;
 }

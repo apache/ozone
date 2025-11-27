@@ -132,7 +132,7 @@ public final class OmSnapshotUtils {
     if (!checkpointDataDirPath.toFile().exists()) {
       boolean dirCreated = checkpointDataDirPath.toFile().mkdirs();
       if (!dirCreated) {
-        LOG.error("Failed to create directory: {}", checkpointDataDirPath);
+        throw new IOException("Failed to create directory: " + checkpointDataDirPath);
       }
     }
     if (hardLinkFile.exists()) {

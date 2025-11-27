@@ -123,13 +123,10 @@ public class TestOzoneManagerSnapshotProvider {
       throws Exception {
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     assertNotNull(checkpointLocation);
-
     OmSnapshotUtils.createHardLinks(checkpointLocation, true);
-    Path parent = checkpointLocation.getParent();
-    assertNotNull(parent);
-
-    Path omDbLocation = Paths.get(parent.toString(),
-        OzoneConsts.OM_CHECKPOINT_DATA_DIR,
+    Path checkpointDataDir = dbCheckpoint.getCheckpointDataDir();
+    assertNotNull(checkpointDataDir);
+    Path omDbLocation = Paths.get(checkpointDataDir.toString(),
         OzoneConsts.OM_DB_NAME
     );
 

@@ -92,6 +92,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -967,9 +968,7 @@ public class TestOMRatisSnapshots {
     TermIndex followerTermIndex = followerRatisServer.getLastAppliedTermIndex();
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
     assertNotNull(leaderCheckpointLocation);
-    Path parent = leaderCheckpointLocation.getParent();
-    assertNotNull(parent);
-    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+    Path checkpointDataDir = leaderDbCheckpoint.getCheckpointDataDir();
     assertNotNull(checkpointDataDir);
     assertTrue(checkpointDataDir.toFile().mkdirs());
     Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
@@ -1039,9 +1038,7 @@ public class TestOMRatisSnapshots {
     LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
     followerOM.setExitManagerForTesting(new DummyExitManager());
     // Install corrupted checkpoint
-    Path parent = leaderCheckpointLocation.getParent();
-    assertNotNull(parent);
-    Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+    Path checkpointDataDir = leaderDbCheckpoint.getCheckpointDataDir();
     assertNotNull(checkpointDataDir);
     assertTrue(checkpointDataDir.toFile().mkdirs());
     Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
@@ -1185,9 +1182,7 @@ public class TestOMRatisSnapshots {
         // Now empty the tarball to restart the download
         // process from the beginning.
         createEmptyTarball(tarball);
-        Path parentDir = tempDir.getParent();
-        assertNotNull(parentDir);
-        Path checkpointDataDir = Paths.get(parentDir.toString(), OM_CHECKPOINT_DATA_DIR);
+        Path checkpointDataDir = getCheckpointDataDir();
         FileUtils.deleteDirectory(checkpointDataDir.toFile());
       } else {
         // Each time we get a new tarball add a set of
@@ -1196,13 +1191,18 @@ public class TestOMRatisSnapshots {
       }
     }
 
+    @NotNull
+    private Path getCheckpointDataDir() {
+      Path parentDir = tempDir.getParent();
+      assertNotNull(parentDir);
+      return Paths.get(parentDir.toString(), OM_CHECKPOINT_DATA_DIR);
+    }
+
     // Get Size of sstfiles in tarball.
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
       OmSnapshotUtils.createHardLinks(tempDir, true);
-      Path parentDir = tempDir.getParent();
-      assertNotNull(parentDir);
-      Path checkpointDataDir = Paths.get(parentDir.toString(), OM_CHECKPOINT_DATA_DIR);
+      Path checkpointDataDir = getCheckpointDataDir();
       assertNotNull(checkpointDataDir);
       Path omDbDir = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
       assertNotNull(omDbDir);

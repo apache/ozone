@@ -42,7 +42,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
@@ -4053,12 +4052,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (checkpointLocation == null) {
         throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
       }
-      Path parent = checkpointLocation.getParent();
-      if (parent == null) {
-        throw new IOException("Cannot install checkpoint from leader " + leaderId +
-            ": checkpointLocation has no parent: " + checkpointLocation);
-      }
-      Path checkpointDataDir = Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
+      Path checkpointDataDir = omDBCheckpoint.getCheckpointDataDir();
       termIndex = installCheckpoint(leaderId, checkpointDataDir);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
@@ -4067,29 +4061,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Install checkpoint. If the checkpoint snapshot index is greater than
-   * OM's last applied transaction index, then re-initialize the OM
-   * state via this checkpoint. Before re-initializing OM state, the OM Ratis
-   * server should be stopped so that no new transactions can be applied.
-   */
-  TermIndex installCheckpoint(String leaderId, DBCheckpoint omDBCheckpoint)
-      throws Exception {
-
-    Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
-    TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
-        .getTrxnInfoFromCheckpoint(configuration, checkpointLocation);
-
-    LOG.info("Installing checkpoint with OMTransactionInfo {}",
-        checkpointTrxnInfo);
-
-    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
-  }
-
-  /**
    * Install checkpoint obtained from leader using the dbCheckpoint endpoint.
    * The unpacked directory after installing hardlinks would contain a
-   * checkpoint_data dir that comprises of both active OM DB dir and the
+   * checkpoint_data dir that comprises both active OM DB dir and the
    * db.snapshots directory.
+   * If the checkpoint snapshot index is greater than
+   * OM's last applied transaction index, then re-initialize the OM
+   * state via this checkpoint. Before re-initializing OM state, the OM Ratis
+   * server should be stopped so that no new transactions can be applied
    */
   TermIndex installCheckpoint(String leaderId, Path checkpointDataDir)
       throws Exception {
@@ -4372,6 +4351,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           Files.move(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
         }
       }
+    } else {
+      throw new IOException("The source directory from which the DB contents are" +
+          " to be moved does not exist at" + newDbDir.toFile().getAbsolutePath());
     }
   }
 
