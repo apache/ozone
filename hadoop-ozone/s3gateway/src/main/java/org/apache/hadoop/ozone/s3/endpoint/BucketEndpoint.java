@@ -396,52 +396,84 @@ public class BucketEndpoint extends EndpointBase {
       result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
       final String normalizedPrefix = prefix == null ? "" : prefix;
-      // track the previous directory name to avoid duplicate CommonPrefixes entries
+      // Track the previous directory name to avoid duplicate CommonPrefixes entries
       String prevDir = null;
-      for (OzoneMultipartUpload upload : ozoneMultipartUploadList.getUploads()) {
+      // Track the last key processed for pagination
+      String lastProcessedKey = null;
+      String lastProcessedUploadId = null;
+      // Count of items added to response (CommonPrefixes + Uploads)
+      int responseItemCount = 0;
+
+      List<OzoneMultipartUpload> pendingUploads =
+          ozoneMultipartUploadList.getUploads();
+      int processedUploads = 0;
+      for (OzoneMultipartUpload upload : pendingUploads) {
         String keyName = upload.getKeyName();
-        // filter out keys that don't match the prefix in FS-optimized buckets
+        
+        // Filter out keys that don't match the prefix in FS-optimized buckets
         if (bucket.getBucketLayout().isFileSystemOptimized() &&
             StringUtils.isNotEmpty(normalizedPrefix) &&
             !keyName.startsWith(normalizedPrefix)) {
           continue;
         }
-        // skip keys shorter than prefix to avoid substring errors
+        // Skip keys shorter than prefix to avoid substring errors
         if (keyName.length() < normalizedPrefix.length()) {
           continue;
         }
-        // relative key name after removing the prefix
+
+        // Relative key name after removing the prefix
         String relativeKeyName = keyName.substring(normalizedPrefix.length());
+        String currentDirName = null;
+        boolean isDirectoryPlaceholder = false;
+        if (StringUtils.isNotBlank(delimiter)) {
+          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+          if (depth > 0) {
+            int delimiterIndex = relativeKeyName.indexOf(delimiter);
+            currentDirName = relativeKeyName.substring(0, delimiterIndex);
+          } else if (relativeKeyName.endsWith(delimiter)) {
+            currentDirName = relativeKeyName.substring(
+                0, relativeKeyName.length() - delimiter.length());
+            isDirectoryPlaceholder = true;
+          }
+        }
+
+        // If we've already returned maxUploads items, keep iterating only to drain
+        // entries that belong to the same prefix (so that the next page won't repeat them).
+        if (responseItemCount >= maxUploads) {
+          if (StringUtils.isNotBlank(delimiter)
+              && currentDirName != null
+              && currentDirName.equals(prevDir)) {
+            lastProcessedKey = keyName;
+            lastProcessedUploadId = upload.getUploadId();
+            continue;
+          }
+          break;
+        }
 
         // Track whether this upload was added as a CommonPrefix
         boolean addedAsPrefix = false;
-        // Only extract common prefixes when delimiter is provided
+        
+        // When delimiter is provided, group keys by common prefix (AWS S3 behavior)
+        // Example: with delimiter="/", keys "dir1/file1" and "dir1/file2" 
+        // are collapsed into CommonPrefix "dir1/" instead of individual Upload entries
         if (StringUtils.isNotBlank(delimiter)) {
-          // collapse objects that share the same delimiter
-          // first segment after the prefix into a single CommonPrefixes entry.
-          // This matches AWS behavior where keys under the same "directory" are grouped.
-          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-          if (depth > 0) {
-            // Key has delimiter(s): extract the first directory segment
-            int delimiterIndex = relativeKeyName.indexOf(delimiter);
-            String dirName = relativeKeyName.substring(0, delimiterIndex);
-            // Only add CommonPrefix if this directory hasn't been added yet (deduplication)
-            if (!dirName.equals(prevDir)) {
-              result.addCommonPrefix(EncodingTypeObject.createNullable(
-                  normalizedPrefix + dirName + delimiter, encodingType));
-              prevDir = dirName;
-            }
+          if (currentDirName != null && !currentDirName.equals(prevDir)) {
+            result.addCommonPrefix(EncodingTypeObject.createNullable(
+                normalizedPrefix + currentDirName + delimiter, encodingType));
+            prevDir = currentDirName;
+            responseItemCount++;
             addedAsPrefix = true;
-          } else if (relativeKeyName.endsWith(delimiter)) {
-            // Key itself ends with delimiter (represents a "directory" placeholder)
+          } else if (isDirectoryPlaceholder) {
             result.addCommonPrefix(EncodingTypeObject.createNullable(
                 normalizedPrefix + relativeKeyName, encodingType));
+            responseItemCount++;
+            addedAsPrefix = true;
+          } else if (currentDirName != null) {
             addedAsPrefix = true;
           }
         }
 
-        // This ensures all uploads are represented: either as individual Upload entries
-        // or as part of CommonPrefixes (when delimiter is used).
+        // Add as individual Upload entry if not collapsed into CommonPrefix
         if (!addedAsPrefix) {
           result.addUpload(new ListMultipartUploadsResult.Upload(
               EncodingTypeObject.createNullable(upload.getKeyName(), encodingType),
@@ -449,7 +481,27 @@ public class BucketEndpoint extends EndpointBase {
               upload.getCreationTime(),
               S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
           ));
+          responseItemCount++;
         }
+
+        // Track the last processed key for pagination
+        lastProcessedKey = keyName;
+        lastProcessedUploadId = upload.getUploadId();
+        processedUploads++;
+      }
+
+      boolean hasMoreUploads =
+          processedUploads < pendingUploads.size()
+              || ozoneMultipartUploadList.isTruncated();
+
+      // Override NextKeyMarker and NextUploadIdMarker if we stopped early due to maxUploads
+      if (responseItemCount >= maxUploads && lastProcessedKey != null
+          && hasMoreUploads) {
+        result.setNextKeyMarker(EncodingTypeObject.createNullable(lastProcessedKey, encodingType));
+        result.setNextUploadIdMarker(lastProcessedUploadId);
+        result.setTruncated(true);
+      } else {
+        result.setTruncated(ozoneMultipartUploadList.isTruncated());
       }
 
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
