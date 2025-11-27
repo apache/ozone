@@ -881,6 +881,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
+  public void setAllowListAllVolumes(boolean isAllowListAllVolumes) {
+    allowListAllVolumes = isAllowListAllVolumes;
+  }
+
   /**
    * Constructs OM instance based on the configuration.
    *
@@ -5259,8 +5263,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfigureAllowListAllVolumes(String newVal) {
-    getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
-    setAllowListAllVolumesFromConfig();
+    String valueString = StringUtils.trim(newVal);
+    boolean newValue;
+    boolean defaultValue = OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
+    // See Configuration#getBoolean for the implementation
+    if (null != valueString && !valueString.isEmpty()) {
+      if (org.apache.hadoop.util.StringUtils.equalsIgnoreCase("true", valueString)) {
+        newValue = true;
+      } else if (org.apache.hadoop.util.StringUtils.equalsIgnoreCase("false", valueString)) {
+        newValue = false;
+      } else {
+        LOG.warn("Invalid value for boolean: {}, choose default value: {} for " + OZONE_OM_VOLUME_LISTALL_ALLOWED,
+            valueString, defaultValue);
+        newValue = defaultValue;
+      }
+    } else {
+      newValue = defaultValue;
+    }
+    setAllowListAllVolumes(newValue);
     return String.valueOf(allowListAllVolumes);
   }
 

@@ -104,6 +104,7 @@ public interface ConfigurationSource {
 
     return valueString.trim().split("\\s*[,\n]\\s*");
   }
+
   /**
    * Gets the configuration entries where the key contains the prefix. This
    * method will strip the prefix from the key in the return Map.
