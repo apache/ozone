@@ -28,6 +28,7 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -381,7 +382,7 @@ public final class RocksDatabase implements Closeable {
       final ColumnFamily f = new ColumnFamily(h);
       map.put(f.getName(), f);
     }
-    return Collections.unmodifiableMap(map);
+    return map;
   }
 
   private static Map<Integer, String> toColumnFamilyNameMap(Collection<ColumnFamily> families) {
@@ -663,6 +664,32 @@ public final class RocksDatabase implements Closeable {
 
   public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
+  }
+
+  public void dropColumnFamily(String tableName) throws RocksDatabaseException {
+    ColumnFamily columnFamily = columnFamilies.get(tableName);
+    if (columnFamily != null) {
+      try {
+        getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+        byte[] handleNameBytes = columnFamily.getHandle().getName();
+        ColumnFamilyDescriptor descriptor = null;
+        for (int i = 0; i < descriptors.size(); i++) {
+          ColumnFamilyDescriptor desc = descriptors.get(i);
+          if (Arrays.equals(desc.getName(), handleNameBytes)) {
+            descriptor = desc;
+            descriptors.remove(i);
+            break;
+          }
+        }
+        if (descriptor != null) {
+          RocksDatabase.close(descriptor);
+        }
+        columnFamily.getHandle().close();
+        columnFamilies.remove(tableName);
+      } catch (RocksDBException e) {
+        throw new RocksDatabaseException("Failed to drop " + tableName, e);
+      }
+    }
   }
 
   byte[] get(ColumnFamily family, byte[] key) throws RocksDatabaseException {
