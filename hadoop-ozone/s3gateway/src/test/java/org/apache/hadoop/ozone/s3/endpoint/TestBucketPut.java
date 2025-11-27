@@ -108,7 +108,7 @@ public class TestBucketPut {
 
     OS3Exception os3 = (OS3Exception) cause;
 
-    assertEquals("InvalidRequest", os3.getCode());
+    assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
     assertEquals(400, os3.getHttpCode());
   }
 
