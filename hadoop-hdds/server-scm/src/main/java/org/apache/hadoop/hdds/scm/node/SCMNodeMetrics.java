@@ -157,12 +157,13 @@ public final class SCMNodeMetrics implements MetricsSource {
     metrics.addGauge(
         Interns.info("AllNodes", "Number of datanodes"), totalNodeCount);
 
-    String readOnlyNodes = nodeStatistics.get("ReadOnlyNodes");
-    if (readOnlyNodes != null) {
+    String nodesOutOfSpace = nodeStatistics.get("NodesOutOfSpace");
+    if (nodesOutOfSpace != null) {
       metrics.addGauge(
-          Interns.info("ReadOnlyNodes", "Number of datanodes that are read-only because " +
-              "they cannot accept new writes due to insufficient metadata or data space"),
-          Integer.parseInt(readOnlyNodes));
+          Interns.info("NodesOutOfSpace", "Number of datanodes that cannot accept new writes because " +
+              "they lack either sufficient metadata space, data volume space for creating new containers " +
+              "or free space in existing open containers."),
+          Integer.parseInt(nodesOutOfSpace));
     }
 
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {

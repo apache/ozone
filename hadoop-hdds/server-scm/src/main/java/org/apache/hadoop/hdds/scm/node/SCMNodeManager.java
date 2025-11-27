@@ -1281,7 +1281,7 @@ public class SCMNodeManager implements NodeManager {
     // Statistics node space
     nodeSpaceStatistics(nodeStatistics);
     // Statistics node readOnly
-    nodeReadOnlyStatistics(nodeStatistics);
+    nodeOutOfSpaceStatistics(nodeStatistics);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
@@ -1369,7 +1369,7 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
-  private void nodeReadOnlyStatistics(Map<String, String> nodeStatics) {
+  private void nodeOutOfSpaceStatistics(Map<String, String> nodeStatics) {
     List<DatanodeInfo> allNodes = getAllNodes();
     long blockSize = (long) conf.getStorageSize(
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
@@ -1384,12 +1384,12 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
-    int readOnlyCount = (int) allNodes.parallelStream()
+    int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
         .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
             && !hasContainerWithSpace(dn, blockSize, containerSize))
         .count();
 
-    nodeStatics.put("ReadOnlyNodes", String.valueOf(readOnlyCount));
+    nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
   }
   
   /**
