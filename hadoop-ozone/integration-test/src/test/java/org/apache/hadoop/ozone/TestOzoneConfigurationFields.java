@@ -103,9 +103,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
         ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD,
-        ReconConfigKeys.OZONE_RECON_JMX_FETCH_THREAD_POOL_SIZE,
-        ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_CONNECT_TIMEOUT_MS,
-        ReconConfigKeys.OZONE_RECON_JMX_FETCH_HTTP_SOCKET_TIMEOUT_MS,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys
