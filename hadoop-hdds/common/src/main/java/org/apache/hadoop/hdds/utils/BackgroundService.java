@@ -42,7 +42,7 @@ public abstract class BackgroundService {
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
-  private ScheduledThreadPoolExecutor exec;
+  private volatile ScheduledThreadPoolExecutor exec;
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
