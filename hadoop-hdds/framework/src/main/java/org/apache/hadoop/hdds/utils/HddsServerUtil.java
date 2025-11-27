@@ -751,7 +751,9 @@ public final class HddsServerUtil {
       executor.setCorePoolSize(size);
       executor.setMaximumPoolSize(size);
     }
-    LOG.info("{} pool size {} from {} to {}", logger.getName(), change, currentCorePoolSize, size);
+    if (logger != null) {
+      logger.info("pool size {} from {} to {}", change, currentCorePoolSize, size);
+    }
   }
 
 }
