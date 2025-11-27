@@ -687,7 +687,8 @@ public final class RocksDatabase implements Closeable {
         }
         columnFamilies.remove(tableName);
       } catch (RocksDBException e) {
-        throw new RocksDatabaseException("Failed to drop " + tableName, e);
+        closeOnError(e);
+        throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
       }
     }
   }
