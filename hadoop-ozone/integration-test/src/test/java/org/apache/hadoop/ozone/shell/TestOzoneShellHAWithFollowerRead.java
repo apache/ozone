@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Timeout;
  * This class tests Ozone sh shell command with FollowerRead.
  * Inspired by TestS3Shell
  */
-@Timeout(value = 10, unit = TimeUnit.MINUTES)
 public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
 
   @BeforeAll
@@ -44,6 +43,7 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     conf.setFromObject(omHAConfig);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    conf.setBoolean("ozone.om.ha.raft.server.read.leader.lease.enabled", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     startKMS();
     startCluster(conf);
