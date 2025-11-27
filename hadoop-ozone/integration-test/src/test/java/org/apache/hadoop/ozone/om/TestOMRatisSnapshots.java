@@ -50,6 +50,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import jakarta.annotation.Nonnull;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -92,7 +93,6 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1191,7 +1191,7 @@ public class TestOMRatisSnapshots {
       }
     }
 
-    @NotNull
+    @Nonnull
     private Path getCheckpointDataDir() {
       Path parentDir = tempDir.getParent();
       assertNotNull(parentDir);
