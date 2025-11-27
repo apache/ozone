@@ -210,6 +210,8 @@ public class TestBucketPut {
              && acl.getAclScope() == ACCESS)
          .findFirst()
          .orElseThrow(() -> new AssertionError("owner-id ACL not found"));
+
+    assertEquals("owner-id", ownerAcl.getName());
   }
 
   @Test
