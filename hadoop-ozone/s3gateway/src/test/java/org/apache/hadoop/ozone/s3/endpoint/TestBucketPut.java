@@ -19,24 +19,25 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -176,6 +177,35 @@ public class TestBucketPut {
 
     assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
     assertEquals(400, ex.getHttpCode());
+  }
+
+  @Test
+  public void testPutAclWithBothHeadersAndBody() throws Exception {
+    bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
+
+    // Header: READ
+    when(mockHeaders.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn("id=owner-id");
+
+    // Body: FULL_CONTROL
+    InputStream body = new ByteArrayInputStream(
+        VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
+
+    Response resp = bucketEndpoint.put(bucketName, "acl", body);
+    assertEquals(200, resp.getStatus());
+
+     OzoneBucket bucket = bucketEndpoint.getClient()
+         .getObjectStore()
+         .getS3Bucket(bucketName);
+
+     List<OzoneAcl> acls = bucket.getAcls();
+     assertFalse(acls.isEmpty());
+
+     OzoneAcl ownerAcl = acls.stream()
+         .filter(acl -> "owner-id".equals(acl.getName())
+             && acl.getAclScope() == ACCESS)
+         .findFirst()
+         .orElseThrow(() -> new AssertionError("owner-id ACL not found"));
   }
 
 }
