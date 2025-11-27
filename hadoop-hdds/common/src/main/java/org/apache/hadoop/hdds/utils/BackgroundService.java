@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.ratis.util.TimeDuration;
@@ -51,6 +52,7 @@ public abstract class BackgroundService {
   private final String threadNamePrefix;
   private final PeriodicalTask service;
   private CompletableFuture<Void> future;
+  private final Semaphore semaphore;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
@@ -70,6 +72,7 @@ public abstract class BackgroundService {
     initExecutorAndThreadGroup();
     service = new PeriodicalTask();
     this.future = CompletableFuture.completedFuture(null);
+    this.semaphore = new Semaphore(1);
   }
 
   protected CompletableFuture<Void> getFuture() {
@@ -162,7 +165,9 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      synchronized (BackgroundService.this) {
+
+      try {
+        semaphore.acquire();
         while (!tasks.isEmpty()) {
           BackgroundTask task = tasks.poll();
           future = future.thenCombine(CompletableFuture.runAsync(() -> {
@@ -186,6 +191,10 @@ public abstract class BackgroundService {
             }
           }, exec).exceptionally(e -> null), (Void1, Void) -> null);
         }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } finally {
+        semaphore.release();
       }
     }
   }
