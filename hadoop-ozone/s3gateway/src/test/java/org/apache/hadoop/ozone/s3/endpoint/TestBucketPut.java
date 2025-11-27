@@ -24,7 +24,11 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_E
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -93,7 +97,7 @@ public class TestBucketPut {
     InputStream body = new ByteArrayInputStream(VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
 
     Response resp = bucketEndpoint.put(bucketName, "acl", body);
-    Assertions.assertEquals(200, resp.getStatus());
+    assertEquals(200, resp.getStatus());
   }
 
   @Test
@@ -194,14 +198,14 @@ public class TestBucketPut {
     Response resp = bucketEndpoint.put(bucketName, "acl", body);
     assertEquals(200, resp.getStatus());
 
-     OzoneBucket bucket = bucketEndpoint.getClient()
+    OzoneBucket bucket = bucketEndpoint.getClient()
          .getObjectStore()
          .getS3Bucket(bucketName);
 
-     List<OzoneAcl> acls = bucket.getAcls();
-     assertFalse(acls.isEmpty());
+    List<OzoneAcl> acls = bucket.getAcls();
+    assertFalse(acls.isEmpty());
 
-     OzoneAcl ownerAcl = acls.stream()
+    OzoneAcl ownerAcl = acls.stream()
          .filter(acl -> "owner-id".equals(acl.getName())
              && acl.getAclScope() == ACCESS)
          .findFirst()
@@ -217,7 +221,7 @@ public class TestBucketPut {
 
     Response resp = bucketEndpoint.put(bucketName, "acl", null);
 
-    assertEquals(200, resp.getStatus());
+    Assertions.assertEquals(200, resp.getStatus());
   }
 
   @Test
@@ -230,7 +234,7 @@ public class TestBucketPut {
     OS3Exception ex = assertThrows(OS3Exception.class,
         () -> bucketEndpoint.put(bucketName, "acl", null));
 
-    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
-    assertEquals(400, ex.getHttpCode());
+    Assertions.assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+    Assertions.assertEquals(400, ex.getHttpCode());
   }
 }
