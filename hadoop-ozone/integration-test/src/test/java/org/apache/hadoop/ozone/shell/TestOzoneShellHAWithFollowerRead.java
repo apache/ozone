@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,6 +39,9 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     omHAConfig.setReadOption(RaftServerConfigKeys.Read.Option.LINEARIZABLE.name());
 
     conf.setFromObject(omHAConfig);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     startKMS();
     startCluster(conf);
   }

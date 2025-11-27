@@ -665,6 +665,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.allow.leader.non.linearizable.read</name>
+    <value>false</value>
+    <tag>OM, HA, PERFORMANCE</tag>
+    <description>
+      Allow leader to handler requests directly, no need to check the leadership
+      for every request.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.db.dirs</name>
     <value/>
     <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
