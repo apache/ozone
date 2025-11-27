@@ -98,7 +98,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void containerSampleLimit() throws ReconfigurationException {
     ReplicationManagerConfiguration config = replicationManagerConfig();
 
-    getSubject().reconfigurePropertyImpl(
+    getSubject().reconfigureProperty(
         "hdds.scm.replication.container.sample.limit",
         "120");
 
