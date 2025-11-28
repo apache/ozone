@@ -613,10 +613,10 @@ public class SnapshotDefragService extends BackgroundService
         checkpointMetadataManager = null;
         // Switch the snapshot DB location to the new version.
         previousVersion  = atomicSwitchSnapshotDB(snapshotId, checkpointLocation);
+        omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
       } finally {
         snapshotContentLocks.releaseLock();
       }
-      omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
     } finally {
       if (checkpointMetadataManager != null) {
         checkpointMetadataManager.close();

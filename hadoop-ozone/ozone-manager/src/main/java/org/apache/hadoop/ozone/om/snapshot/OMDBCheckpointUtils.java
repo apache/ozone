@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Set;
+import java.util.Collection;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.file.Counters;
@@ -55,7 +55,7 @@ public final class OMDBCheckpointUtils {
     return Boolean.parseBoolean(includeParam);
   }
 
-  public static void logEstimatedTarballSize(Path dbLocation, Set<Path> snapshotPaths) {
+  public static void logEstimatedTarballSize(Path dbLocation, Collection<Path> snapshotPaths) {
     try {
       Counters.PathCounters counters = Counters.longPathCounters();
       CountingPathVisitor visitor = new CountingPathVisitor(
