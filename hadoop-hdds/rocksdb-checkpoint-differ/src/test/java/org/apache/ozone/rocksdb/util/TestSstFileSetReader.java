@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +36,6 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.TestUtils;
@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -74,7 +75,7 @@ class TestSstFileSetReader {
    * @return Absolute path to the created SST file
    * @throws RocksDBException if there's an error during SST file creation
    */
-  private String createRandomSSTFile(TreeMap<String, Integer> keys)
+  private Path createRandomSSTFile(TreeMap<String, Integer> keys)
       throws RocksDBException {
     File file = new File(tempDir, "tmp_sst_file" + fileCounter.incrementAndGet() + ".sst");
 
@@ -94,7 +95,7 @@ class TestSstFileSetReader {
       sstFileWriter.finish();
     }
     assertTrue(file.exists());
-    return file.getAbsolutePath();
+    return file.getAbsoluteFile().toPath();
   }
 
   /**
@@ -121,8 +122,8 @@ class TestSstFileSetReader {
    * @return Pair containing the complete sorted key map and list of SST file paths
    * @throws RocksDBException if there's an error during SST file creation
    */
-  private Pair<SortedMap<String, Integer>, List<String>> createDummyData(int numberOfFiles) throws RocksDBException {
-    List<String> files = new ArrayList<>();
+  private Pair<SortedMap<String, Integer>, List<Path>> createDummyData(int numberOfFiles) throws RocksDBException {
+    List<Path> files = new ArrayList<>();
     int numberOfKeysPerFile = 1000;
     TreeMap<String, Integer> keys =
         new TreeMap<>(createKeys(0, numberOfKeysPerFile * numberOfFiles));
@@ -136,7 +137,7 @@ class TestSstFileSetReader {
       cnt += 1;
     }
     for (TreeMap<String, Integer> fileKeys : fileKeysList) {
-      String tmpSSTFile = createRandomSSTFile(fileKeys);
+      Path tmpSSTFile = createRandomSSTFile(fileKeys);
       files.add(tmpSSTFile);
     }
     return Pair.of(keys, files);
@@ -153,8 +154,8 @@ class TestSstFileSetReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException {
-    Pair<SortedMap<String, Integer>, List<String>> data = createDummyData(numberOfFiles);
-    List<String> files = data.getRight();
+    Pair<SortedMap<String, Integer>, List<Path>> data = createDummyData(numberOfFiles);
+    List<Path> files = data.getRight();
     SortedMap<String, Integer> keys = data.getLeft();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
@@ -170,15 +171,15 @@ class TestSstFileSetReader {
                     upperBound.map(u -> entry.getKey().compareTo(u) < 0)
                         .orElse(true))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        try (Stream<String> keyStream =
+        try (ClosableIterator<String> keyStream =
                  new SstFileSetReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
-          keyStream.forEach(key -> {
+          while (keyStream.hasNext()) {
+            String key = keyStream.next();
             assertEquals(1, keysInBoundary.get(key));
             assertNotNull(keysInBoundary.remove(key));
-          });
-          keysInBoundary.values()
-              .forEach(val -> assertEquals(0, val));
+          }
+          keysInBoundary.values().forEach(val -> assertEquals(0, val));
         }
       }
     }
@@ -195,9 +196,9 @@ class TestSstFileSetReader {
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
-    Pair<SortedMap<String, Integer>, List<String>> data =
+    Pair<SortedMap<String, Integer>, List<Path>> data =
         createDummyData(numberOfFiles);
-    List<String> files = data.getRight();
+    List<Path> files = data.getRight();
     SortedMap<String, Integer> keys = data.getLeft();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
@@ -213,13 +214,13 @@ class TestSstFileSetReader {
                     upperBound.map(u -> entry.getKey().compareTo(u) < 0)
                         .orElse(true))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        try (Stream<String> keyStream = new SstFileSetReader(files)
+        try (ClosableIterator<String> keyStream = new SstFileSetReader(files)
             .getKeyStreamWithTombstone(lowerBound.orElse(null),
                 upperBound.orElse(null))) {
-          keyStream.forEach(
-              key -> {
-                assertNotNull(keysInBoundary.remove(key));
-              });
+          while (keyStream.hasNext()) {
+            String key = keyStream.next();
+            assertNotNull(keysInBoundary.remove(key));
+          }
         }
         assertEquals(0, keysInBoundary.size());
       }
@@ -237,7 +238,7 @@ class TestSstFileSetReader {
     assumeTrue(numberOfFiles >= 2);
 
     // Create overlapping SST files with some duplicate keys
-    List<String> files = new ArrayList<>();
+    List<Path> files = new ArrayList<>();
     Map<String, Integer> expectedKeys = new TreeMap<>();
 
     // File 0: keys 0-9 (all valid entries)
@@ -283,8 +284,11 @@ class TestSstFileSetReader {
 
     // Read using SstFileSetReader and verify correct behavior
     List<String> actualKeys = new ArrayList<>();
-    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
-      keyStream.forEach(actualKeys::add);
+    try (ClosableIterator<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
+      while (keyStream.hasNext()) {
+        actualKeys.add(keyStream.next());
+      }
+
     }
 
     // Verify all expected keys are present and in sorted order
@@ -305,7 +309,7 @@ class TestSstFileSetReader {
       throws RocksDBException {
     assumeTrue(numberOfFiles >= 3);
 
-    List<String> files = new ArrayList<>();
+    List<Path> files = new ArrayList<>();
 
     // All files will contain the same set of keys, but we expect the last file to "win"
     String[] testKeys = {KEY_PREFIX + "duplicate1", KEY_PREFIX + "duplicate2", KEY_PREFIX + "duplicate3"};
@@ -329,8 +333,10 @@ class TestSstFileSetReader {
 
     // Read all keys
     List<String> actualKeys = new ArrayList<>();
-    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
-      keyStream.forEach(actualKeys::add);
+    try (ClosableIterator<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
+      while (keyStream.hasNext()) {
+        actualKeys.add(keyStream.next());
+      }
     }
 
     // Verify we only get each duplicate key once (not numberOfFiles times)

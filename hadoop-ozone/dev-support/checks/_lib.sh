@@ -40,13 +40,17 @@ _install_tool() {
     return
   fi
 
-  if [[ ! -d "${dir}" ]]; then
+  if [[ ! -d "${dir}" ]] || ! which "$bin" >& /dev/null; then
     mkdir -pv "${dir}"
     pushd "${dir}"
     if eval "${func}"; then
       echo "Installed ${tool} in ${dir}"
     else
-      echo "Failed to install ${tool}"
+      msg="Failed to install ${tool}"
+      echo "$msg" >&2
+      if [[ -n "${REPORT_FILE}" ]]; then
+        echo "$msg" >> "${REPORT_FILE}"
+      fi
       exit 1
     fi
     popd

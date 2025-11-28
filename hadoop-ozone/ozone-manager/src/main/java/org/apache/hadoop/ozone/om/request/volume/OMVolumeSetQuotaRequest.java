@@ -120,25 +120,22 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume));
       acquireVolumeLock = getOmLockDetails().isLockAcquired();
 
-      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs.Builder builder = getVolumeInfo(omMetadataManager, volume).toBuilder();
       if (checkQuotaBytesValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInBytes(), volume)) {
-        omVolumeArgs.setQuotaInBytes(
+        builder.setQuotaInBytes(
             setVolumePropertyRequest.getQuotaInBytes());
-      } else {
-        omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
       if (checkQuotaNamespaceValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInNamespace(), volume)) {
-        omVolumeArgs.setQuotaInNamespace(
+        builder.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
-      } else {
-        omVolumeArgs.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
       }
 
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-      omVolumeArgs.setModificationTime(
-          setVolumePropertyRequest.getModificationTime());
+      OmVolumeArgs omVolumeArgs = builder
+          .setModificationTime(setVolumePropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(

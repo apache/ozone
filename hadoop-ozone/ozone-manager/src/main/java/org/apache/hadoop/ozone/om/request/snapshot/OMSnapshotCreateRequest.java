@@ -32,7 +32,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -167,12 +166,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
 
-      // Note down RDB latest transaction sequence number, which is used
-      // as snapshot generation in the Differ.
-      final long dbLatestSequenceNumber =
-          ((RDBStore) omMetadataManager.getStore()).getDb()
-              .getLatestSequenceNumber();
-      snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
       ByteString txnBytes = TransactionInfo.valueOf(context.getTermIndex()).toByteString();
       snapshotInfo.setCreateTransactionInfo(txnBytes);
       snapshotInfo.setLastTransactionInfo(txnBytes);

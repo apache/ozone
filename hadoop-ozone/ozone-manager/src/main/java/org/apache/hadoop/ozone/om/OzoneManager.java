@@ -288,6 +288,7 @@ import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -3573,6 +3574,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+
+    // Note: Any OM (leader or follower) can run snapshot defrag
+
+    final UserGroupInformation ugi = getRemoteUser();
+    // Check Ozone admin privilege
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to trigger "
+          + "snapshot defragmentation manually", PERMISSION_DENIED);
+    }
+
+    // Get the SnapshotDefragService from KeyManager
+    final SnapshotDefragService defragService = keyManager.getSnapshotDefragService();
+    if (defragService == null) {
+      throw new OMException("Snapshot defragmentation service is not initialized",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Trigger Snapshot Defragmentation
+    if (noWait) {
+      final Thread t = new Thread(() -> {
+        try {
+          defragService.triggerSnapshotDefragOnce();
+        } catch (Exception e) {
+          LOG.error("Error during snapshot defragmentation", e);
+        }
+      }, threadPrefix + "SnapshotDefragTrigger-" + System.currentTimeMillis());
+      t.start();
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation without waiting"
+          + " in a new thread, tid = {}", ugi, t.getId());
+      return true;
+    } else {
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation and is waiting", ugi);
+      return defragService.triggerSnapshotDefragOnce();
+    }
+  }
+
   @Override
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException {
@@ -4735,7 +4773,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Add to cache.
       metadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(dbVolumeKey),
-          CacheValue.get(transactionID, omVolumeArgs));
+          CacheValue.get(DEFAULT_OM_UPDATE_ID, omVolumeArgs));
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
           CacheValue.get(transactionID, userVolumeInfo));
@@ -5194,10 +5232,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins =
-        OzoneAdmins.getOzoneAdminsFromConfig(getConfiguration(),
-            omStarterUser);
+        OzoneAdmins.getOzoneAdminsFromConfigValue(newVal, omStarterUser);
     omAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
@@ -5205,9 +5241,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneReadOnlyAdmins(String newVal) {
-    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
     Collection<String> pReadOnlyAdmins =
-        OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(getConfiguration());
+        OzoneAdmins.getOzoneReadOnlyAdminsFromConfigValue(newVal);
     readOnlyAdmins.setAdminUsernames(pReadOnlyAdmins);
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
@@ -5217,7 +5252,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String reconfOzoneKeyDeletingLimitPerTask(String newVal) {
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
-    getConfiguration().set(OZONE_KEY_DELETING_LIMIT_PER_TASK, newVal);
 
     getKeyManager().getDeletingService()
         .setKeyLimitPerTask(Integer.parseInt(newVal));
@@ -5231,14 +5265,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
-    getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
     return newVal;
   }
 
   private String reconfOzoneThreadNumberDirDeletion(String newVal) {
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
-    getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
     return newVal;
   }
 

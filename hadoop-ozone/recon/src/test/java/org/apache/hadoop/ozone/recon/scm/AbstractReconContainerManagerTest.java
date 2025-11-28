@@ -104,7 +104,7 @@ public class AbstractReconContainerManagerTest {
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        Clock.system(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()), null);
 
     containerManager = new ReconContainerManager(
         conf,

@@ -91,7 +91,7 @@ public class TestKeyValueContainerData {
     statistics.updateRead(10);
     statistics.incrementBlockCount();
     kvData.updateWriteStats(10, true);
-    kvData.incrPendingDeletionBlocks(1);
+    kvData.incrPendingDeletionBlocks(1, 256);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
     long expectedDataHash =  1234L;

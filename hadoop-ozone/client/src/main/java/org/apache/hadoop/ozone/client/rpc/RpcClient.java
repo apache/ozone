@@ -1625,8 +1625,8 @@ public class RpcClient implements ClientProtocol {
             .setParentObjectID(keyInfo.getParentObjectID())
             .setFileChecksum(keyInfo.getFileChecksum())
             .setOwnerName(keyInfo.getOwnerName())
+            .addAllMetadata(keyInfo.getMetadata())
             .build();
-        dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 
         blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));

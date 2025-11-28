@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -763,7 +764,7 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setSize(next.getDataSize());
     String eTag = next.getMetadata().get(ETAG);
     if (eTag != null) {
-      keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
+      keyMetadata.setETag(wrapInQuotes(eTag));
     }
     keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
         next.getReplicationConfig()).toString());

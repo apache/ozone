@@ -77,11 +77,6 @@ public class TestSCMInstallSnapshotWithHA {
   private static final long SNAPSHOT_THRESHOLD = 5;
   private static final int LOG_PURGE_GAP = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -101,9 +96,6 @@ public class TestSCMInstallSnapshotWithHA {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {

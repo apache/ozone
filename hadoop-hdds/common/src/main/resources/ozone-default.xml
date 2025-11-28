@@ -702,6 +702,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs.permissions</name>
     <value>750</value>
     <description>
@@ -4852,5 +4860,10 @@
     <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
     <value>10000</value>
     <description>Maximum number of lock objects that could be present in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.local.data.manager.service.interval</name>
+    <value>5m</value>
+    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
 </configuration>
