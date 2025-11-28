@@ -33,7 +33,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -53,8 +52,8 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
-import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -159,10 +158,9 @@ public class SnapshotDefragService extends BackgroundService
     if (tmpDefragDirPath.toFile().exists()) {
       deleteDirectory(tmpDefragDirPath);
     }
-    createDirectories(tmpDefragDirPath);
     this.tmpDefragDir = tmpDefragDirPath.toString();
     this.differTmpDir = tmpDefragDirPath.resolve("differSstFiles");
-
+    createDirectories(differTmpDir);
     this.deltaDiffComputer = new CompositeDeltaDiffComputer(omSnapshotManager,
         ozoneManager.getMetadataManager(), differTmpDir, (status) -> {
       LOG.debug("Snapshot defragmentation diff status: {}", status);
@@ -184,6 +182,10 @@ public class SnapshotDefragService extends BackgroundService
   @VisibleForTesting
   public void resume() {
     running.set(true);
+  }
+
+  boolean isRunning() {
+    return running.get();
   }
 
   /**
@@ -263,8 +265,8 @@ public class SnapshotDefragService extends BackgroundService
   void performFullDefragmentation(DBStore checkpointDBStore, TablePrefixInfo prefixInfo,
       Set<String> incrementalTables) throws IOException {
     for (String table : incrementalTables) {
-      Table<String, byte[]> checkpointTable = checkpointDBStore.getTable(table, StringCodec.get(),
-          ByteArrayCodec.get());
+      Table<String, CodecBuffer> checkpointTable = checkpointDBStore.getTable(table, StringCodec.get(),
+          CodecBufferCodec.get(true));
       String tableBucketPrefix = prefixInfo.getTablePrefix(table);
       String prefixUpperBound = getLexicographicallyHigherString(tableBucketPrefix);
 
@@ -287,7 +289,8 @@ public class SnapshotDefragService extends BackgroundService
       // Compact the table completely with kForce to get rid of tombstones.
       try (ManagedCompactRangeOptions compactRangeOptions = new ManagedCompactRangeOptions()) {
         compactRangeOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
-        compactRangeOptions.setExclusiveManualCompaction(true);
+        // Need to allow the range tombstones to change levels and get propogated to bottommost level.
+        compactRangeOptions.setChangeLevel(true);
         checkpointDBStore.compactTable(table, compactRangeOptions);
       }
     }
@@ -308,9 +311,9 @@ public class SnapshotDefragService extends BackgroundService
    *         indicating whether any delta entries were written (true if there are differences, false otherwise)
    * @throws IOException if an I/O error occurs during processing
    */
-  @VisibleForTesting
-  Pair<Path, Boolean> spillTableDiffIntoSstFile(List<Path> deltaFilePaths, Table<String, byte[]> snapshotTable,
-      Table<String, byte[]> previousSnapshotTable, String tableKeyPrefix) throws IOException {
+  private Pair<Path, Boolean> spillTableDiffIntoSstFile(List<Path> deltaFilePaths,
+      Table<String, CodecBuffer> snapshotTable, Table<String, CodecBuffer> previousSnapshotTable,
+      String tableKeyPrefix) throws IOException {
     String sstFileReaderUpperBound = null;
     if (Strings.isNotEmpty(tableKeyPrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tableKeyPrefix);
@@ -321,22 +324,28 @@ public class SnapshotDefragService extends BackgroundService
     int deltaEntriesCount = 0;
     try (ClosableIterator<String> keysToCheck =
              sstFileSetReader.getKeyStreamWithTombstone(tableKeyPrefix, sstFileReaderUpperBound);
-         TableMergeIterator<String, byte[]> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
+         TableMergeIterator<String, CodecBuffer> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
              tableKeyPrefix, snapshotTable, previousSnapshotTable);
          RDBSstFileWriter rdbSstFileWriter = new RDBSstFileWriter(fileToBeIngested.toFile())) {
       while (tableMergeIterator.hasNext()) {
-        Table.KeyValue<String, List<byte[]>> kvs = tableMergeIterator.next();
+        Table.KeyValue<String, List<CodecBuffer>> kvs = tableMergeIterator.next();
         // Check if the values are equal or if they are not equal then the value should be written to the
         // delta sstFile.
-        if (!Arrays.equals(kvs.getValue().get(0), kvs.getValue().get(1))) {
-          try (CodecBuffer key = StringCodec.get().toHeapCodecBuffer(kvs.getKey())) {
-            byte[] keyArray = key.asReadOnlyByteBuffer().array();
-            byte[] val = kvs.getValue().get(0);
+        CodecBuffer snapValue = kvs.getValue().get(0);
+        CodecBuffer prevValue = kvs.getValue().get(1);
+        boolean valuesEqual = false;
+        if (snapValue == null && prevValue == null) {
+          valuesEqual = true;
+        } else if (snapValue != null && prevValue != null) {
+          valuesEqual = snapValue.readableBytes() == prevValue.readableBytes() && snapValue.startsWith(prevValue);
+        }
+        if (!valuesEqual) {
+          try (CodecBuffer key = StringCodec.get().toDirectCodecBuffer(kvs.getKey())) {
             // If the value is null then add a tombstone to the delta sstFile.
-            if (val == null) {
-              rdbSstFileWriter.delete(keyArray);
+            if (snapValue == null) {
+              rdbSstFileWriter.delete(key);
             } else {
-              rdbSstFileWriter.put(keyArray, val);
+              rdbSstFileWriter.put(key, snapValue);
             }
           }
           deltaEntriesCount++;
@@ -397,10 +406,10 @@ public class SnapshotDefragService extends BackgroundService
           // file can reingested into the checkpointStore.
           fileToBeIngested = deltaFiles.get(0);
         } else {
-          Table<String, byte[]> snapshotTable = snapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), ByteArrayCodec.get());
-          Table<String, byte[]> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), ByteArrayCodec.get());
+          Table<String, CodecBuffer> snapshotTable = snapshot.get().getMetadataManager().getStore()
+              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
+          Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
+              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
           String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
           Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
               previousSnapshotTable, tableBucketPrefix);
@@ -439,8 +448,8 @@ public class SnapshotDefragService extends BackgroundService
    * @throws IOException if an I/O error occurs during table ingestion or file operations.
    */
   @VisibleForTesting
-  void ingestNonIncrementalTables(DBStore checkpointDBStore,
-      SnapshotInfo snapshotInfo, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables) throws IOException {
+  void ingestNonIncrementalTables(DBStore checkpointDBStore, SnapshotInfo snapshotInfo,
+      TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables) throws IOException {
     String volumeName = snapshotInfo.getVolumeName();
     String bucketName = snapshotInfo.getBucketName();
     String snapshotName = snapshotInfo.getName();
@@ -455,12 +464,14 @@ public class SnapshotDefragService extends BackgroundService
               + SST_FILE_EXTENSION);
           filesToBeDeleted.add(tmpSstFile);
           String prefix = bucketPrefixInfo.getTablePrefix(snapshotTableName);
-          byte[] prefixBytes = Strings.isBlank(prefix) ? null : StringCodec.get().toPersistedFormat(prefix);
-          Table<byte[], byte[]> snapshotTableBytes = snapshotDBStore.getTable(snapshotTableName, ByteArrayCodec.get(),
-              ByteArrayCodec.get());
-          snapshotTableBytes.dumpToFileWithPrefix(tmpSstFile.toFile(), prefixBytes);
-          Table<byte[], byte[]> checkpointTable = checkpointDBStore.getTable(snapshotTableName, ByteArrayCodec.get(),
-              ByteArrayCodec.get());
+          try (CodecBuffer prefixBytes = Strings.isBlank(prefix) ? null :
+              StringCodec.get().toDirectCodecBuffer(prefix)) {
+            Table<CodecBuffer, CodecBuffer> snapshotTableBytes = snapshotDBStore.getTable(snapshotTableName,
+                CodecBufferCodec.get(true), CodecBufferCodec.get(true));
+            snapshotTableBytes.dumpToFileWithPrefix(tmpSstFile.toFile(), prefixBytes);
+          }
+          Table<CodecBuffer, CodecBuffer> checkpointTable = checkpointDBStore.getTable(snapshotTableName,
+              CodecBufferCodec.get(true), CodecBufferCodec.get(true));
           checkpointTable.loadFromFile(tmpSstFile.toFile());
         }
       }
@@ -572,7 +583,8 @@ public class SnapshotDefragService extends BackgroundService
     LOG.debug("Acquired MultiSnapshotLocks on snapshot: {}", snapshotID);
   }
 
-  private boolean checkAndDefragSnapshot(SnapshotChainManager chainManager, UUID snapshotId) throws IOException {
+  @VisibleForTesting
+  boolean checkAndDefragSnapshot(SnapshotChainManager chainManager, UUID snapshotId) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, snapshotId);
 
     if (snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
