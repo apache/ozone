@@ -77,8 +77,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
@@ -456,8 +454,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final ReplicationConfigValidator replicationConfigValidator;
 
-  private boolean allowListAllVolumes;
-
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
   private final ScmClient scmClient;
@@ -528,7 +524,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
-            .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
                 this::reconfOzoneSnapshotSSTFilteringServiceInterval)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
@@ -872,13 +867,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void setInstanceVariablesFromConf() {
     this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
-    setAllowListAllVolumesFromConfig();
-  }
-
-  public void setAllowListAllVolumesFromConfig() {
-    allowListAllVolumes = configuration.getBoolean(
-        OZONE_OM_VOLUME_LISTALL_ALLOWED,
-        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   /**
@@ -2766,10 +2754,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean getAclsEnabled() {
     return isAclEnabled;
-  }
-
-  public boolean getAllowListAllVolumes() {
-    return allowListAllVolumes;
   }
 
   public UncheckedAutoCloseableSupplier<IOmMetadataReader> getOmMetadataReader() {
@@ -5256,12 +5240,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getKeyManager().getDeletingService()
         .setKeyLimitPerTask(Integer.parseInt(newVal));
     return newVal;
-  }
-
-  private String reconfigureAllowListAllVolumes(String newVal) {
-    getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
-    setAllowListAllVolumesFromConfig();
-    return String.valueOf(allowListAllVolumes);
   }
 
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
