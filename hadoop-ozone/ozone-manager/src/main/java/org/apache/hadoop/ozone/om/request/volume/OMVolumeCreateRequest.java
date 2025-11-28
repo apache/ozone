@@ -167,7 +167,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
             ozoneManager.getConfig());
         // ACLs from VolumeArgs
-        if (omVolumeArgs.getAcls() != null) {
+        if (omVolumeArgs.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
           listOfAcls.addAll(omVolumeArgs.getAcls());
         }
         // Remove the duplicates
