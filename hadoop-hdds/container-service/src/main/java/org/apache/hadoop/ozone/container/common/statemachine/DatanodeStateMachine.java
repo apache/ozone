@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdfs.util.EnumCounters;
@@ -796,28 +797,9 @@ public class DatanodeStateMachine implements Closeable {
    * Resize the executor based on the number of active endpoint tasks.
    */
   public void resizeExecutor(int size) {
-    if (size <= 0) {
-      LOG.warn("Executor pool size cannot be resized to {}", size);
-      return;
-    }
-
     if (executorService instanceof ThreadPoolExecutor) {
       ThreadPoolExecutor tpe = (ThreadPoolExecutor) executorService;
-      int currentCorePoolSize = tpe.getCorePoolSize();
-
-      // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
-      // equal to the corePoolSize. We must make sure this invariant holds when
-      // changing the pool size. Therefore, we take into account whether the
-      // new size is greater or smaller than the current core pool size.
-      if (size > currentCorePoolSize) {
-        LOG.info("DatanodeStateMachine pool size has been increased from {} to {}", currentCorePoolSize, size);
-        tpe.setMaximumPoolSize(size);
-        tpe.setCorePoolSize(size);
-      } else if (size < currentCorePoolSize) {
-        LOG.info("DatanodeStateMachine pool size has been reduced from {} to {}", currentCorePoolSize, size);
-        tpe.setCorePoolSize(size);
-        tpe.setMaximumPoolSize(size);
-      }
+      HddsServerUtil.setPoolSize(tpe, size, LOG);
     }
   }
 }
