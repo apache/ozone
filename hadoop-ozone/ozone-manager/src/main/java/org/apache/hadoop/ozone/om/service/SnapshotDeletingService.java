@@ -119,7 +119,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.lockIds = new ArrayList<>(2);
   }
 
-  private class SnapshotDeletingTask implements BackgroundTask {
+  private class SnapshotDeletingTask extends BackgroundTask {
 
     @SuppressWarnings("checkstyle:MethodLength")
     @Override

@@ -60,19 +60,19 @@ import org.slf4j.LoggerFactory;
 /**
  * BlockDeletingTask for KeyValueContainer.
  */
-public class BlockDeletingTask implements BackgroundTask {
+public class BlockDeletingTask extends BackgroundTask {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(BlockDeletingTask.class);
+  private static final long serialVersionUID = 1L;
+  private static final Logger LOG = LoggerFactory.getLogger(BlockDeletingTask.class);
 
-  private final BlockDeletingServiceMetrics metrics;
+  private final transient BlockDeletingServiceMetrics metrics;
   private final int priority;
-  private final KeyValueContainerData containerData;
+  private final transient KeyValueContainerData containerData;
   private long blocksToDelete;
-  private final OzoneContainer ozoneContainer;
-  private final ConfigurationSource conf;
+  private final transient OzoneContainer ozoneContainer;
+  private final transient ConfigurationSource conf;
   private Duration blockDeletingMaxLockHoldingTime;
-  private final ContainerChecksumTreeManager checksumTreeManager;
+  private final transient ContainerChecksumTreeManager checksumTreeManager;
 
   public BlockDeletingTask(
       BlockDeletingService blockDeletingService,

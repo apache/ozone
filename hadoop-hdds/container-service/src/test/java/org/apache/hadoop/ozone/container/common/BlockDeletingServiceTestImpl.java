@@ -68,7 +68,7 @@ class BlockDeletingServiceTestImpl extends BlockDeletingService {
   // Override the implementation to start a single on-call control thread.
   @Override
   public void start() {
-    PeriodicalTask svc = new PeriodicalTask();
+    PeriodicalTask svc = new PeriodicalTask(1);
     // In test mode, relies on a latch countdown to runDeletingTasks tasks.
     Runnable r = () -> {
       while (true) {

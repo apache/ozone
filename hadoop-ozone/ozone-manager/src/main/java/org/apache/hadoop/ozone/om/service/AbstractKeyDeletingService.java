@@ -106,6 +106,30 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return true;
   }
 
+  private static final class BackgroundDeleteTask extends BackgroundTask {
+    private static final long serialVersionUID = 1L;
+
+    private final transient BootstrapStateHandler.Lock bootstrapLock;
+    private final BackgroundTask task;
+
+    private BackgroundDeleteTask(BootstrapStateHandler.Lock bootstrapLock, BackgroundTask task) {
+      this.bootstrapLock = bootstrapLock;
+      this.task = task;
+    }
+
+    @Override
+    public BackgroundTaskResult call() throws Exception {
+      try (UncheckedAutoCloseable readLock = bootstrapLock.acquireReadLock()) {
+        return task.call();
+      }
+    }
+
+    @Override
+    public int getPriority() {
+      return task.getPriority();
+    }
+  }
+
   /**
    * A specialized implementation of {@link BackgroundTaskQueue} that modifies
    * the behavior of added tasks to utilize a read lock during execution.
@@ -119,20 +143,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   public class DeletingServiceTaskQueue extends BackgroundTaskQueue {
     @Override
     public synchronized void add(BackgroundTask task) {
-      super.add(new BackgroundTask() {
-
-        @Override
-        public BackgroundTaskResult call() throws Exception {
-          try (UncheckedAutoCloseable readLock = getBootstrapStateLock().acquireReadLock()) {
-            return task.call();
-          }
-        }
-
-        @Override
-        public int getPriority() {
-          return task.getPriority();
-        }
-      });
+      super.add(new BackgroundDeleteTask(lock, task));
     }
   }
 

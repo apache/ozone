@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService.DirDeletingTask;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -226,8 +227,8 @@ public class TestDirectoryDeletingService {
             return future;
           });
       ozoneManager.getKeyManager().getDirDeletingService().suspend();
-      DirectoryDeletingService.DirDeletingTask dirDeletingTask =
-          ozoneManager.getKeyManager().getDirDeletingService().new DirDeletingTask(null);
+      DirDeletingTask dirDeletingTask = new DirDeletingTask(null, false,
+          ozoneManager.getKeyManager().getDirDeletingService());
 
       dirDeletingTask.processDeletedDirsForStore(null, ozoneManager.getKeyManager(), 1, 6000);
       assertThat(futureList).hasSize(threadCount);
