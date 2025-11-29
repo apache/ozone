@@ -667,28 +667,30 @@ public final class RocksDatabase implements Closeable {
   }
 
   public void dropColumnFamily(String tableName) throws RocksDatabaseException {
-    ColumnFamily columnFamily = columnFamilies.get(tableName);
-    if (columnFamily != null) {
-      try {
-        getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
-        byte[] handleNameBytes = columnFamily.getHandle().getName();
-        ColumnFamilyDescriptor descriptor = null;
-        for (int i = 0; i < descriptors.size(); i++) {
-          ColumnFamilyDescriptor desc = descriptors.get(i);
-          if (Arrays.equals(desc.getName(), handleNameBytes)) {
-            descriptor = desc;
-            descriptors.remove(i);
-            break;
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      ColumnFamily columnFamily = columnFamilies.get(tableName);
+      if (columnFamily != null) {
+        try {
+          getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+          byte[] handleNameBytes = columnFamily.getHandle().getName();
+          ColumnFamilyDescriptor descriptor = null;
+          for (int i = 0; i < descriptors.size(); i++) {
+            ColumnFamilyDescriptor desc = descriptors.get(i);
+            if (Arrays.equals(desc.getName(), handleNameBytes)) {
+              descriptor = desc;
+              descriptors.remove(i);
+              break;
+            }
           }
+          columnFamily.getHandle().close();
+          if (descriptor != null) {
+            RocksDatabase.close(descriptor);
+          }
+          columnFamilies.remove(tableName);
+        } catch (RocksDBException e) {
+          closeOnError(e);
+          throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
         }
-        columnFamily.getHandle().close();
-        if (descriptor != null) {
-          RocksDatabase.close(descriptor);
-        }
-        columnFamilies.remove(tableName);
-      } catch (RocksDBException e) {
-        closeOnError(e);
-        throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
       }
     }
   }
