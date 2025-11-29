@@ -41,7 +41,7 @@
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.39.2</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.82</bouncycastle.version>
+    <bouncycastle.version>1.83</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
