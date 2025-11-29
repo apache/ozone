@@ -256,7 +256,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     final long diff = position + length - requestedLength;
     if (diff > 0) {
       final long rounded = roundUp(diff + preReadSize, responseDataSize);
-      LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
+      LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
           position, length, requestedLength, diff, rounded, preReadSize);
       readBlockImpl(rounded);
       requestedLength += rounded;
