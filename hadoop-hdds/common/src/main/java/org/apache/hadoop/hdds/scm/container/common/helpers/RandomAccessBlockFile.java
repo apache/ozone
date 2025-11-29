@@ -59,9 +59,15 @@ public class RandomAccessBlockFile {
     }
   }
 
-  public synchronized int read(ByteBuffer buffer) throws IOException {
+  public synchronized boolean read(ByteBuffer buffer) throws IOException {
     Preconditions.assertTrue(isOpen(), "Not opened");
-    return channel.read(buffer);
+    while (buffer.hasRemaining()) {
+      final int r = channel.read(buffer);
+      if (r == -1) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public synchronized void close() {

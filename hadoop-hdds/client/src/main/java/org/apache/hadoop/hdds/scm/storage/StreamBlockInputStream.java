@@ -187,6 +187,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
     closeStream();
     position = pos;
+    requestedLength = pos;
   }
 
   @Override
@@ -255,7 +256,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     final long diff = position + length - requestedLength;
     if (diff > 0) {
       final long rounded = roundUp(diff + preReadSize, responseDataSize);
-      LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
+      LOG.info("XXX position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
           position, length, requestedLength, diff, rounded, preReadSize);
       readBlockImpl(rounded);
       requestedLength += rounded;
@@ -323,6 +324,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final CompletableFuture<Void> future = new CompletableFuture<>();
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
+
+    void clear() {
+      responseQueue.clear();
+    }
 
     void checkError() throws IOException {
       if (future.isCompletedExceptionally()) {
