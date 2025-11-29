@@ -325,10 +325,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
 
-    void clear() {
-      responseQueue.clear();
-    }
-
     void checkError() throws IOException {
       if (future.isCompletedExceptionally()) {
         try {
