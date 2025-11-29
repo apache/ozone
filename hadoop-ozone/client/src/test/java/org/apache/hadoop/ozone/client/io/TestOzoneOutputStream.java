@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Map;
@@ -52,6 +53,16 @@ public class TestOzoneOutputStream {
     public Map<String, String> getMetadata() {
       return metadata;
     }
+
+    @Override
+    public void flush() {
+      // avoid KeyOutputStream.flush() using null semaphore
+    }
+
+    @Override
+    public void close() {
+      // avoid real close logic touching internal state
+    }
   }
 
   /**
@@ -74,21 +85,21 @@ public class TestOzoneOutputStream {
    * test Plain KeyOutputStream and getMetadata() (no encryption).
    */
   @Test
-  public void testPlainKeyOutputStream() {
+  public void testPlainKeyOutputStream() throws IOException {
     Map<String, String> metadata = Collections.singletonMap("k1", "v1");
 
     FakeKeyOutputStream key = new FakeKeyOutputStream(metadata);
-    OzoneOutputStream ozone = new OzoneOutputStream(key, null);
-
-    assertNotNull(ozone.getKeyOutputStream());
-    assertEquals("v1", ozone.getMetadata().get("k1"));
+    try (OzoneOutputStream ozone = new OzoneOutputStream(key, null)) {
+      assertNotNull(ozone.getKeyOutputStream());
+      assertEquals("v1", ozone.getMetadata().get("k1"));
+    }
   }
 
   /**
    * test getKeyOutputStream and getMetadata() wrapped inside CryptoOutputStream.
    */
   @Test
-  public void testCryptoWrapped() {
+  public void testCryptoWrapped() throws IOException {
     Map<String, String> metadata = Collections.singletonMap("k1", "v1");
 
     FakeKeyOutputStream key = new FakeKeyOutputStream(metadata);
@@ -99,34 +110,34 @@ public class TestOzoneOutputStream {
     CryptoOutputStream crypto = mock(CryptoOutputStream.class);
     when(crypto.getWrappedStream()).thenReturn(key);
 
-    OzoneOutputStream ozone = new OzoneOutputStream(crypto, null);
-
-    assertNotNull(ozone.getKeyOutputStream());
-    assertEquals("v1", ozone.getMetadata().get("k1"));
+    try (OzoneOutputStream ozone = new OzoneOutputStream(crypto, null)) {
+      assertNotNull(ozone.getKeyOutputStream());
+      assertEquals("v1", ozone.getMetadata().get("k1"));
+    }
   }
 
   /**
    * test getKeyOutputStream and getMetadata() wrapped inside CipherOutputStreamOzone.
    */
   @Test
-  public void testCipherWrapped() {
+  public void testCipherWrapped() throws IOException {
     Map<String, String> metadata = Collections.singletonMap("k1", "v1");
 
     FakeKeyOutputStream key = new FakeKeyOutputStream(metadata);
     FakeCipherOutputStreamOzone cipher =
         new FakeCipherOutputStreamOzone(key);
 
-    OzoneOutputStream ozone = new OzoneOutputStream(cipher, null);
-
-    assertNotNull(ozone.getKeyOutputStream());
-    assertEquals("v1", ozone.getMetadata().get("k1"));
+    try (OzoneOutputStream ozone = new OzoneOutputStream(cipher, null)) {
+      assertNotNull(ozone.getKeyOutputStream());
+      assertEquals("v1", ozone.getMetadata().get("k1"));
+    }
   }
 
   /**
    * test for Non-KeyMetadataAware stream verify that exception is thrown here.
    */
   @Test
-  public void testNonKeyMetadataAwareThrows() {
+  public void testNonKeyMetadataAwareThrows() throws IOException {
     OutputStream nonMeta = new OutputStream() {
       @Override
       public void write(int b) {
@@ -134,8 +145,8 @@ public class TestOzoneOutputStream {
       }
     };
 
-    OzoneOutputStream ozone = new OzoneOutputStream(nonMeta, null);
-
-    assertThrows(IllegalStateException.class, ozone::getMetadata);
+    try (OzoneOutputStream ozone = new OzoneOutputStream(nonMeta, null)) {
+      assertThrows(IllegalStateException.class, ozone::getMetadata);
+    }
   }
 }
