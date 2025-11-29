@@ -49,6 +49,20 @@ public interface HierarchicalResourceLockManager extends AutoCloseable {
   HierarchicalResourceLock acquireWriteLock(DAGLeveledResource resource, String key) throws IOException;
 
   /**
+   * Acquires a write lock on the specified hierarchical resource.
+   * This method is typically used for managing write operations on resources
+   * that are part of a directed acyclic graph (DAG) structure, ensuring a
+   * deterministic and deadlock-free locking order.
+   *
+   * @param resource the {@code DAGLeveledResource} representing the hierarchical
+   *                 resource for which the write lock is to be acquired
+   * @return a {@code HierarchicalResourceLock} instance to manage the lifecycle
+   *         of the acquired lock for the specified resource
+   * @throws IOException if an I/O error occurs during the lock acquisition process
+   */
+  HierarchicalResourceLock acquireResourceWriteLock(DAGLeveledResource resource) throws IOException;
+
+  /**
    * Retrieves a stream of all currently locked resources in the system by the thread calling this method.
    *
    * @return a stream of {@code DAGLeveledResource} representing the resources that are currently locked

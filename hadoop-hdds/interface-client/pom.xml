@@ -96,10 +96,9 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
-              <includes>
-                <include>hdds.proto</include>
-                <include>ReconfigureProtocol.proto</include>
-              </includes>
+              <excludes>
+                <exclude>DatanodeClientProtocol.proto</exclude>
+              </excludes>
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf2.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>

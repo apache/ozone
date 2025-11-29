@@ -352,12 +352,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     // get snapshotInfo entries
-    OmMetadataManagerImpl checkpointMetadataManager =
+    try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        iterator = checkpointMetadataManager
-        .getSnapshotInfoTable().iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            iterator = checkpointMetadataManager
+            .getSnapshotInfoTable().iterator()) {
 
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
@@ -371,8 +371,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           snapshotPaths.add(path);
         }
       }
-    } finally {
-      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }

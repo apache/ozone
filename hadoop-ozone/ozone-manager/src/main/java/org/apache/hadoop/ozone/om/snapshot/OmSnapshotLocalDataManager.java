@@ -69,13 +69,11 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.CheckedSupplier;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,8 +109,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private final MutableGraph<LocalDataVersionNode> localDataGraph;
   private final Map<UUID, SnapshotVersionsMeta> versionNodeMap;
   private final OMMetadataManager omMetadataManager;
-  // Used for acquiring locks on the entire data structure.
-  private final ReadWriteLock fullLock;
   // Used for taking a lock on internal data structure Map and Graph to ensure thread safety;
   private final ReadWriteLock internalLock;
   // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
@@ -136,9 +132,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       }
     };
     this.versionNodeMap = new ConcurrentHashMap<>();
-    this.fullLock = new ReentrantReadWriteLock();
     this.internalLock = new ReentrantReadWriteLock();
     init(configuration, snapshotChainManager, omLayoutVersionManager, defaultSnapProvider);
+  }
+
+  public Map<UUID, SnapshotVersionsMeta> getVersionNodeMapUnmodifiable() {
+    return Collections.unmodifiableMap(versionNodeMap);
   }
 
   @VisibleForTesting
@@ -224,8 +223,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return new WritableOmSnapshotLocalDataProvider(snapshotId, previousSnapshotId);
   }
 
-  public WritableOmSnapshotLocalDataProvider getWritableOmSnapshotLocalData(UUID snapshotId)
-      throws IOException {
+  public WritableOmSnapshotLocalDataProvider getWritableOmSnapshotLocalData(UUID snapshotId) throws IOException {
     return new WritableOmSnapshotLocalDataProvider(snapshotId);
   }
 
@@ -448,19 +446,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    * @return an instance of {@code UncheckedAutoCloseableSupplier<OMLockDetails>} representing
    *         the acquired lock details, where the lock will automatically be released on close.
    */
-  public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
-    this.fullLock.writeLock().lock();
-    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
-      @Override
-      public OMLockDetails get() {
-        return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
-      }
-
-      @Override
-      public void close() {
-        fullLock.writeLock().unlock();
-      }
-    };
+  public HierarchicalResourceLock lock() throws IOException {
+    return locks.acquireResourceWriteLock(SNAPSHOT_LOCAL_DATA_LOCK);
   }
 
   private void validateVersionRemoval(UUID snapshotId, int version) throws IOException {
@@ -831,18 +818,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
       super(snapshotId, false);
-      fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId, UUID snapshotIdToBeResolved) throws IOException {
       super(snapshotId, false, null, snapshotIdToBeResolved, true);
-      fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
       super(snapshotId, false, snapshotLocalDataSupplier, null, false);
-      fullLock.readLock().lock();
     }
 
     private SnapshotVersionsMeta validateModification(OmSnapshotLocalData snapshotLocalData)
@@ -1005,7 +989,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     @Override
     public void close() throws IOException {
       super.close();
-      fullLock.readLock().unlock();
     }
   }
 
