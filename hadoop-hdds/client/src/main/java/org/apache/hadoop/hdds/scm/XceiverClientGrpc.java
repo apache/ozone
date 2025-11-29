@@ -63,6 +63,7 @@ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -384,25 +385,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         });
   }
 
-  private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<Validator> validators)
-      throws IOException {
-    ContainerCommandResponseProto responseProto = null;
-    IOException ioException = null;
-
-    // In case of an exception or an error, we will try to read from the
-    // datanodes in the pipeline in a round-robin fashion.
-    XceiverClientReply reply = new XceiverClientReply(null);
+  private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
     List<DatanodeDetails> datanodeList = null;
-
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
+    DatanodeBlockID blockID = getRequestBlockID(request);
 
     if (blockID != null) {
       if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
@@ -440,6 +425,33 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     if (!allInService) {
       datanodeList = sortDatanodeByOperationalState(datanodeList);
     }
+    return datanodeList;
+  }
+
+  private static DatanodeBlockID getRequestBlockID(ContainerCommandRequestProto request) {
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
+      blockID = request.getReadBlock().getBlockID();
+    }
+    return blockID;
+  }
+
+  private XceiverClientReply sendCommandWithRetry(
+      ContainerCommandRequestProto request, List<Validator> validators)
+      throws IOException {
+    ContainerCommandResponseProto responseProto = null;
+    IOException ioException = null;
+
+    // In case of an exception or an error, we will try to read from the
+    // datanodes in the pipeline in a round-robin fashion.
+    XceiverClientReply reply = new XceiverClientReply(null);
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
 
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -495,13 +507,73 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
-                processForDebug(request), pipeline);
+            processForDebug(request), pipeline);
       } else {
         LOG.warn(message + " on the pipeline {}.",
                 request.getCmdType(), pipeline);
       }
       throw ioException;
     }
+  }
+
+  /**
+   * Starts a streaming read operation, intended to read entire blocks from the datanodes. This method expects a
+   * {@link StreamingReaderSpi} to be passed in, which will be used to receive the streamed data from the datanode.
+   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is set into the pass StreamObserver,
+   * which contains information about the datanode used for the read, and the request observer that can be used to
+   * manage the stream (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent
+   * streaming reads so upon successful return of this method, the caller must ensure to call
+   * {@link #completeStreamRead(StreamingReadResponse)} to release the semaphore once the streaming read is complete.
+   * @param request The container command request to initiate the streaming read.
+   * @param streamObserver The observer that will handle the streamed responses.=
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Override
+  public void streamRead(ContainerCommandRequestProto request,
+      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
+    List<DatanodeDetails> datanodeList = sortDatanodes(request);
+    IOException lastException = null;
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        checkOpen(dn);
+        semaphore.acquire();
+        XceiverClientProtocolServiceStub stub = asyncStubs.get(dn.getID());
+        if (stub == null) {
+          throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executing command {} on datanode {}", processForDebug(request), dn);
+        }
+        StreamObserver<ContainerCommandRequestProto> requestObserver = stub
+            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(streamObserver);
+        streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
+            (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
+        requestObserver.onNext(request);
+        requestObserver.onCompleted();
+        return;
+      } catch (IOException e) {
+        LOG.error("Failed to start streaming read to DataNode {}", dn, e);
+        semaphore.release();
+        lastException = e;
+      }
+    }
+    if (lastException != null) {
+      throw lastException;
+    } else {
+      throw new IOException("Failed to start streaming read to any available DataNodes");
+    }
+  }
+
+  /**
+   * This method should be called to indicate the end of streaming read. Its primary purpose is to release the
+   * semaphore acquired when starting the streaming read, but is also used to update any metrics or debug logs as
+   * needed.
+   */
+  @Override
+  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+    semaphore.release();
   }
 
   private static List<DatanodeDetails> sortDatanodeByOperationalState(

@@ -268,7 +268,7 @@ public interface Table<KEY, VALUE> {
   /**
    * Create the metrics datasource that emits table cache metrics.
    */
-  default TableCacheMetrics createCacheMetrics() throws RocksDatabaseException {
+  default TableCacheMetrics createCacheMetrics() {
     throw new NotImplementedException("getCacheValue is not implemented");
   }
 

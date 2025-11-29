@@ -34,19 +34,13 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class
 )
 public class FetchKeySubCommand implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
 
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID",
-      required = false
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @Override
   public Void call() throws Exception {
-    try (OzoneManagerProtocol client = parent.createOmClient(omServiceId)) {
+    try (OzoneManagerProtocol client = omServiceOption.newClient()) {
       UUID uuid = client.refetchSecretKey();
       System.out.println("Current Secret Key ID: " + uuid);
     }

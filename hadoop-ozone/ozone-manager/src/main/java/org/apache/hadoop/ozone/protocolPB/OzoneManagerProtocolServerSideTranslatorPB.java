@@ -171,7 +171,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       this.lastRequestToSubmit = request;
-      return ozoneManager.getOmExecutionFlow().submit(request);
+      return ozoneManager.getOmExecutionFlow().submit(request, true);
     } finally {
       OzoneManager.setS3Auth(null);
     }
@@ -184,6 +184,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
+    // Read from leader or followers using linearizable read
+    if (omRatisServer.isLinearizableRead()) {
+      return ozoneManager.getOmExecutionFlow().submit(request, false);
+    }
     // Check if this OM is the leader.
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     if (raftServerStatus == LEADER_AND_READY ||

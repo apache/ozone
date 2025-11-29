@@ -90,7 +90,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
       if (omPrefixInfo != null) {
-        omPrefixInfo.setUpdateID(trxnLogIndex);
+        omPrefixInfo = omPrefixInfo.toBuilder()
+            .setUpdateID(trxnLogIndex)
+            .build();
       }
 
       try {
