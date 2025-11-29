@@ -22,8 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -61,7 +59,6 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
-        .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
         .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
         .add(OZONE_THREAD_NUMBER_DIR_DELETION)
@@ -120,20 +117,21 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void allowListAllVolumes() throws ReconfigurationException {
-    final boolean newValue = !cluster().getOzoneManager().getAllowListAllVolumes();
+    final boolean newValue = !cluster().getOzoneManager().getConfig().isListAllVolumesAllowed();
 
-    getSubject().reconfigureProperty(OZONE_OM_VOLUME_LISTALL_ALLOWED,
+    getSubject().reconfigureProperty(OmConfig.Keys.LIST_ALL_VOLUMES_ALLOWED,
         String.valueOf(newValue));
 
-    assertEquals(newValue, cluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(newValue, cluster().getOzoneManager().getConfig().isListAllVolumesAllowed());
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "invalid"})
   void unsetAllowListAllVolumes(String newValue) throws ReconfigurationException {
-    getSubject().reconfigureProperty(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
+    getSubject().reconfigureProperty(OmConfig.Keys.LIST_ALL_VOLUMES_ALLOWED, newValue);
 
-    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(Boolean.parseBoolean(newValue),
+        cluster().getOzoneManager().getConfig().isListAllVolumesAllowed());
   }
 
   @Test
