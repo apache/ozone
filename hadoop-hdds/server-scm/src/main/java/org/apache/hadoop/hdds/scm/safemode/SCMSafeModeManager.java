@@ -119,6 +119,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private void emitSafeModeStatus() {
     final SafeModeStatus safeModeStatus = status.get();
+    safeModeMetrics.setScmInSafeMode(safeModeStatus.isInSafeMode());
     scmContext.updateSafeModeStatus(safeModeStatus);
 
     // notify SCMServiceManager
