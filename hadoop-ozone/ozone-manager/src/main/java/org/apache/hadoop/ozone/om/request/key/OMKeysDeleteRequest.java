@@ -316,7 +316,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
 
@@ -327,7 +329,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyInfo = openKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
           openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
           openKeyInfoMap.put(dbOpenKey, openKeyInfo);

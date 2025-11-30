@@ -80,8 +80,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
@@ -969,7 +968,7 @@ final class TestSecureOzoneCluster {
     // first renewed cert
     X509Certificate newCert =
         generateSelfSignedX509Cert(securityConfig, null,
-            LocalDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
+            ZonedDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
             Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     SCMGetCertResponseProto responseProto =
@@ -1052,7 +1051,7 @@ final class TestSecureOzoneCluster {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509Certificate newCertHolder = generateSelfSignedX509Cert(
         securityConfig, null,
-        LocalDateTime.now().plus(gracePeriod),
+        ZonedDateTime.now().plus(gracePeriod),
         Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
     // provide an invalid SCMGetCertResponseProto. Without
@@ -1365,7 +1364,7 @@ final class TestSecureOzoneCluster {
     assertThat(cn).contains(SCM_SUB_CA);
     assertThat(cn).contains(hostName);
 
-    LocalDate today = LocalDateTime.now().toLocalDate();
+    LocalDate today = ZonedDateTime.now().toLocalDate();
     Date invalidDate;
 
     // Make sure the end date is honored.
@@ -1399,13 +1398,13 @@ final class TestSecureOzoneCluster {
   }
 
   private static X509Certificate generateSelfSignedX509Cert(
-      SecurityConfig conf, KeyPair keyPair, LocalDateTime startDate,
+      SecurityConfig conf, KeyPair keyPair, ZonedDateTime startDate,
       Duration certLifetime) throws Exception {
     if (keyPair == null) {
       keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     }
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return SelfSignedCertificate.newBuilder()
         .setBeginDate(start)
         .setEndDate(end)
@@ -1436,13 +1435,12 @@ final class TestSecureOzoneCluster {
         .setDigitalEncryption(true);
 
     addIpAndDnsDataToBuilder(csrBuilder);
-    LocalDateTime start = LocalDateTime.now();
+    ZonedDateTime start = ZonedDateTime.now();
     Duration certDuration = conf.getDefaultCertDuration();
     //TODO: generateCSR!
     return approver.sign(conf, rootKeyPair.getPrivate(), rootCert,
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(certDuration)
-                .atZone(ZoneId.systemDefault()).toInstant()),
+            Date.from(start.toInstant()),
+            Date.from(start.plus(certDuration).toInstant()),
             csrBuilder.build().generateCSR(), "test", clusterId,
             String.valueOf(System.nanoTime()));
   }

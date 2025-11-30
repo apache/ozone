@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -104,6 +105,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -728,6 +730,30 @@ public final class HddsServerUtil {
         "       args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
         "  classpath = " + System.getProperty("java.class.path"),
         "       conf = " + conf);
+  }
+
+  public static void setPoolSize(ThreadPoolExecutor executor, int size, Logger logger) {
+    Preconditions.assertTrue(size > 0, () -> "Pool size must be positive: " + size);
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    String change = "unchanged";
+    if (size > currentCorePoolSize) {
+      change = "increased";
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else if (size < currentCorePoolSize) {
+      change = "decreased";
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
+    if (logger != null) {
+      logger.info("pool size {} from {} to {}", change, currentCorePoolSize, size);
+    }
   }
 
 }
