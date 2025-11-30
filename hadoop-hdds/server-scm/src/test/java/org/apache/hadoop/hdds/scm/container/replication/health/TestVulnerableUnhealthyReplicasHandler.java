@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestVulnerableUnhealthyReplicasHandler {
   private ReplicationManager replicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ReplicationConfig repConfig;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
@@ -68,7 +69,8 @@ public class TestVulnerableUnhealthyReplicasHandler {
     handler = new VulnerableUnhealthyReplicasHandler(replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(2)

@@ -176,7 +176,7 @@ public class TestReplicationManager {
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     repQueue = new ReplicationQueue();
 
     // Ensure that RM will run when asked.
@@ -1006,7 +1006,7 @@ public class TestReplicationManager {
         .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
             Lists.newArrayList(2, 1, 1, 1)));
 
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());

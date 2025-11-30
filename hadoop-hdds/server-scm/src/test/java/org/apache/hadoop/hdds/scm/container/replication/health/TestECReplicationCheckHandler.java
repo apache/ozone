@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.He
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +76,7 @@ public class TestECReplicationCheckHandler {
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
   private PlacementPolicy placementPolicy;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   @BeforeEach
   public void setup() {
@@ -84,7 +86,8 @@ public class TestECReplicationCheckHandler {
     healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(maintenanceRedundancy)
