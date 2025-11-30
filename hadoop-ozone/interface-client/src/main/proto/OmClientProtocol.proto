@@ -915,6 +915,7 @@ message SnapshotDiffJobProto {
   optional bool disableNativeDiff = 11;
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
+  optional string largestEntryKey = 14;
 }
 
 message OzoneObj {
