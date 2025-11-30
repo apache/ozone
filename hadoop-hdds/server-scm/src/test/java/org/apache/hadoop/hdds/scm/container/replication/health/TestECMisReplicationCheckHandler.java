@@ -65,7 +65,6 @@ public class TestECMisReplicationCheckHandler {
   private ECReplicationConfig repConfig;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
-  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ReplicationManagerReport report;
   private PlacementPolicy placementPolicy;
 
@@ -77,7 +76,8 @@ public class TestECMisReplicationCheckHandler {
     handler = new ECMisReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
-    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     int maintenanceRedundancy = 2;
     requestBuilder = new ContainerCheckRequest.Builder()

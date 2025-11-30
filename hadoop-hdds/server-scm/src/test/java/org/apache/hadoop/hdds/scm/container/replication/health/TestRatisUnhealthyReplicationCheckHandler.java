@@ -60,7 +60,6 @@ public class TestRatisUnhealthyReplicationCheckHandler {
   private ReplicationConfig repConfig;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
-  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ReplicationManagerReport report;
   private int maintenanceRedundancy = 2;
 
@@ -69,7 +68,8 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     handler = new RatisUnhealthyReplicationCheckHandler();
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)

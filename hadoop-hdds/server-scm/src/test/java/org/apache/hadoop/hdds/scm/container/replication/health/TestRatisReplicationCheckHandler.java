@@ -83,7 +83,6 @@ public class TestRatisReplicationCheckHandler {
   private PlacementPolicy containerPlacementPolicy;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
-  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ReplicationManagerReport report;
   private int maintenanceRedundancy = 2;
 
@@ -103,7 +102,8 @@ public class TestRatisReplicationCheckHandler {
         replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)

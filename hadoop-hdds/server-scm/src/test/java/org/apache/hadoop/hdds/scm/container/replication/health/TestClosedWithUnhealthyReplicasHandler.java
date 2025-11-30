@@ -57,7 +57,6 @@ import org.mockito.ArgumentCaptor;
 public class TestClosedWithUnhealthyReplicasHandler {
   private ClosedWithUnhealthyReplicasHandler handler;
   private ReplicationManager replicationManager;
-  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ECReplicationConfig ecReplicationConfig;
   private ContainerCheckRequest.Builder requestBuilder;
 
@@ -65,7 +64,8 @@ public class TestClosedWithUnhealthyReplicasHandler {
   public void setup() {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     replicationManager = mock(ReplicationManager.class);
-    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     handler = new ClosedWithUnhealthyReplicasHandler(replicationManager);
     requestBuilder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())

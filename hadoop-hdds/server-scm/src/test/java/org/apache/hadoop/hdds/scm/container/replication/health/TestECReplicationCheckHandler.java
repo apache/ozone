@@ -76,7 +76,6 @@ public class TestECReplicationCheckHandler {
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
   private PlacementPolicy placementPolicy;
-  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   @BeforeEach
   public void setup() {
@@ -86,7 +85,8 @@ public class TestECReplicationCheckHandler {
     healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
-    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
