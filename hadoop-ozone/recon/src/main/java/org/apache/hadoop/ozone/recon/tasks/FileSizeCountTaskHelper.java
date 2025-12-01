@@ -108,7 +108,8 @@ public abstract class FileSizeCountTaskHelper {
                                                  String taskName,
                                                  int maxIterators,
                                                  int maxWorkers,
-                                                 int maxKeysInMemory) {
+                                                 int maxKeysInMemory,
+                                                 long fileSizeCountFlushThreshold) {
     LOG.info("{}: Starting parallel RocksDB reprocess with {} iterators, {} workers for bucket layout {}",
         taskName, maxIterators, maxWorkers, bucketLayout);
     Map<FileSizeCountKey, Long> fileSizeCountMap = new ConcurrentHashMap<>();
@@ -120,7 +121,7 @@ public abstract class FileSizeCountTaskHelper {
     long iterationStartTime = Time.monotonicNow();
     boolean status = reprocessBucketLayout(
         bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName,
-        maxIterators, maxWorkers, maxKeysInMemory);
+        maxIterators, maxWorkers, maxKeysInMemory, fileSizeCountFlushThreshold);
     if (!status) {
       return buildTaskResult(taskName, false);
     }
@@ -154,14 +155,15 @@ public abstract class FileSizeCountTaskHelper {
                                               String taskName,
                                               int maxIterators,
                                               int maxWorkers,
-                                              int maxKeysInMemory) {
+                                              int maxKeysInMemory,
+                                              long fileSizeCountFlushThreshold) {
     LOG.info("{}: Starting lockless parallel iteration with {} iterators, {} workers for bucket layout {}",
         taskName, maxIterators, maxWorkers, bucketLayout);
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
 
     // Divide threshold by worker count so each worker flushes independently
-    final int PER_WORKER_THRESHOLD = Math.max(1, 200000 / maxWorkers);  // 200k / 20 = 10k
+    final long PER_WORKER_THRESHOLD = Math.max(1, fileSizeCountFlushThreshold / maxWorkers);
     
     // Map thread IDs to worker-specific maps for lockless updates
     Map<Long, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();

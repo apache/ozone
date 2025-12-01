@@ -63,6 +63,9 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
     int maxWorkers = ozoneConfiguration.getInt(
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
+    long fileSizeCountFlushThreshold = ozoneConfiguration.getLong(
+        ReconServerConfigKeys.OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD,
+        ReconServerConfigKeys.OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     return FileSizeCountTaskHelper.reprocess(
         omMetadataManager,
         reconFileMetadataManager,
@@ -70,7 +73,8 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
         getTaskName(),
         maxIterators,
         maxWorkers,
-        maxKeysInMemory
+        maxKeysInMemory,
+        fileSizeCountFlushThreshold
     );
   }
 
