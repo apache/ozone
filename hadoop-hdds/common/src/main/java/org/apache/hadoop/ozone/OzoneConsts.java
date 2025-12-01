@@ -553,6 +553,11 @@ public final class OzoneConsts {
       "compactionLogTable";
 
   /**
+   * DB completed request info table name. Referenced in RDBStore.
+   */
+  public static final String COMPLETED_REQUEST_INFO_TABLE = "completedRequestInfoTable";
+
+  /**
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
