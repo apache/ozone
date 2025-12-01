@@ -291,7 +291,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "safe_mode_metrics_num_container_with_e_c_data_replica_reported_threshold",
+              "expr": "safe_mode_metrics_num_container_with_ec_data_replica_reported_threshold",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}} target",
@@ -302,7 +302,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "safe_mode_metrics_current_containers_with_e_c_data_replica_reported_count",
+              "expr": "safe_mode_metrics_current_containers_with_ec_data_replica_reported_count",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}} actual",
