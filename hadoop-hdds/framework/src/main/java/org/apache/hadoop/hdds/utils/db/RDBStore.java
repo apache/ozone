@@ -76,6 +76,7 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final boolean readOnly;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -113,6 +114,7 @@ public class RDBStore implements DBStore {
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
+      this.readOnly = readOnly;
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
@@ -251,13 +253,15 @@ public class RDBStore implements DBStore {
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
     }
-    try {
-      // Flush to ensure all data is persisted to disk before closing.
-      flushDB();
-      LOG.debug("Successfully flushed DB before close");
-    } catch (Exception e) {
-      LOG.warn("Failed to flush DB before close", e);
-      // Continue with close even if flush fails
+    if (!readOnly) {
+      try {
+        // Flush to ensure all data is persisted to disk before closing.
+        flushDB();
+        LOG.debug("Successfully flushed DB before close");
+      } catch (Exception e) {
+        LOG.warn("Failed to flush DB before close", e);
+        // Continue with close even if flush fails
+      }
     }
     IOUtils.close(LOG, db);
   }
@@ -365,7 +369,7 @@ public class RDBStore implements DBStore {
         db.getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
       } catch (RocksDBException e) {
         throw new RocksDatabaseException("Failed to drop " + tableName, e);
-      }  
+      }
     }
   }
 

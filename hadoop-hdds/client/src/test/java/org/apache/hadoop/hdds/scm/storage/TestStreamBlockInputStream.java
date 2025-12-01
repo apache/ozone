@@ -193,7 +193,7 @@ public class TestStreamBlockInputStream {
       return null;
     }).when(xceiverClient).streamRead(any(), any());
     assertThrows(IOException.class, () -> blockStream.read());
-    verify(xceiverClient, times(0)).completeStreamRead(any());
+    verify(xceiverClient, times(1)).completeStreamRead(any());
   }
 
   @Test

@@ -338,7 +338,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     List<OzoneAcl> acls = new ArrayList<>();
     // Add default acls
     acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfig()));
-    if (omBucketInfo.getAcls() != null) {
+    if (omBucketInfo.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
       // Add acls for bucket creator.
       acls.addAll(omBucketInfo.getAcls());
     }
