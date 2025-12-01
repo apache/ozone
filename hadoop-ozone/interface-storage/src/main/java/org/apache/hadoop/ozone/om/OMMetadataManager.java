@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -337,6 +338,17 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       String startKey, int maxKeys) throws IOException;
 
   /**
+   * Returns a list of operation info objects.
+   *
+   * @param startKey the start key determines where to start listing
+   * from, this key is excluded from the result.
+   * @param maxKeys the maximum number of results to return.
+   * @return a list of {@link OmCompletedRequestInfo}
+   * @throws IOException
+   */
+  List<OmCompletedRequestInfo> listCompletedRequestInfo(String startKey, int maxResults) throws IOException;
+
+  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
@@ -477,6 +489,8 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
+  Table<String, OmCompletedRequestInfo> getCompletedRequestInfoTable();
 
   /**
    * Gets the OM Meta table.
