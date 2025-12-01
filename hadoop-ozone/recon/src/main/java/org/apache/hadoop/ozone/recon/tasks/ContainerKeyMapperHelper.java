@@ -131,7 +131,6 @@ public abstract class ContainerKeyMapperHelper {
                                                 int maxIterators,
                                                 int maxWorkers,
                                                 int maxKeysInMemory) {
-    AtomicLong omKeyCount = new AtomicLong(0);
 
     try {
       LOG.info("{}: Starting lockless parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
@@ -159,9 +158,7 @@ public abstract class ContainerKeyMapperHelper {
           
           handleKeyReprocess(kv.getKey(), kv.getValue(), myLocalMap, SHARED_CONTAINER_KEY_COUNT_MAP,
               reconContainerMetadataManager);
-          
-          omKeyCount.incrementAndGet();
-          
+
           // Flush this worker's map when it reaches threshold
           if (myLocalMap.size() >= PER_WORKER_THRESHOLD) {
             synchronized (flushLock) {
@@ -227,13 +224,10 @@ public abstract class ContainerKeyMapperHelper {
       Instant end = Instant.now();
       long durationMillis = Duration.between(start, end).toMillis();
       double durationSeconds = (double) durationMillis / 1000.0;
-      long keysProcessed = omKeyCount.get();
-      double throughput = keysProcessed / Math.max(durationSeconds, 0.001);
-      
-      LOG.info("{}: Lockless parallel reprocess completed. Processed {} keys in {} ms ({} sec) - " +
-          "Throughput: {} keys/sec - Containers: {}, Worker threshold: {}",
-          taskName, keysProcessed, durationMillis, String.format("%.2f", durationSeconds),
-          String.format("%.2f", throughput), totalContainers, PER_WORKER_THRESHOLD);
+
+      LOG.info("{}: Lockless parallel reprocess completed. Processed keys in {} ms ({} sec) - " +
+          "Containers: {}, Worker threshold: {}",
+          taskName, durationMillis, String.format("%.2f", durationSeconds), totalContainers, PER_WORKER_THRESHOLD);
     } catch (Exception ex) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;
