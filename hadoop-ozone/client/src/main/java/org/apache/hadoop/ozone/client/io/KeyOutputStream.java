@@ -660,13 +660,6 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  /**
-   * Cleanup the resources without committing the key.
-   */
-  public void cleanup() {
-    doInWriteLock(blockOutputStreamEntryPool::cleanup);
-  }
-
   synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();

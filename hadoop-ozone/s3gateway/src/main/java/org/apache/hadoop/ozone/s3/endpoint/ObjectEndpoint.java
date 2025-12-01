@@ -172,7 +172,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     SHA_256_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
-        return MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+        return MessageDigest.getInstance("SHA-256");
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }
@@ -341,40 +341,25 @@ public class ObjectEndpoint extends EndpointBase {
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
-        OzoneOutputStream output = null;
-        boolean hasValidSha256 = true;
-        try {
-          output = getClientProtocol().createKey(
-              volume.getName(), bucketName, keyPath, length, replicationConfig,
-              customMetadata, tags);
+        try (OzoneOutputStream output = getClientProtocol().createKey(
+            volume.getName(), bucketName, keyPath, length, replicationConfig,
+            customMetadata, tags)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
           putLength = IOUtils.copyLarge(multiDigestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
-
-          // validate "X-AMZ-CONTENT-SHA256"
-          String sha256 = DatatypeConverter.printHexBinary(
-                  multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).digest())
-              .toLowerCase();
           eTag = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
-          hasValidSha256 = S3Utils.isValidXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload());
-          if (!hasValidSha256) {
-            throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
-          }
-        } finally {
-          if (output != null) {
-            if (hasValidSha256) {
-              output.close();
-            } else {
-              output.getKeyOutputStream().cleanup();
-            }
-          }
         }
       }
+      // validate "X-AMZ-CONTENT-SHA256"
+      String sha256 = DatatypeConverter.printHexBinary(
+              multiDigestInputStream.getMessageDigest("SHA-256").digest())
+          .toLowerCase();
+      S3Utils.validateXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload(), keyPath);
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
@@ -427,7 +412,7 @@ public class ObjectEndpoint extends EndpointBase {
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
         multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).reset();
+        multiDigestInputStream.getMessageDigest("SHA-256").reset();
       }
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -1156,7 +1141,7 @@ public class ObjectEndpoint extends EndpointBase {
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
         multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH).reset();
+        multiDigestInputStream.getMessageDigest("SHA-256").reset();
       }
     }
   }

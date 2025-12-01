@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -174,12 +173,14 @@ public class TestS3Utils {
 
   @ParameterizedTest
   @MethodSource("validXAmzContentSHA256Headers")
-  public void testIsValidXAmzContentSHA256HeaderValid(String testName, String headerValue, String actualSha256,
+  public void testValidateXAmzContentSHA256HeaderValid(String testName, String headerValue, String actualSha256,
                                                        boolean isSignedPayload) {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
+    String resource = "/bucket/key";
 
-    assertTrue(S3Utils.isValidXAmzContentSHA256Header(headers, actualSha256, isSignedPayload));
+    assertDoesNotThrow(() ->
+        S3Utils.validateXAmzContentSHA256Header(headers, actualSha256, isSignedPayload, resource));
   }
 
   public static List<Arguments> invalidXAmzContentSHA256Headers() {
@@ -187,20 +188,26 @@ public class TestS3Utils {
     String differentSha256 = "different0hash0000000000000000000000000000000000000000000000000000";
     return Arrays.asList(
         // Header missing with signed payload
-        Arguments.of("missing header with signed payload", null, actualSha256, true),
+        Arguments.of("missing header with signed payload", null, actualSha256, true,
+            S3ErrorTable.INVALID_ARGUMENT.getCode()),
         // SHA-256 mismatch
-        Arguments.of("SHA-256 mismatch", actualSha256, differentSha256, true)
+        Arguments.of("SHA-256 mismatch", actualSha256, differentSha256, true,
+            S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getCode())
     );
   }
 
   @ParameterizedTest
   @MethodSource("invalidXAmzContentSHA256Headers")
-  public void testIsValidXAmzContentSHA256HeaderInvalid(String testName, String headerValue, String actualSha256,
-                                                         boolean isSignedPayload) {
+  public void testValidateXAmzContentSHA256HeaderInvalid(String testName, String headerValue, String actualSha256,
+                                                         boolean isSignedPayload, String expectedErrorCode) {
+
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256)).thenReturn(headerValue);
+    String resource = "/bucket/key";
 
-    assertFalse(S3Utils.isValidXAmzContentSHA256Header(headers, actualSha256, isSignedPayload));
+    OS3Exception exception = assertThrows(OS3Exception.class, () ->
+        S3Utils.validateXAmzContentSHA256Header(headers, actualSha256, isSignedPayload, resource));
+    assertEquals(expectedErrorCode, exception.getCode());
   }
 
 }
