@@ -208,7 +208,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenKeyToDeleteKey, openKeyToDelete, fileName, trxnLogIndex);
+            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, trxnLogIndex);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
