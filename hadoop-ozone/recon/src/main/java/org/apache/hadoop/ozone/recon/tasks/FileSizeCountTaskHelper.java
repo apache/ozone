@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -145,7 +147,8 @@ public abstract class FileSizeCountTaskHelper {
   }
 
   /**
-   * Iterates over the OM DB keys for the given bucket layout and updates the fileSizeCountMap (RocksDB version).
+   * Iterates over the OM DB keys for the given bucket layout using lockless per-worker maps.
+   * Each worker maintains its own map to eliminate read lock contention.
    */
   public static boolean reprocessBucketLayout(BucketLayout bucketLayout,
                                               OMMetadataManager omMetadataManager,
@@ -155,59 +158,92 @@ public abstract class FileSizeCountTaskHelper {
                                               int maxIterators,
                                               int maxWorkers,
                                               int maxKeysInMemory) {
-    LOG.info("{}: Starting parallel iteration with {} iterators, {} workers for bucket layout {}",
+    LOG.info("{}: Starting lockless parallel iteration with {} iterators, {} workers for bucket layout {}",
         taskName, maxIterators, maxWorkers, bucketLayout);
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
 
-    // LOCAL lock (task-specific) - coordinates worker threads within this task only
-    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-    final int FLUSH_THRESHOLD = 200000;
+    // Per-worker threshold: divide total by worker count
+    final int PER_WORKER_THRESHOLD = Math.max(1, 200000 / maxWorkers);  // 200k / 20 = 10k
     
-    // Use parallel table iteration
+    // Each worker thread gets its own map (lockless updates!)
+    //ThreadLocal<Map<FileSizeCountKey, Long>> workerLocalMap =
+    //    ThreadLocal.withInitial(ConcurrentHashMap::new);
+
+    Map<Long, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();
+    // Track all worker maps for final flush
+    //List<Map<FileSizeCountKey, Long>> allWorkerMaps =
+    //    Collections.synchronizedList(new ArrayList<>());
+    
+    // Single lock for DB flush operations only
+    Object flushLock = new Object();
+    
+    // Worker operation - lockless map updates!
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
-      try {
-        lock.readLock().lock();
-        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
-      } finally {
-        lock.readLock().unlock();
-      }
-      
-      // Check if flush is needed
-      if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
-        try {
-          lock.writeLock().lock();
-          // Double-check size after acquiring write lock
-          if (fileSizeCountMap.size() >= FLUSH_THRESHOLD) {
-            LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
-            writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-            fileSizeCountMap.clear();
-          }
-        } finally {
-          lock.writeLock().unlock();
+        // Get this worker thread's private map (no lock needed!)
+        //Map<FileSizeCountKey, Long> myMap = workerLocalMap.get();
+      Map<FileSizeCountKey, Long> myMap = allMap.computeIfAbsent(Thread.currentThread().getId(), (k) -> new HashMap<>());
+      //Map<FileSizeCountKey, Long> myMap = allMap.get(Thread.currentThread().getId());
+        
+        // Register this worker's map on first use (thread-safe registration)
+        /*if (!allWorkerMaps.contains(myMap)) {
+            synchronized (allWorkerMaps) {
+                if (!allWorkerMaps.contains(myMap)) {
+                    allWorkerMaps.add(myMap);
+                }
+            }
+        }*/
+        
+        // Update map without any locks - each worker owns its map!
+        handlePutKeyEvent(kv.getValue(), myMap);
+        
+        // Check if this worker's map needs flushing
+        if (myMap.size() >= PER_WORKER_THRESHOLD) {
+            synchronized (flushLock) {
+                // Double-check size after acquiring lock
+                //if (myMap.size() >= PER_WORKER_THRESHOLD) {
+                    LOG.info("{}: Worker flushing {} entries to RocksDB",
+                        taskName, myMap.size());
+                    writeCountsToDB(myMap, reconFileMetadataManager);
+                    myMap.clear();
+               // }
+            }
         }
-      }
-      return null;
+        return null;
     };
     
     try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, FLUSH_THRESHOLD)) {
-      keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, PER_WORKER_THRESHOLD)) {
+        keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
     } catch (Exception ex) {
-      LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
-      return false;
+        LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
+        return false;
     }
+    
+    // Final flush: Ensure all worker maps are written to DB
+    // Since its a single thread flushing the maps one by one hence no need for the lock.
+    LOG.info("{}: Final flush of {} worker maps", taskName, allMap.size());
+    //synchronized (flushLock) {
+        for (Map<FileSizeCountKey, Long> workerMap : allMap.values()) {
+            if (!workerMap.isEmpty()) {
+                LOG.info("{}: Flushing remaining {} entries from worker map",
+                    taskName, workerMap.size());
+                writeCountsToDB(workerMap, reconFileMetadataManager);
+                workerMap.clear();
+            }
+        }
+    //}
+    
+    // Clean up ThreadLocal to prevent memory leaks
+    //workerLocalMap.remove();
     
     long endTime = Time.monotonicNow();
     long durationMs = endTime - startTime;
     double durationSec = durationMs / 1000.0;
-    int totalKeys = fileSizeCountMap.values().stream().mapToInt(Long::intValue).sum();
-    double throughput = totalKeys / Math.max(durationSec, 0.001);
     
-    LOG.info("{}: Reprocessed {} keys for bucket layout {} in {} ms ({} sec) - Throughput: {}/sec",
-        taskName, totalKeys, bucketLayout, durationMs, String.format("%.2f", durationSec), 
-        String.format("%.2f", throughput));
+    LOG.info("{}: Lockless parallel reprocess completed for {} in {} ms ({} sec) - Worker threshold: {} entries",
+        taskName, bucketLayout, durationMs, String.format("%.2f", durationSec), PER_WORKER_THRESHOLD);
     
     return true;
   }

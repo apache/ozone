@@ -33,11 +33,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -135,7 +137,6 @@ public class OmTableInsightTask implements ReconOmTask {
           }
         } else {
           if (usesNonStringKeys(tableName)) {
-            processTableSequentially(tableName, table);
           } else {
             processTableInParallel(tableName, table, omMetadataManager);
           }
@@ -207,9 +208,10 @@ public class OmTableInsightTask implements ReconOmTask {
     // Cast to String keys for parallel processing
     Table<String, Object> genericTable = (Table<String, Object>) table;
 
-    try (ParallelTableIteratorOperation<String, Object> parallelIter =
-             new ParallelTableIteratorOperation<>(omMetadataManager, genericTable,
-                 StringCodec.get(), maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
+    try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
+        omMetadataManager, omMetadataManager.getStore()
+        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE), StringCodec.get(),
+        maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
