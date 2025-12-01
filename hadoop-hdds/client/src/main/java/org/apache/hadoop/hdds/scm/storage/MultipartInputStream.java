@@ -262,12 +262,12 @@ public class MultipartInputStream extends ExtendedInputStream {
 
       final CompletableFuture<ByteBuffer> finalResult = result;
       final long offset = range.getOffset();
-      final int length = range.getLength();
+      final int rangeLength = range.getLength();
 
       // Submit async read task for this range
       CompletableFuture.runAsync(() -> {
         try {
-          ByteBuffer buffer = allocate.apply(length);
+          ByteBuffer buffer = allocate.apply(rangeLength);
           readRangeData(offset, buffer);
           buffer.flip();
           finalResult.complete(buffer);
@@ -304,7 +304,6 @@ public class MultipartInputStream extends ExtendedInputStream {
       }
     }
   }
-
 
   @Override
   public synchronized void close() throws IOException {
