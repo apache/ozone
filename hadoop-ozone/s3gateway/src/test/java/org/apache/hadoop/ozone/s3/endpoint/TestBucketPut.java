@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -212,6 +213,14 @@ public class TestBucketPut {
          .orElseThrow(() -> new AssertionError("owner-id ACL not found"));
 
     assertEquals("owner-id", ownerAcl.getName());
+
+    List<IAccessAuthorizer.ACLType> permissions = ownerAcl.getAclList();
+
+    assertTrue(permissions.contains(IAccessAuthorizer.ACLType.READ),
+        "Expected READ permission from header");
+
+    assertFalse(permissions.contains(IAccessAuthorizer.ACLType.ALL),
+        "FULL_CONTROL/ALL from body should not be applied when header is present");
   }
 
   @Test
