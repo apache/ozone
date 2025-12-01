@@ -167,6 +167,10 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL =
+      "ozone.om.snapshot.directory.metrics.update.interval";
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
+
   /**
    * OM Ratis related configurations.
    */
