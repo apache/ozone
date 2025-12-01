@@ -155,7 +155,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
         "OutputStream is not KeyMetadataAware: " + base.getClass());
   }
 
-  private OutputStream unwrap(OutputStream out) {
+  private static OutputStream unwrap(OutputStream out) {
     if (out instanceof CryptoOutputStream) {
       return ((CryptoOutputStream) out).getWrappedStream();
     } else if (out instanceof CipherOutputStreamOzone) {
