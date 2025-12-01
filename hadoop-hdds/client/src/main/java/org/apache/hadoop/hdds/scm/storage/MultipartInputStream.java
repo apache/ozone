@@ -22,9 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.FileRange;
 
 /**
  * A stream for accessing multipart streams.
@@ -231,6 +235,76 @@ public class MultipartInputStream extends ExtendedInputStream {
     seek(getPos() + toSkip);
     return toSkip;
   }
+
+  /**
+   * Implements vectored read for multipart input stream.
+   * This method reads multiple byte ranges asynchronously, potentially
+   * from different underlying part streams.
+   *
+   * @param ranges list of file ranges to read
+   * @param allocate function to allocate ByteBuffer for each range
+   * @throws IOException if there is an error performing the reads
+   */
+  public void readVectored(List<? extends FileRange> ranges,
+                           IntFunction<ByteBuffer> allocate) throws IOException {
+    checkOpen();
+    if (!initialized) {
+      initialize();
+    }
+
+    // Perform vectored read using positioned read operations
+    for (FileRange range : ranges) {
+      CompletableFuture<ByteBuffer> result = range.getData();
+      if (result == null) {
+        result = new CompletableFuture<>();
+        range.setData(result);
+      }
+
+      final CompletableFuture<ByteBuffer> finalResult = result;
+      final long offset = range.getOffset();
+      final int length = range.getLength();
+
+      // Submit async read task for this range
+      CompletableFuture.runAsync(() -> {
+        try {
+          ByteBuffer buffer = allocate.apply(length);
+          readRangeData(offset, buffer);
+          buffer.flip();
+          finalResult.complete(buffer);
+        } catch (Exception e) {
+          finalResult.completeExceptionally(e);
+        }
+      });
+    }
+  }
+
+  /**
+   * Helper method to read data for a specific range.
+   * Uses synchronized seeks to read data from the correct position.
+   *
+   * @param offset the starting offset in the stream
+   * @param buffer the buffer to read data into
+   * @throws IOException if there is an error reading data
+   */
+  private void readRangeData(long offset, ByteBuffer buffer) throws IOException {
+    synchronized (this) {
+      long savedPos = getPos();
+      try {
+        seek(offset);
+        int remaining = buffer.remaining();
+        byte[] temp = new byte[remaining];
+        int bytesRead = read(temp, 0, remaining);
+        if (bytesRead < remaining) {
+          throw new EOFException("Could not read all requested bytes. " +
+              "Requested: " + remaining + ", Read: " + bytesRead);
+        }
+        buffer.put(temp, 0, bytesRead);
+      } finally {
+        seek(savedPos);
+      }
+    }
+  }
+
 
   @Override
   public synchronized void close() throws IOException {
