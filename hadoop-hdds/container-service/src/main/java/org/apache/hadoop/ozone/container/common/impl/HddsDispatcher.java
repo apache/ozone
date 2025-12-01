@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
@@ -819,7 +820,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
-      DispatcherContext dispatcherContext) {
+      RandomAccessBlockFile blockFile, DispatcherContext dispatcherContext) {
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
@@ -858,7 +859,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       }
       perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
-      responseProto = handler.readBlock(msg, container, dispatcherContext, streamObserver);
+      responseProto = handler.readBlock(msg, container, blockFile, streamObserver);
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
       if (responseProto == null) {
