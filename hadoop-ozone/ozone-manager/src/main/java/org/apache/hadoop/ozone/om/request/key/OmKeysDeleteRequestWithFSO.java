@@ -110,7 +110,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               CacheValue.get(trxnLogIndex));
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
       final OmKeyInfo updatedOmKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
       quotaReleased += sumBlockLengths(updatedOmKeyInfo);
       omKeyInfoList.set(i, updatedOmKeyInfo);
@@ -151,7 +151,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
             CacheValue.get(trxnLogIndex));
 
       final OmKeyInfo updatedDirInfo = dirInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
       quotaReleased += sumBlockLengths(updatedDirInfo);
       dirList.set(i, updatedDirInfo);

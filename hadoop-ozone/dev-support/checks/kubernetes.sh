@@ -21,6 +21,10 @@ cd "$DIR/../../.." || exit 1
 
 export KUBECONFIG
 
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/summary.txt"
+
 source "${DIR}/_lib.sh"
 source "${DIR}/install/flekszible.sh"
 
@@ -30,20 +34,16 @@ else
   source "${DIR}/install/k3s.sh"
 fi
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
-REPORT_FILE="$REPORT_DIR/summary.txt"
-
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
     "$DIR/build.sh" -Pcoverage
+    mkdir -p "$REPORT_DIR" # removed by full build
 fi
 
 create_aws_dir
-
-mkdir -p "$REPORT_DIR"
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"

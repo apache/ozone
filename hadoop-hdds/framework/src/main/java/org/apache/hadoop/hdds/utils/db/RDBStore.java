@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
@@ -74,12 +76,14 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final boolean readOnly;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   boolean readOnly,
-                  String dbJmxBeanName, boolean enableCompactionDag,
+                  String dbJmxBeanName,
+                  boolean enableCompactionDag, Function<Boolean, UncheckedAutoCloseable> differLockSupplier,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
@@ -95,12 +99,14 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionDag) {
+        Preconditions.checkNotNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
+            "compaction dag is enabled");
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR,
             DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
-            configuration);
+            configuration, differLockSupplier);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -108,6 +114,7 @@ public class RDBStore implements DBStore {
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
+      this.readOnly = readOnly;
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
@@ -189,6 +196,7 @@ public class RDBStore implements DBStore {
     return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
   }
 
+  @Override
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
@@ -244,6 +252,16 @@ public class RDBStore implements DBStore {
     }
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
+    }
+    if (!readOnly) {
+      try {
+        // Flush to ensure all data is persisted to disk before closing.
+        flushDB();
+        LOG.debug("Successfully flushed DB before close");
+      } catch (Exception e) {
+        LOG.warn("Failed to flush DB before close", e);
+        // Continue with close even if flush fails
+      }
     }
     IOUtils.close(LOG, db);
   }
@@ -330,6 +348,29 @@ public class RDBStore implements DBStore {
   @Override
   public Map<Integer, String> getTableNames() {
     return db.getColumnFamilyNames();
+  }
+
+  /**
+  /**
+   * Drops a table from the database by removing its associated column family.
+   * <p>
+   * <b>Warning:</b> This operation should be used with extreme caution. If the table needs to be used again,
+   * it is recommended to reinitialize the entire DB store, as the column family will be permanently
+   * removed from the database. This method is suitable for truncating a RocksDB column family in a single operation.
+   *
+   * @param tableName the name of the table to be dropped
+   * @throws RocksDatabaseException if an error occurs while attempting to drop the table
+   */
+  @Override
+  public void dropTable(String tableName) throws RocksDatabaseException {
+    ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily != null) {
+      try {
+        db.getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+      } catch (RocksDBException e) {
+        throw new RocksDatabaseException("Failed to drop " + tableName, e);
+      }
+    }
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {

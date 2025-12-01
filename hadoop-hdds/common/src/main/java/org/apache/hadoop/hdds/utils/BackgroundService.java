@@ -217,4 +217,8 @@ public abstract class BackgroundService {
         .build();
     exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
   }
+
+  protected String getServiceName() {
+    return serviceName;
+  }
 }

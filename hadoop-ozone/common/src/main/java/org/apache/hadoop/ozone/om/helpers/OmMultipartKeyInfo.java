@@ -229,7 +229,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   /**
    * Builder of OmMultipartKeyInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmMultipartKeyInfo> {
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
@@ -293,18 +293,13 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
-    @Override
-    public Builder withUpdateID(long newValue) {
-      super.withUpdateID(newValue);
-      return this;
-    }
-
     public Builder setParentID(long parentObjId) {
       this.parentID = parentObjId;
       return this;
     }
 
-    public OmMultipartKeyInfo build() {
+    @Override
+    protected OmMultipartKeyInfo buildObject() {
       return new OmMultipartKeyInfo(this);
     }
   }

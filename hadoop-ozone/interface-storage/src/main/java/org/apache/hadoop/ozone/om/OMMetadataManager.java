@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
@@ -84,6 +85,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
   @VisibleForTesting
   DBStore getStore();
+
+  /**
+   * Retrieves the parent directory of all the snapshots in the system.
+   *
+   * @return a Path object representing the parent directory of the snapshot.
+   */
+  Path getSnapshotParentDir();
 
   /**
    * Returns the OzoneManagerLock used on Metadata DB.
