@@ -127,9 +127,9 @@ public class TestFileChecksumHelper {
         : RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
 
     return new OmKeyInfo.Builder()
-        .setVolumeName(null)
-        .setBucketName(null)
-        .setKeyName(null)
+        .setVolumeName("vol1")
+        .setBucketName("bucket")
+        .setKeyName("key")
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, locationInfo)))
         .setCreationTime(Time.now())

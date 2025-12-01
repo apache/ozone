@@ -1045,7 +1045,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
           = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
       objectID = omPathInfoFSO.getLeafNodeObjectId();
       builder.setParentObjectID(omPathInfoFSO.getLastKnownParentId());
-      builder.setFileName(omPathInfoFSO.getLeafNodeName());
     }
     builder.setObjectID(objectID);
     return builder.build();
