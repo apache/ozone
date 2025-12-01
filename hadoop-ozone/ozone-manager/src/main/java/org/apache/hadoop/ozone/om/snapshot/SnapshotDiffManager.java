@@ -91,7 +91,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -119,6 +118,7 @@ import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
+import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -1034,11 +1034,15 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (Strings.isNotEmpty(tablePrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
-    try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
+    try (ClosableIterator<String> keysToCheck = nativeRocksToolsLoaded ?
         sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
-        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
+        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound);
+         TableMergeIterator<String, WithParentObjectId> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
+             tablePrefix, (Table<String, WithParentObjectId>) fsTable, (Table<String, WithParentObjectId>) tsTable)) {
       AtomicLong keysProcessed = new AtomicLong(0);
-      keysToCheck.forEach(key -> {
+      while (tableMergeIterator.hasNext()) {
+        Table.KeyValue<String, List<WithParentObjectId>> kvs = tableMergeIterator.next();
+        String key = kvs.getKey();
         if (totalEstimatedKeysToProcess > 0) {
           double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
           if (progressPct >= checkpoint[0]) {
@@ -1048,16 +1052,14 @@ public class SnapshotDiffManager implements AutoCloseable {
         }
 
         try {
-          final WithParentObjectId fromObjectId = fsTable.get(key);
-          final WithParentObjectId toObjectId = tsTable.get(key);
-          if (areKeysEqual(fromObjectId, toObjectId) || !isKeyInBucket(key,
-              tablePrefixes, fsTable.getName())) {
+          final WithParentObjectId fromObjectId = kvs.getValue().get(0);
+          final WithParentObjectId toObjectId = kvs.getValue().get(1);
+          if (areKeysEqual(fromObjectId, toObjectId)) {
             keysProcessed.getAndIncrement();
-            return;
+            continue;
           }
           if (fromObjectId != null) {
-            byte[] rawObjId = codecRegistry.asRawData(
-                fromObjectId.getObjectID());
+            byte[] rawObjId = codecRegistry.asRawData(fromObjectId.getObjectID());
             // Removing volume bucket info by removing the table bucket Prefix
             // from the key.
             // For FSO buckets will be left with the parent id/keyname.
@@ -1071,8 +1073,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           }
           if (toObjectId != null) {
             byte[] rawObjId = codecRegistry.asRawData(toObjectId.getObjectID());
-            byte[] rawValue = codecRegistry.asRawData(
-                key.substring(tablePrefix.length()));
+            byte[] rawValue = codecRegistry.asRawData(key.substring(tablePrefix.length()));
             newObjIdToKeyMap.put(rawObjId, rawValue);
             objectIdToIsDirMap.put(rawObjId, isDirectoryTable);
             newParentIds.ifPresent(set -> set.add(toObjectId
@@ -1082,7 +1083,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      });
+      }
     } catch (RocksDBException rocksDBException) {
       // TODO: [SNAPSHOT] Gracefully handle exception
       //  e.g. when input files do not exist

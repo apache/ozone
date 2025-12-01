@@ -61,7 +61,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -333,7 +333,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
-    if (keyArgs.getAclsList() != null) {
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
 
@@ -407,7 +407,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
 
     // add acls from clients
-    acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
+      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    }
     acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
@@ -973,31 +975,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (omBucketInfo.getIsVersionEnabled()) {
         newSize += dbKeyInfo.getDataSize();
       }
-      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
-      dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex);
-      dbKeyInfo.setReplicationConfig(replicationConfig);
-
       // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
-      dbKeyInfo = dbKeyInfo.toBuilder()
-          .setMetadata(KeyValueUtil.getFromProtobuf(
-              keyArgs.getMetadataList()))
-          .build();
-
       // Construct a new tags from KeyArgs
       // Clear the old one when the key is overwritten
-      dbKeyInfo.getTags().clear();
-      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
-          keyArgs.getTagsList()));
+      final OmKeyInfo.Builder builder = dbKeyInfo.toBuilder()
+          .setDataSize(newSize)
+          .setModificationTime(keyArgs.getModificationTime())
+          .setReplicationConfig(replicationConfig)
+          .setMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+          .setUpdateID(transactionLogIndex)
+          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setFileEncryptionInfo(encInfo);
 
       if (keyArgs.hasExpectedDataGeneration()) {
-        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+        builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
 
-      dbKeyInfo.setFileEncryptionInfo(encInfo);
-      return dbKeyInfo;
+      return builder.build();
     }
 
     // the key does not exist, create a new object.
@@ -1164,10 +1160,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
+        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
+        .build();
     // This is a special marker to indicate that SnapshotDeletingService
     // can reclaim this key's blocks unconditionally.
-    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

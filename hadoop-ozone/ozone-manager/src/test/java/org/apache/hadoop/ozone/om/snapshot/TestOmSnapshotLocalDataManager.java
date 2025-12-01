@@ -83,7 +83,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
@@ -211,22 +211,23 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   private String getReadLockMessageAcquire(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getReadLockMessageRelease(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageAcquire(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageRelease(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
-  private HierarchicalResourceLock getHierarchicalResourceLock(FlatResource resource, String key, boolean isWriteLock) {
+  private HierarchicalResourceLock getHierarchicalResourceLock(DAGLeveledResource resource, String key,
+      boolean isWriteLock) {
     return new HierarchicalResourceLock() {
       @Override
       public boolean isLockAcquired() {
@@ -247,12 +248,12 @@ public class TestOmSnapshotLocalDataManager {
   private void mockLockManager() throws IOException {
     lockCapturor.clear();
     reset(lockManager);
-    when(lockManager.acquireReadLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireReadLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(READ_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), false);
         });
-    when(lockManager.acquireWriteLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireWriteLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(WRITE_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), true);
@@ -543,7 +544,7 @@ public class TestOmSnapshotLocalDataManager {
     if (purgeSnapshot) {
       assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
-      assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
+      assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
     } else {
       try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
         OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
@@ -968,7 +969,7 @@ public class TestOmSnapshotLocalDataManager {
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
-        localDataManager.getVersionNodeMap();
+        localDataManager.getVersionNodeMapUnmodifiable();
     assertEquals(2, versionMap.size());
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
   }
@@ -998,7 +999,7 @@ public class TestOmSnapshotLocalDataManager {
     when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
-      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
       Map<UUID, UUID> previousMap = ImmutableMap.of(snap2, snap3, snap1, snap2);
       Map<UUID, Map<Integer, OmSnapshotLocalData.VersionMeta>> expectedSstFile = ImmutableMap.of(
           snap3, ImmutableMap.of(0,
@@ -1009,7 +1010,7 @@ public class TestOmSnapshotLocalDataManager {
                   new SstFileInfo(snap1.toString(), snap1 + "k1", snap1 + "k2", KEY_TABLE)))),
           snap2, ImmutableMap.of(0,
               new OmSnapshotLocalData.VersionMeta(0, ImmutableList.of())));
-      for (UUID snapshotId : localDataManager.getVersionNodeMap().keySet()) {
+      for (UUID snapshotId : localDataManager.getVersionNodeMapUnmodifiable().keySet()) {
         try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
                  localDataManager.getOmSnapshotLocalData(snapshotId)) {
           OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
@@ -1021,7 +1022,7 @@ public class TestOmSnapshotLocalDataManager {
         }
       }
     } else {
-      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
     }
   }
 

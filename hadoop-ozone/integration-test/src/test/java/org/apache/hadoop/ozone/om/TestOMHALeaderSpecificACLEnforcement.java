@@ -225,7 +225,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
     String newAdmins = currentAdmins + "," + username;
     
     // Reconfigure the OM to add the new admin
-    om.getReconfigurationHandler().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newAdmins);
+    om.getReconfigurationHandler().reconfigureProperty(OZONE_ADMINISTRATORS, newAdmins);
   }
 
   /**
