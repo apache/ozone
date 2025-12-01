@@ -436,13 +436,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     }
   }
 
-  /**
-   * Cleanup the incomplete multipart upload parts.
-   */
-  public void cleanup() {
-    blockDataStreamOutputEntryPool.cleanup();
-  }
-
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
   }
