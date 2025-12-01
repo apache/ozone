@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -47,8 +49,6 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @Metrics(about = "OM Snapshot Directory Metrics", context = OzoneConsts.OZONE)
-public class OMSnapshotDirectoryMetrics implements MetricsSource {
+public final class OMSnapshotDirectoryMetrics implements MetricsSource {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotDirectoryMetrics.class);
   private static final String SOURCE_NAME =
@@ -125,12 +125,20 @@ public class OMSnapshotDirectoryMetrics implements MetricsSource {
    * Internal class to store per-checkpoint metrics.
    */
   private static class CheckpointMetrics {
-    final long size;
-    final int sstFileCount;
+    private final long size;
+    private final int sstFileCount;
 
     CheckpointMetrics(long size, int sstFileCount) {
       this.size = size;
       this.sstFileCount = sstFileCount;
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    public int getSstFileCount() {
+      return sstFileCount;
     }
   }
 
@@ -289,8 +297,8 @@ public class OMSnapshotDirectoryMetrics implements MetricsSource {
       collector.addRecord(SOURCE_NAME)
           .setContext("Per-Checkpoint Directory Metrics")
           .tag(SnapshotMetricsInfo.CheckpointDirName, checkpointDirName)
-          .addGauge(SnapshotMetricsInfo.CheckpointDirSize, metrics.size)
-          .addGauge(SnapshotMetricsInfo.CheckpointSstFilesCount, metrics.sstFileCount);
+          .addGauge(SnapshotMetricsInfo.CheckpointDirSize, metrics.getSize())
+          .addGauge(SnapshotMetricsInfo.CheckpointSstFilesCount, metrics.getSstFileCount());
     }
   }
 
