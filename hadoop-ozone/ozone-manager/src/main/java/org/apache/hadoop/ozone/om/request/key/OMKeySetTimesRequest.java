@@ -230,7 +230,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo = omKeyInfo.toBuilder().withUpdateID(trxnLogIndex).build();
+      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
 
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())

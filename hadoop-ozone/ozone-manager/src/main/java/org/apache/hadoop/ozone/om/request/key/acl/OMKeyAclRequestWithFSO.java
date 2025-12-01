@@ -107,7 +107,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo = omKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
 

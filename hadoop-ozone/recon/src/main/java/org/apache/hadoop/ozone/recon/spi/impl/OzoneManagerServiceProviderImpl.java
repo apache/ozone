@@ -363,7 +363,18 @@ public class OzoneManagerServiceProviderImpl
   }
 
   private void stopSyncDataFromOMThread() {
-    scheduler.shutdownNow();
+    scheduler.shutdown();
+    try {
+      if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
+        scheduler.shutdownNow();
+        if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+          LOG.error("OM sync scheduler failed to terminate");
+        }
+      }
+    } catch (InterruptedException e) {
+      scheduler.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
     tarExtractor.stop();
     LOG.debug("Shutdown the OM DB sync scheduler.");
   }

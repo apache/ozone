@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -289,7 +291,10 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    */
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
     return lock(() -> lock.acquireResourceWriteLock(SNAPSHOT_DB_LOCK),
-        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK), () -> cleanup(true));
+        () -> lock.releaseResourceWriteLock(SNAPSHOT_DB_LOCK), () -> {
+        cleanup(true);
+        return dbMap.isEmpty();
+      });
   }
 
   /**
@@ -301,16 +306,25 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock(UUID snapshotId) {
     return lock(() -> lock.acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
         () -> lock.releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotId.toString()),
-        () -> cleanup(snapshotId));
+        () -> {
+        cleanup(snapshotId, false);
+        return !dbMap.containsKey(snapshotId);
+      });
+  }
+
+  private OMLockDetails getEmptyOmLockDetails(OMLockDetails lockDetails) {
+    return lockDetails.isLockAcquired() ? EMPTY_DETAILS_LOCK_ACQUIRED : EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   private UncheckedAutoCloseableSupplier<OMLockDetails> lock(Supplier<OMLockDetails> lockFunction,
-      Supplier<OMLockDetails> unlockFunction, Supplier<Void> cleanupFunction) {
-    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(lockFunction.get());
+      Supplier<OMLockDetails> unlockFunction, Supplier<Boolean> cleanupFunction) {
+    Supplier<OMLockDetails> emptyLockFunction = () -> getEmptyOmLockDetails(lockFunction.get());
+    Supplier<OMLockDetails> emptyUnlockFunction = () -> getEmptyOmLockDetails(unlockFunction.get());
+
+    AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(emptyLockFunction.get());
     if (lockDetails.get().isLockAcquired()) {
-      cleanupFunction.get();
-      if (!dbMap.isEmpty()) {
-        lockDetails.set(unlockFunction.get());
+      if (!cleanupFunction.get()) {
+        lockDetails.set(emptyUnlockFunction.get());
       }
     }
 
@@ -320,7 +334,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       public void close() {
         lockDetails.updateAndGet((prevLock) -> {
           if (prevLock != null && prevLock.isLockAcquired()) {
-            return unlockFunction.get();
+            return emptyUnlockFunction.get();
           }
           return prevLock;
         });
@@ -340,14 +354,19 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private synchronized Void cleanup(boolean force) {
     if (force || dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
-        cleanup(evictionKey);
+        cleanup(evictionKey, true);
       }
     }
     return null;
   }
 
-  private synchronized Void cleanup(UUID evictionKey) {
+  private synchronized Void cleanup(UUID evictionKey, boolean expectKeyToBePresent) {
     ReferenceCounted<OmSnapshot> snapshot = dbMap.get(evictionKey);
+
+    if (!expectKeyToBePresent && snapshot == null) {
+      return null;
+    }
+
     if (snapshot != null && snapshot.getTotalRefCount() == 0) {
       try {
         compactSnapshotDB(snapshot.get());

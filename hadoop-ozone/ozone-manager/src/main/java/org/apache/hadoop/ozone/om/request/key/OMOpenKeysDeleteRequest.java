@@ -197,7 +197,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo = omKeyInfo.toBuilder()
-              .withUpdateID(trxnLogIndex)
+              .setUpdateID(trxnLogIndex)
               .build();
           deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, omKeyInfo));
 

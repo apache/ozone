@@ -161,7 +161,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
       // Set the UpdateID to current transactionLogIndex
       openKeyInfo = openKeyInfo.toBuilder()
-          .withUpdateID(trxnLogIndex)
+          .setUpdateID(trxnLogIndex)
           .build();
 
       // Add to cache.

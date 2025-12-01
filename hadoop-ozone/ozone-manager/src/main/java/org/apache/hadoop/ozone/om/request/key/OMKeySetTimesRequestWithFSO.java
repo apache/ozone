@@ -100,7 +100,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo = omKeyInfo.toBuilder().withUpdateID(trxnLogIndex).build();
+      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
 
       // update cache.
       if (isDirectory) {
