@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.NATIVE;
 import static org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver.AuthorizerType.RANGER;
@@ -609,6 +610,36 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardOneAtEndAndOneNotAtEnd()
+      throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*key*")),
+        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
+            "at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*key*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/*key*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
+  public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardOneAtEndAndOneNotAtEndWithPath()
+      throws OMException {
+    expectOMExceptionWithCode(
+        () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/a/b/t/*key*")),
+        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
+            "at the end", NOT_SUPPORTED_OPERATION);
+
+    final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
+        S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "a/b/t/*key*", null);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
+        RANGER, Collections.singleton("arn:aws:s3:::bucket3/a/b/t/*key*"));
+    assertThat(resultRanger).containsOnly(expectedRangerResourceSpec);
+  }
+
+  @Test
   public void testValidateAndCategorizeResourcesWithMultipleResources() throws OMException {
     final Set<IamSessionPolicyResolver.ResourceSpec> resultNative = validateAndCategorizeResources(
         NATIVE, strSet("arn:aws:s3:::bucket1", "arn:aws:s3:::bucket2/*", "arn:aws:s3:::bucket3/key.txt"));
@@ -790,25 +821,75 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testCreatePathsAndPermissionsWithConditionPrefixes() {
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForObjectActionMustIgnoreConditionPrefixes() {
     final Set<S3Action> actions = Collections.singleton(S3Action.GET_OBJECT);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
 
     final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
-        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", null, null));
-    final Set<IOzoneObj> nativeReadObjects = objSet(
-        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"), bucket("bucket1"), volume());
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX, "bucket1", "", null));
+    final Set<IOzoneObj> nativeReadObjects = objSet(prefix("bucket1", ""), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, nativeResourceSpecs, prefixes);
     assertThat(resultNative).containsExactly(new AssumeRoleRequest.OzoneGrant(nativeReadObjects, acls(READ)));
 
     final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
-        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", null, null));
-    final Set<IOzoneObj> rangerReadObjects = objSet(
-        key("bucket1", "folder1/"), key("bucket1", "folder2/"), bucket("bucket1"), volume());
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket1", "*", null));
+    final Set<IOzoneObj> rangerReadObjects = objSet(key("bucket1", "*"), bucket("bucket1"), volume());
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, rangerResourceSpecs, prefixes);
     assertThat(resultRanger).containsExactly(new AssumeRoleRequest.OzoneGrant(rangerReadObjects, acls(READ)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsAListingAction() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.LIST_BUCKET);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> nativeReadObjects = objSet(
+        prefix("bucket1", "folder1/"), prefix("bucket1", "folder2/"), volume());
+    final Set<IOzoneObj> nativeReadAndListObject = objSet(bucket("bucket1"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, prefixes);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(nativeReadObjects, acls(READ)),
+        new AssumeRoleRequest.OzoneGrant(nativeReadAndListObject, acls(READ, LIST)));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> rangerReadObjects = objSet(
+        key("bucket1", "folder1/"), key("bucket1", "folder2/"), volume());
+    final Set<IOzoneObj> rangerReadAndListObject = objSet(bucket("bucket1"));
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, prefixes);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(rangerReadObjects, acls(READ)),
+        new AssumeRoleRequest.OzoneGrant(rangerReadAndListObject, acls(READ, LIST)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsNotAListingAction() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.GET_BUCKET_ACL);
+    final Set<String> prefixes = strSet("folder1/", "folder2/");
+    final Set<IOzoneObj> readObject = objSet(volume());
+    final Set<IOzoneObj> readAndReadAclObject = objSet(bucket("bucket1"));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> nativeResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, nativeResourceSpecs, prefixes);
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)),
+        new AssumeRoleRequest.OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL)));
+
+    final Set<IamSessionPolicyResolver.ResourceSpec> rangerResourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, rangerResourceSpecs, prefixes);
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)),
+        new AssumeRoleRequest.OzoneGrant(readAndReadAclObject, acls(READ, READ_ACL)));
   }
 
   // TODO sts - add more createPathsAndPermissions tests in the next PR
