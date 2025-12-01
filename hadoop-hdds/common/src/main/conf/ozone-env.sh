@@ -31,8 +31,7 @@
 # To avoid noisy warnings during CLI execution (e.g., ozone version),
 # we only attempt to raise the limit when the hard limit is non-zero,
 # and we silence any possible error for safety.
-hard=$(ulimit -Hc 2>/dev/null || echo 0)
-if [ "$hard" != 0 ]; then
+if [ "$(ulimit -Hc 2>/dev/null || echo 0)" != 0 ]; then
   ulimit -c unlimited 2>/dev/null || true
 fi
 
