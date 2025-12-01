@@ -83,7 +83,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
@@ -211,22 +211,23 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   private String getReadLockMessageAcquire(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getReadLockMessageRelease(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageAcquire(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageRelease(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
-  private HierarchicalResourceLock getHierarchicalResourceLock(FlatResource resource, String key, boolean isWriteLock) {
+  private HierarchicalResourceLock getHierarchicalResourceLock(DAGLeveledResource resource, String key,
+      boolean isWriteLock) {
     return new HierarchicalResourceLock() {
       @Override
       public boolean isLockAcquired() {
@@ -247,12 +248,12 @@ public class TestOmSnapshotLocalDataManager {
   private void mockLockManager() throws IOException {
     lockCapturor.clear();
     reset(lockManager);
-    when(lockManager.acquireReadLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireReadLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(READ_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), false);
         });
-    when(lockManager.acquireWriteLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireWriteLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(WRITE_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), true);
@@ -543,7 +544,7 @@ public class TestOmSnapshotLocalDataManager {
     if (purgeSnapshot) {
       assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
-      assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
+      assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
     } else {
       try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
         OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
@@ -790,15 +791,17 @@ public class TestOmSnapshotLocalDataManager {
     expNotDefraggedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1", "dt2").collect(Collectors.toList()));
 
     List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
+    int seqNumber = 0;
     for (Map.Entry<String, List<String>> entry : expNotDefraggedSSTFileList.entrySet()) {
       String cfname = entry.getKey();
       for (String fname : entry.getValue()) {
-        mockedLiveFiles.add(createMockLiveFileMetaData("/" + fname + ".sst", cfname, "k1", "k2"));
+        mockedLiveFiles.add(createMockLiveFileMetaData("/" + fname + ".sst", cfname, "k1", "k2", seqNumber++));
       }
     }
+    int expectedDbTxSequenceNumber = seqNumber - 1;
     // Add some other column families and files that should be ignored
-    mockedLiveFiles.add(createMockLiveFileMetaData("ot1.sst", "otherTable", "k1", "k2"));
-    mockedLiveFiles.add(createMockLiveFileMetaData("ot2.sst", "otherTable", "k1", "k2"));
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot1.sst", "otherTable", "k1", "k2", seqNumber++));
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot2.sst", "otherTable", "k1", "k2", seqNumber));
 
     mockSnapshotStore(snapshotId, mockedLiveFiles);
     localDataManager = getNewOmSnapshotLocalDataManager();
@@ -820,6 +823,7 @@ public class TestOmSnapshotLocalDataManager {
     assertEquals(0L, localData.getLastDefragTime());
     assertTrue(localData.getNeedsDefrag());
     assertEquals(1, localData.getVersionSstFileInfos().size());
+    assertEquals(expectedDbTxSequenceNumber, localData.getDbTxSequenceNumber());
   }
 
   @Test
@@ -829,12 +833,12 @@ public class TestOmSnapshotLocalDataManager {
     // Setup snapshot store mock
 
     List<LiveFileMetaData> sstFiles = new ArrayList<>();
-    sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file2.sst", KEY_TABLE, "key3", "key9"));
-    sstFiles.add(createMockLiveFileMetaData("file3.sst", FILE_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file4.sst", FILE_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7"));
+    sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7", 10));
+    sstFiles.add(createMockLiveFileMetaData("file2.sst", KEY_TABLE, "key3", "key9", 20));
+    sstFiles.add(createMockLiveFileMetaData("file3.sst", FILE_TABLE, "key1", "key7", 30));
+    sstFiles.add(createMockLiveFileMetaData("file4.sst", FILE_TABLE, "key1", "key7", 100));
+    sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7", 5000));
+    sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7", 6000));
     List<SstFileInfo> sstFileInfos = IntStream.range(0, sstFiles.size() - 1)
         .mapToObj(sstFiles::get).map(lfm ->
             new SstFileInfo(lfm.fileName().replace(".sst", ""),
@@ -856,6 +860,7 @@ public class TestOmSnapshotLocalDataManager {
       assertEquals(expectedVersionMeta, versionMeta);
       // New Snapshot create needs to be defragged always.
       assertTrue(snapshotLocalData.needsDefrag());
+      assertEquals(5000, snapshotLocalData.getSnapshotLocalData().getDbTxSequenceNumber());
     }
   }
 
@@ -964,7 +969,7 @@ public class TestOmSnapshotLocalDataManager {
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
-        localDataManager.getVersionNodeMap();
+        localDataManager.getVersionNodeMapUnmodifiable();
     assertEquals(2, versionMap.size());
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
   }
@@ -994,7 +999,7 @@ public class TestOmSnapshotLocalDataManager {
     when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
-      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
       Map<UUID, UUID> previousMap = ImmutableMap.of(snap2, snap3, snap1, snap2);
       Map<UUID, Map<Integer, OmSnapshotLocalData.VersionMeta>> expectedSstFile = ImmutableMap.of(
           snap3, ImmutableMap.of(0,
@@ -1005,17 +1010,19 @@ public class TestOmSnapshotLocalDataManager {
                   new SstFileInfo(snap1.toString(), snap1 + "k1", snap1 + "k2", KEY_TABLE)))),
           snap2, ImmutableMap.of(0,
               new OmSnapshotLocalData.VersionMeta(0, ImmutableList.of())));
-      for (UUID snapshotId : localDataManager.getVersionNodeMap().keySet()) {
+      for (UUID snapshotId : localDataManager.getVersionNodeMapUnmodifiable().keySet()) {
         try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
                  localDataManager.getOmSnapshotLocalData(snapshotId)) {
           OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
           assertEquals(snapshotId, snapshotLocalData.getSnapshotId());
           assertEquals(previousMap.get(snapshotId), snapshotLocalData.getPreviousSnapshotId());
           assertEquals(expectedSstFile.get(snapshotId), snapshotLocalData.getVersionSstFileInfos());
+          assertTrue(readableOmSnapshotLocalDataProvider.needsDefrag());
+          assertTrue(snapshotLocalData.getNeedsDefrag());
         }
       }
     } else {
-      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
     }
   }
 
@@ -1060,11 +1067,17 @@ public class TestOmSnapshotLocalDataManager {
 
   private LiveFileMetaData createMockLiveFileMetaData(String fileName, String columnFamilyName, String smallestKey,
       String largestKey) {
+    return createMockLiveFileMetaData(fileName, columnFamilyName, smallestKey, largestKey, 0);
+  }
+
+  private LiveFileMetaData createMockLiveFileMetaData(String fileName, String columnFamilyName, String smallestKey,
+      String largestKey, long largestSeqNumber) {
     LiveFileMetaData liveFileMetaData = mock(LiveFileMetaData.class);
     when(liveFileMetaData.columnFamilyName()).thenReturn(StringUtils.string2Bytes(columnFamilyName));
     when(liveFileMetaData.fileName()).thenReturn(fileName);
     when(liveFileMetaData.smallestKey()).thenReturn(StringUtils.string2Bytes(smallestKey));
     when(liveFileMetaData.largestKey()).thenReturn(StringUtils.string2Bytes(largestKey));
+    when(liveFileMetaData.largestSeqno()).thenReturn(largestSeqNumber);
     return liveFileMetaData;
   }
 
@@ -1074,7 +1087,7 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file2.sst", "columnFamily1", "key3", "key10"));
     sstFiles.add(createMockLiveFileMetaData("file3.sst", "columnFamily2", "key1", "key8"));
     sstFiles.add(createMockLiveFileMetaData("file4.sst", "columnFamily2", "key0", "key10"));
-    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null);
+    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null, 10);
   }
 
   private void createSnapshotLocalDataFile(UUID snapshotId, UUID previousSnapshotId)

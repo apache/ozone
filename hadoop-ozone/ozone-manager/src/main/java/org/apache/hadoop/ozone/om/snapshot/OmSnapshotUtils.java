@@ -17,16 +17,15 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,17 +57,6 @@ public final class OmSnapshotUtils {
    */
   public static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
-  }
-
-  /**
-   * Get the INode for file.
-   *
-   * @param file File whose INode is to be retrieved.
-   * @return INode for file.
-   */
-  @VisibleForTesting
-  public static Object getINode(Path file) throws IOException {
-    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }
 
   /**

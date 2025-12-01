@@ -39,7 +39,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.38.7</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.39.5</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.82</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -107,7 +107,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <io.grpc.version>1.71.0</io.grpc.version>
+    <io.grpc.version>1.77.0</io.grpc.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
     <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
@@ -173,9 +173,7 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <!-- Use netty version known to work with grpc-netty. See table: -->
-    <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
-    <netty.version>4.1.119.Final</netty.version>
+    <netty.version>4.1.128.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -188,7 +186,6 @@
       4.7.7: https://github.com/remkop/picocli/issues/2407
     -->
     <picocli.version>4.7.5</picocli.version>
-    <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
     <project.build.outputTimestamp>2025-03-12T22:12:52Z</project.build.outputTimestamp>
@@ -1919,13 +1916,6 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
           <version>${maven-dependency-plugin.version}</version>
-          <dependencies>
-            <dependency>
-              <groupId>org.codehaus.plexus</groupId>
-              <artifactId>plexus-archiver</artifactId>
-              <version>${plexus-archiver.version}</version>
-            </dependency>
-          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

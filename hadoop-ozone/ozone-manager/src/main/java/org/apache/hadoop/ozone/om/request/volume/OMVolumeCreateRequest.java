@@ -129,17 +129,16 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     boolean acquiredUserLock = false;
     Exception exception = null;
     OMClientResponse omClientResponse = null;
-    OmVolumeArgs omVolumeArgs = null;
+    final OmVolumeArgs omVolumeArgs;
     Map<String, String> auditMap = null;
     try {
-      omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      omVolumeArgs.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-
+      omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+          .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       auditMap = omVolumeArgs.toAuditMap();
       // acquire lock.
@@ -168,7 +167,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
             ozoneManager.getConfig());
         // ACLs from VolumeArgs
-        if (omVolumeArgs.getAcls() != null) {
+        if (omVolumeArgs.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
           listOfAcls.addAll(omVolumeArgs.getAcls());
         }
         // Remove the duplicates

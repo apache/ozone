@@ -31,7 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -275,14 +275,14 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       PersistedUserVolumeInfo volumeList = null;
       if (!skipVolumeCreation) {
         // Create volume. TODO: dedup OMVolumeCreateRequest
-        omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-        omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
-        omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
-        omVolumeArgs.setObjectID(
-            ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-        omVolumeArgs.setUpdateID(transactionLogIndex);
+        omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+            .setQuotaInBytes(OzoneConsts.QUOTA_RESET)
+            .setQuotaInNamespace(OzoneConsts.QUOTA_RESET)
+            .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+            .setUpdateID(transactionLogIndex)
+            .incRefCount()
+            .build();
 
-        omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");
@@ -297,15 +297,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       } else {
         LOG.info("Skipped volume '{}' creation. "
             + "Will only increment volume refCount", volumeName);
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .incRefCount()
+            .build();
 
-        omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");
 
         omMetadataManager.getVolumeTable().addCacheEntry(
-            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            new CacheKey<>(dbVolumeKey),
             CacheValue.get(transactionLogIndex, omVolumeArgs));
       }
 
