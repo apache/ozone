@@ -255,7 +255,6 @@ class TestBlockOutputStream {
 
         assertEquals(1, keyOutputStream.getStreamEntries().size());
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
 
       assertEquals(pendingWriteChunkCount,
@@ -378,7 +377,6 @@ class TestBlockOutputStream {
             blockOutputStream.getTotalAckDataLength());
 
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
 
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
@@ -471,7 +469,6 @@ class TestBlockOutputStream {
         assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
 
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
@@ -661,7 +658,6 @@ class TestBlockOutputStream {
             .isLessThanOrEqualTo(1);
 
         // now close the stream, it will update ack length after watchForCommit
-        key.close();
       }
       assertEquals(pendingWriteChunkCount,
           metrics.getPendingContainerOpCountMetrics(WriteChunk));
@@ -764,7 +760,6 @@ class TestBlockOutputStream {
             .isLessThanOrEqualTo(2);
 
         // now close the stream, it will update ack length after watchForCommit
-        key.close();
       }
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty

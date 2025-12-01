@@ -175,7 +175,6 @@ class TestBlockOutputStreamWithFailures {
       // commitInfoMap will remain intact as there is no server failure
       assertEquals(3, raftClient.getCommitInfoMap().size());
       // now close the stream, It will update ack length after watchForCommit
-      key.close();
     }
     // make sure the bufferPool is empty
     assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
@@ -258,7 +257,6 @@ class TestBlockOutputStreamWithFailures {
 
         assertEquals(2, keyOutputStream.getStreamEntries().size());
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
       // Make sure the retryCount is reset after the exception is handled
       assertEquals(0, keyOutputStream.getRetryCount());
@@ -361,7 +359,6 @@ class TestBlockOutputStreamWithFailures {
         assertEquals(0, keyOutputStream.getRetryCount());
         // now close the stream, It will update ack length after watchForCommit
 
-        key.close();
       }
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
@@ -419,7 +416,6 @@ class TestBlockOutputStreamWithFailures {
       // commitInfoMap will remain intact as there is no server failure
       assertEquals(3, raftClient.getCommitInfoMap().size());
       // now close the stream, It will update ack length after watchForCommit
-      key.close();
     }
     // make sure the bufferPool is empty
     assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
@@ -478,7 +474,6 @@ class TestBlockOutputStreamWithFailures {
       // commitInfoMap will remain intact as there is no server failure
       assertEquals(3, raftClient.getCommitInfoMap().size());
       // now close the stream, It will hit exception
-      key.close();
     }
 
     assertInstanceOf(ContainerNotOpenException.class,
@@ -569,7 +564,6 @@ class TestBlockOutputStreamWithFailures {
       assertEquals(1, raftClient.getCommitInfoMap().size());
       assertEquals(2, keyOutputStream.getStreamEntries().size());
       // now close the stream, It will update ack length after watchForCommit
-      key.close();
     }
     // make sure the bufferPool is empty
     assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
@@ -656,7 +650,6 @@ class TestBlockOutputStreamWithFailures {
         assertEquals(0, keyOutputStream.getRetryCount());
         assertEquals(2, keyOutputStream.getStreamEntries().size());
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
@@ -748,7 +741,6 @@ class TestBlockOutputStreamWithFailures {
         assertEquals(1, raftClient.getCommitInfoMap().size());
 
         // now close the stream, It will update ack length after watchForCommit
-        key.close();
       }
 
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
