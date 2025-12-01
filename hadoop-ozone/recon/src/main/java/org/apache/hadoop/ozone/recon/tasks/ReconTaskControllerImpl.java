@@ -351,7 +351,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Clean up any pre-existing checkpoint directories from previous runs
     cleanupPreExistingCheckpoints();
     
-    executorService = Executors.newFixedThreadPool(8,
+    executorService = Executors.newFixedThreadPool(threadCount,
         new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
             .build());
     
