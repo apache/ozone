@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -163,50 +160,30 @@ public abstract class FileSizeCountTaskHelper {
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     long startTime = Time.monotonicNow();
 
-    // Per-worker threshold: divide total by worker count
+    // Divide threshold by worker count so each worker flushes independently
     final int PER_WORKER_THRESHOLD = Math.max(1, 200000 / maxWorkers);  // 200k / 20 = 10k
     
-    // Each worker thread gets its own map (lockless updates!)
-    //ThreadLocal<Map<FileSizeCountKey, Long>> workerLocalMap =
-    //    ThreadLocal.withInitial(ConcurrentHashMap::new);
-
+    // Map thread IDs to worker-specific maps for lockless updates
     Map<Long, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();
-    // Track all worker maps for final flush
-    //List<Map<FileSizeCountKey, Long>> allWorkerMaps =
-    //    Collections.synchronizedList(new ArrayList<>());
     
-    // Single lock for DB flush operations only
+    // Lock for coordinating DB flush operations only
     Object flushLock = new Object();
     
-    // Worker operation - lockless map updates!
+    // Lambda executed by workers for each key
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
-        // Get this worker thread's private map (no lock needed!)
-        //Map<FileSizeCountKey, Long> myMap = workerLocalMap.get();
-      Map<FileSizeCountKey, Long> myMap = allMap.computeIfAbsent(Thread.currentThread().getId(), (k) -> new HashMap<>());
-      //Map<FileSizeCountKey, Long> myMap = allMap.get(Thread.currentThread().getId());
+        // Get or create this worker's private map using thread ID
+        Map<FileSizeCountKey, Long> myMap = allMap.computeIfAbsent(
+            Thread.currentThread().getId(), k -> new HashMap<>());
         
-        // Register this worker's map on first use (thread-safe registration)
-        /*if (!allWorkerMaps.contains(myMap)) {
-            synchronized (allWorkerMaps) {
-                if (!allWorkerMaps.contains(myMap)) {
-                    allWorkerMaps.add(myMap);
-                }
-            }
-        }*/
-        
-        // Update map without any locks - each worker owns its map!
+        // Update worker's private map without locks
         handlePutKeyEvent(kv.getValue(), myMap);
         
-        // Check if this worker's map needs flushing
+        // Flush this worker's map when it reaches threshold
         if (myMap.size() >= PER_WORKER_THRESHOLD) {
             synchronized (flushLock) {
-                // Double-check size after acquiring lock
-                //if (myMap.size() >= PER_WORKER_THRESHOLD) {
-                    LOG.info("{}: Worker flushing {} entries to RocksDB",
-                        taskName, myMap.size());
-                    writeCountsToDB(myMap, reconFileMetadataManager);
-                    myMap.clear();
-               // }
+                LOG.info("{}: Worker flushing {} entries to RocksDB", taskName, myMap.size());
+                writeCountsToDB(myMap, reconFileMetadataManager);
+                myMap.clear();
             }
         }
         return null;
@@ -221,22 +198,15 @@ public abstract class FileSizeCountTaskHelper {
         return false;
     }
     
-    // Final flush: Ensure all worker maps are written to DB
-    // Since its a single thread flushing the maps one by one hence no need for the lock.
+    // Final flush: Write remaining entries from all worker maps to DB
     LOG.info("{}: Final flush of {} worker maps", taskName, allMap.size());
-    //synchronized (flushLock) {
-        for (Map<FileSizeCountKey, Long> workerMap : allMap.values()) {
-            if (!workerMap.isEmpty()) {
-                LOG.info("{}: Flushing remaining {} entries from worker map",
-                    taskName, workerMap.size());
-                writeCountsToDB(workerMap, reconFileMetadataManager);
-                workerMap.clear();
-            }
+    for (Map<FileSizeCountKey, Long> workerMap : allMap.values()) {
+        if (!workerMap.isEmpty()) {
+            LOG.info("{}: Flushing remaining {} entries from worker map", taskName, workerMap.size());
+            writeCountsToDB(workerMap, reconFileMetadataManager);
+            workerMap.clear();
         }
-    //}
-    
-    // Clean up ThreadLocal to prevent memory leaks
-    //workerLocalMap.remove();
+    }
     
     long endTime = Time.monotonicNow();
     long durationMs = endTime - startTime;

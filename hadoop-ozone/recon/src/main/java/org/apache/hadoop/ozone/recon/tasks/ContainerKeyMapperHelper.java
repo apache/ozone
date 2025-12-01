@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -133,43 +132,44 @@ public abstract class ContainerKeyMapperHelper {
                                                 int maxWorkers,
                                                 int maxKeysInMemory) {
     AtomicLong omKeyCount = new AtomicLong(0);
-    Map<ContainerKeyPrefix, Integer> localContainerKeyMap = new ConcurrentHashMap<>();
 
     try {
-      LOG.info("{}: Starting parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
+      LOG.info("{}: Starting lockless parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
           taskName, maxIterators, maxWorkers, maxKeysInMemory, bucketLayout);
       Instant start = Instant.now();
 
       // Perform one-time initialization (truncate tables + clear shared map)
       initializeContainerKeyMapperIfNeeded(reconContainerMetadataManager, taskName);
 
-      // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
-      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+      // Divide threshold by worker count so each worker flushes independently
+      final long PER_WORKER_THRESHOLD = Math.max(1, containerKeyFlushToDBMaxThreshold / maxWorkers);
       
-      // Use parallel table iteration
+      // Map thread IDs to worker-specific local maps for lockless updates
+      Map<Long, Map<ContainerKeyPrefix, Integer>> allLocalMaps = new ConcurrentHashMap<>();
+      
+      Object flushLock = new Object();
+      
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         try {
-          try {
-            lock.readLock().lock();
-            handleKeyReprocess(kv.getKey(), kv.getValue(), localContainerKeyMap, SHARED_CONTAINER_KEY_COUNT_MAP,
-                reconContainerMetadataManager);
-          } finally {
-            lock.readLock().unlock();
-          }
+          // Get or create this worker's private local map using thread ID
+          Map<ContainerKeyPrefix, Integer> myLocalMap = allLocalMaps.computeIfAbsent(
+              Thread.currentThread().getId(), k -> new ConcurrentHashMap<>());
+          
+          handleKeyReprocess(kv.getKey(), kv.getValue(), myLocalMap, SHARED_CONTAINER_KEY_COUNT_MAP,
+              reconContainerMetadataManager);
+          
           omKeyCount.incrementAndGet();
           
-          // Check if flush is needed
-          if (localContainerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
-            try {
-              lock.writeLock().lock();
-              if (!checkAndCallFlushToDB(localContainerKeyMap, containerKeyFlushToDBMaxThreshold,
+          // Flush this worker's map when it reaches threshold
+          if (myLocalMap.size() >= PER_WORKER_THRESHOLD) {
+            synchronized (flushLock) {
+              LOG.info("{}: Worker flushing {} entries to RocksDB", taskName, myLocalMap.size());
+              if (!flushAndCommitContainerKeyInfoToDB(myLocalMap, Collections.emptyMap(),
                   reconContainerMetadataManager)) {
                 throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
               }
-            } finally {
-              lock.writeLock().unlock();
             }
           }
           return null;
@@ -177,18 +177,32 @@ public abstract class ContainerKeyMapperHelper {
           throw new UncheckedIOException(e);
         }
       };
+      
       try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
                new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                   StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, containerKeyFlushToDBMaxThreshold)) {
+                   StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, PER_WORKER_THRESHOLD)) {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
       }
 
-      // Capture total container count BEFORE final flush clears the map
+      // Final flush: Write remaining entries from all worker local maps to DB
+      LOG.info("{}: Final flush of {} worker local maps", taskName, allLocalMaps.size());
+      for (Map<ContainerKeyPrefix, Integer> workerLocalMap : allLocalMaps.values()) {
+        if (!workerLocalMap.isEmpty()) {
+          LOG.info("{}: Flushing remaining {} entries from worker map", taskName, workerLocalMap.size());
+          if (!flushAndCommitContainerKeyInfoToDB(workerLocalMap, Collections.emptyMap(),
+              reconContainerMetadataManager)) {
+            LOG.error("Failed to flush worker local map for {}", taskName);
+            return false;
+          }
+        }
+      }
+
+      // Capture total container count from shared map
       long totalContainers = SHARED_CONTAINER_KEY_COUNT_MAP.size();
 
-      // Final flush and commit
-      if (!flushAndCommitContainerKeyInfoToDB(localContainerKeyMap, SHARED_CONTAINER_KEY_COUNT_MAP, reconContainerMetadataManager)) {
-        LOG.error("Failed to flush Container Key data to DB for {}", taskName);
+      // Final flush: Shared container count map
+      if (!flushAndCommitContainerKeyInfoToDB(Collections.emptyMap(), SHARED_CONTAINER_KEY_COUNT_MAP, reconContainerMetadataManager)) {
+        LOG.error("Failed to flush shared container count map for {}", taskName);
         return false;
       }
 
@@ -216,22 +230,13 @@ public abstract class ContainerKeyMapperHelper {
       long keysProcessed = omKeyCount.get();
       double throughput = keysProcessed / Math.max(durationSeconds, 0.001);
       
-      LOG.info("{}: Parallel reprocess completed. Processed {} keys in {} ms ({} sec) - " +
-          "Throughput: {} keys/sec - Containers: {}, Container-Key mappings: {}",
+      LOG.info("{}: Lockless parallel reprocess completed. Processed {} keys in {} ms ({} sec) - " +
+          "Throughput: {} keys/sec - Containers: {}, Worker threshold: {}",
           taskName, keysProcessed, durationMillis, String.format("%.2f", durationSeconds),
-          String.format("%.2f", throughput), totalContainers, localContainerKeyMap.size());
+          String.format("%.2f", throughput), totalContainers, PER_WORKER_THRESHOLD);
     } catch (Exception ex) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;
-    }
-    return true;
-  }
-
-  private static boolean checkAndCallFlushToDB(Map<ContainerKeyPrefix, Integer> localContainerKeyMap,
-                                               long containerKeyFlushToDBMaxThreshold,
-                                               ReconContainerMetadataManager reconContainerMetadataManager) {
-    if (localContainerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
-      return flushAndCommitContainerKeyInfoToDB(localContainerKeyMap, Collections.emptyMap(), reconContainerMetadataManager);
     }
     return true;
   }
