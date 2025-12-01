@@ -610,8 +610,10 @@ public class DiskBalancerService extends BackgroundService {
 
   private void cleanupPendingDeletionContainers() {
     // delete all pending deletion containers before stop the service
-    while (tryCleanupOnePendingDeletionContainer()) {
-    }
+    boolean ret;
+    do {
+      ret = tryCleanupOnePendingDeletionContainer();
+    } while (ret);
   }
 
   private boolean tryCleanupOnePendingDeletionContainer() {
