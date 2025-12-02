@@ -35,13 +35,6 @@ public class TestOmInit {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -50,9 +43,6 @@ public class TestOmInit {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

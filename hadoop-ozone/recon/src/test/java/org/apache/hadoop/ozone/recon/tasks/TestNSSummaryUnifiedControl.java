@@ -31,10 +31,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -53,6 +50,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -116,18 +114,12 @@ public class TestNSSummaryUnifiedControl {
         // Simplified test implementation that mimics the real execution flow
         // but bypasses the complex sub-task execution while maintaining proper state management
         
-        String threadName = Thread.currentThread().getName();
-        LOG.info("TEST executeReprocess called by thread: {}, using manager: {}", 
-            threadName, getReconNamespaceSummaryManager().getClass().getSimpleName());
-        
         // Initialize a list of tasks to run in parallel (empty for testing)
         Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
         try {
           // This will call the mocked clearNSSummaryTable (might throw Exception for failure tests)
-          LOG.info("TEST: About to call clearNSSummaryTable on: {}", getReconNamespaceSummaryManager());
           getReconNamespaceSummaryManager().clearNSSummaryTable();
-          LOG.info("TEST: clearNSSummaryTable call completed");
         } catch (IOException ioEx) {
           LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
           NSSummaryTask.setRebuildStateToFailed();
@@ -169,9 +161,9 @@ public class TestNSSummaryUnifiedControl {
           long durationInMillis = TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
           LOG.info("Test NSSummary reprocess execution time: {} milliseconds", durationInMillis);
           
-          // Don't reset state here - let the main reprocess method handle state management
-          // The test should not interfere with state transitions during execution
+          // Reset state to IDLE on successful completion
           if (success) {
+            NSSummaryTask.resetRebuildState();
             LOG.info("Test NSSummary tree reprocess completed successfully with unified control.");
           }
         }
@@ -323,66 +315,30 @@ public class TestNSSummaryUnifiedControl {
    * Test multiple concurrent attempts - only one should succeed, others rejected.
    */
   @Test
-  @SuppressWarnings("methodlength")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
-    CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
-    CountDownLatch startSimultaneously = new CountDownLatch(1);
-    CountDownLatch allThreadsStartedReprocess = new CountDownLatch(threadCount);
+    CountDownLatch startLatch = new CountDownLatch(1);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
     AtomicInteger clearTableCallCount = new AtomicInteger(0);
-    
-    // Track which threads are part of our test to filter out external calls
-    final Set<String> testThreadNames = Collections.synchronizedSet(new HashSet<>());
 
     // Ensure clean initial state
     NSSummaryTask.resetRebuildState();
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(), 
         "Initial state must be IDLE");
 
-    // Setup rebuild to block and count calls with additional debugging
+    // Setup rebuild to block and count calls
     doAnswer(invocation -> {
-      String threadName = Thread.currentThread().getName();
-      RebuildState currentState = NSSummaryTask.getRebuildState();
+      int callNum = clearTableCallCount.incrementAndGet();
+      LOG.info("clearNSSummaryTable called #{}, current state: {}", callNum, NSSummaryTask.getRebuildState());
       
-      // Count all calls but distinguish between test threads and external threads
-      boolean isTestThread = threadName.contains("ForkJoinPool") || testThreadNames.contains(threadName);
-      if (isTestThread) {
-        LOG.error("Test Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
-        int callNum = clearTableCallCount.incrementAndGet();
-        LOG.info("clearNSSummaryTable called #{} by test thread: {}, current state: {}", 
-            callNum, threadName, currentState);
-        
-        // Wait for ALL threads to have attempted to call reprocess() before allowing any to proceed
-        // This ensures we test true simultaneous access to the compareAndSet operations
-        try {
-          boolean awaitSuccess = allThreadsStartedReprocess.await(10, TimeUnit.SECONDS);
-          if (!awaitSuccess) {
-            LOG.warn("allThreadsStartedReprocess.await() timed out");
-          }
-          // Then wait for test to signal completion
-          awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
-          if (!awaitSuccess) {
-            LOG.warn("finishLatch.await() timed out");
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          LOG.warn("Thread interrupted while waiting");
+      if (callNum == 1) {
+        startLatch.countDown();
+        boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("finishLatch.await() timed out");
         }
-        
-        if (callNum > 1) {
-          // If we get a second call from our test threads during the SAME test execution,
-          // this indicates the unified control failed
-          LOG.error("UNEXPECTED: clearNSSummaryTable called multiple times (call #{}) by test thread: {}, state: {}", 
-              callNum, threadName, currentState);
-        }
-      } else {
-        LOG.error("External Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
-        // Log external calls that shouldn't be counted but might indicate CI interference
-        LOG.warn("clearNSSummaryTable called by EXTERNAL thread: {}, state: {} - this may be CI interference",
-            threadName, currentState);
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -391,62 +347,25 @@ public class TestNSSummaryUnifiedControl {
     CompletableFuture<Void>[] futures = new CompletableFuture[threadCount];
 
     try {
-      // Launch multiple concurrent rebuilds with proper synchronization
+      // Launch multiple concurrent rebuilds
       for (int i = 0; i < threadCount; i++) {
         final int threadId = i;
         futures[i] = CompletableFuture.runAsync(() -> {
-          try {
-            // Register this thread as part of our test
-            String threadName = Thread.currentThread().getName();
-            testThreadNames.add(threadName);
-            
-            // Signal this thread is ready
-            allThreadsReady.countDown();
-            // Wait for all threads to be ready before starting simultaneously
-            boolean allReady = allThreadsReady.await(5, TimeUnit.SECONDS);
-            if (!allReady) {
-              LOG.warn("Thread {} timed out waiting for all threads to be ready", threadId);
-            }
-            
-            // All threads now wait for the signal to start simultaneously
-            boolean startSignalReceived = startSimultaneously.await(5, TimeUnit.SECONDS);
-            if (!startSignalReceived) {
-              LOG.warn("Thread {} timed out waiting for start signal", threadId);
-            }
-
-            LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName,
-                NSSummaryTask.getRebuildState());
-            
-            // Signal that this thread has started calling reprocess()
-            allThreadsStartedReprocess.countDown();
-            
-            TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
-            if (result.isTaskSuccess()) {
-              int count = successCount.incrementAndGet();
-              LOG.info("Thread {} ({}) rebuild succeeded (success #{})", threadId, threadName, count);
-            } else {
-              int count = rejectedCount.incrementAndGet();
-              LOG.info("Thread {} ({}) rebuild rejected (rejection #{})", threadId, threadName, count);
-            }
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            LOG.error("Thread {} interrupted", threadId);
+          LOG.info("Thread {} attempting rebuild, current state: {}", threadId, NSSummaryTask.getRebuildState());
+          TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
+          if (result.isTaskSuccess()) {
+            int count = successCount.incrementAndGet();
+            LOG.info("Thread {} rebuild succeeded (success #{})", threadId, count);
+          } else {
+            int count = rejectedCount.incrementAndGet();
+            LOG.info("Thread {} rebuild rejected (rejection #{})", threadId, count);
           }
         }, executor);
       }
 
-      // Wait for all threads to be ready, then start them simultaneously
-      assertTrue(allThreadsReady.await(5, TimeUnit.SECONDS), 
-          "All threads should be ready");
-      
-      // Start all threads simultaneously
-      startSimultaneously.countDown();
-      
-      // Wait for all threads to have started their reprocess() calls
-      assertTrue(allThreadsStartedReprocess.await(10, TimeUnit.SECONDS), 
-          "All threads should start reprocess calls");
-      
-      // Verify that state is RUNNING (at least one thread acquired the lock)
+      // Wait for first rebuild to start
+      assertTrue(startLatch.await(5, TimeUnit.SECONDS), 
+          "At least one rebuild should start");
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
           "State should be RUNNING");
 
@@ -467,9 +386,6 @@ public class TestNSSummaryUnifiedControl {
           "All other rebuilds should be rejected");
       assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
           "Final state should be IDLE");
-      
-      // Additional verification that our mock was actually used
-      verify(mockNamespaceSummaryManager, times(1)).clearNSSummaryTable();
 
     } finally {
       finishLatch.countDown(); // Ensure cleanup

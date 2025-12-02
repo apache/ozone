@@ -87,6 +87,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    super.preExecute(ozoneManager);
+
     // Get original request.
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
@@ -94,6 +96,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_BUCKET,
+                buildVolumeAuditMap(bucketInfo.getVolumeName()), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
 
     validateMaxBucket(ozoneManager);
 
@@ -206,13 +224,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            volumeName, bucketName, null);
-      }
-
       mergeOmLockDetails(
           metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -242,9 +253,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      omBucketInfo.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      omBucketInfo = omBucketInfo.toBuilder()
+          .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
 
@@ -252,7 +264,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
       checkQuotaInNamespace(omVolumeArgs, 1L);
 
       // update used namespace for volume
-      omVolumeArgs.incrUsedNamespace(1L);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .incrUsedNamespace(1L)
+          .build();
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
@@ -324,7 +338,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     List<OzoneAcl> acls = new ArrayList<>();
     // Add default acls
     acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfig()));
-    if (omBucketInfo.getAcls() != null) {
+    if (omBucketInfo.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
       // Add acls for bucket creator.
       acls.addAll(omBucketInfo.getAcls());
     }

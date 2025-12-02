@@ -27,14 +27,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 public class DeleteKeysResult {
 
   private List<OmKeyInfo> keysToDelete;
-  private long consumedSize;
 
   private boolean processedKeys;
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete,
-      long consumedSize, boolean processedKeys) {
+  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, boolean processedKeys) {
     this.keysToDelete = keysToDelete;
-    this.consumedSize = consumedSize;
     this.processedKeys = processedKeys;
   }
 
@@ -42,11 +39,8 @@ public class DeleteKeysResult {
     return keysToDelete;
   }
 
-  public long getConsumedSize() {
-    return consumedSize;
-  }
-
   public boolean isProcessedKeys() {
     return processedKeys;
   }
+
 }

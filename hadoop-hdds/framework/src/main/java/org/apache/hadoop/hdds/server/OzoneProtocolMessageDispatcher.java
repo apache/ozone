@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.server;
 
 import com.google.protobuf.ServiceException;
-import io.opentracing.Span;
-import java.util.function.UnaryOperator;
+import io.opentelemetry.api.trace.Span;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -42,20 +42,22 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       protocolMessageMetrics;
 
   private final Logger logger;
-  private final UnaryOperator<REQUEST> requestPreprocessor;
-  private final UnaryOperator<RESPONSE> responsePreprocessor;
+  private final Function<REQUEST, String> requestPreprocessor;
+  private final Function<RESPONSE, String> responsePreprocessor;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
       ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
       Logger logger) {
-    this(serviceName, protocolMessageMetrics, logger, req -> req, resp -> resp);
+    this(serviceName, protocolMessageMetrics, logger,
+        OzoneProtocolMessageDispatcher::escapeNewLines,
+        OzoneProtocolMessageDispatcher::escapeNewLines);
   }
 
   public OzoneProtocolMessageDispatcher(String serviceName,
       ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
       Logger logger,
-      UnaryOperator<REQUEST> requestPreprocessor,
-      UnaryOperator<RESPONSE> responsePreprocessor) {
+      Function<REQUEST, String> requestPreprocessor,
+      Function<RESPONSE, String> responsePreprocessor) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
@@ -75,7 +77,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             "[service={}] [type={}] request is received: <json>{}</json>",
             serviceName,
             type,
-            escapeNewLines(requestPreprocessor.apply(request)));
+            requestPreprocessor.apply(request));
       } else if (logger.isDebugEnabled()) {
         logger.debug("{} {} request is received",
             serviceName, type);
@@ -93,12 +95,12 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
                 + "<json>{}</json>",
             serviceName,
             type,
-            escapeNewLines(responsePreprocessor.apply(response)));
+            responsePreprocessor.apply(response));
       }
       return response;
 
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

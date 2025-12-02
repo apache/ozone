@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import moment from 'moment';
 import { ValueType } from 'react-select';
 import { useLocation } from 'react-router-dom';
@@ -28,11 +28,11 @@ import MultiSelect from '@/v2/components/select/multiSelect';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import BucketsTable, { COLUMNS } from '@/v2/components/tables/bucketsTable';
 
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { showDataFetchError } from '@/utils/common';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
 import {
   Bucket,
@@ -54,6 +54,11 @@ const defaultColumns = COLUMNS.map(column => ({
   label: column.title as string,
   value: column.key as string
 }));
+
+const DEFAULT_BUCKET_RESPONSE: BucketResponse = {
+  totalCount: 0,
+  buckets: []
+};
 
 function getVolumeBucketMap(data: Bucket[]) {
   const volumeBucketMap = data.reduce((
@@ -91,9 +96,6 @@ function getFilteredBuckets(
 }
 
 const Buckets: React.FC<{}> = () => {
-
-  const cancelSignal = useRef<AbortController>();
-
   const [state, setState] = useState<BucketsState>({
     totalCount: 0,
     lastUpdated: 0,
@@ -102,7 +104,6 @@ const Buckets: React.FC<{}> = () => {
     bucketsUnderVolume: [],
     volumeOptions: [],
   });
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedVolumes, setSelectedVolumes] = useState<Option[]>([]);
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
@@ -114,9 +115,20 @@ const Buckets: React.FC<{}> = () => {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const { search } = useLocation();
 
+  // Use the modern hooks pattern
+  const bucketsData = useApiData<BucketResponse>(
+    `/api/v1/buckets?limit=${selectedLimit.value}`,
+    DEFAULT_BUCKET_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
   function getVolumeSearchParam() {
     return new URLSearchParams(search).get('volume');
-  };
+  }
 
   function handleVolumeChange(selected: ValueType<Option, true>) {
     const { volumeBucketMap } = state;
@@ -132,7 +144,7 @@ const Buckets: React.FC<{}> = () => {
       ...state,
       bucketsUnderVolume: selectedBuckets
     });
-  };
+  }
 
   function handleAclLinkClick(bucket: Bucket) {
     setCurrentRow(bucket);
@@ -147,41 +159,28 @@ const Buckets: React.FC<{}> = () => {
     setSelectedLimit(selected as Option);
   }
 
-  const loadData = () => {
-    setLoading(true);
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/buckets',
-      cancelSignal.current,
-      '',
-      { limit: selectedLimit.value }
-    );
-    cancelSignal.current = controller;
-    request.then(response => {
-      const bucketsResponse: BucketResponse = response.data;
-      const totalCount = bucketsResponse.totalCount;
-      const buckets: Bucket[] = bucketsResponse.buckets;
+  // Process buckets data when it changes
+  useEffect(() => {
+    if (bucketsData.data && bucketsData.data.buckets) {
+      const buckets: Bucket[] = bucketsData.data.buckets.map(bucket => ({
+        volumeName: bucket.volumeName,
+        name: bucket.name,
+        versioning: bucket.versioning,
+        storageType: bucket.storageType,
+        bucketLayout: bucket.bucketLayout,
+        creationTime: bucket.creationTime,
+        modificationTime: bucket.modificationTime,
+        sourceVolume: bucket.sourceVolume,
+        sourceBucket: bucket.sourceBucket,
+        usedBytes: bucket.usedBytes,
+        usedNamespace: bucket.usedNamespace,
+        quotaInBytes: bucket.quotaInBytes,
+        quotaInNamespace: bucket.quotaInNamespace,
+        owner: bucket.owner,
+        acls: bucket.acls
+      }));
 
-      const dataSource: Bucket[] = buckets?.map(bucket => {
-        return {
-          volumeName: bucket.volumeName,
-          name: bucket.name,
-          versioning: bucket.versioning,
-          storageType: bucket.storageType,
-          bucketLayout: bucket.bucketLayout,
-          creationTime: bucket.creationTime,
-          modificationTime: bucket.modificationTime,
-          sourceVolume: bucket.sourceVolume,
-          sourceBucket: bucket.sourceBucket,
-          usedBytes: bucket.usedBytes,
-          usedNamespace: bucket.usedNamespace,
-          quotaInBytes: bucket.quotaInBytes,
-          quotaInNamespace: bucket.quotaInNamespace,
-          owner: bucket.owner,
-          acls: bucket.acls
-        };
-      }) ?? [];
-
-      const volumeBucketMap: Map<string, Set<Bucket>> = getVolumeBucketMap(dataSource);
+      const volumeBucketMap: Map<string, Set<Bucket>> = getVolumeBucketMap(buckets);
 
       // Set options for volume selection dropdown
       const volumeOptions: Option[] = Array.from(
@@ -191,30 +190,34 @@ const Buckets: React.FC<{}> = () => {
         value: k
       }));
 
-      setLoading(false);
+      setState(prevState => ({
+        ...prevState,
+        totalCount: bucketsData.data.totalCount,
+        volumeBucketMap: volumeBucketMap,
+        volumeOptions: volumeOptions,
+        lastUpdated: Number(moment())
+      }));
 
+      // Set default volumes if none selected
       setSelectedVolumes((prevState) => {
         if (prevState.length === 0) return volumeOptions;
         return prevState;
       });
+    }
+  }, [bucketsData.data]);
 
-      setState({
-        ...state,
-        totalCount: totalCount,
-        volumeBucketMap: volumeBucketMap,
-        volumeOptions: volumeOptions,
-        lastUpdated: Number(moment())
-      });
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError(error.toString());
-    });
-  }
-
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
+  // Update buckets under volume when volume selection or data changes
+  useEffect(() => {
+    setState(prevState => ({
+      ...prevState,
+      bucketsUnderVolume: getFilteredBuckets(
+        selectedVolumes,
+        prevState.volumeBucketMap
+      )
+    }));
+  }, [selectedVolumes, state.volumeBucketMap]);
 
   useEffect(() => {
-    autoReloadHelper.startPolling();
     const initialVolume = getVolumeSearchParam();
     if (initialVolume) {
       setSelectedVolumes([{
@@ -222,30 +225,14 @@ const Buckets: React.FC<{}> = () => {
         value: initialVolume
       }]);
     }
-    loadData();
-
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!]);
-    })
   }, []);
 
-  useEffect(() => {
-    // If the data is fetched, we need to regenerate the columns
-    // To make sure the filters are properly applied
-    setState({
-      ...state,
-      bucketsUnderVolume: getFilteredBuckets(
-        selectedVolumes,
-        state.volumeBucketMap
-      )
-    });
-  }, [state.volumeBucketMap])
+  // Create refresh function for auto-reload
+  const loadBucketsData = () =>{
+    bucketsData.refetch();
+  };
 
-  // If limit changes, load new data
-  useEffect(() => {
-    loadData();
-  }, [selectedLimit.value]);
+  const autoReload = useAutoReload(loadBucketsData);
 
   const {
     lastUpdated, columnOptions,
@@ -257,10 +244,10 @@ const Buckets: React.FC<{}> = () => {
       <div className='page-header-v2'>
         Buckets
         <AutoReloadPanel
-          isLoading={loading}
+          isLoading={bucketsData.loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData}
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadBucketsData}
         />
       </div>
       <div className='data-container'>
@@ -305,7 +292,7 @@ const Buckets: React.FC<{}> = () => {
               }} />
           </div>
           <BucketsTable
-            loading={loading}
+            loading={bucketsData.loading}
             data={bucketsUnderVolume}
             handleAclClick={handleAclLinkClick}
             selectedColumns={selectedColumns}

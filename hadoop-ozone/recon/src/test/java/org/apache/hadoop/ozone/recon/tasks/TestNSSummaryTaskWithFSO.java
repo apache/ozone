@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
@@ -34,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -232,6 +234,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
       nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
       result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
     }
@@ -345,9 +348,9 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
     public void testProcessUpdateFileSize() throws IOException {
       NSSummary nsSummaryForBucket1 =
           getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
-      // file 1 is gone, so bucket 1 is empty now
+
       assertNotNull(nsSummaryForBucket1);
-      assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       // after put dir4, bucket1 now has two child dirs: dir1 and dir4
@@ -478,16 +481,16 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       Mockito.when(event4.getAction()).thenReturn(OMDBUpdateEvent.OMDBUpdateAction.PUT);
 
       OmKeyInfo keyInfo1 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(2).setKeyName("key1")
-          .setBucketName("bucket1")
+          .setBucketName("bucket1").setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setDataSize(1024).setVolumeName("volume1").build();
       OmKeyInfo keyInfo2 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
-          .setBucketName("bucket1")
+          .setBucketName("bucket1").setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setDataSize(1024).setVolumeName("volume1").build();
       OmKeyInfo keyInfo3 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
-          .setBucketName("bucket1")
+          .setBucketName("bucket1").setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setDataSize(1024).setVolumeName("volume1").build();
       OmKeyInfo keyInfo4 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
-          .setBucketName("bucket1")
+          .setBucketName("bucket1").setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setDataSize(1024).setVolumeName("volume1").build();
       Mockito.when(event1.getValue()).thenReturn(keyInfo1);
       Mockito.when(event2.getValue()).thenReturn(keyInfo2);

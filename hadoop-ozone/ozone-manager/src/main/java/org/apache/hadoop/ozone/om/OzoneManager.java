@@ -77,8 +77,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
@@ -214,9 +212,9 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -288,6 +286,7 @@ import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -361,6 +360,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private static final AuditLogger SYSTEMAUDIT = new AuditLogger(
       AuditLoggerType.OMSYSTEMLOGGER);
+
+  private static final String AUDIT_PARAM_LEADER_ID = "leaderId";
+  private static final String AUDIT_PARAM_TERM = "term";
+  private static final String AUDIT_PARAM_LAST_APPLIED_INDEX = "lastAppliedIndex";
 
   private static final String OM_DAEMON = "om";
   private static final String NO_LEADER_ERROR_MESSAGE =
@@ -451,8 +454,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final ReplicationConfigValidator replicationConfigValidator;
 
-  private boolean allowListAllVolumes;
-
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
   private final ScmClient scmClient;
@@ -523,7 +524,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
-            .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
                 this::reconfOzoneSnapshotSSTFilteringServiceInterval)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
@@ -867,13 +867,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void setInstanceVariablesFromConf() {
     this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
-    setAllowListAllVolumesFromConfig();
-  }
-
-  public void setAllowListAllVolumesFromConfig() {
-    allowListAllVolumes = configuration.getBoolean(
-        OZONE_OM_VOLUME_LISTALL_ALLOWED,
-        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   /**
@@ -2763,10 +2756,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return isAclEnabled;
   }
 
-  public boolean getAllowListAllVolumes() {
-    return allowListAllVolumes;
-  }
-
   public UncheckedAutoCloseableSupplier<IOmMetadataReader> getOmMetadataReader() {
     return rcOmMetadataReader;
   }
@@ -3011,6 +3000,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setQuotaInBytes(realBucket.getQuotaInBytes())
             .setQuotaInNamespace(realBucket.getQuotaInNamespace())
             .setUsedBytes(realBucket.getUsedBytes())
+            .setSnapshotUsedBytes(realBucket.getSnapshotUsedBytes())
+            .setSnapshotUsedNamespace(realBucket.getSnapshotUsedNamespace())
             .setUsedNamespace(realBucket.getUsedNamespace())
             .addAllMetadata(realBucket.getMetadata())
             .setBucketLayout(realBucket.getBucketLayout())
@@ -3295,12 +3286,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           .build());
     }
 
-    // Since this OM is processing the request, we can assume it to be the
-    // leader OM
-
+    RaftPeerRole selfRole;
+    RaftPeerId leaderId = null;
+    if (omRatisServer == null) {
+      selfRole = RaftPeerRole.LEADER;
+    } else {
+      leaderId = omRatisServer.getLeaderId();
+      RaftPeerId selfPeerId = omRatisServer.getRaftPeerId();
+      if (leaderId != null && leaderId.equals(selfPeerId)) {
+        selfRole = RaftPeerRole.LEADER;
+      } else if (omNodeDetails.isRatisListener()) {
+        selfRole = RaftPeerRole.LISTENER;
+      } else {
+        selfRole = RaftPeerRole.FOLLOWER;
+      }
+    }
     OMRoleInfo omRole = OMRoleInfo.newBuilder()
         .setNodeId(getOMNodeId())
-        .setServerRole(RaftPeerRole.LEADER.name())
+        .setServerRole(selfRole.name())
         .build();
     omServiceInfoBuilder.setOmRoleInfo(omRole);
 
@@ -3324,10 +3327,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               .setValue(peerNode.getRpcPort())
               .build());
 
-      String role = peerNode.isRatisListener() ? RaftPeerRole.LISTENER.name() : RaftPeerRole.FOLLOWER.name();
+      RaftPeerRole roleForPeer;
+      if (leaderId != null && peerNode.getNodeId().equals(leaderId.toString())) {
+        roleForPeer = RaftPeerRole.LEADER;
+      } else if (peerNode.isRatisListener()) {
+        roleForPeer = RaftPeerRole.LISTENER;
+      } else {
+        roleForPeer = RaftPeerRole.FOLLOWER;
+      }
       OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
           .setNodeId(peerNode.getNodeId())
-          .setServerRole(role)
+          .setServerRole(roleForPeer.name())
           .build();
       peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
 
@@ -3545,6 +3555,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync", ugi);
       // Block in the handler thread
       return bgSync.triggerRangerSyncOnce();
+    }
+  }
+
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+
+    // Note: Any OM (leader or follower) can run snapshot defrag
+
+    final UserGroupInformation ugi = getRemoteUser();
+    // Check Ozone admin privilege
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to trigger "
+          + "snapshot defragmentation manually", PERMISSION_DENIED);
+    }
+
+    // Get the SnapshotDefragService from KeyManager
+    final SnapshotDefragService defragService = keyManager.getSnapshotDefragService();
+    if (defragService == null) {
+      throw new OMException("Snapshot defragmentation service is not initialized",
+          FEATURE_NOT_ENABLED);
+    }
+
+    // Trigger Snapshot Defragmentation
+    if (noWait) {
+      final Thread t = new Thread(() -> {
+        try {
+          defragService.triggerSnapshotDefragOnce();
+        } catch (Exception e) {
+          LOG.error("Error during snapshot defragmentation", e);
+        }
+      }, threadPrefix + "SnapshotDefragTrigger-" + System.currentTimeMillis());
+      t.start();
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation without waiting"
+          + " in a new thread, tid = {}", ugi, t.getId());
+      return true;
+    } else {
+      LOG.info("User '{}' manually triggered Snapshot Defragmentation and is waiting", ugi);
+      return defragService.triggerSnapshotDefragOnce();
     }
   }
 
@@ -4134,6 +4181,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         exitManager.exitSystem(1, errorMsg, e, LOG);
       }
     }
+    buildDBCheckpointInstallAuditLog(leaderId, term, lastAppliedIndex);
 
     // Delete the backup DB
     try {
@@ -4158,6 +4206,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
+  }
+
+  private void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(AUDIT_PARAM_LEADER_ID, leaderId);
+    auditMap.put(AUDIT_PARAM_TERM, String.valueOf(term));
+    auditMap.put(AUDIT_PARAM_LAST_APPLIED_INDEX, String.valueOf(lastAppliedIndex));
+    SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.DB_CHECKPOINT_INSTALL, auditMap));
   }
 
   private void stopTrashEmptier() {
@@ -4701,7 +4757,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Add to cache.
       metadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(dbVolumeKey),
-          CacheValue.get(transactionID, omVolumeArgs));
+          CacheValue.get(DEFAULT_OM_UPDATE_ID, omVolumeArgs));
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
           CacheValue.get(transactionID, userVolumeInfo));
@@ -5160,10 +5216,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins =
-        OzoneAdmins.getOzoneAdminsFromConfig(getConfiguration(),
-            omStarterUser);
+        OzoneAdmins.getOzoneAdminsFromConfigValue(newVal, omStarterUser);
     omAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
@@ -5171,9 +5225,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneReadOnlyAdmins(String newVal) {
-    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
     Collection<String> pReadOnlyAdmins =
-        OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(getConfiguration());
+        OzoneAdmins.getOzoneReadOnlyAdminsFromConfigValue(newVal);
     readOnlyAdmins.setAdminUsernames(pReadOnlyAdmins);
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
@@ -5183,28 +5236,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String reconfOzoneKeyDeletingLimitPerTask(String newVal) {
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
-    getConfiguration().set(OZONE_KEY_DELETING_LIMIT_PER_TASK, newVal);
 
     getKeyManager().getDeletingService()
         .setKeyLimitPerTask(Integer.parseInt(newVal));
     return newVal;
   }
 
-  private String reconfigureAllowListAllVolumes(String newVal) {
-    getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
-    setAllowListAllVolumesFromConfig();
-    return String.valueOf(allowListAllVolumes);
-  }
-
   private String reconfOzoneDirDeletingServiceInterval(String newVal) {
-    getConfiguration().set(OZONE_DIR_DELETING_SERVICE_INTERVAL, newVal);
     return newVal;
   }
 
   private String reconfOzoneThreadNumberDirDeletion(String newVal) {
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
-    getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
     return newVal;
   }
 

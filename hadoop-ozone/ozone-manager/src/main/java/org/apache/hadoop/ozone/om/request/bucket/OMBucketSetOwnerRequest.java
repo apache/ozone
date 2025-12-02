@@ -147,24 +147,24 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
         return omClientResponse;
       }
 
-      omBucketInfo.setOwner(newOwner);
+      OmBucketInfo newOmBucketInfo = omBucketInfo.toBuilder()
+          .setOwner(newOwner)
+          .setModificationTime(setBucketPropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
+          .build();
+
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",
           newOwner, bucketName, volumeName);
-
-      omBucketInfo.setModificationTime(
-          setBucketPropertyRequest.getModificationTime());
-      // Set the updateID to current transaction log index
-      omBucketInfo.setUpdateID(transactionLogIndex);
 
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
+          CacheValue.get(transactionLogIndex, newOmBucketInfo));
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMBucketSetOwnerResponse(
-          omResponse.build(), omBucketInfo);
+          omResponse.build(), newOmBucketInfo);
     } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;

@@ -48,11 +48,9 @@ spec:
         - configMapRef:
             name: config
         env:
-        - name: JAEGER_SAMPLER_TYPE
-          value: probabilistic
-        - name: JAEGER_SAMPLER_PARAM
+        - name: OTEL_TRACES_SAMPLER_ARG
           value: "0.01"
-        - name: JAEGER_AGENT_HOST
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: jaeger-0.jaeger
         volumeMounts:
         - name: data

@@ -37,15 +37,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
-import org.apache.ozone.compaction.log.SstFileInfo;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.apache.hadoop.ozone.util.ObjectSerializer;
+import org.apache.hadoop.ozone.util.YamlSerializer;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,26 +63,26 @@ import org.yaml.snakeyaml.Yaml;
 public class TestOmSnapshotLocalDataYaml {
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
-  private static OmSnapshotManager omSnapshotManager;
-  private static final Yaml YAML = new OmSnapshotLocalDataYaml.YamlFactory().create();
-  private static final UncheckedAutoCloseableSupplier<Yaml> YAML_SUPPLIER = new UncheckedAutoCloseableSupplier<Yaml>() {
-    @Override
-    public Yaml get() {
-      return YAML;
-    }
-
-    @Override
-    public void close() {
-
-    }
-  };
+  private static final OmSnapshotLocalDataYaml.YamlFactory YAML_FACTORY = new OmSnapshotLocalDataYaml.YamlFactory();
+  private static ObjectSerializer<OmSnapshotLocalData> omSnapshotLocalDataSerializer;
 
   private static final Instant NOW = Instant.now();
 
   @BeforeAll
-  public static void setupClassMocks() throws IOException {
-    omSnapshotManager = mock(OmSnapshotManager.class);
-    when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(YAML_SUPPLIER);
+  public static void setupSerializer() throws IOException {
+    omSnapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(YAML_FACTORY) {
+      @Override
+      public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
+        data.computeAndSetChecksum(yaml);
+      }
+    };
+  }
+
+  @AfterAll
+  public static void cleanupSerializer() throws IOException {
+    if (omSnapshotLocalDataSerializer != null) {
+      omSnapshotLocalDataSerializer.close();
+    }
   }
 
   @BeforeEach
@@ -104,39 +108,41 @@ public class TestOmSnapshotLocalDataYaml {
   /**
    * Creates a snapshot local data YAML file.
    */
-  private Pair<File, UUID> writeToYaml(String snapshotName) throws IOException {
+  private Pair<File, UUID> writeToYaml(UUID snapshotId, String snapshotName, TransactionInfo transactionInfo)
+      throws IOException {
     String yamlFilePath = snapshotName + ".yaml";
     UUID previousSnapshotId = UUID.randomUUID();
-    // Create snapshot data with uncompacted SST files
-    List<LiveFileMetaData> uncompactedSSTFileList = asList(
+    // Create snapshot data with not defragged SST files
+    List<LiveFileMetaData> notDefraggedSSTFileList = asList(
         createLiveFileMetaData("sst1", "table1", "k1", "k2"),
         createLiveFileMetaData("sst2", "table1", "k3", "k4"),
         createLiveFileMetaData("sst3", "table2", "k4", "k5"));
-    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml(uncompactedSSTFileList, previousSnapshotId);
+    OmSnapshotLocalData dataYaml = new OmSnapshotLocalData(snapshotId, notDefraggedSSTFileList,
+        previousSnapshotId, transactionInfo, 10);
 
     // Set version
     dataYaml.setVersion(42);
     // Set SST filtered flag
     dataYaml.setSstFiltered(true);
 
-    // Set last compaction time
-    dataYaml.setLastCompactionTime(NOW.toEpochMilli());
+    // Set last defrag time
+    dataYaml.setLastDefragTime(NOW.toEpochMilli());
 
-    // Set needs compaction flag
-    dataYaml.setNeedsCompaction(true);
+    // Set needs defrag flag
+    dataYaml.setNeedsDefrag(true);
 
-    // Add some compacted SST files
+    // Add some defragged SST files
     dataYaml.addVersionSSTFileInfos(ImmutableList.of(
-        new SstFileInfo("compacted-sst1", "k1", "k2", "table1"),
-        new SstFileInfo("compacted-sst2", "k3", "k4", "table2")),
+        createLiveFileMetaData("defragged-sst1", "table1", "k1", "k2"),
+        createLiveFileMetaData("defragged-sst2", "table2", "k3", "k4")),
         1);
     dataYaml.addVersionSSTFileInfos(Collections.singletonList(
-        new SstFileInfo("compacted-sst3", "k4", "k5", "table1")), 3);
+        createLiveFileMetaData("defragged-sst3", "table1", "k4", "k5")), 3);
 
     File yamlFile = new File(testRoot, yamlFilePath);
 
     // Create YAML file with SnapshotData
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    omSnapshotLocalDataSerializer.save(yamlFile, dataYaml);
 
     // Check YAML file exists
     assertTrue(yamlFile.exists());
@@ -146,73 +152,83 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testWriteToYaml() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot1");
+    UUID snapshotId = UUID.randomUUID();
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot1", transactionInfo);
     File yamlFile = yamlFilePrevIdPair.getLeft();
     UUID prevSnapId = yamlFilePrevIdPair.getRight();
 
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Verify fields
     assertEquals(44, snapshotData.getVersion());
+    assertEquals(10, snapshotData.getDbTxSequenceNumber());
     assertTrue(snapshotData.getSstFiltered());
+    assertEquals(transactionInfo, snapshotData.getTransactionInfo());
 
-    VersionMeta uncompactedFiles = snapshotData.getVersionSstFileInfos().get(0);
+    VersionMeta notDefraggedSSTFiles = snapshotData.getVersionSstFileInfos().get(0);
     assertEquals(new VersionMeta(0,
         ImmutableList.of(new SstFileInfo("sst1", "k1", "k2", "table1"),
             new SstFileInfo("sst2", "k3", "k4", "table1"),
-            new SstFileInfo("sst3", "k4", "k5", "table2"))), uncompactedFiles);
-    assertEquals(NOW.toEpochMilli(), snapshotData.getLastCompactionTime());
-    assertTrue(snapshotData.getNeedsCompaction());
+            new SstFileInfo("sst3", "k4", "k5", "table2"))), notDefraggedSSTFiles);
+    assertEquals(NOW.toEpochMilli(), snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
 
-    Map<Integer, VersionMeta> compactedFiles = snapshotData.getVersionSstFileInfos();
-    assertEquals(3, compactedFiles.size());
-    assertTrue(compactedFiles.containsKey(43));
-    assertTrue(compactedFiles.containsKey(44));
-    assertEquals(2, compactedFiles.get(43).getSstFiles().size());
-    assertEquals(1, compactedFiles.get(44).getSstFiles().size());
+    Map<Integer, VersionMeta> defraggedSSTFiles = snapshotData.getVersionSstFileInfos();
+    assertEquals(3, defraggedSSTFiles.size());
+    assertTrue(defraggedSSTFiles.containsKey(43));
+    assertTrue(defraggedSSTFiles.containsKey(44));
+    assertEquals(2, defraggedSSTFiles.get(43).getSstFiles().size());
+    assertEquals(1, defraggedSSTFiles.get(44).getSstFiles().size());
     assertEquals(prevSnapId, snapshotData.getPreviousSnapshotId());
+    assertEquals(snapshotId, snapshotData.getSnapshotId());
     assertEquals(ImmutableMap.of(
         0, new VersionMeta(0,
             ImmutableList.of(new SstFileInfo("sst1", "k1", "k2", "table1"),
                 new SstFileInfo("sst2", "k3", "k4", "table1"),
                 new SstFileInfo("sst3", "k4", "k5", "table2"))),
         43, new VersionMeta(1,
-            ImmutableList.of(new SstFileInfo("compacted-sst1", "k1", "k2", "table1"),
-                new SstFileInfo("compacted-sst2", "k3", "k4", "table2"))),
+            ImmutableList.of(new SstFileInfo("defragged-sst1", "k1", "k2", "table1"),
+                new SstFileInfo("defragged-sst2", "k3", "k4", "table2"))),
         44, new VersionMeta(3,
-            ImmutableList.of(new SstFileInfo("compacted-sst3", "k4", "k5", "table1")))), compactedFiles);
+            ImmutableList.of(new SstFileInfo("defragged-sst3", "k4", "k5", "table1")))), defraggedSSTFiles);
   }
 
   @Test
   public void testUpdateSnapshotDataFile() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot2");
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot2", null);
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
-    OmSnapshotLocalDataYaml dataYaml =
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
-
+    OmSnapshotLocalData dataYaml =
+        omSnapshotLocalDataSerializer.load(yamlFile);
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
     // Update snapshot data
     dataYaml.setSstFiltered(false);
-    dataYaml.setNeedsCompaction(false);
+    dataYaml.setNeedsDefrag(false);
     dataYaml.addVersionSSTFileInfos(
-        singletonList(new SstFileInfo("compacted-sst4", "k5", "k6", "table3")), 5);
+        singletonList(createLiveFileMetaData("defragged-sst4", "table3", "k5", "k6")), 5);
+    dataYaml.setTransactionInfo(transactionInfo);
 
     // Write updated data back to file
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    omSnapshotLocalDataSerializer.save(yamlFile, dataYaml);
 
     // Read back the updated data
-    dataYaml = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    dataYaml = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Verify updated data
     assertThat(dataYaml.getSstFiltered()).isFalse();
-    assertThat(dataYaml.getNeedsCompaction()).isFalse();
+    assertThat(dataYaml.getNeedsDefrag()).isFalse();
+    assertEquals(transactionInfo, dataYaml.getTransactionInfo());
 
-    Map<Integer, VersionMeta> compactedFiles = dataYaml.getVersionSstFileInfos();
-    assertEquals(4, compactedFiles.size());
-    assertTrue(compactedFiles.containsKey(45));
-    assertEquals(new VersionMeta(5, ImmutableList.of(new SstFileInfo("compacted-sst4", "k5", "k6", "table3"))),
-        compactedFiles.get(45));
+    Map<Integer, VersionMeta> defraggedFiles = dataYaml.getVersionSstFileInfos();
+    assertEquals(4, defraggedFiles.size());
+    assertTrue(defraggedFiles.containsKey(45));
+    assertEquals(new VersionMeta(5, ImmutableList.of(new SstFileInfo("defragged-sst4", "k5", "k6", "table3"))),
+        defraggedFiles.get(45));
   }
 
   @Test
@@ -220,18 +236,20 @@ public class TestOmSnapshotLocalDataYaml {
     File emptyFile = new File(testRoot, "empty.yaml");
     assertTrue(emptyFile.createNewFile());
 
-    IOException ex = assertThrows(IOException.class, () ->
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, emptyFile));
+    IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
-    assertThat(ex).hasMessageContaining("Failed to load snapshot file. File is empty.");
+    assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
   }
 
   @Test
   public void testChecksum() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot3");
+    UUID snapshotId = UUID.randomUUID();
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot3", transactionInfo);
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Get the original checksum
     String originalChecksum = snapshotData.getChecksum();
@@ -239,12 +257,15 @@ public class TestOmSnapshotLocalDataYaml {
     // Verify the checksum is not null or empty
     assertThat(originalChecksum).isNotNull().isNotEmpty();
 
-    assertTrue(OmSnapshotLocalDataYaml.verifyChecksum(omSnapshotManager, snapshotData));
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(snapshotData));
   }
 
   @Test
   public void testYamlContainsAllFields() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot4");
+    UUID snapshotId = UUID.randomUUID();
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
+        ThreadLocalRandom.current().nextLong());
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot4", transactionInfo);
     File yamlFile = yamlFilePrevIdPair.getLeft();
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
 
@@ -252,8 +273,11 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(content).contains(OzoneConsts.OM_SLD_VERSION);
     assertThat(content).contains(OzoneConsts.OM_SLD_CHECKSUM);
     assertThat(content).contains(OzoneConsts.OM_SLD_IS_SST_FILTERED);
-    assertThat(content).contains(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME);
-    assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_COMPACTION);
+    assertThat(content).contains(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME);
+    assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_DEFRAG);
     assertThat(content).contains(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
+    assertThat(content).contains(OzoneConsts.OM_SLD_SNAP_ID);
+    assertThat(content).contains(OzoneConsts.OM_SLD_PREV_SNAP_ID);
+    assertThat(content).contains(OzoneConsts.OM_SLD_TXN_INFO);
   }
 }
