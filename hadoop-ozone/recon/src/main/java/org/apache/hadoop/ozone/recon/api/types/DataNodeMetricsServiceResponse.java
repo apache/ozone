@@ -43,6 +43,12 @@ public class DataNodeMetricsServiceResponse {
     this.pendingDeletionPerDataNode = builder.pendingDeletion;
   }
 
+  public DataNodeMetricsServiceResponse() {
+    this.status = DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED;
+    this.totalPendingDeletion = 0L;
+    this.pendingDeletionPerDataNode = null;
+  }
+
   public DataNodeMetricsService.MetricCollectionStatus getStatus() {
     return status;
   }

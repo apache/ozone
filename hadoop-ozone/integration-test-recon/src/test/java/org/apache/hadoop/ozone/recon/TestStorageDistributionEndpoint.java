@@ -35,6 +35,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -46,6 +47,8 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -66,6 +69,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -100,6 +106,7 @@ public class TestStorageDistributionEndpoint {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static final String STORAGE_DIST_ENDPOINT = "/api/v1/storageDistribution";
+  private static final String PENDING_DELETION_ENDPOINT = "/api/v1/pendingDeletion";
 
   static List<Arguments> replicationConfigs() {
     return Collections.singletonList(
@@ -131,16 +138,14 @@ public class TestStorageDistributionEndpoint {
     // Enhanced DataNode configuration to move pending deletion from SCM to DN faster
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionInterval(Duration.ofMillis(100));
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(10000));
     // Increase block delete queue limit to allow more queued commands on DN
     dnConf.setBlockDeleteQueueLimit(50);
     // Reduce the interval for delete command worker processing
-    dnConf.setBlockDeleteCommandWorkerInterval(Duration.ofMillis(100));
+    dnConf.setBlockDeleteCommandWorkerInterval(Duration.ofMillis(10000));
     // Increase blocks deleted per interval to speed up deletion
     dnConf.setBlockDeletionLimit(5000);
     conf.setFromObject(dnConf);
-    // Increase DN delete threads for faster parallel processing
-    conf.setInt("ozone.datanode.block.delete.threads.max", 10);
 
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -211,6 +216,64 @@ public class TestStorageDistributionEndpoint {
         return false;
       }
     }, 5000, 30000);
+    closeAllContainers();
+    fs.delete(dir1, true);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        syncDataFromOM();
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(getReconWebAddress(conf))
+            .append(PENDING_DELETION_ENDPOINT+"?component=om");
+        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+        Map<String, Integer> pendingDeletionMap =
+            MAPPER.readValue(response, Map.class);
+        assertEquals(30, pendingDeletionMap.get("totalSize"));
+        assertEquals(30, pendingDeletionMap.get("pendingDirectorySize") + pendingDeletionMap.get("pendingKeySize"));
+        return true;
+      } catch (Throwable e) {
+        LOG.debug("Waiting for storage distribution assertions to pass", e);
+        return false;
+      }
+    }, 2000, 60000);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(getReconWebAddress(conf))
+            .append(PENDING_DELETION_ENDPOINT+"?component=scm");
+        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+        ScmPendingDeletion pendingDeletion =
+            MAPPER.readValue(response, ScmPendingDeletion.class);
+        assertEquals(30, pendingDeletion.getTotalReplicatedBlockSize());
+        assertEquals(10, pendingDeletion.getTotalBlocksize());
+        assertEquals(10, pendingDeletion.getTotalBlocksCount());
+        return true;
+      } catch (Throwable e) {
+        LOG.debug("Waiting for storage distribution assertions to pass", e);
+        return false;
+      }
+    }, 2000, 60000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(getReconWebAddress(conf))
+            .append(PENDING_DELETION_ENDPOINT+"?component=dn");
+        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+        DataNodeMetricsServiceResponse pendingDeletion =
+            MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+        assertNotNull(pendingDeletion);
+        assertEquals(30, pendingDeletion.getTotalPendingDeletion());
+        assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
+        pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
+          assertEquals(10, dn.getPendingBlockSize());
+        });
+        return true;
+      } catch (Throwable e) {
+        LOG.debug("Waiting for storage distribution assertions to pass", e);
+        return false;
+      }
+    }, 2000, 60000);
   }
 
   private void verifyBlocksCreated(
@@ -271,6 +334,14 @@ public class TestStorageDistributionEndpoint {
         BlockID blockID = omKeyLocationInfo.getBlockID();
         consumer.accept(blockID);
       }
+    }
+  }
+
+  private static void closeAllContainers() {
+    for (ContainerInfo container :
+        scm.getContainerManager().getContainers()) {
+      scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
+          container.containerID());
     }
   }
 

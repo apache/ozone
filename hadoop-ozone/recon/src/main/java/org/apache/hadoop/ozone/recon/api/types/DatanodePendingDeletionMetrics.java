@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -34,7 +35,11 @@ public class DatanodePendingDeletionMetrics {
   @JsonProperty("pendingBlockSize")
   private final long pendingBlockSize;
 
-  public DatanodePendingDeletionMetrics(String hostName, String datanodeUuid, long pendingBlockSize) {
+  @JsonCreator
+  public DatanodePendingDeletionMetrics(
+      @JsonProperty("hostName") String hostName,
+      @JsonProperty("datanodeUuid") String datanodeUuid,
+      @JsonProperty("pendingBlockSize") long pendingBlockSize) {
     this.hostName = hostName;
     this.datanodeUuid = datanodeUuid;
     this.pendingBlockSize = pendingBlockSize;
@@ -52,4 +57,3 @@ public class DatanodePendingDeletionMetrics {
     return datanodeUuid;
   }
 }
-

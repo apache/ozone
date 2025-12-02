@@ -32,9 +32,27 @@ public class ScmPendingDeletion {
   @JsonProperty("totalBlocksCount")
   private final long totalBlocksCount;
 
+  public ScmPendingDeletion() {
+    this.totalBlocksize = 0;
+    this.totalReplicatedBlockSize = 0;
+    this.totalBlocksCount = 0;
+  }
+
   public ScmPendingDeletion(long size, long replicatedSize, long totalBlocks) {
     this.totalBlocksize = size;
     this.totalReplicatedBlockSize = replicatedSize;
     this.totalBlocksCount = totalBlocks;
+  }
+
+  public long getTotalBlocksize() {
+    return totalBlocksize;
+  }
+
+  public long getTotalReplicatedBlockSize() {
+    return totalReplicatedBlockSize;
+  }
+
+  public long getTotalBlocksCount() {
+    return totalBlocksCount;
   }
 }

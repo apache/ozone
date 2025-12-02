@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
@@ -35,7 +39,6 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.tasks.DataNodeMetricsCollectionTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 /**
  * The DataNodeMetricsService class is responsible for collecting and managing
  * metrics related to datanodes in an Ozone Recon environment. Specifically,
@@ -46,6 +49,7 @@ import org.slf4j.LoggerFactory;
  * The metrics collection process involves communicating with each datanode,
  * fetching their pending deletion metrics, and aggregating the data.
  */
+
 @Singleton
 public class DataNodeMetricsService {
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
@@ -53,10 +57,12 @@ public class DataNodeMetricsService {
   private Long totalPendingDeletion = 0L;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private final ReconNodeManager reconNodeManager;
+  private final int threadCount;
 
   @Inject
-  public DataNodeMetricsService(OzoneStorageContainerManager reconSCM) {
+  public DataNodeMetricsService(OzoneStorageContainerManager reconSCM, OzoneConfiguration conf) {
     reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
+    threadCount = conf.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY, OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
   }
 
   public void startTask() {
@@ -64,7 +70,7 @@ public class DataNodeMetricsService {
     pendingDeletionList = new ArrayList<>();
     totalPendingDeletion = 0L;
     currentStatus = MetricCollectionStatus.IN_PROGRESS;
-    ExecutorService executor = Executors.newFixedThreadPool(10);
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
     List<Future<DatanodePendingDeletionMetrics>> futures = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
       String hostName = node.getHostName();
