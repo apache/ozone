@@ -44,6 +44,50 @@ summary: 数据节点的磁盘平衡器.
 可以通过在“ozone-site.xml”配置文件中将以下属性设置为“true”来**启用**该功能：
 `hdds.datanode.disk.balancer.enabled = false`
 
+## 身份验证和授权
+
+* **身份验证**：需要 RPC 身份验证（例如，在安全集群中通过 `kinit`）。客户端的身份由数据节点的 RPC 层验证。
+
+* **授权**：每个数据节点都使用 `OzoneAdmins` 根据 `ozone.administrators` 配置执行授权检查：
+- **管理操作**（启动、停止、更新）：要求用户位于 `ozone.administrators` 成员中
+- **只读操作**（状态、报告）：不需要管理员权限
+
+#### 默认行为
+
+默认情况下，如果未配置 `ozone.administrators`，则只有启动数据节点服务的用户才能启动、停止或更新 DiskBalancer。
+
+这意味着在典型的部署中，如果数据节点以用户 `dn` 的身份运行，则只有该用户拥有 DiskBalancer 操作的 管理员权限。
+
+#### 为其他用户启用身份验证
+
+要允许其他用户执行 DiskBalancer 管理操作（启动、停止、更新），请在 `ozone-site.xml` 文件中配置 `ozone.administrators` 属性：
+
+**Example 1: Single user**
+```xml
+<property>
+  <name>ozone.administrators</name>
+  <value>scm</value>
+</property>
+```
+
+**Example 2: Multiple users**
+```xml
+<property>
+  <name>ozone.administrators</name>
+  <value>scm,hdfs</value>
+</property>
+```
+
+**Example 3: Using groups**
+```xml
+<property>
+  <name>ozone.administrators.groups</name>
+  <value>ozone-admins,cluster-operators</value>
+</property>
+```
+**注意**：`ozone-admins` 和 `cluster-operators` 是示例组名称。请将其替换为您环境中的实际组名称。 更新 `ozone.administrators` 配置后，
+请重启数据节点服务以使更改生效。
+
 ## 命令行用法
 DiskBalancer 通过 `ozone admin datanode diskbalancer` 命令进行管理。
 
@@ -157,13 +201,6 @@ ozone admin datanode diskbalancer report --in-service-datanodes
 # 以 JSON 格式获取报告
 ozone admin datanode diskbalancer report --in-service-datanodes --json
 ```
-### 身份验证和授权
-
-* **身份验证**：需要 RPC 身份验证（例如，在安全集群中通过 `kinit`）。客户端的身份由数据节点的 RPC 层验证。
-
-* **授权**：每个数据节点都使用 `OzoneAdmins` 根据 `ozone.administrators` 配置执行授权检查：
-- **管理操作**（启动、停止、更新）：要求用户位于 `ozone.administrators` 成员中
-- **只读操作**（状态、报告）：不需要管理员权限
 
 ## DiskBalancer Configurations
 

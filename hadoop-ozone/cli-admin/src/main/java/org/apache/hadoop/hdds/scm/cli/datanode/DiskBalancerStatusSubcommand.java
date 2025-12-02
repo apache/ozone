@@ -91,7 +91,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   private String generateStatus(List<DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
+        "%-35s %-15s %-15s %-15s %-12s %-20s %-12s %-12s %-15s %-18s %-20s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -99,6 +99,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     contentList.add("Threshold(%)");
     contentList.add("BandwidthInMB");
     contentList.add("Threads");
+    contentList.add("StopAfterDiskEven");
     contentList.add("SuccessMove");
     contentList.add("FailureMove");
     contentList.add("BytesMoved(MB)");
@@ -106,7 +107,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto : protos) {
-      formatBuilder.append("%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
+      formatBuilder.append("%-35s %-15s %-15s %-15s %-12s %-20s %-12s %-12s %-15s %-18s %-20s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesMovedMB = (long) Math.ceil(proto.getBytesMoved() / (1024.0 * 1024.0));
       long bytesToMoveMB = (long) Math.ceil(proto.getBytesToMove() / (1024.0 * 1024.0));
@@ -119,6 +120,8 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
           String.valueOf(proto.getDiskBalancerConf().getDiskBandwidthInMB()));
       contentList.add(
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
+      contentList.add(
+          String.valueOf(proto.getDiskBalancerConf().getStopAfterDiskEven()));
       contentList.add(String.valueOf(proto.getSuccessMoveCount()));
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
       contentList.add(String.valueOf(bytesMovedMB));
@@ -153,6 +156,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     result.put("threshold", status.getDiskBalancerConf().getThreshold());
     result.put("bandwidthInMB", status.getDiskBalancerConf().getDiskBandwidthInMB());
     result.put("threads", status.getDiskBalancerConf().getParallelThread());
+    result.put("stopAfterDiskEven", status.getDiskBalancerConf().getStopAfterDiskEven());
     result.put("successMove", status.getSuccessMoveCount());
     result.put("failureMove", status.getFailureMoveCount());
     result.put("bytesMovedMB", (long) Math.ceil(status.getBytesMoved() / (1024.0 * 1024.0)));

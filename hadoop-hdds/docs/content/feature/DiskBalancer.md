@@ -48,6 +48,52 @@ The Disk Balancer feature is introduced with a feature flag. By default, this fe
 The feature can be **enabled** by setting the following property to `true` in the `ozone-site.xml` configuration file:
 `hdds.datanode.disk.balancer.enabled = false`
 
+### Authentication and Authorization
+
+* **Authentication**: RPC authentication is required (e.g., via `kinit` in secure clusters). The client's identity is verified by the datanode's RPC layer.
+
+* **Authorization**: Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
+  - **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators`
+  - **Read-only operations** (status, report): Do not require admin privileges
+
+#### Default Behavior
+
+By default, if `ozone.administrators` is not configured, only the user who launched the datanode service can start, stop,
+or update DiskBalancer. This means that in a typical deployment where the datanode runs as user `dn`, only that user has
+admin privileges for DiskBalancer operations.
+
+#### Enabling Authentication for Additional Users
+
+To allow other users to perform DiskBalancer admin operations (start, stop, update), configure the `ozone.administrators` property in `ozone-site.xml`:
+
+**Example 1: Single user**
+```xml
+<property>
+  <name>ozone.administrators</name>
+  <value>scm</value>
+</property>
+```
+
+**Example 2: Multiple users**
+```xml
+<property>
+  <name>ozone.administrators</name>
+  <value>scm,hdfs</value>
+</property>
+```
+
+**Example 3: Using groups**
+```xml
+<property>
+  <name>ozone.administrators.groups</name>
+  <value>ozone-admins,cluster-operators</value>
+</property>
+```
+
+**Note**: `ozone-admins` and `cluster-operators` are example group names. Replace them with actual
+group names from your environment. After updating the `ozone.administrators` configuration,
+restart the datanode service for the changes to take effect.
+
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
 
@@ -161,14 +207,6 @@ ozone admin datanode diskbalancer report --in-service-datanodes
 # Get report as JSON
 ozone admin datanode diskbalancer report --in-service-datanodes --json
 ```
-
-### Authentication and Authorization
-
-* **Authentication**: RPC authentication is required (e.g., via `kinit` in secure clusters). The client's identity is verified by the datanode's RPC layer.
-
-* **Authorization**: Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
-  - **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators`
-  - **Read-only operations** (status, report): Do not require admin privileges
 
 ## **DiskBalancer Configurations**
 
