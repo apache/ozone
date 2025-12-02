@@ -24,9 +24,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +44,7 @@ public abstract class BackgroundService {
   protected static final Logger LOG = LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
+  private UncheckedAutoCloseableSupplier<ScheduledExecutorService> periodicTaskScheduler;
   private volatile ForkJoinPool exec;
   private ThreadGroup threadGroup;
   private final String serviceName;
@@ -49,7 +53,7 @@ public abstract class BackgroundService {
   private volatile int threadPoolSize;
   private final String threadNamePrefix;
   private volatile CompletableFuture<Void> future;
-  private volatile AtomicBoolean isShutdown;
+  private volatile AtomicReference<Boolean> isShutdown;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
@@ -115,7 +119,7 @@ public abstract class BackgroundService {
       initExecutorAndThreadGroup();
     }
     LOG.info("Starting service {} with interval {} ms", serviceName, intervalInMillis);
-    exec.execute(new PeriodicalTask(-1));
+    exec.execute(new PeriodicalTask(periodicTaskScheduler.get()));
   }
 
   protected void setInterval(long newInterval, TimeUnit newUnit) {
@@ -139,88 +143,116 @@ public abstract class BackgroundService {
    * Wait until all tasks to return the result.
    */
   public class PeriodicalTask extends RecursiveAction {
-    private int numberOfLoops;
     private final Queue<BackgroundTask> tasksInFlight;
-    private final AtomicBoolean isShutdown;
+    private final AtomicReference<Boolean> isShutdown;
+    private final ScheduledExecutorService scheduledExecuterService;
 
-    public PeriodicalTask(int numberOfLoops) {
-      this.numberOfLoops = numberOfLoops;
+    public PeriodicalTask(ScheduledExecutorService scheduledExecutorService) {
       this.tasksInFlight = new LinkedList<>();
       this.isShutdown = BackgroundService.this.isShutdown;
+      this.scheduledExecuterService = scheduledExecutorService;
     }
 
-    private boolean waitForNextInterval() {
+    private PeriodicalTask(PeriodicalTask other) {
+      this.tasksInFlight = other.tasksInFlight;
+      this.isShutdown = other.isShutdown;
+      this.scheduledExecuterService = other.scheduledExecuterService;
+    }
 
-      if (numberOfLoops > 0) {
-        numberOfLoops--;
-        if (numberOfLoops == 0) {
+    private boolean performIfNotShutdown(Runnable runnable) {
+      return isShutdown.updateAndGet((shutdown) -> {
+        if (!shutdown) {
+          runnable.run();
+        }
+        return shutdown;
+      });
+    }
+
+    private <T> boolean performIfNotShutdown(Consumer<T> consumer, T t) {
+      return isShutdown.updateAndGet((shutdown) -> {
+        if (!shutdown) {
+          consumer.accept(t);
+        }
+        return shutdown;
+      });
+    }
+
+    private boolean runTasks() {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Running background service : {}", serviceName);
+      }
+      if (isShutdown.get()) {
+        return false;
+      }
+      if (!tasksInFlight.isEmpty()) {
+        LOG.warn("Tasks are still in flight service {}. This should not happen schedule should only begin once all " +
+            "tasks from schedules have completed execution.", serviceName);
+        tasksInFlight.clear();
+      }
+
+      BackgroundTaskQueue tasks = getTasks(true);
+      if (tasks.isEmpty()) {
+        // No task found, or some problems to init tasks
+        // return and retry in next interval.
+        return false;
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Number of background tasks to execute : {}", tasks.size());
+      }
+      Consumer<BackgroundTask> taskForkHandler = task -> {
+        task.fork();
+        tasksInFlight.offer(task);
+      };
+      while (!tasks.isEmpty()) {
+        BackgroundTask task = tasks.poll();
+        // Fork and submit the task back to executor.
+        if (performIfNotShutdown(taskForkHandler, task)) {
           return false;
         }
       }
-      // Check if the executor has been shutdown during task execution.
-      if (!isShutdown.get()) {
-        synchronized (BackgroundService.this) {
-          // Get the shutdown flag again after acquiring the lock.
-          if (isShutdown.get()) {
-            return false;
-          }
-          try {
-            BackgroundService.this.wait(intervalInMillis);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            LOG.warn("Interrupted while waiting for next interval.", e);
-            return false;
+      Consumer<BackgroundTask> taskCompletionHandler = task -> {
+        BackgroundTask.BackgroundTaskForkResult result = task.join();
+        // Check for exception first in the task execution.
+        if (result.getThrowable() != null) {
+          LOG.error("Background task execution failed", result.getThrowable());
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("task execution result size {}", result.getResult().getSize());
           }
         }
+        if (result.getTotalExecutionTime() > serviceTimeoutInNanos) {
+          LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+              serviceName, result.getTotalExecutionTime(), serviceTimeoutInNanos);
+        }
+      };
+      while (!tasksInFlight.isEmpty()) {
+        BackgroundTask taskInFlight = tasksInFlight.poll();
+        // Join the tasks forked before and wait for the result one by one.
+        if (performIfNotShutdown(taskCompletionHandler, taskInFlight)) {
+          return false;
+        }
       }
-      return !isShutdown.get();
+      return true;
+    }
+
+    private void scheduleNextTask() {
+      performIfNotShutdown(() -> {
+        if (scheduledExecuterService != null) {
+          scheduledExecuterService.schedule(() -> exec.submit(new PeriodicalTask(this)),
+              intervalInMillis, TimeUnit.MILLISECONDS);
+        }
+      });
     }
 
     @Override
     public void compute() {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Running background service : {}", serviceName);
+      future = new CompletableFuture<>();
+      if (runTasks()) {
+        scheduleNextTask();
+      } else {
+        LOG.debug("Service {} is shutdown. Cancelling all schedules of all tasks.", serviceName);
       }
-      boolean runAgain = true;
-      do {
-        future = new CompletableFuture<>();
-        BackgroundTaskQueue tasks = getTasks(true);
-        if (tasks.isEmpty()) {
-          // No task found, or some problems to init tasks
-          // return and retry in next interval.
-          continue;
-        }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Number of background tasks to execute : {}", tasks.size());
-        }
-
-        while (!tasks.isEmpty()) {
-          BackgroundTask task = tasks.poll();
-          // Fork and submit the task back to executor.
-          task.fork();
-          tasksInFlight.offer(task);
-        }
-
-        while (!tasksInFlight.isEmpty()) {
-          BackgroundTask taskInFlight = tasksInFlight.poll();
-          // Join the tasks forked before and wait for the result one by one.
-          BackgroundTask.BackgroundTaskForkResult result = taskInFlight.join();
-          // Check for exception first in the task execution.
-          if (result.getThrowable() != null) {
-            LOG.error("Background task execution failed", result.getThrowable());
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("task execution result size {}", result.getResult().getSize());
-            }
-          }
-          if (result.getTotalExecutionTime() > serviceTimeoutInNanos) {
-            LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
-                serviceName, result.getTotalExecutionTime(), serviceTimeoutInNanos);
-          }
-        }
-        future.complete(null);
-        runAgain = waitForNextInterval();
-      } while (runAgain);
+      future.complete(null);
     }
   }
 
@@ -229,17 +261,19 @@ public abstract class BackgroundService {
     LOG.info("Shutting down service {}", this.serviceName);
     final ThreadGroup threadGroupToBeClosed;
     final ForkJoinPool execToShutdown;
+    final UncheckedAutoCloseableSupplier<ScheduledExecutorService> periodicTaskSchedulerToBeClosed;
     // Set the shutdown flag to true to prevent new tasks from being submitted.
     synchronized (this) {
+      periodicTaskSchedulerToBeClosed = periodicTaskScheduler;
       threadGroupToBeClosed = threadGroup;
       execToShutdown = exec;
       exec = null;
       threadGroup = null;
+      periodicTaskScheduler = null;
       if (isShutdown != null) {
         this.isShutdown.set(true);
       }
       isShutdown = null;
-      this.notify();
     }
     if (execToShutdown != null) {
       execToShutdown.shutdown();
@@ -252,13 +286,16 @@ public abstract class BackgroundService {
         Thread.currentThread().interrupt();
         execToShutdown.shutdownNow();
       }
-      if (threadGroupToBeClosed != null && !threadGroupToBeClosed.isDestroyed()) {
-        threadGroupToBeClosed.destroy();
-      }
+    }
+    if (periodicTaskSchedulerToBeClosed != null) {
+      periodicTaskSchedulerToBeClosed.close();
+    }
+    if (threadGroupToBeClosed != null && !threadGroupToBeClosed.isDestroyed()) {
+      threadGroupToBeClosed.destroy();
     }
   }
 
-  private void initExecutorAndThreadGroup() {
+  private synchronized void initExecutorAndThreadGroup() {
     try {
       threadGroup = new ThreadGroup(serviceName);
       Thread initThread = new Thread(threadGroup, () -> {
@@ -271,10 +308,11 @@ public abstract class BackgroundService {
               return thread;
             };
         exec = new ForkJoinPool(threadPoolSize, factory, null, false);
-        isShutdown = new AtomicBoolean(false);
+        isShutdown = new AtomicReference<>(false);
       });
       initThread.start();
       initThread.join();
+      periodicTaskScheduler = BackgroundServiceScheduler.get();
     } catch (InterruptedException e) {
       shutdown();
       Thread.currentThread().interrupt();
