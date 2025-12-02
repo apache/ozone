@@ -2654,7 +2654,6 @@
       <id>go-offline</id>
       <properties>
         <maven.javadoc.skip>true</maven.javadoc.skip>
-        <maven.shade.skip>true</maven.shade.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
