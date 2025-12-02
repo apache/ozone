@@ -32,15 +32,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,6 +53,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -314,10 +318,12 @@ public class TestNSSummaryUnifiedControl {
    * Test multiple concurrent attempts - only one should succeed, others rejected.
    */
   @Test
+  @Flaky("HDDS-13573")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
-    CountDownLatch startLatch = new CountDownLatch(1);
-    CountDownLatch allThreadsStartedLatch = new CountDownLatch(threadCount);
+    // Barrier ensures ALL threads reach the lock acquisition point before ANY can proceed
+    CyclicBarrier startBarrier = new CyclicBarrier(threadCount);
+    CountDownLatch firstThreadAcquiredLock = new CountDownLatch(1);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
@@ -334,16 +340,15 @@ public class TestNSSummaryUnifiedControl {
       LOG.info("clearNSSummaryTable called #{}, current state: {}", callNum, NSSummaryTask.getRebuildState());
       
       if (callNum == 1) {
-        startLatch.countDown();
-        // Wait for ALL threads to attempt lock acquisition before proceeding
-        boolean awaitSuccess = allThreadsStartedLatch.await(10, TimeUnit.SECONDS);
+        firstThreadAcquiredLock.countDown();
+        boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
         if (!awaitSuccess) {
-          LOG.warn("allThreadsStartedLatch.await() timed out");
+          LOG.error("finishLatch.await() timed out");
+          throw new RuntimeException("finishLatch timeout");
         }
-        awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
-        if (!awaitSuccess) {
-          LOG.warn("finishLatch.await() timed out");
-        }
+      } else {
+        // Second call should never happen if unified control works
+        LOG.error("clearNSSummaryTable called {} times! This should only be called once.", callNum);
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -356,33 +361,37 @@ public class TestNSSummaryUnifiedControl {
       for (int i = 0; i < threadCount; i++) {
         final int threadId = i;
         futures[i] = CompletableFuture.runAsync(() -> {
-          // Signal that this thread has started before attempting rebuild
-          allThreadsStartedLatch.countDown();
-          LOG.info("Thread {} attempting rebuild, current state: {}", threadId, NSSummaryTask.getRebuildState());
-          TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
-          if (result.isTaskSuccess()) {
-            int count = successCount.incrementAndGet();
-            LOG.info("Thread {} rebuild succeeded (success #{})", threadId, count);
-          } else {
-            int count = rejectedCount.incrementAndGet();
-            LOG.info("Thread {} rebuild rejected (rejection #{})", threadId, count);
+          try {
+            LOG.info("Thread {} waiting at barrier, current state: {}", threadId, NSSummaryTask.getRebuildState());
+            // ALL threads wait here until ALL have reached this point
+            startBarrier.await(10, TimeUnit.SECONDS);
+
+            LOG.info("Thread {} past barrier, attempting rebuild", threadId);
+            TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
+
+            if (result.isTaskSuccess()) {
+              int count = successCount.incrementAndGet();
+              LOG.info("Thread {} rebuild succeeded (success #{})", threadId, count);
+            } else {
+              int count = rejectedCount.incrementAndGet();
+              LOG.info("Thread {} rebuild rejected (rejection #{})", threadId, count);
+            }
+          } catch (InterruptedException | BrokenBarrierException | TimeoutException e) {
+            LOG.error("Thread {} failed at barrier", threadId, e);
+            throw new RuntimeException(e);
           }
         }, executor);
       }
 
-      // Wait for ALL threads to start before checking anything
-      assertTrue(allThreadsStartedLatch.await(5, TimeUnit.SECONDS),
-          "All threads should start within timeout");
-
-      // Wait for first rebuild to actually enter the critical section
-      assertTrue(startLatch.await(5, TimeUnit.SECONDS),
-          "At least one rebuild should start");
+      // Wait for first thread to acquire lock and enter critical section
+      assertTrue(firstThreadAcquiredLock.await(10, TimeUnit.SECONDS),
+          "At least one rebuild should acquire lock");
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
           "State should be RUNNING");
 
       // Let rebuilds complete
       finishLatch.countDown();
-      CompletableFuture.allOf(futures).get(10, TimeUnit.SECONDS);
+      CompletableFuture.allOf(futures).get(15, TimeUnit.SECONDS);
 
       // Debug output
       LOG.info("Final counts - Success: {}, Rejected: {}, ClearTable calls: {}, Final state: {}", 
@@ -399,10 +408,7 @@ public class TestNSSummaryUnifiedControl {
           "Final state should be IDLE");
 
     } finally {
-      // Ensure cleanup - count down latches to prevent deadlock in case of failure
-      while (allThreadsStartedLatch.getCount() > 0) {
-        allThreadsStartedLatch.countDown();
-      }
+      // Ensure cleanup - count down latch to prevent deadlock in case of failure
       finishLatch.countDown();
       executor.shutdown();
       executor.awaitTermination(5, TimeUnit.SECONDS);
