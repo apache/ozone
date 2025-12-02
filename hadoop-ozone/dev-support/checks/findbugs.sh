@@ -27,6 +27,9 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/findbugs"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
+source "${DIR}/_lib.sh"
+source "${DIR}/install/spotbugs.sh"
+
 MAVEN_OPTIONS='-B -fae -DskipDocs -DskipRecon -DskipShade --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then

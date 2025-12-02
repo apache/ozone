@@ -293,7 +293,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         .build();
     // Set toFileName
     fromKeyValue.setKeyName(toKeyFileName);
-    fromKeyValue.setFileName(toKeyFileName);
     // Set toKeyObjectId
     if (toKeyParent != null) {
       fromKeyValue.setParentObjectID(toKeyParent.getObjectID());

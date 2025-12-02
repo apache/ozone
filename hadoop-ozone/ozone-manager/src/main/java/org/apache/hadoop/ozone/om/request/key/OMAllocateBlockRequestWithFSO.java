@@ -222,9 +222,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   private void addOpenTableCacheEntry(long trxnLogIndex,
       OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
-    String fileName = openKeyInfo.getFileName();
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-            openKeyInfo, fileName, keyName, trxnLogIndex);
+        openKeyInfo, keyName, trxnLogIndex);
   }
 
   @Nonnull
