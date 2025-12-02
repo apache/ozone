@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -68,6 +69,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -450,6 +452,9 @@ public class TestFailureHandlingByClient {
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
     restartDataNodes.add(datanodes.get(0));
+
+    HddsDatanodeService hddsDatanode = cluster.getHddsDatanode(datanodes.get(0));
+    GenericTestUtils.waitFor(hddsDatanode::isStopped, 1000, 30000);
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
