@@ -29,6 +29,8 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
@@ -115,6 +117,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     OMResponse response = dispatcher.processRequest(validatedRequest,
         this::processRequest, request.getCmdType(), request.getTraceID());
 
+    logLargeResponseIfNeeded(response);
+
     return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
         () -> requestValidations.validateResponse(request, response));
   }
@@ -136,6 +140,31 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
     }
     return response;
+  }
+
+  /**
+   * Logs a warning if the OMResponse size exceeds half of the IPC maximum
+   * response size threshold.
+   *
+   * @param response The OMResponse to check
+   */
+  @VisibleForTesting
+  public void logLargeResponseIfNeeded(OMResponse response) {
+    try {
+      Configuration conf = ozoneManager.getConfiguration();
+      long maxSize = conf.getLong(CommonConfigurationKeys.IPC_MAXIMUM_RESPONSE_LENGTH,
+          CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+      long warnThreshold = maxSize / 2;
+
+      long respSize = response.getSerializedSize();
+      if (respSize > warnThreshold) {
+        LOG.warn("Large OMResponse detected: cmd={} size={}B threshold={}B ",
+            response.getCmdType(), respSize, warnThreshold);
+      }
+    } catch (Exception e) {
+      // Don't let logging errors disrupt response generation
+      LOG.debug("Failed to log response size", e);
+    }
   }
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
