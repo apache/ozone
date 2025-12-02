@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
 import static org.apache.hadoop.ozone.OzoneConsts.DATA_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEYS_LIST;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEY_SOURCE_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICATION_CONFIG;
 import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
@@ -264,8 +265,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    addDeletedKeys(auditMap, deleteKeysInfo, unDeletedKeys.getKeysList());
-    auditMap.put("sourceType", String.valueOf(sourceType)); // todo move to markForAudit
+    addDeletedKeys(auditMap, deleteKeysInfo, unDeletedKeys.getKeysList(), sourceType);
 
     markForAudit(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
@@ -273,9 +273,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       switch (sourceType) {
-      case RETENTION:
-        omMetrics.incNumKeyRetentionDeletes(deleteKeys.size());
-        omMetrics.incNumKeyRetentionDeleteFails(unDeletedKeys.getKeysList().size());
+      case LIFECYCLE:
+        omMetrics.incNumKeyLifecycleDeletes(deleteKeys.size());
+        omMetrics.incNumKeyLifecycleDeleteFails(unDeletedKeys.getKeysList().size());
         break;
       case TRASH:
         omMetrics.incNumKeyTrashDeletes(deleteKeys.size());
@@ -294,8 +294,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       break;
     case FAILURE:
       switch (sourceType) {
-      case RETENTION:
-        omMetrics.incNumKeyRetentionDeleteFails(unDeletedKeys.getKeysList().size());
+      case LIFECYCLE:
+        omMetrics.incNumKeyLifecycleDeleteFails(unDeletedKeys.getKeysList().size());
         break;
       case TRASH:
         omMetrics.incNumKeyTrashDeleteFails(unDeletedKeys.getKeysList().size());
@@ -400,7 +400,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
    * Add key info to audit map for DeleteKeys request.
    */
   protected static void addDeletedKeys(Map<String, String> auditMap,
-      List<OmKeyInfo> deletedKeyInfos, List<String> unDeletedKeys) {
+      List<OmKeyInfo> deletedKeyInfos, List<String> unDeletedKeys, RequestSource sourceType) {
     StringBuilder keys = new StringBuilder();
     for (int i = 0; i < deletedKeyInfos.size(); i++) {
       OmKeyInfo key = deletedKeyInfos.get(i);
@@ -413,6 +413,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
     auditMap.put(DELETED_KEYS_LIST, keys.toString());
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
+    auditMap.put(DELETED_KEY_SOURCE_TYPE, String.valueOf(sourceType));
   }
 
   /**

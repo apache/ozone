@@ -58,7 +58,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
   private @Metric MutableCounterLong numKeyDeletes;
-  private @Metric MutableCounterLong numKeyRetentionDeletes;
+  private @Metric MutableCounterLong numKeyLifecycleDeletes;
   private @Metric MutableCounterLong numKeyTrashDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
@@ -122,7 +122,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyLookupFails;
   private @Metric MutableCounterLong numKeyRenameFails;
   private @Metric MutableCounterLong numKeyDeleteFails;
-  private @Metric MutableCounterLong numKeyRetentionDeleteFails;
+  private @Metric MutableCounterLong numKeyLifecycleDeleteFails;
   private @Metric MutableCounterLong numKeyTrashDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
@@ -808,8 +808,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeleteFails.incr(count);
   }
 
-  public void incNumKeyRetentionDeleteFails(int count) {
-    numKeyRetentionDeleteFails.incr(count);
+  public void incNumKeyLifecycleDeleteFails(int count) {
+    numKeyLifecycleDeleteFails.incr(count);
   }
 
   public void incNumKeyTrashDeleteFails(int count) {
@@ -830,9 +830,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyDeletes.incr(count);
   }
 
-  public void incNumKeyRetentionDeletes(int count) {
+  public void incNumKeyLifecycleDeletes(int count) {
     numKeyOps.incr();
-    numKeyRetentionDeletes.incr(count);
+    numKeyLifecycleDeletes.incr(count);
   }
 
   public void incNumKeyTrashDeletes(int count) {
@@ -1140,8 +1140,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
-  public long getNumKeyRetentionDeletes() {
-    return numKeyRetentionDeletes.value();
+  public long getNumKeyLifecycleDeletes() {
+    return numKeyLifecycleDeletes.value();
   }
 
   @VisibleForTesting
@@ -1155,8 +1155,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
-  public long getNumKeyRetentionDeleteFails() {
-    return numKeyRetentionDeleteFails.value();
+  public long getNumKeyLifecycleDeleteFails() {
+    return numKeyLifecycleDeleteFails.value();
   }
 
   @VisibleForTesting

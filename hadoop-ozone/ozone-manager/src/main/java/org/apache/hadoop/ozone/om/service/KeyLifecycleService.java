@@ -815,7 +815,7 @@ public class KeyLifecycleService extends BackgroundService {
           DeleteKeyArgs deleteKeyArgs = builder.build();
           DeleteKeysRequest deleteKeysRequest = DeleteKeysRequest.newBuilder()
                   .setDeleteKeys(deleteKeyArgs)
-                  .setSourceType(RequestSource.RETENTION)
+                  .setSourceType(RequestSource.LIFECYCLE)
                   .build();
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 

@@ -57,7 +57,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
   public static Collection<Object[]> requestSourceType() {
     return Arrays.asList(
         new Object[]{RequestSource.USER},
-        new Object[]{RequestSource.RETENTION},
+        new Object[]{RequestSource.LIFECYCLE},
         new Object[]{RequestSource.TRASH});
   }
 
@@ -106,8 +106,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     case USER:
       assertEquals(deleteKeyList.size(), ozoneManager.getMetrics().getNumKeyDeletes());
       break;
-    case RETENTION:
-      assertEquals(deleteKeyList.size(), ozoneManager.getMetrics().getNumKeyRetentionDeletes());
+    case LIFECYCLE:
+      assertEquals(deleteKeyList.size(), ozoneManager.getMetrics().getNumKeyLifecycleDeletes());
       break;
     case TRASH:
       assertEquals(deleteKeyList.size(), ozoneManager.getMetrics().getNumKeyTrashDeletes());
@@ -213,8 +213,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
       case USER:
         assertEquals(1, ozoneManager.getMetrics().getNumKeyDeletesFails());
         break;
-      case RETENTION:
-        assertEquals(1, ozoneManager.getMetrics().getNumKeyRetentionDeleteFails());
+      case LIFECYCLE:
+        assertEquals(1, ozoneManager.getMetrics().getNumKeyLifecycleDeleteFails());
         break;
       case TRASH:
         assertEquals(1, ozoneManager.getMetrics().getNumKeyTrashDeleteFails());

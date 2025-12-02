@@ -22,8 +22,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -44,18 +42,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
-  public static Collection<Object[]> retentionDeletion() {
-    return Arrays.asList(
-        new Object[]{RequestSource.USER},
-        new Object[]{RequestSource.RETENTION},
-        new Object[]{RequestSource.TRASH});
-  }
-
   private static final int KEY_COUNT = 3;
 
   @Override
   @ParameterizedTest
-  @MethodSource("retentionDeletion")
+  @MethodSource("requestSourceType")
   public void testKeysDeleteRequest(RequestSource sourceType) throws Exception {
 
     createPreRequisites(sourceType);
@@ -68,7 +59,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
   @Override
   @ParameterizedTest
-  @MethodSource("retentionDeletion")
+  @MethodSource("requestSourceType")
   public void testKeysDeleteRequestFail(RequestSource sourceType) throws Exception {
     createPreRequisites(sourceType);
     setOmRequest(getOmRequest().toBuilder().setDeleteKeysRequest(
