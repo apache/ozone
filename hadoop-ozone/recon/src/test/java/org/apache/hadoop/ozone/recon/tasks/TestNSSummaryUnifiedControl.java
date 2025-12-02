@@ -58,9 +58,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Integration tests for HDDS-13443: Unified and controlled sync access to 
+ * Integration tests for HDDS-13443: Unified and controlled sync access to
  * retrigger of build of NSSummary tree.
- * 
+ *
  * <p>These tests verify that the unified control mechanism prevents concurrent
  * rebuilds and properly manages state transitions across all entry points.
  */
@@ -78,7 +78,7 @@ public class TestNSSummaryUnifiedControl {
   void setUp() throws IOException {
     // Reset static state before each test
     NSSummaryTask.resetRebuildState();
-    
+
     // Create mocks
     mockNamespaceSummaryManager = mock(ReconNamespaceSummaryManager.class);
     mockReconOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -94,26 +94,26 @@ public class TestNSSummaryUnifiedControl {
     // Reset static state after each test to ensure test isolation
     NSSummaryTask.resetRebuildState();
   }
-  
+
   /**
    * Create a testable NSSummaryTask that uses mocked sub-tasks for successful execution.
    */
   private NSSummaryTask createTestableNSSummaryTask() {
     return new NSSummaryTask(
-        mockNamespaceSummaryManager, 
-        mockReconOMMetadataManager, 
+        mockNamespaceSummaryManager,
+        mockReconOMMetadataManager,
         ozoneConfiguration) {
-      
+
       @Override
       public TaskResult buildTaskResult(boolean success) {
         return super.buildTaskResult(success);
       }
-      
-      @Override 
+
+      @Override
       protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
         // Simplified test implementation that mimics the real execution flow
         // but bypasses the complex sub-task execution while maintaining proper state management
-        
+
         // Initialize a list of tasks to run in parallel (empty for testing)
         Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
@@ -128,7 +128,7 @@ public class TestNSSummaryUnifiedControl {
 
         // Add mock sub-tasks that always succeed
         tasks.add(() -> true); // Mock FSO task
-        tasks.add(() -> true); // Mock Legacy task  
+        tasks.add(() -> true); // Mock Legacy task
         tasks.add(() -> true); // Mock OBS task
 
         List<Future<Boolean>> results;
@@ -137,7 +137,7 @@ public class TestNSSummaryUnifiedControl {
             .build();
         ExecutorService executorService = Executors.newFixedThreadPool(2, threadFactory);
         boolean success = false;
-        
+
         try {
           results = executorService.invokeAll(tasks);
           for (Future<Boolean> result : results) {
@@ -148,19 +148,19 @@ public class TestNSSummaryUnifiedControl {
             }
           }
           success = true;
-          
+
         } catch (InterruptedException | ExecutionException ex) {
           LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
           NSSummaryTask.setRebuildStateToFailed();
           return buildTaskResult(false);
-          
+
         } finally {
           executorService.shutdown();
 
           long endTime = System.nanoTime();
           long durationInMillis = TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
           LOG.info("Test NSSummary reprocess execution time: {} milliseconds", durationInMillis);
-          
+
           // Reset state to IDLE on successful completion
           if (success) {
             NSSummaryTask.resetRebuildState();
@@ -198,7 +198,7 @@ public class TestNSSummaryUnifiedControl {
     assertTrue(result.isTaskSuccess(), "Rebuild should succeed");
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should return to IDLE after successful rebuild");
-    
+
     // Verify interactions
     verify(mockNamespaceSummaryManager, times(1)).clearNSSummaryTable();
   }
@@ -252,7 +252,7 @@ public class TestNSSummaryUnifiedControl {
       }, executor);
 
       // Wait for first rebuild to start
-      assertTrue(startLatch.await(5, TimeUnit.SECONDS), 
+      assertTrue(startLatch.await(5, TimeUnit.SECONDS),
           "First rebuild should start within timeout");
       assertTrue(firstRebuildStarted.get(), "First rebuild should have started");
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
@@ -268,7 +268,7 @@ public class TestNSSummaryUnifiedControl {
 
       // Get second rebuild result quickly (should be immediate rejection)
       TaskResult secondResult = secondRebuild.get(2, TimeUnit.SECONDS);
-      assertFalse(secondResult.isTaskSuccess(), 
+      assertFalse(secondResult.isTaskSuccess(),
           "Second rebuild should be rejected");
       assertTrue(secondRebuildRejected.get(), "Second rebuild should have been rejected");
 
@@ -295,7 +295,7 @@ public class TestNSSummaryUnifiedControl {
   void testRebuildAfterFailure() throws Exception {
     // First rebuild fails
     doThrow(new IOException("Test failure")).when(mockNamespaceSummaryManager).clearNSSummaryTable();
-    
+
     TaskResult failedResult = nsSummaryTask.reprocess(mockOMMetadataManager);
     assertFalse(failedResult.isTaskSuccess(), "First rebuild should fail");
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
@@ -304,7 +304,7 @@ public class TestNSSummaryUnifiedControl {
     // Second rebuild succeeds
     // Setup successful rebuild by default - no exception thrown
     doNothing().when(mockNamespaceSummaryManager).clearNSSummaryTable();
-    
+
     TaskResult successResult = nsSummaryTask.reprocess(mockOMMetadataManager);
     assertTrue(successResult.isTaskSuccess(), "Second rebuild should succeed");
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
@@ -318,6 +318,7 @@ public class TestNSSummaryUnifiedControl {
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch allThreadsStartedLatch = new CountDownLatch(threadCount);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
@@ -325,17 +326,22 @@ public class TestNSSummaryUnifiedControl {
 
     // Ensure clean initial state
     NSSummaryTask.resetRebuildState();
-    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(), 
+    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "Initial state must be IDLE");
 
     // Setup rebuild to block and count calls
     doAnswer(invocation -> {
       int callNum = clearTableCallCount.incrementAndGet();
       LOG.info("clearNSSummaryTable called #{}, current state: {}", callNum, NSSummaryTask.getRebuildState());
-      
+
       if (callNum == 1) {
         startLatch.countDown();
-        boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+        // Wait for ALL threads to attempt lock acquisition before proceeding
+        boolean awaitSuccess = allThreadsStartedLatch.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("allThreadsStartedLatch.await() timed out");
+        }
+        awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
         if (!awaitSuccess) {
           LOG.warn("finishLatch.await() timed out");
         }
@@ -351,6 +357,8 @@ public class TestNSSummaryUnifiedControl {
       for (int i = 0; i < threadCount; i++) {
         final int threadId = i;
         futures[i] = CompletableFuture.runAsync(() -> {
+          // Signal that this thread has started before attempting rebuild
+          allThreadsStartedLatch.countDown();
           LOG.info("Thread {} attempting rebuild, current state: {}", threadId, NSSummaryTask.getRebuildState());
           TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
           if (result.isTaskSuccess()) {
@@ -363,8 +371,12 @@ public class TestNSSummaryUnifiedControl {
         }, executor);
       }
 
-      // Wait for first rebuild to start
-      assertTrue(startLatch.await(5, TimeUnit.SECONDS), 
+      // Wait for ALL threads to start before checking anything
+      assertTrue(allThreadsStartedLatch.await(5, TimeUnit.SECONDS),
+          "All threads should start within timeout");
+
+      // Wait for first rebuild to actually enter the critical section
+      assertTrue(startLatch.await(5, TimeUnit.SECONDS),
           "At least one rebuild should start");
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
           "State should be RUNNING");
@@ -374,21 +386,25 @@ public class TestNSSummaryUnifiedControl {
       CompletableFuture.allOf(futures).get(10, TimeUnit.SECONDS);
 
       // Debug output
-      LOG.info("Final counts - Success: {}, Rejected: {}, ClearTable calls: {}, Final state: {}", 
+      LOG.info("Final counts - Success: {}, Rejected: {}, ClearTable calls: {}, Final state: {}",
           successCount.get(), rejectedCount.get(), clearTableCallCount.get(), NSSummaryTask.getRebuildState());
 
       // Verify results - only one thread should have successfully executed the rebuild
-      assertEquals(1, clearTableCallCount.get(), 
+      assertEquals(1, clearTableCallCount.get(),
           "clearNSSummaryTable should only be called once due to unified control");
-      assertEquals(1, successCount.get(), 
+      assertEquals(1, successCount.get(),
           "Exactly one rebuild should succeed");
-      assertEquals(threadCount - 1, rejectedCount.get(), 
+      assertEquals(threadCount - 1, rejectedCount.get(),
           "All other rebuilds should be rejected");
       assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
           "Final state should be IDLE");
 
     } finally {
-      finishLatch.countDown(); // Ensure cleanup
+      // Ensure cleanup - count down latches to prevent deadlock in case of failure
+      while (allThreadsStartedLatch.getCount() > 0) {
+        allThreadsStartedLatch.countDown();
+      }
+      finishLatch.countDown();
       executor.shutdown();
       executor.awaitTermination(5, TimeUnit.SECONDS);
     }
@@ -418,11 +434,11 @@ public class TestNSSummaryUnifiedControl {
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
     // Start rebuild in background to test state transitions
-    CompletableFuture<TaskResult> rebuild = CompletableFuture.supplyAsync(() -> 
+    CompletableFuture<TaskResult> rebuild = CompletableFuture.supplyAsync(() ->
         nsSummaryTask.reprocess(mockOMMetadataManager));
 
     // Wait for rebuild to start and verify RUNNING state
-    assertTrue(rebuildStarted.await(5, TimeUnit.SECONDS), 
+    assertTrue(rebuildStarted.await(5, TimeUnit.SECONDS),
         "Rebuild should start within timeout");
     assertEquals(RebuildState.RUNNING, ReconUtils.getNSSummaryRebuildState(),
         "State should be RUNNING during rebuild");
@@ -445,7 +461,7 @@ public class TestNSSummaryUnifiedControl {
         .when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
     TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
-    
+
     assertFalse(result.isTaskSuccess(), "Rebuild should fail on exception");
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after exception");
@@ -453,7 +469,7 @@ public class TestNSSummaryUnifiedControl {
     // Verify we can recover from FAILED state
     // Setup successful rebuild by default - no exception thrown
     doNothing().when(mockNamespaceSummaryManager).clearNSSummaryTable();
-    
+
     TaskResult recoveryResult = nsSummaryTask.reprocess(mockOMMetadataManager);
     assertTrue(recoveryResult.isTaskSuccess(), "Recovery rebuild should succeed");
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
