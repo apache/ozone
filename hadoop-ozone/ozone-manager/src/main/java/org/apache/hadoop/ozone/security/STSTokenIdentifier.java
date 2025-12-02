@@ -23,6 +23,7 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -112,20 +113,23 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    * Convert this identifier to protobuf format.
    */
   public OMTokenProto toProtoBuf() {
-    final OMTokenProto.Builder builder = OMTokenProto.newBuilder()
+    Preconditions.checkArgument(this.encryptionKey != null, "The encryption key must not be null");
+
+    final OMTokenProto.Builder builder = OMTokenProto.newBuilder();
+    // Note: secretKeyId must be set before attempting to decrypt secretAccessKey
+    if (getSecretKeyId() != null) {
+      builder.setSecretKeyId(getSecretKeyId().toString());
+    }
+
+    builder
         .setType(OMTokenProto.Type.S3_STS_TOKEN)
         .setMaxDate(getExpiry().toEpochMilli())
         .setOwner(getOwnerId() != null ? getOwnerId() : "")
         .setAccessKeyId(getOwnerId() != null ? getOwnerId() : "")
         .setOriginalAccessKeyId(originalAccessKeyId != null ? originalAccessKeyId : "")
         .setRoleArn(roleArn != null ? roleArn : "")
-        // TODO sts - encrypt secret access key in a future PR
-        .setSecretAccessKey(secretAccessKey != null ? secretAccessKey : "")
+        .setSecretAccessKey(secretAccessKey != null ? encryptSensitiveField(secretAccessKey) : "")
         .setSessionPolicy(sessionPolicy != null ? sessionPolicy : "");
-
-    if (getSecretKeyId() != null) {
-      builder.setSecretKeyId(getSecretKeyId().toString());
-    }
 
     return builder.build();
   }
@@ -137,6 +141,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     Preconditions.checkArgument(
         token.getType() == OMTokenProto.Type.S3_STS_TOKEN,
         "Invalid token type for STSTokenIdentifier: " + token.getType());
+    Preconditions.checkArgument(this.encryptionKey != null, "The encryption key must not be null");
 
     setOwnerId(token.getOwner());
     setExpiry(Instant.ofEpochMilli(token.getMaxDate()));
@@ -147,11 +152,6 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     if (token.hasRoleArn()) {
       this.roleArn = token.getRoleArn();
     }
-    if (token.hasSecretAccessKey()) {
-      // TODO sts - decrypt secret access key in a future PR
-      this.secretAccessKey = token.getSecretAccessKey();
-    }
-
     if (token.hasSecretKeyId()) {
       try {
         setSecretKeyId(UUID.fromString(token.getSecretKeyId()));
@@ -161,10 +161,61 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
             "Invalid secretKeyId format in STS token: " + token.getSecretKeyId(), e);
       }
     }
+    // Note: secretKeyId must be set before attempting to decrypt secretAccessKey
+    if (token.hasSecretAccessKey()) {
+      this.secretAccessKey = decryptSensitiveField(token.getSecretAccessKey());
+    }
 
     if (token.hasSessionPolicy()) {
       this.sessionPolicy = token.getSessionPolicy();
     }
+  }
+
+  /**
+   * Encrypt a sensitive field using the configured encryption key.
+   */
+  private String encryptSensitiveField(String value) {
+    if (encryptionKey == null) {
+      throw new IllegalStateException("Encryption key must be set before encrypting sensitive fields");
+    }
+
+    try {
+      final byte[] aad = computeAadBytes();
+      return STSTokenEncryption.encrypt(value, encryptionKey, aad);
+    } catch (STSTokenEncryption.STSTokenEncryptionException e) {
+      throw new RuntimeException("Token encryption failed", e);
+    }
+  }
+
+  /**
+   * Decrypt a sensitive field using the configured encryption key.
+   */
+  private String decryptSensitiveField(String encryptedValue) {
+    if (encryptionKey == null) {
+      throw new IllegalStateException("Encryption key must be set before decrypting sensitive fields");
+    }
+
+    try {
+      final byte[] aad = computeAadBytes();
+      return STSTokenEncryption.decrypt(encryptedValue, encryptionKey, aad);
+    } catch (STSTokenEncryption.STSTokenEncryptionException e) {
+      throw new RuntimeException("Token decryption failed", e);
+    }
+  }
+
+  /**
+   * Compute additional authenticated data to bind token context to encryption.
+   * Includes token type, ownerId, expiry millis, and secretKeyId.
+   */
+  private byte[] computeAadBytes() {
+    final StringBuilder stringBuilder = new StringBuilder("v1|S3_STS_TOKEN|");
+    stringBuilder.append(getOwnerId());
+    stringBuilder.append('|');
+    stringBuilder.append(getExpiry().toEpochMilli());
+    stringBuilder.append('|');
+    stringBuilder.append(getSecretKeyId().toString());
+    final String aad = stringBuilder.toString();
+    return aad.getBytes(StandardCharsets.UTF_8);
   }
 
   public String getRoleArn() {
@@ -191,6 +242,10 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
    */
   public String getSessionPolicy() {
     return sessionPolicy;
+  }
+
+  public void setEncryptionKey(byte[] encryptionKey) {
+    this.encryptionKey = encryptionKey.clone();
   }
 
   @Override
