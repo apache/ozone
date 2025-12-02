@@ -145,6 +145,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
+import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -173,7 +174,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     SHA_256_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
-        return MessageDigest.getInstance("SHA-256");
+        return MessageDigest.getInstance(OzoneConsts.FILE_HASH);
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }
@@ -338,7 +339,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, tags, multiDigestInputStream, perf);
+                customMetadata, tags, multiDigestInputStream, headers, signatureInfo.isSignPayload(), perf);
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -354,13 +355,24 @@ public class ObjectEndpoint extends EndpointBase {
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
+
+          final String amzContentSha256Header =
+              validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
+          // If x-amz-content-sha256 is present and is not an unsigned payload
+          // or multi-chunk payload, validate the sha256.
+          MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
+          if (sha256Digest != null && !hasUnsignedPayload(amzContentSha256Header) &&
+              !hasMultiChunksPayload(amzContentSha256Header)) {
+            final String actualSha256 = DatatypeConverter.printHexBinary(
+                sha256Digest.digest()).toLowerCase();
+            output.getKeyOutputStream().setPreCommit(() -> {
+              Preconditions.checkArgument(amzContentSha256Header.equals(actualSha256),
+                  S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getErrorMessage());
+                }
+            );
+          }
         }
       }
-      // validate "X-AMZ-CONTENT-SHA256"
-      String sha256 = DatatypeConverter.printHexBinary(
-              multiDigestInputStream.getMessageDigest("SHA-256").digest())
-          .toLowerCase();
-      S3Utils.validateXAmzContentSHA256Header(headers, sha256, signatureInfo.isSignPayload(), keyPath);
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
@@ -406,6 +418,10 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCopyObjectFailureStats(startNanos);
       } else {
         getMetrics().updateCreateKeyFailureStats(startNanos);
+      }
+      if (ex instanceof IllegalArgumentException &&
+          ex.getMessage().equals(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getErrorMessage())) {
+        throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
       }
       throw ex;
     } finally {
