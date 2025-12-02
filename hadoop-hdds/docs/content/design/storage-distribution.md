@@ -68,7 +68,13 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 
 ### Recon API Design
 
-The Recon API will expose a single endpoint that returns a JSON object with the following structure:
+#### 1. Get Storage Distribution Information
+
+**Endpoint:** `GET /storageDistribution`
+**Description:** Retrieves comprehensive storage metrics including global capacity, namespace usage, and per-DataNode storage breakdown.
+**Parameters:** None
+**Responses:** 200 OK
+**Response Structure:**
 
 | Field              | Type             | Description                            |
 |--------------------|------------------|----------------------------------------|
@@ -77,67 +83,30 @@ The Recon API will expose a single endpoint that returns a JSON object with the 
 | usedSpaceBreakdown | Object           | Detailed breakdown of used space.      |
 | dataNodeUsage      | Array of Objects | Per-DataNode storage usage.            |
 
-#### globalStorage Object
+**Response Objects:**
 
+##### globalStorage Object
 | Field          | Type | Description                                       |
 |----------------|------|---------------------------------------------------|
 | totalUsedSpace | Long | Total used space across all DataNodes in bytes.   |
 | totalFreeSpace | Long | Total free space across all DataNodes in bytes.   |
 | totalCapacity  | Long | Total raw capacity across all DataNodes in bytes. |
 
-#### globalNamespace Object
-
+##### globalNamespace Object
 | Field          | Type | Description                                             |
 |----------------|------|---------------------------------------------------------|
 | totalUsedSpace | Long | Total used space for namespace objects (keys) in bytes. |
 | totalKeys      | Long | Total number of keys in the namespace.                  |
 
-#### usedSpaceBreakdown Object
+##### usedSpaceBreakdown Object
+| Field                      | Type | Description                                            |
+|----------------------------|------|--------------------------------------------------------|
+| openKeyBytes               | Long | Bytes currently held by open keys (not yet committed). |
+| committedKeyBytes          | Long | Bytes committed to existing keys.                      |
+| preAllocatedContainerBytes | Long | Pre-allocated space for open containers.               |
 
-| Field                 | Type   | Description                                            |
-|-----------------------|--------|--------------------------------------------------------|
-| openKeyBytes         | Long   | Bytes currently held by open keys (not yet committed). |
-| committedKeyBytes        | Long   | Bytes committed to existing keys.                      |
-| preAllocatedContainerBytes | Long   | Pre-allocated space for open containers.               |
-| pendingDeletionBytes  | Object | Bytes pending deletion.                                |
-
-#### deletionPendingBytes Object
-
-| Field   | Type   | Description                                     |
-|---------|--------|-------------------------------------------------|
-| total   | Long   | Total bytes pending deletion across all stages. |
-| byComponent | Object | Breakdown of pending deletion bytes by component.   |
-
-#### byStage Object
-
-| Field | Type   | Description                                         |
-|-------|--------|-----------------------------------------------------|
-| DN    | Object | DataNode pending deletion metrics.                  |
-| SCM   | Object | Storage Container Manager pending deletion metrics. |
-| OM    | Object | Ozone Manager pending deletion metrics.             |
-
-#### DN Object (within byStage)
-
-| Field        | Type | Description                                   |
-|--------------|------|-----------------------------------------------|
-| pendingBytes | Long | Bytes pending deletion at the DataNode level. |
-
-#### SCM Object (within byStage)
-
-| Field        | Type | Description                              |
-|--------------|------|------------------------------------------|
-| pendingBytes | Long | Bytes pending deletion at the SCM level. |
-
-#### OM Object (within byStage)
-
-| Field                 | Type | Description                                                                              |
-|-----------------------|------|------------------------------------------------------------------------------------------|
-| pendingKeyBytes       | Long | Key bytes pending deletion at the Ozone Manager level.                                   |
-| pendingDirectoryBytes | Long | Directory bytes pending deletion at the Ozone Manager level.                             |
-| totalBytes            | Long | Total bytes pending deletion at the Ozone Manager level (includes keys and directories). |
-#### dataNodeUsage Array of Objects
-
-Each object in this array represents the usage for a single DataNode.
+##### dataNodeUsage Array (Per-DataNode Metrics)
+Each object represents the storage metrics for a single DataNode.
 
 | Field            | Type   | Description                                    |
 |------------------|--------|------------------------------------------------|
@@ -147,10 +116,9 @@ Each object in this array represents the usage for a single DataNode.
 | used             | Long   | Used space on the DataNode in bytes.           |
 | remaining        | Long   | Remaining free space on the DataNode in bytes. |
 | committed        | Long   | Bytes committed to keys on this DataNode.      |
-| pendingDeletion  | Long   | Bytes pending deletion on this DataNode.       |
-| minimumFreeSpace | Long   | Configured minimum free space in Bytes.        |
+| minimumFreeSpace | Long   | Configured minimum free space in bytes.        |
 
-#### Example API Output
+**Example Response:**
 
 ```json
 {
@@ -166,23 +134,7 @@ Each object in this array represents the usage for a single DataNode.
   "usedSpaceBreakdown": {
     "openKeysBytes": 0,
     "committedBytes": 5242880000,
-    "containerPreAllocated": 0,
-    "deletionPendingBytes": {
-      "total": 0,
-      "byStage": {
-        "DN": {
-          "pendingBytes": 0
-        },
-        "SCM": {
-          "pendingBytes": 0
-        },
-        "OM": {
-          "pendingKeyBytes": 0,
-          "totalBytes": 0,
-          "pendingDirectoryBytes": 0
-        }
-      }
-    }
+    "preAllocatedContainerBytes": 0
   },
   "dataNodeUsage": [
     {
@@ -192,7 +144,6 @@ Each object in this array represents the usage for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "pendingDeletion": 0,
       "minimumFreeSpace": 1080992000
     },
     {
@@ -202,7 +153,6 @@ Each object in this array represents the usage for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "pendingDeletion": 0,
       "minimumFreeSpace": 1080992000
     },
     {
@@ -212,12 +162,56 @@ Each object in this array represents the usage for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "pendingDeletion": 0,
       "minimumFreeSpace": 1080992000
     }
   ]
 }
 ```
+
+#### 2. Get Pending Deletion Bytes
+
+**Endpoint:** `GET /pendingDeletion`
+**Description:** Retrieves pending deletion metrics across different Ozone components (OM, SCM, and DataNodes).
+**Parameters:**
+- `component` (required): Component type - `om`, `scm`, or `dn`
+**Responses:**
+- **200 OK:** Data is available or task is running
+- **202 Accepted:** No data available yet but task is in progress
+
+**Response Schemas by Component:**
+
+##### a) Ozone Manager (OM) - `GET /pendingDeletion?component=om`
+
+| Field               | Type | Description                          |
+|---------------------|------|--------------------------------------|
+| totalSize           | Long | Total pending bytes across all items |
+| pendingDirectorySize | Long | Total pending bytes for directories  |
+| pendingKeySize      | Long | Total pending bytes for keys         |
+
+##### b) Storage Container Manager (SCM) - `GET /pendingDeletion?component=scm`
+
+| Field                    | Type | Description                                    |
+|--------------------------|------|------------------------------------------------|
+| totalBlocksize           | Long | Total pending bytes for unreplicated blocks    |
+| totalReplicatedBlockSize | Long | Total pending bytes for replicated blocks      |
+| totalBlocksCount         | Long | Total number of pending blocks                 |
+
+##### c) DataNodes (DN) - `GET /pendingDeletion?component=dn`
+
+| Field                      | Type             | Description                                         |
+|----------------------------|------------------|-----------------------------------------------------|
+| status                     | String           | Status of the background metrics collection task   |
+| totalPendingDeletion       | Long             | Sum of pending deletion bytes across all DataNodes |
+| pendingDeletionPerDataNode | Array of Objects | Per-DataNode pending deletion metrics              |
+
+**pendingDeletionPerDataNode Array (Per-DataNode Metrics):**
+Each object contains pending deletion information for a single DataNode.
+
+| Field            | Type   | Description                              |
+|------------------|--------|------------------------------------------|
+| hostName         | String | Hostname of the DataNode                 |
+| datanodeUuid     | String | Unique identifier for the DataNode       |
+| pendingBlockSize | Long   | Total pending bytes on this DataNode     |
 
 ### Backend Implementation
 
@@ -275,7 +269,7 @@ A new HDDS layout feature, STORAGE_SPACE_DISTRIBUTION, has been introduced to ha
 #### Why a New Layout Feature Is Needed
 
 Although rolling upgrades are not supported in Ozone (meaning OM and SCM should never run different versions simultaneously), SCM and Datanodes may persist aggregated size metrics in their databases during the upgrade process.
-If these metrics are written before the cluster is finalized, and later the cluster is downgraded and re-upgraded, the old values can become stale or inaccurate since old code won’t update them correctly.
+If these metrics are written before the cluster is finalized, and later the cluster is downgraded and re-upgraded, the old values can become stale or inaccurate since old code won't update them correctly.
 
 To prevent such inaccuracies, SCM and DNs must only start persisting the aggregated pending deletion data once the layout feature is finalized.
 
