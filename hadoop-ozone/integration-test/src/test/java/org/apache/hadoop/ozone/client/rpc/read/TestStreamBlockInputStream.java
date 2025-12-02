@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -70,46 +71,61 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   void testReadKey() throws Exception {
     try (MiniOzoneCluster cluster = newCluster()) {
       cluster.waitForClusterToBeReady();
-
       LOG.info("cluster ready");
-
       OzoneConfiguration conf = cluster.getConf();
-      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-      clientConfig.setStreamReadBlock(true);
-      OzoneConfiguration copy = new OzoneConfiguration(conf);
-      copy.setFromObject(clientConfig);
-      String keyName = getNewKeyName();
-      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        bucket = TestBucket.newBuilder(client).build();
-        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
-        LOG.info("writeRandomBytes {} bytes", inputData.length);
 
-        for (int i = 1; i <= 10; i++) {
-          runTestReadKey(keyName, DATA_LENGTH / i);
-        }
-
-        for (int n = 4; n <= 16 << 10; n <<= 2) {
-          runTestReadKey(keyName, n << 10); // 4kB
-        }
+      runTestReadKey(DATA_LENGTH, false, conf);
+      for (int i = 0; i < 3; i++) {
+        final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
+        runTestReadKey(keyLength, true, conf);
       }
     }
   }
 
-  private void runTestReadKey(String key, int bufferSize) throws Exception {
-    LOG.info("---------------------------------------------------------");
-    LOG.info("read {} bytes with bufferSize {}", DATA_LENGTH, bufferSize);
+  void runTestReadKey(int keyLength, boolean randomReadOffset, OzoneConfiguration conf) throws Exception {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadBlock(true);
+    OzoneConfiguration copy = new OzoneConfiguration(conf);
+    copy.setFromObject(clientConfig);
+    String keyName = getNewKeyName();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+      bucket = TestBucket.newBuilder(client).build();
+      inputData = bucket.writeRandomBytes(keyName, keyLength);
+      LOG.info("---------------------------------------------------------");
+      LOG.info("writeRandomBytes {} bytes", inputData.length);
+
+      for (int i = 1; i <= 10; i++) {
+        runTestReadKey(keyName, keyLength / i, randomReadOffset, keyLength);
+      }
+
+      for (int n = 4; n <= 16 << 10; n <<= 2) {
+        runTestReadKey(keyName, n << 10, randomReadOffset, keyLength);
+      }
+    }
+  }
+
+  private void runTestReadKey(String key, int bufferSize, boolean randomReadOffset, int keyLength) throws Exception {
+    final int readOffset = randomReadOffset ? ThreadLocalRandom.current().nextInt(keyLength / 2) : 0;
+    LOG.info("read {} bytes with bufferSize {}, readOffset {}", keyLength, bufferSize, readOffset);
     // Read the data fully into a large enough byte array
     final byte[] buffer = new byte[bufferSize];
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      int pos = 0;
-      for (; pos < DATA_LENGTH;) {
+      if (readOffset > 0) {
+        keyInputStream.seek(readOffset);
+      }
+
+      int pos = readOffset;
+      for (; pos < keyLength;) {
         final int read = keyInputStream.read(buffer, 0, buffer.length);
+        if (read == -1) {
+          break;
+        }
         for (int i = 0; i < read; i++) {
           assertEquals(inputData[pos + i], buffer[i], "pos=" + pos + ", i=" + i);
         }
         pos += read;
       }
-      assertEquals(DATA_LENGTH, pos);
+      assertEquals(keyLength, pos);
     }
   }
 

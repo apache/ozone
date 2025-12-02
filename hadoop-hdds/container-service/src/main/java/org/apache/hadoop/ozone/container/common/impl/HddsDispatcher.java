@@ -49,13 +49,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -820,7 +820,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
-      RandomAccessBlockFile blockFile, DispatcherContext dispatcherContext) {
+      RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
