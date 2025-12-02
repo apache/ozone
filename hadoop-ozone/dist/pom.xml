@@ -273,11 +273,6 @@
           <artifactId>ozone-filesystem-hadoop3</artifactId>
           <scope>runtime</scope>
         </dependency>
-        <dependency>
-          <groupId>org.apache.ozone</groupId>
-          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
-          <scope>runtime</scope>
-        </dependency>
       </dependencies>
     </profile>
 
