@@ -74,7 +74,7 @@ public class TestS3Utils {
     for (String s3StorageType : S3STORAGETYPES) {
       for (String s3StorageConfig : S3STORAGECONFIG) {
         for (ReplicationConfig clientReplConfig : REPLICATIONS) {
-          for (ReplicationConfig bucketReplConfig : REPLICATIONS) {
+          for (ReplicationConfig bucketReplConfig: REPLICATIONS) {
             args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig));
           }
         }
@@ -86,8 +86,7 @@ public class TestS3Utils {
   @ParameterizedTest
   @MethodSource("validS3ReplicationConfigs")
   public void testValidResolveS3ClientSideReplicationConfig(String s3StorageType, String s3StorageConfig,
-                                                            ReplicationConfig clientConfiguredReplConfig,
-                                                            ReplicationConfig bucketReplConfig)
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
       throws OS3Exception {
     ReplicationConfig replicationConfig = S3Utils
         .resolveS3ClientSideReplicationConfig(s3StorageType, s3StorageConfig,
@@ -136,8 +135,7 @@ public class TestS3Utils {
   @ParameterizedTest
   @MethodSource("invalidS3ReplicationConfigs")
   public void testResolveRepConfWhenUserPassedIsInvalid(String s3StorageType, String s3StorageConfig,
-                                                        ReplicationConfig clientConfiguredReplConfig,
-                                                        ReplicationConfig bucketReplConfig)
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
       throws OS3Exception {
     OS3Exception exception = assertThrows(OS3Exception.class, () -> S3Utils.
         resolveS3ClientSideReplicationConfig(
@@ -149,4 +147,5 @@ public class TestS3Utils {
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
   }
+
 }
