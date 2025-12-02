@@ -532,9 +532,8 @@ public final class IamSessionPolicyResolver {
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
 
-      // If condition prefixes are present, these would constrain the object permissions if the action is a listing
-      // action
-      if (prefixes != null && !prefixes.isEmpty() && action.bucketPerms.contains(LIST)) {
+      // If condition prefixes are present, these would constrain the object permissions if the action is s3:ListBucket
+      if (prefixes != null && !prefixes.isEmpty() && action == S3Action.LIST_BUCKET) {
         for (String prefix : prefixes) {
           createObjectResourcesFromConditionPrefix(
               volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, singleton(READ));
