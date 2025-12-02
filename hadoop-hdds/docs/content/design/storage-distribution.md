@@ -71,9 +71,13 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 #### 1. Get Storage Distribution Information
 
 **Endpoint:** `GET /storageDistribution`
+
 **Description:** Retrieves comprehensive storage metrics including global capacity, namespace usage, and per-DataNode storage breakdown.
+
 **Parameters:** None
+
 **Responses:** 200 OK
+
 **Response Structure:**
 
 | Field              | Type             | Description                            |
@@ -171,9 +175,12 @@ Each object represents the storage metrics for a single DataNode.
 #### 2. Get Pending Deletion Bytes
 
 **Endpoint:** `GET /pendingDeletion`
+
 **Description:** Retrieves pending deletion metrics across different Ozone components (OM, SCM, and DataNodes).
+
 **Parameters:**
 - `component` (required): Component type - `om`, `scm`, or `dn`
+
 **Responses:**
 - **200 OK:** Data is available or task is running
 - **202 Accepted:** No data available yet but task is in progress
