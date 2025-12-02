@@ -378,6 +378,7 @@ class TestObjectPut {
     when(messageDigest.getAlgorithm()).thenReturn("MD5");
     MessageDigest sha256Digest = mock(MessageDigest.class);
     when(sha256Digest.getAlgorithm()).thenReturn("SHA-256");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("test-signature");
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
