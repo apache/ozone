@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,7 +84,7 @@ public class MultiDigestInputStream extends FilterInputStream {
    * @param in the underlying input stream
    * @param inputDigests the message digest instances to compute (may be zero-length)
    */
-  public MultiDigestInputStream(InputStream in, MessageDigest... inputDigests) {
+  public MultiDigestInputStream(InputStream in, Collection<MessageDigest> inputDigests) {
     super(in);
     this.digests = new HashMap<>();
     for (MessageDigest digest : inputDigests) {

@@ -77,6 +77,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -411,8 +412,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
-        multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest("SHA-256").reset();
+        multiDigestInputStream.resetDigests();
       }
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -1140,8 +1140,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
       if (multiDigestInputStream != null) {
-        multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).reset();
-        multiDigestInputStream.getMessageDigest("SHA-256").reset();
+        multiDigestInputStream.resetDigests();
       }
     }
   }
@@ -1571,10 +1570,13 @@ public class ObjectEndpoint extends EndpointBase {
     final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
     final long effectiveLength;
+    List<MessageDigest> digests = new ArrayList<>();
+    digests.add(getMessageDigestInstance());
     if (hasMultiChunksPayload(amzContentSha256Header)) {
       validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
+        digests.add(getSha256DigestInstance());
       } else {
         chunkInputStream = new SignedChunksInputStream(body);
       }
@@ -1590,7 +1592,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     // DigestInputStream is used for ETag calculation
     MultiDigestInputStream multiDigestInputStream =
-        new MultiDigestInputStream(chunkInputStream, getMessageDigestInstance(), getSha256DigestInstance());
+        new MultiDigestInputStream(chunkInputStream, digests);
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
   }
 

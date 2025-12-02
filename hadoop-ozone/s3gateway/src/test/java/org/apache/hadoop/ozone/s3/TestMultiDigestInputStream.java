@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
@@ -45,26 +48,26 @@ public class TestMultiDigestInputStream {
     return Stream.of(
         // Empty stream
         Arguments.of("empty stream with MD5",
-            new MessageDigest[]{MessageDigest.getInstance("MD5")}, ""),
+            Arrays.asList(MessageDigest.getInstance("MD5")), ""),
         Arguments.of("empty stream with multiple algorithms",
-            new MessageDigest[]{MessageDigest.getInstance("MD5"),
-                MessageDigest.getInstance("SHA-256")}, ""),
+            Arrays.asList(MessageDigest.getInstance("MD5"),
+                MessageDigest.getInstance("SHA-256")), ""),
         // Normal data
         Arguments.of("MD5",
-            new MessageDigest[]{MessageDigest.getInstance("MD5")}, TEST_DATA),
+            Arrays.asList(MessageDigest.getInstance("MD5")), TEST_DATA),
         Arguments.of("MD5 and SHA-256",
-            new MessageDigest[]{MessageDigest.getInstance("MD5"),
-                MessageDigest.getInstance("SHA-256")}, TEST_DATA),
+            Arrays.asList(MessageDigest.getInstance("MD5"),
+                MessageDigest.getInstance("SHA-256")), TEST_DATA),
         Arguments.of("MD5, SHA-1 and SHA-256",
-            new MessageDigest[]{MessageDigest.getInstance("MD5"),
+            Arrays.asList(MessageDigest.getInstance("MD5"),
                 MessageDigest.getInstance("SHA-1"),
-                MessageDigest.getInstance("SHA-256")}, TEST_DATA)
+                MessageDigest.getInstance("SHA-256")), TEST_DATA)
     );
   }
 
   @ParameterizedTest
   @MethodSource("algorithmAndDataTestCases")
-  void testRead(String testName, MessageDigest[] digests, String data) throws Exception {
+  void testRead(String testName, List<MessageDigest> digests, String data) throws Exception {
     byte[] dataBytes = data.getBytes(UTF_8);
 
     try (MultiDigestInputStream mdis = new MultiDigestInputStream(
@@ -85,7 +88,7 @@ public class TestMultiDigestInputStream {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
     try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
-        MessageDigest.getInstance("MD5"))) {
+        Collections.singletonList(MessageDigest.getInstance("MD5")))) {
 
       mdis.on(false);
 
@@ -107,7 +110,7 @@ public class TestMultiDigestInputStream {
     byte[] data = (firstPart + secondPart).getBytes(UTF_8);
 
     try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
-        MessageDigest.getInstance("MD5"))) {
+        Collections.singletonList(MessageDigest.getInstance("MD5")))) {
       // Read first part with digest on
       byte[] buffer1 = new byte[firstPart.length()];
       int bytesRead1 = mdis.read(buffer1, 0, buffer1.length);
@@ -132,7 +135,7 @@ public class TestMultiDigestInputStream {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
     try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
-        MessageDigest.getInstance("MD5"))) {
+        Collections.singletonList(MessageDigest.getInstance("MD5")))) {
 
       int byte1 = mdis.read();
       int byte2 = mdis.read();
@@ -151,7 +154,7 @@ public class TestMultiDigestInputStream {
     byte[] data = TEST_DATA.getBytes(UTF_8);
 
     try (MultiDigestInputStream mdis = new MultiDigestInputStream(new ByteArrayInputStream(data),
-        MessageDigest.getInstance("MD5"), MessageDigest.getInstance("SHA-1"))) {
+        Arrays.asList(MessageDigest.getInstance("MD5"), MessageDigest.getInstance("SHA-1")))) {
 
       // Test initial state - getAllDigests
       Map<String, MessageDigest> allDigests = mdis.getAllDigests();
@@ -191,4 +194,3 @@ public class TestMultiDigestInputStream {
   }
 
 }
-
