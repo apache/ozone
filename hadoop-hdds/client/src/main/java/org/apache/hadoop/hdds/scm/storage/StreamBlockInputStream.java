@@ -243,23 +243,24 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     while (streamingReader == null) {
       try {
         acquireClient();
+        final StreamingReader reader = new StreamingReader();
+        xceiverClient.initStreamRead(blockID, reader);
+        streamingReader = reader;
       } catch (IOException ioe) {
         handleExceptions(ioe);
       }
-
-      streamingReader = new StreamingReader();
-      xceiverClient.initStreamRead(blockID, streamingReader);
     }
   }
 
   synchronized void readBlock(int length) throws IOException {
-    final long diff = position + length - requestedLength;
-    if (diff > 0) {
-      final long rounded = roundUp(diff + preReadSize, responseDataSize);
-      LOG.debug("position {}, length {}, requested {}, diff {}, rounded {}, preReadSize={}",
-          position, length, requestedLength, diff, rounded, preReadSize);
-      readBlockImpl(rounded);
-      requestedLength += rounded;
+    final long required = position + length - requestedLength;
+    final long readLength = required + preReadSize;
+
+    if (readLength > 0) {
+      LOG.debug("position {}, length {}, requested {}, diff {}, readLength {}, preReadSize={}",
+          position, length, requestedLength, required, readLength, preReadSize);
+      readBlockImpl(readLength);
+      requestedLength += readLength;
     }
   }
 
@@ -363,6 +364,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
       readBlock(length);
 
+      while (true) {
+        final ByteBuffer buf = readFromQueue();
+        if (buf.hasRemaining()) {
+          return buf;
+        }
+      }
+    }
+
+    ByteBuffer readFromQueue() throws IOException {
       final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
@@ -473,13 +483,5 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       final boolean set = response.compareAndSet(null, streamingReadResponse);
       Preconditions.assertTrue(set, () -> "Failed to set streamingReadResponse");
     }
-  }
-
-  static long roundUp(long required, int packet) {
-    final long n = (required - 1) / packet;
-    final long rounded = (n + 1) * packet;
-    Preconditions.assertTrue(rounded >= required);
-    Preconditions.assertTrue(rounded - packet < required);
-    return rounded;
   }
 }

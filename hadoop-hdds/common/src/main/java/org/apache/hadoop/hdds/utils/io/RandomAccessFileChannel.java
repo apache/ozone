@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.common.helpers;
+package org.apache.hadoop.hdds.utils.io;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -28,15 +28,15 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** {@link RandomAccessFile} for blocks. */
-public class RandomAccessBlockFile {
-  private static final Logger LOG = LoggerFactory.getLogger(RandomAccessBlockFile.class);
+/** {@link RandomAccessFile} and its {@link FileChannel}. */
+public class RandomAccessFileChannel {
+  private static final Logger LOG = LoggerFactory.getLogger(RandomAccessFileChannel.class);
 
   private File blockFile;
   private RandomAccessFile raf;
   private FileChannel channel;
 
-  public RandomAccessBlockFile() {
+  public RandomAccessFileChannel() {
   }
 
   public synchronized boolean isOpen() {

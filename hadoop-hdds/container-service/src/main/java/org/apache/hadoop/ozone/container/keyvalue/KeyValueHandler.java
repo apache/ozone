@@ -56,6 +56,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.hdds.utils.IOUtils.roundUp;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
@@ -114,7 +115,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
@@ -124,6 +124,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
@@ -2059,7 +2060,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
-      RandomAccessBlockFile blockFile,
+      RandomAccessFileChannel blockFile,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
@@ -2092,7 +2093,7 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessBlockFile blockFile,
+  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
@@ -2127,17 +2128,27 @@ public class KeyValueHandler extends Handler {
     // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
     // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
     // it simplifies the code to always do this.
-    long adjustedOffset = readBlock.getOffset() - readBlock.getOffset() % bytesPerChecksum;
+    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
     int totalDataLength = 0;
     int numResponses = 0;
-    for (boolean shouldRead = true; totalDataLength < readBlock.getLength() && shouldRead;) {
+    final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
+    final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
+    LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
+        adjustedOffset, requiredLength, blockData.getSize());
+    for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
       shouldRead = blockFile.read(buffer);
       buffer.flip();
       final int readLength = buffer.remaining();
+      if (readLength == 0) {
+        assertTrue(!shouldRead);
+        break;
+      }
       assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
+
       if (checksumType != ContainerProtos.ChecksumType.NONE) {
         final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
             bytesPerChunk, bytesPerChecksum, chunkInfos);
@@ -2165,7 +2176,7 @@ public class KeyValueHandler extends Handler {
   static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
       final List<ContainerProtos.ChunkInfo> chunks) {
     assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    final int numChecksums = readLength / bytesPerChecksum;
+    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
     final List<ByteString> checksums = new ArrayList<>(numChecksums);
     for (int i = 0; i < numChecksums; i++) {
       // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
@@ -2179,7 +2190,9 @@ public class KeyValueHandler extends Handler {
       assertTrue(c < chunks.size(),
           () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
       final ContainerProtos.ChunkInfo chunk = chunks.get(c);
-      assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+      if (c < chunks.size() - 1) {
+        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+      }
       final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
       assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
       final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();

@@ -130,10 +130,10 @@ public class TestStreamRead {
       final int n = 10;
       final SizeInBytes writeBufferSize = SizeInBytes.valueOf("8MB");
       final SizeInBytes[] readBufferSizes = {
-          SizeInBytes.valueOf("4k"),
-          SizeInBytes.valueOf("1M"),
-          SizeInBytes.valueOf("8M"),
           SizeInBytes.valueOf("32M"),
+          SizeInBytes.valueOf("8M"),
+          SizeInBytes.valueOf("1M"),
+          SizeInBytes.valueOf("4k"),
       };
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
