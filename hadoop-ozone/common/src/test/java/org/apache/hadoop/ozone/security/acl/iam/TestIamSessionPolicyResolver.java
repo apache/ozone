@@ -841,7 +841,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsAListingAction() {
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsListBucket() {
     final Set<S3Action> actions = Collections.singleton(S3Action.LIST_BUCKET);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
 
@@ -869,7 +869,7 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsNotAListingAction() {
+  public void testCreatePathsAndPermissionsWithConditionPrefixesForBucketActionWhenActionIsNotListBucket() {
     final Set<S3Action> actions = Collections.singleton(S3Action.GET_BUCKET_ACL);
     final Set<String> prefixes = strSet("folder1/", "folder2/");
     final Set<IOzoneObj> readObject = objSet(volume());
