@@ -44,13 +44,37 @@ summary: 数据节点的磁盘平衡器.
 可以通过在“ozone-site.xml”配置文件中将以下属性设置为“true”来**启用**该功能：
 `hdds.datanode.disk.balancer.enabled = false`
 
-## 身份验证和授权
+### 身份验证和授权
 
-* **身份验证**：需要 RPC 身份验证（例如，在安全集群中通过 `kinit`）。客户端的身份由数据节点的 RPC 层验证。
+DiskBalancer 命令通过 RPC 直接与数据节点通信，因此需要进行正确的身份验证和授权配置。
 
-* **授权**：每个数据节点都使用 `OzoneAdmins` 根据 `ozone.administrators` 配置执行授权检查：
-- **管理操作**（启动、停止、更新）：要求用户位于 `ozone.administrators` 成员中
-- **只读操作**（状态、报告）：不需要管理员权限
+#### 身份验证配置
+
+在启用了 Kerberos 的安全集群中，必须在 `ozone-site.xml` 文件中配置数据节点的 Kerberos 主体以进行 RPC 身份验证：
+
+```xml
+<property>
+<name>hdds.datanode.kerberos.principal</name>
+<value>dn/_HOST@REALM.TLD</value>
+<description>
+  The Datanode service principal. This is typically set to
+  dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
+  own fully qualified hostname at startup. The _HOST placeholder
+  allows using the same configuration setting on all Datanodes.
+</description>
+
+</property>
+```
+
+**注意**：如果没有此配置，DiskBalancer 命令在安全集群中将因身份验证错误而失败。 客户端使用此主体在建立 RPC 连接时验证数据节点的身份。
+
+#### 授权配置
+
+每个数据节点都使用 `OzoneAdmins` 根据 `ozone.administrators` 配置执行授权检查：
+
+- **管理员操作**（启动、停止、更新）：要求用户位于 `ozone.administrators` 成员列表中，或属于 `ozone.administrators.groups` 中的某个组。
+
+- **只读操作**（状态、报告）：不需要管理员权限 - 任何已认证的用户都可以查询状态和报告。
 
 #### 默认行为
 

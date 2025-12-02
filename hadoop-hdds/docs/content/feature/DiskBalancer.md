@@ -50,11 +50,33 @@ The feature can be **enabled** by setting the following property to `true` in th
 
 ### Authentication and Authorization
 
-* **Authentication**: RPC authentication is required (e.g., via `kinit` in secure clusters). The client's identity is verified by the datanode's RPC layer.
+DiskBalancer commands communicate directly with datanodes via RPC, requiring proper authentication and authorization configuration.
 
-* **Authorization**: Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
-  - **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators`
-  - **Read-only operations** (status, report): Do not require admin privileges
+#### Authentication Configuration
+
+In secure clusters with Kerberos enabled, the datanode must have its Kerberos principal configured for RPC authentication in `ozone-site.xml`:
+
+```xml
+<property>
+  <name>hdds.datanode.kerberos.principal</name>
+  <value>dn/_HOST@REALM.TLD</value>
+  <description>
+    The Datanode service principal. This is typically set to
+    dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
+    own fully qualified hostname at startup. The _HOST placeholder
+    allows using the same configuration setting on all Datanodes.
+  </description>
+</property>
+```
+
+**Note**: Without this configuration, DiskBalancer commands will fail with authentication errors in secure clusters.
+The client uses this principal to verify the datanode's identity when establishing RPC connections.
+
+#### Authorization Configuration
+
+Each datanode performs authorization checks using `OzoneAdmins` based on the `ozone.administrators` configuration:
+- **Admin operations** (start, stop, update): Require the user to be in `ozone.administrators` or belong to a group in `ozone.administrators.groups`
+- **Read-only operations** (status, report): Do not require admin privileges - any authenticated user can query status and reports
 
 #### Default Behavior
 
@@ -62,7 +84,7 @@ By default, if `ozone.administrators` is not configured, only the user who launc
 or update DiskBalancer. This means that in a typical deployment where the datanode runs as user `dn`, only that user has
 admin privileges for DiskBalancer operations.
 
-#### Enabling Authentication for Additional Users
+#### Enabling Authorization for Additional Users
 
 To allow other users to perform DiskBalancer admin operations (start, stop, update), configure the `ozone.administrators` property in `ozone-site.xml`:
 
