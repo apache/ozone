@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
@@ -764,9 +765,14 @@ public class TestContainerStateMachineFailures {
       assertEquals(1, locationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      ContainerSet containerSet = cluster.getHddsDatanode(omKeyLocationInfo.getPipeline().getLeaderNode())
+          .getDatanodeStateMachine().getContainer().getContainerSet();
 
       induceFollowerFailure(omKeyLocationInfo, 2);
       key.flush();
+      // wait for container close for failure in flush for both followers applyTransaction failure
+      GenericTestUtils.waitFor(() -> containerSet.getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
+              .getState().equals(ContainerProtos.ContainerDataProto.State.CLOSED), 100, 30000);
       key.write("ratis".getBytes(UTF_8));
       key.flush();
     }
