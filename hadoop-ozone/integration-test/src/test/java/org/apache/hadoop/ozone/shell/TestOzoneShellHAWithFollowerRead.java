@@ -19,9 +19,12 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class tests Ozone sh shell command with FollowerRead.
@@ -42,8 +45,28 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean("ozone.om.ha.raft.server.read.leader.lease.enabled", true);
+    conf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     startKMS();
     startCluster(conf);
+  }
+
+  @Test
+  public void testAllowLeaderSkipLinearizableRead() throws Exception {
+    super.testListAllKeysInternal("skipvol1");
+    long lastMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
+    Assertions.assertTrue(lastMetrics > 0);
+
+    OzoneConfiguration oldConf = getCluster().getConf();
+    OzoneConfiguration newConf = new OzoneConfiguration(oldConf);
+    newConf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", false);
+    getCluster().getOMLeader().setConfiguration(newConf);
+
+    super.testListAllKeysInternal("skipvol2");
+
+    long curMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
+    Assertions.assertEquals(lastMetrics, curMetrics);
+
+    getCluster().getOMLeader().setConfiguration(oldConf);
   }
 }
