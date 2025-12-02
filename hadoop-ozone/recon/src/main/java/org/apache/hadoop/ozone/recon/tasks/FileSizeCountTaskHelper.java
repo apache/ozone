@@ -110,36 +110,27 @@ public abstract class FileSizeCountTaskHelper {
                                                  int maxWorkers,
                                                  int maxKeysInMemory,
                                                  long fileSizeCountFlushThreshold) {
-    LOG.info("{}: Starting parallel RocksDB reprocess with {} iterators, {} workers for bucket layout {}",
-        taskName, maxIterators, maxWorkers, bucketLayout);
+    LOG.info("{}: Starting reprocess for bucket layout {}", taskName, bucketLayout);
     Map<FileSizeCountKey, Long> fileSizeCountMap = new ConcurrentHashMap<>();
     long overallStartTime = Time.monotonicNow();
     
     // Ensure the file count table is truncated only once during reprocess
     truncateFileCountTableIfNeeded(reconFileMetadataManager, taskName);
     
-    long iterationStartTime = Time.monotonicNow();
     boolean status = reprocessBucketLayout(
         bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName,
         maxIterators, maxWorkers, maxKeysInMemory, fileSizeCountFlushThreshold);
     if (!status) {
       return buildTaskResult(taskName, false);
     }
-    long iterationEndTime = Time.monotonicNow();
     
-    long writeStartTime = Time.monotonicNow();
     // Write remaining counts to DB (no global lock needed - FSO and OBS are mutually exclusive)
     writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
-    long writeEndTime = Time.monotonicNow();
-    
-    long overallEndTime = Time.monotonicNow();
-    long totalDurationMs = overallEndTime - overallStartTime;
-    long iterationDurationMs = iterationEndTime - iterationStartTime;
-    long writeDurationMs = writeEndTime - writeStartTime;
-    
-    LOG.info("{}: Parallel RocksDB reprocess completed - Total: {} ms (Iteration: {} ms, Write: {} ms) - " +
-        "File count entries: {}", taskName, totalDurationMs, iterationDurationMs, writeDurationMs, 
-        fileSizeCountMap.size());
+
+    long totalDurationMs = Time.monotonicNow() - overallStartTime;
+    double durationSeconds = (double) totalDurationMs / 1000.0;
+
+    LOG.info("{}: Reprocess completed in {} sec", taskName, durationSeconds);
     
     return buildTaskResult(taskName, true);
   }
@@ -157,10 +148,7 @@ public abstract class FileSizeCountTaskHelper {
                                               int maxWorkers,
                                               int maxKeysInMemory,
                                               long fileSizeCountFlushThreshold) {
-    LOG.info("{}: Starting lockless parallel iteration with {} iterators, {} workers for bucket layout {}",
-        taskName, maxIterators, maxWorkers, bucketLayout);
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
-    long startTime = Time.monotonicNow();
 
     // Divide threshold by worker count so each worker flushes independently
     final long PER_WORKER_THRESHOLD = Math.max(1, fileSizeCountFlushThreshold / maxWorkers);
@@ -183,7 +171,6 @@ public abstract class FileSizeCountTaskHelper {
         // Flush this worker's map when it reaches threshold
         if (myMap.size() >= PER_WORKER_THRESHOLD) {
             synchronized (flushLock) {
-                LOG.info("{}: Worker flushing {} entries to RocksDB", taskName, myMap.size());
                 writeCountsToDB(myMap, reconFileMetadataManager);
                 myMap.clear();
             }
@@ -201,21 +188,12 @@ public abstract class FileSizeCountTaskHelper {
     }
     
     // Final flush: Write remaining entries from all worker maps to DB
-    LOG.info("{}: Final flush of {} worker maps", taskName, allMap.size());
     for (Map<FileSizeCountKey, Long> workerMap : allMap.values()) {
         if (!workerMap.isEmpty()) {
-            LOG.info("{}: Flushing remaining {} entries from worker map", taskName, workerMap.size());
             writeCountsToDB(workerMap, reconFileMetadataManager);
             workerMap.clear();
         }
     }
-    
-    long endTime = Time.monotonicNow();
-    long durationMs = endTime - startTime;
-    double durationSec = durationMs / 1000.0;
-    
-    LOG.info("{}: Lockless parallel reprocess completed for {} in {} ms ({} sec) - Worker threshold: {} entries",
-        taskName, bucketLayout, durationMs, String.format("%.2f", durationSec), PER_WORKER_THRESHOLD);
     
     return true;
   }

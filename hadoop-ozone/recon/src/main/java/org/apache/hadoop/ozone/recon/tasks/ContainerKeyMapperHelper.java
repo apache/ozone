@@ -100,13 +100,10 @@ public abstract class ContainerKeyMapperHelper {
       if (ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.compareAndSet(false, true)) {
         try {
           // Step 1: Truncate tables
-          LOG.info("{}: Truncating container key tables for reprocess", taskName);
           reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
-          LOG.info("{}: Successfully truncated container key tables", taskName);
           
           // Step 2: Clear shared map
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
-          LOG.info("{}: Initialized shared container count map for cross-task synchronization", taskName);
           
           // Step 3: Initialize reference counter (2 tasks: FSO + OBS)
           ACTIVE_TASK_COUNT.set(2);
@@ -133,8 +130,7 @@ public abstract class ContainerKeyMapperHelper {
                                                 int maxKeysInMemory) {
 
     try {
-      LOG.info("{}: Starting lockless parallel reprocess with {} iterators, {} workers, max {} keys in memory for bucket layout {}",
-          taskName, maxIterators, maxWorkers, maxKeysInMemory, bucketLayout);
+      LOG.info("{}: Starting reprocess for bucket layout {}", taskName, bucketLayout);
       Instant start = Instant.now();
 
       // Perform one-time initialization (truncate tables + clear shared map)
@@ -162,7 +158,6 @@ public abstract class ContainerKeyMapperHelper {
           // Flush this worker's map when it reaches threshold
           if (myLocalMap.size() >= PER_WORKER_THRESHOLD) {
             synchronized (flushLock) {
-              LOG.info("{}: Worker flushing {} entries to RocksDB", taskName, myLocalMap.size());
               if (!flushAndCommitContainerKeyInfoToDB(myLocalMap, Collections.emptyMap(),
                   reconContainerMetadataManager)) {
                 throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
@@ -182,10 +177,8 @@ public abstract class ContainerKeyMapperHelper {
       }
 
       // Final flush: Write remaining entries from all worker local maps to DB
-      LOG.info("{}: Final flush of {} worker local maps", taskName, allLocalMaps.size());
       for (Map<ContainerKeyPrefix, Integer> workerLocalMap : allLocalMaps.values()) {
         if (!workerLocalMap.isEmpty()) {
-          LOG.info("{}: Flushing remaining {} entries from worker map", taskName, workerLocalMap.size());
           if (!flushAndCommitContainerKeyInfoToDB(workerLocalMap, Collections.emptyMap(),
               reconContainerMetadataManager)) {
             LOG.error("Failed to flush worker local map for {}", taskName);
@@ -211,7 +204,7 @@ public abstract class ContainerKeyMapperHelper {
       // Decrement active task counter and cleanup if this is the last task
       int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
       LOG.info("{}: Task completed. Remaining active tasks: {}", taskName, remainingTasks);
-      
+
       if (remainingTasks == 0) {
         // Last task finished - clean up shared resources
         synchronized (INITIALIZATION_LOCK) {
@@ -225,9 +218,7 @@ public abstract class ContainerKeyMapperHelper {
       long durationMillis = Duration.between(start, end).toMillis();
       double durationSeconds = (double) durationMillis / 1000.0;
 
-      LOG.info("{}: Lockless parallel reprocess completed. Processed keys in {} ms ({} sec) - " +
-          "Containers: {}, Worker threshold: {}",
-          taskName, durationMillis, String.format("%.2f", durationSeconds), totalContainers, PER_WORKER_THRESHOLD);
+      LOG.info("{}: Reprocess completed in {} sec", taskName, durationSeconds);
     } catch (Exception ex) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ex);
       return false;

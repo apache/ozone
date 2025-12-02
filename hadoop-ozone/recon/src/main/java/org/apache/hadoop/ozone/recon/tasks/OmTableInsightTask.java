@@ -119,7 +119,7 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
-    LOG.info("Starting RocksDB Reprocess for {}", getTaskName());
+    LOG.info("{}: Starting reprocess", getTaskName());
     long startTime = Time.monotonicNow();
 
     init();
@@ -137,6 +137,7 @@ public class OmTableInsightTask implements ReconOmTask {
           }
         } else {
           if (usesNonStringKeys(tableName)) {
+            processTableSequentially(tableName, table);
           } else {
             processTableInParallel(tableName, table, omMetadataManager);
           }
@@ -158,14 +159,8 @@ public class OmTableInsightTask implements ReconOmTask {
     }
     long endTime = Time.monotonicNow();
     long durationMs = endTime - startTime;
-    double durationSec = durationMs / 1000.0;
-    int handlerTables = tableHandlers.size();  // 3 handler tables (with size calculation)
-    int simpleTables = tables.size() - handlerTables;  // Simple count-only tables
 
-    LOG.info("{}: RocksDB reprocess completed in {} ms ({} sec) - " +
-        "Total tables: {}, Handler tables (with size): {}, Simple tables (count only): {}",
-        getTaskName(), durationMs, String.format("%.2f", durationSec), 
-        tables.size(), handlerTables, simpleTables);
+    LOG.info("{}: Reprocess completed in {} ms", getTaskName(), durationMs);
     return buildTaskResult(true);
   }
 
@@ -200,13 +195,7 @@ public class OmTableInsightTask implements ReconOmTask {
     int workerCount = 2;  // Only 2 workers needed for simple counting
     long loggingThreshold = calculateLoggingThreshold(table);
     
-    LOG.info("{}: Processing simple table {} with parallel iteration ({} iterators, {} workers)",
-        getTaskName(), tableName, maxIterators, workerCount);
-    
     AtomicLong count = new AtomicLong(0);
-    
-    // Cast to String keys for parallel processing
-    Table<String, Object> genericTable = (Table<String, Object>) table;
 
     try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
         omMetadataManager, omMetadataManager.getStore()
@@ -221,9 +210,7 @@ public class OmTableInsightTask implements ReconOmTask {
       });
     }
     
-    long finalCount = count.get();
-    LOG.info("{}: Table {} counted {} entries", getTaskName(), tableName, finalCount);
-    objectCountMap.put(getTableCountKeyFromTable(tableName), finalCount);
+    objectCountMap.put(getTableCountKeyFromTable(tableName), count.get());
   }
 
   /**
