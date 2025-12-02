@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -70,7 +69,6 @@ public class TestOMResponse {
         configuration, ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
-    when(ozoneManager.getPerfMetrics()).thenReturn(mock(OMPerformanceMetrics.class));
 
     final OmConfig omConfig = configuration.getObject(OmConfig.class);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
@@ -100,7 +98,7 @@ public class TestOMResponse {
   }
 
   @Test
-  public void testLargeResponseLogging() throws Exception {
+  public void testLargeResponseLogging() {
     // Create a large response that exceeds the threshold
     // Use ListKeysResponse with many keys to create a large response
     OzoneManagerProtocolProtos.ListKeysResponse.Builder listKeysBuilder =

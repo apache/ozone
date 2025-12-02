@@ -30,7 +30,6 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
@@ -61,6 +60,9 @@ import org.slf4j.LoggerFactory;
 public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
+  // same as hadoop ipc config defaults
+  public static final String MAXIMUM_RESPONSE_LENGTH = "ipc.maximum.response.length";
+  public static final int MAXIMUM_RESPONSE_LENGTH_DEFAULT = 134217728;
 
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
@@ -152,8 +154,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public void logLargeResponseIfNeeded(OMResponse response) {
     try {
       Configuration conf = ozoneManager.getConfiguration();
-      long maxSize = conf.getLong(CommonConfigurationKeys.IPC_MAXIMUM_RESPONSE_LENGTH,
-          CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+      long maxSize = conf.getLong(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
       long warnThreshold = maxSize / 2;
 
       long respSize = response.getSerializedSize();
