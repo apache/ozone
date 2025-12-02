@@ -223,7 +223,7 @@ public class TestStorageDistributionEndpoint {
         syncDataFromOM();
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT+"?component=om");
+            .append(PENDING_DELETION_ENDPOINT + "?component=om");
         String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
         Map<String, Integer> pendingDeletionMap =
             MAPPER.readValue(response, Map.class);
@@ -240,7 +240,7 @@ public class TestStorageDistributionEndpoint {
       try {
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT+"?component=scm");
+            .append(PENDING_DELETION_ENDPOINT + "?component=scm");
         String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
         ScmPendingDeletion pendingDeletion =
             MAPPER.readValue(response, ScmPendingDeletion.class);
@@ -258,7 +258,7 @@ public class TestStorageDistributionEndpoint {
         scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT+"?component=dn");
+            .append(PENDING_DELETION_ENDPOINT + "?component=dn");
         String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
         DataNodeMetricsServiceResponse pendingDeletion =
             MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
