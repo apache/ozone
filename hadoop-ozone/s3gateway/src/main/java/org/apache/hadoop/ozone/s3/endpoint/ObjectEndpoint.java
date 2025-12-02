@@ -1586,13 +1586,10 @@ public class ObjectEndpoint extends EndpointBase {
     final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
     final long effectiveLength;
-    List<MessageDigest> digests = new ArrayList<>();
-    digests.add(getMessageDigestInstance());
     if (hasMultiChunksPayload(amzContentSha256Header)) {
       validateMultiChunksUpload(headers, amzDecodedLength, keyPath);
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
-        digests.add(getSha256DigestInstance());
       } else {
         chunkInputStream = new SignedChunksInputStream(body);
       }
@@ -1606,7 +1603,13 @@ public class ObjectEndpoint extends EndpointBase {
       effectiveLength = contentLength;
     }
 
-    // DigestInputStream is used for ETag calculation
+    // MessageDigest is used for ETag calculation
+    // and Sha256Digest is used for "x-amz-content-sha256" header verification
+    List<MessageDigest> digests = new ArrayList<>();
+    digests.add(getMessageDigestInstance());
+    if (!hasUnsignedPayload(amzContentSha256Header) && !hasMultiChunksPayload(amzContentSha256Header)) {
+      digests.add(getSha256DigestInstance());
+    }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
