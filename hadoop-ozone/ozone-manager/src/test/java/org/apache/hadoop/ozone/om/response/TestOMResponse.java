@@ -49,8 +49,6 @@ public class TestOMResponse {
   @TempDir
   private Path folder;
 
-  private OzoneManager ozoneManager;
-  private OzoneConfiguration configuration;
   private OzoneManagerProtocolServerSideTranslatorPB translator;
   private GenericTestUtils.LogCapturer logCapturer;
   private static final long IPC_MAX_LEN = 1024 * 1024; // 1MB
@@ -58,13 +56,13 @@ public class TestOMResponse {
 
   @BeforeEach
   public void setup() throws Exception {
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     configuration.setLong(
         "ipc.maximum.response.length", IPC_MAX_LEN);
 
-    ozoneManager = mock(OzoneManager.class);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         configuration, ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
