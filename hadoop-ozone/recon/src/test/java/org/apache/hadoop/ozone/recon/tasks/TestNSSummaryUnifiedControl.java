@@ -358,12 +358,14 @@ public class TestNSSummaryUnifiedControl {
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after first rebuild");
 
-    // Second rebuild succeeds
+    // Second rebuild succeeds - wait for retry delay (2 seconds)
+    Thread.sleep(2100); // Wait for RETRY_DELAY_MS (2000ms) + buffer
+
     ReconTaskController.ReInitializationResult result2 =
         taskController.queueReInitializationEvent(
             ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result2,
-        "Second event should be queued successfully");
+        "Second event should be queued successfully after retry delay");
 
     assertTrue(secondAttempt.await(10, TimeUnit.SECONDS), "Second rebuild should be attempted");
     Thread.sleep(1000);
@@ -628,12 +630,14 @@ public class TestNSSummaryUnifiedControl {
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after exception");
 
-    // Second rebuild succeeds (recovery)
+    // Second rebuild succeeds (recovery) - wait for retry delay (2 seconds)
+    Thread.sleep(2100); // Wait for RETRY_DELAY_MS (2000ms) + buffer
+
     ReconTaskController.ReInitializationResult result2 =
         taskController.queueReInitializationEvent(
             ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result2,
-        "Second event should be queued successfully");
+        "Second event should be queued successfully after retry delay");
 
     assertTrue(recoveryLatch.await(10, TimeUnit.SECONDS), "Recovery should execute");
     Thread.sleep(1000);
