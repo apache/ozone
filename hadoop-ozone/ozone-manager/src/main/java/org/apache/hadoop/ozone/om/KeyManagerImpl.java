@@ -21,6 +21,7 @@ import static java.lang.String.format;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -2295,15 +2296,33 @@ public class KeyManagerImpl implements KeyManager {
     List<OmKeyInfo> keyInfos = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId, parentInfo.getObjectID(), "");
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
-      while (iterator.hasNext() && remainingNum > 0) {
+      String startKey = null;
+      String lastLoopExclusiveKey = getLexicographicallyHigherString(seekFileInDB);
+      List<DeleteKeysResult.ExclusiveRange> keyRanges = new ArrayList<>();
+      while (iterator.hasNext()) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
+        if (remainingNum <= 0) {
+          lastLoopExclusiveKey = keyInfo.getKey();
+          break;
+        }
         if (deleteKeyFilter.apply(keyInfo)) {
           keyInfos.add(keyInfo.getValue());
           remainingNum--;
+          if (startKey == null) {
+            startKey = keyInfo.getKey();
+          }
+        } else {
+          if (startKey != null) {
+            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, keyInfo.getKey()));
+          }
+          startKey = null;
         }
       }
-      return new DeleteKeysResult(keyInfos, !iterator.hasNext());
+      if (startKey != null) {
+        keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, lastLoopExclusiveKey));
+      }
+      return new DeleteKeysResult(keyInfos, keyRanges, !iterator.hasNext());
     }
   }
 
