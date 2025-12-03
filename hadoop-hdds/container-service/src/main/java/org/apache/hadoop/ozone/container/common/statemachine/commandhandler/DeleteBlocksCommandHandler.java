@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -763,22 +764,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   public void setPoolSize(int size) {
-    if (size <= 0) {
-      throw new IllegalArgumentException("Pool size must be positive.");
-    }
-
-    int currentCorePoolSize = executor.getCorePoolSize();
-
-    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
-    // equal to the corePoolSize. We must make sure this invariant holds when
-    // changing the pool size. Therefore, we take into account whether the
-    // new size is greater or smaller than the current core pool size.
-    if (size > currentCorePoolSize) {
-      executor.setMaximumPoolSize(size);
-      executor.setCorePoolSize(size);
-    } else {
-      executor.setCorePoolSize(size);
-      executor.setMaximumPoolSize(size);
-    }
+    HddsServerUtil.setPoolSize(executor, size, LOG);
   }
 }

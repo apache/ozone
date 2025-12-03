@@ -159,7 +159,8 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public void setKeyName(String keyName) {
-    this.keyName = keyName;
+    this.keyName = Objects.requireNonNull(keyName, "keyName == null");
+    this.fileName = OzoneFSUtils.getFileName(keyName);
   }
 
   public long getDataSize() {
@@ -172,10 +173,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public void setDataSize(long size) {
     this.dataSize = size;
-  }
-
-  public void setFileName(String fileName) {
-    this.fileName = fileName;
   }
 
   public String getFileName() {
@@ -560,8 +557,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setKeyName(String key) {
-      this.keyName = key;
+    public Builder setKeyName(String newValue) {
+      if (!Objects.equals(newValue, keyName)) {
+        this.keyName = newValue;
+        this.fileName = null;
+      }
       return this;
     }
 
@@ -655,11 +655,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setFileName(String keyFileName) {
-      this.fileName = keyFileName;
-      return this;
-    }
-
     @Override
     public Builder setParentObjectID(long parentID) {
       super.setParentObjectID(parentID);
@@ -698,7 +693,17 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(keyName, "keyName == null");
+    }
+
+    @Override
     protected OmKeyInfo buildObject() {
+      // not persisted to DB
+      if (fileName == null) {
+        fileName = OzoneFSUtils.getFileName(keyName);
+      }
       return new OmKeyInfo(this);
     }
   }
@@ -863,8 +868,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
     }
-    // not persisted to DB. FileName will be filtered out from keyName
-    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder;
   }
 

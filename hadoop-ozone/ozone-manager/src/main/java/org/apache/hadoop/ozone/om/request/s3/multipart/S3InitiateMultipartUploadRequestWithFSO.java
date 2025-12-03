@@ -204,7 +204,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(), keyName,
+          multipartOpenKey, omKeyInfo, keyName,
               transactionLogIndex);
 
       // Add to cache

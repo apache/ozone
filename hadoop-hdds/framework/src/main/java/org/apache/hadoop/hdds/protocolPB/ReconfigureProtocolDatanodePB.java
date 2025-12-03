@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.protocolPB;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**

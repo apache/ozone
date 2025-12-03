@@ -217,6 +217,7 @@ message DatanodeUsageInfoProto {
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
     optional int64 pipelineCount = 8;
+    optional int64 reserved = 9;
 }
 
 /**
@@ -478,6 +479,7 @@ message ReplicationManagerReportProto {
     required int64 timestamp = 1;
     repeated KeyIntValue stat = 2;
     repeated KeyContainerIDList statSample = 3;
+    optional int32 sampleLimit = 4 [default = 100];
 }
 
 message ContainerBalancerConfigurationProto {
