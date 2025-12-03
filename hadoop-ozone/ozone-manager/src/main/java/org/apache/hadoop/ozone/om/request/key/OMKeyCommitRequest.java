@@ -620,7 +620,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       Long expectedGen = toCommit.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
-      if (expectedGen == -1L) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         if (existing != null) {
           throw new OMException("Key already exists",
               OMException.ResultCodes.KEY_ALREADY_EXISTS);

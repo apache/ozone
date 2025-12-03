@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -472,8 +473,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       throws OMException {
     if (keyArgs.hasExpectedDataGeneration()) {
       long expectedGen = keyArgs.getExpectedDataGeneration();
-      // If expectedGen is -1, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == -1L) {
+      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         if (dbKeyInfo != null) {
           throw new OMException("Key already exists",
               OMException.ResultCodes.KEY_ALREADY_EXISTS);
