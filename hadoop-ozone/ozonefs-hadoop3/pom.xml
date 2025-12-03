@@ -82,7 +82,6 @@
             </goals>
             <phase>prepare-package</phase>
             <configuration>
-              <skip>${maven.shade.skip}</skip>
               <excludes>META-INF/versions/**/*.*</excludes>
               <artifactItems>
                 <artifactItem>
