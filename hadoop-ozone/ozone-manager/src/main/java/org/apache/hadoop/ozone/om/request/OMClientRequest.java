@@ -21,13 +21,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -94,7 +94,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMClientRequest(OMRequest omRequest) {
-    Preconditions.checkNotNull(omRequest);
+    Objects.requireNonNull(omRequest, "omRequest == null");
     this.omRequest = omRequest;
     this.omLockDetails.clear();
   }
