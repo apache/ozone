@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractContractSeekTest;
 import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
+import org.apache.hadoop.fs.contract.AbstractContractVectoredReadTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -43,6 +44,8 @@ import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Base class for Ozone contract tests.  Manages lifecycle of {@link MiniOzoneCluster}.
@@ -260,6 +263,25 @@ abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluste
 
   @Nested
   class TestContractUnbuffer extends AbstractContractUnbufferTest {
+    @Override
+    protected Configuration createConfiguration() {
+      return createOzoneConfig();
+    }
+
+    @Override
+    protected AbstractFSContract createContract(Configuration conf) {
+      return createOzoneContract(conf);
+    }
+  }
+
+  @Nested
+  @ParameterizedClass(name = "buffer-{0}")
+  @MethodSource("params")
+  class TestContractVectoredRead extends AbstractContractVectoredReadTest {
+    TestContractVectoredRead(String bufferType) {
+      super(bufferType);
+    }
+
     @Override
     protected Configuration createConfiguration() {
       return createOzoneConfig();
