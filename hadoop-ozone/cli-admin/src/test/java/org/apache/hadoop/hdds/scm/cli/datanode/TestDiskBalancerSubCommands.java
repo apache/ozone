@@ -442,6 +442,7 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"threshold\""));
       assertTrue(output.contains("\"bandwidthInMB\""));
       assertTrue(output.contains("\"threads\""));
+      assertTrue(output.contains("\"stopAfterDiskEven\""));
     }
   }
 
@@ -648,6 +649,7 @@ public class TestDiskBalancerSubCommands {
         .setThreshold(threshold)
         .setDiskBandwidthInMB(bandwidthInMB)
         .setParallelThread(parallelThread)
+        .setStopAfterDiskEven(true)
         .build();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()
