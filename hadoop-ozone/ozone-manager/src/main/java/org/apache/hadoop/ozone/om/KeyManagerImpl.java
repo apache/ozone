@@ -2303,8 +2303,9 @@ public class KeyManagerImpl implements KeyManager {
       while (iterator.hasNext()) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
+        String tableKey = entry.getKey();
         if (remainingNum <= 0) {
-          lastLoopExclusiveKey = keyInfo.getKey();
+          lastLoopExclusiveKey = tableKey;
           processedAllKeys = false;
           break;
         }
@@ -2312,11 +2313,11 @@ public class KeyManagerImpl implements KeyManager {
           keyInfos.add(keyInfo.getValue());
           remainingNum--;
           if (startKey == null) {
-            startKey = keyInfo.getKey();
+            startKey = tableKey;
           }
         } else {
           if (startKey != null) {
-            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, keyInfo.getKey()));
+            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, tableKey));
           }
           startKey = null;
         }
