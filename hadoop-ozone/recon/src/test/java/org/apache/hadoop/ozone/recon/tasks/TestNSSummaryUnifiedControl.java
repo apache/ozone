@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  * <p>These tests verify that the queue-based unified control mechanism
  * correctly handles concurrent queueReInitializationEvent() calls in production.
  *
- * <p>Production Architecture:
+ * <p>Execution Flow:
  * <pre>
  * Multiple Concurrent Callers
  *         ↓  ↓  ↓
@@ -333,8 +333,10 @@ public class TestNSSummaryUnifiedControl {
     CountDownLatch secondAttempt = new CountDownLatch(1);
     AtomicInteger attemptCount = new AtomicInteger(0);
 
+    // Setup mock to fail first time, succeed second time
     doAnswer(invocation -> {
       int attempt = attemptCount.incrementAndGet();
+      LOG.info("clearNSSummaryTable attempt #{}", attempt);
       if (attempt == 1) {
         firstAttempt.countDown();
         throw new IOException("First failure");
@@ -345,18 +347,26 @@ public class TestNSSummaryUnifiedControl {
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
     // First rebuild fails
-    taskController.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    ReconTaskController.ReInitializationResult result1 =
+        taskController.queueReInitializationEvent(
+            ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result1,
+        "First event should be queued successfully");
+
     assertTrue(firstAttempt.await(10, TimeUnit.SECONDS), "First rebuild should be attempted");
-    Thread.sleep(500);
+    Thread.sleep(1000);
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after first rebuild");
 
     // Second rebuild succeeds
-    taskController.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    ReconTaskController.ReInitializationResult result2 =
+        taskController.queueReInitializationEvent(
+            ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result2,
+        "Second event should be queued successfully");
+
     assertTrue(secondAttempt.await(10, TimeUnit.SECONDS), "Second rebuild should be attempted");
-    Thread.sleep(500);
+    Thread.sleep(1000);
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should be IDLE after successful rebuild");
   }
@@ -374,7 +384,7 @@ public class TestNSSummaryUnifiedControl {
    * prevents concurrent execution within a single reprocess() call.
    */
   @Test
-  @SuppressWarnings("methodlength")
+  @SuppressWarnings("methodLength")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
@@ -589,33 +599,44 @@ public class TestNSSummaryUnifiedControl {
   @Test
   void testStateTransitionsDuringExceptions() throws Exception {
     CountDownLatch exceptionLatch = new CountDownLatch(1);
+    CountDownLatch recoveryLatch = new CountDownLatch(1);
+    AtomicInteger callCount = new AtomicInteger(0);
 
+    // Setup mock to throw exception first time, succeed second time
     doAnswer(invocation -> {
-      exceptionLatch.countDown();
-      throw new RuntimeException("Unexpected error");
+      int call = callCount.incrementAndGet();
+      LOG.info("clearNSSummaryTable call #{}", call);
+      if (call == 1) {
+        exceptionLatch.countDown();
+        throw new RuntimeException("Unexpected error");
+      } else {
+        recoveryLatch.countDown();
+        return null;
+      }
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
-    taskController.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    // First rebuild throws exception
+    ReconTaskController.ReInitializationResult result1 =
+        taskController.queueReInitializationEvent(
+            ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result1,
+        "First event should be queued successfully");
 
     assertTrue(exceptionLatch.await(10, TimeUnit.SECONDS),
         "Exception should occur");
-    Thread.sleep(500);
+    Thread.sleep(1000);
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after exception");
 
-    // Verify recovery
-    doNothing().when(mockNamespaceSummaryManager).clearNSSummaryTable();
-    CountDownLatch recoveryLatch = new CountDownLatch(1);
-    doAnswer(invocation -> {
-      recoveryLatch.countDown();
-      return null;
-    }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
+    // Second rebuild succeeds (recovery)
+    ReconTaskController.ReInitializationResult result2 =
+        taskController.queueReInitializationEvent(
+            ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result2,
+        "Second event should be queued successfully");
 
-    taskController.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertTrue(recoveryLatch.await(10, TimeUnit.SECONDS), "Recovery should execute");
-    Thread.sleep(500);
+    Thread.sleep(1000);
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should be IDLE after recovery");
   }
