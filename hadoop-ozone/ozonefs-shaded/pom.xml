@@ -131,7 +131,6 @@
             </goals>
             <phase>package</phase>
             <configuration>
-              <skip>${maven.shade.skip}</skip>
               <artifactSet>
                 <excludes>
                   <exclude>com.sun.javadoc:*</exclude>
