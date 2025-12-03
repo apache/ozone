@@ -117,6 +117,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return omhaService.isServiceActive(omNodeId);
   }
 
+  public boolean isSCMActive(String scmNodeId) {
+    return scmhaService.isServiceActive(scmNodeId);
+  }
+
   public Iterator<StorageContainerManager> getInactiveSCM() {
     return scmhaService.inactiveServices();
   }
@@ -149,6 +153,20 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return getStorageContainerManagers().stream()
         .filter(StorageContainerManager::checkLeader)
         .findFirst().orElse(null);
+  }
+
+  public StorageContainerManager getScmLeader(boolean waitForLeaderElection)
+      throws TimeoutException, InterruptedException {
+    if (waitForLeaderElection) {
+      final StorageContainerManager[] scm = new StorageContainerManager[1];
+      GenericTestUtils.waitFor(() -> {
+        scm[0] = getScmLeader();
+        return scm[0] != null;
+      }, 200, waitForClusterToBeReadyTimeout);
+      return scm[0];
+    } else {
+      return getScmLeader();
+    }
   }
 
   public OzoneManager waitForLeaderOM()
@@ -330,6 +348,20 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     conf.set(omHttpAddrKey, localhostWithFreePort());
     conf.set(omHttpsAddrKey, localhostWithFreePort());
     conf.setInt(omRatisPortKey, getFreePort());
+  }
+
+  private void stopAndDeactivate(StorageContainerManager scm) {
+    stopSCM(scm.getSCMNodeId());
+    scmhaService.deactivate(scm);
+  }
+
+  public void stopSCM(String scmNodeId) {
+    stopAndDeactivate(scmhaService.getServiceById(scmNodeId));
+  }
+
+  public void deactivateSCM(String scmNodeId) {
+    StorageContainerManager scm = scmhaService.getServiceById(scmNodeId);
+    scmhaService.deactivate(scm);
   }
 
   /**
@@ -900,6 +932,177 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     for (OzoneManager om : omhaService.getServices()) {
       om.setExitManagerForTesting(new ExitManagerForOM(this, om.getOMNodeId()));
     }
+  }
+
+  private OzoneConfiguration addNewSCMToConfig(String scmServiceId, String scmNodeId) {
+    OzoneConfiguration newConf = new OzoneConfiguration(getConf());
+    StringBuilder scmNames = new StringBuilder();
+    scmNames.append(newConf.get(ScmConfigKeys.OZONE_SCM_NAMES));
+    configureSCMPorts(newConf, scmServiceId, scmNodeId, scmNames);
+
+    String scmNodesKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+    newConf.set(scmNodesKey, newConf.get(scmNodesKey) + "," + scmNodeId);
+    newConf.set(ScmConfigKeys.OZONE_SCM_NAMES, scmNames.toString());
+
+    return newConf;
+  }
+
+  private static void configureSCMPorts(ConfigurationTarget conf, String scmServiceId, String scmNodeId,
+      StringBuilder scmNames) {
+    String scmAddrKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
+    String scmHttpAddrKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, scmServiceId, scmNodeId);
+    String scmHttpsAddrKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, scmServiceId, scmNodeId);
+    String scmRatisPortKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, scmServiceId, scmNodeId);
+    String dnPortKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        scmServiceId, scmNodeId);
+    String blockClientKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        scmServiceId, scmNodeId);
+    String ssClientKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        scmServiceId, scmNodeId);
+    String scmGrpcPortKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
+    String scmSecurityAddrKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId,
+        scmNodeId);
+
+    conf.set(scmAddrKey, "127.0.0.1");
+    conf.set(scmHttpAddrKey, localhostWithFreePort());
+    conf.set(scmHttpsAddrKey, localhostWithFreePort());
+    conf.set(scmSecurityAddrKey, localhostWithFreePort());
+    conf.set("ozone.scm.update.service.port", "0");
+
+    int ratisPort = getFreePort();
+    conf.setInt(scmRatisPortKey, ratisPort);
+    //conf.setInt("ozone.scm.ha.ratis.bind.port", ratisPort);
+
+    int dnPort = getFreePort();
+    conf.set(dnPortKey, "127.0.0.1:" + dnPort);
+    scmNames.append(",localhost:").append(dnPort);
+
+    conf.set(ssClientKey, localhostWithFreePort());
+    conf.setInt(scmGrpcPortKey, getFreePort());
+
+    String blockAddress = localhostWithFreePort();
+    conf.set(blockClientKey, blockAddress);
+    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        blockAddress);
+  }
+
+  /**
+   * Update the configurations of the given list of SCMs on an SCM HA Service.
+   */
+  public void updateSCMConfigs(OzoneConfiguration newConf) {
+    for (StorageContainerManager scm : scmhaService.getActiveServices()) {
+      scm.setConfiguration(newConf);
+    }
+  }
+
+  public void bootstrapSCM(String scmNodeId, boolean updateConfigs) throws Exception {
+    int retryCount = 0;
+    StorageContainerManager scm = null;
+
+    StorageContainerManager scmLeader = getScmLeader(true);
+    long leaderSnapshotIndex = scmLeader.getScmHAManager().getRatisServer().getSCMStateMachine()
+        .getLatestSnapshot().getIndex();
+
+    while (true) {
+      try {
+        OzoneConfiguration newConf = addNewSCMToConfig(scmhaService.getServiceId(), scmNodeId);
+
+        if (updateConfigs) {
+          updateSCMConfigs(newConf);
+        }
+
+        scm = bootstrapNewSCM(scmNodeId, newConf);
+
+        LOG.info("Bootstrapped SCM {} RPC server at {}", scmNodeId,
+            scm.getClientRpcAddress());
+
+        // Add new SCMs to cluster's in memory map and update existing SCMs conf.
+        setConf(newConf);
+
+        break;
+      } catch (IOException e) {
+        // Existing SCM config could have been updated with new conf. Reset it.
+        for (StorageContainerManager existingSCM : scmhaService.getServices()) {
+          existingSCM.setConfiguration(getConf());
+        }
+        if (e instanceof BindException ||
+            e.getCause() instanceof BindException) {
+          ++retryCount;
+          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+              retryCount, e);
+        } else {
+          throw e;
+        }
+      }
+
+      waitForBootstrappedNodeToBeReady(scm, leaderSnapshotIndex);
+      if (updateConfigs) {
+        waitForConfigUpdateOnActiveSCMs(scmNodeId);
+      }
+    }
+  }
+
+  /**
+   * Start a new SCM in Bootstrap mode. Configs (address and ports) for the new
+   * SCM must already be set in the newConf.
+   */
+  private StorageContainerManager bootstrapNewSCM(String nodeId,
+      OzoneConfiguration newConf) throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration(newConf);
+
+    // For bootstrapping node, set the nodeId config also.
+    config.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
+
+    // Set metadata/DB dir base path
+    String metaDirPath = clusterMetaPath + "/" + nodeId;
+    config.set(OZONE_METADATA_DIRS, metaDirPath);
+
+    StorageContainerManager.scmBootstrap(config);
+    StorageContainerManager scm = StorageContainerManager.createSCM(config);
+
+    scmhaService.addInstance(scm, false);
+    startInactiveSCM(nodeId);
+
+    return scm;
+  }
+
+  private void waitForBootstrappedNodeToBeReady(StorageContainerManager newSCM,
+      long leaderSnapshotIndex) throws Exception {
+    // Wait for bootstrapped nodes to catch up with others
+    GenericTestUtils.waitFor(() -> {
+      return newSCM.getScmHAManager().getRatisServer().getSCMStateMachine()
+          .getLatestSnapshot().getIndex() >= leaderSnapshotIndex;
+    }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  private void waitForConfigUpdateOnActiveSCMs(
+      String newSCMNodeId) throws Exception {
+    StorageContainerManager newSCMNode = scmhaService
+        .getServiceById(newSCMNodeId);
+    GenericTestUtils.waitFor(() -> {
+      // Each existing active SCM should contain the new SCM in its peerList.
+      // Also, the new SCM should contain each existing active SCM in it's SCM
+      // peer list and RatisServer peerList.
+      for (StorageContainerManager scm : scmhaService.getActiveServices()) {
+        if (!scm.doesPeerExist(scm.getScmId())) {
+          return false;
+        }
+        if (!newSCMNode.doesPeerExist(scm.getSCMNodeId())) {
+          return false;
+        }
+      }
+      return true;
+    }, 1000, waitForClusterToBeReadyTimeout);
   }
 
   /**
