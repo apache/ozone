@@ -2299,11 +2299,13 @@ public class KeyManagerImpl implements KeyManager {
       String startKey = null;
       String lastLoopExclusiveKey = getLexicographicallyHigherString(seekFileInDB);
       List<DeleteKeysResult.ExclusiveRange> keyRanges = new ArrayList<>();
+      boolean processedAllKeys = true;
       while (iterator.hasNext()) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
         if (remainingNum <= 0) {
           lastLoopExclusiveKey = keyInfo.getKey();
+          processedAllKeys = false;
           break;
         }
         if (deleteKeyFilter.apply(keyInfo)) {
@@ -2322,7 +2324,7 @@ public class KeyManagerImpl implements KeyManager {
       if (startKey != null) {
         keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, lastLoopExclusiveKey));
       }
-      return new DeleteKeysResult(keyInfos, keyRanges, !iterator.hasNext());
+      return new DeleteKeysResult(keyInfos, keyRanges, processedAllKeys);
     }
   }
 
