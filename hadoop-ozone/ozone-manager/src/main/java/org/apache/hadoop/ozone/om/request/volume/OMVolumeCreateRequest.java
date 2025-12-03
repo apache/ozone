@@ -21,11 +21,11 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -110,7 +110,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
-    Preconditions.checkNotNull(createVolumeRequest);
+    Objects.requireNonNull(createVolumeRequest, "createVolumeRequest == null");
     VolumeInfo volumeInfo = createVolumeRequest.getVolumeInfo();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();

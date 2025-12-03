@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -298,7 +299,7 @@ public class OzoneListStatusHelper {
         .build();
     OzoneFileStatus fileStatusInfo = getStatusHelper.apply(startKeyArgs,
         null, false);
-    Preconditions.checkNotNull(fileStatusInfo);
+    Objects.requireNonNull(fileStatusInfo, "fileStatusInfo == null");
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
     final long volumeId = volumeInfo.getObjectID();
     final long bucketId = omBucketInfo.getObjectID();
