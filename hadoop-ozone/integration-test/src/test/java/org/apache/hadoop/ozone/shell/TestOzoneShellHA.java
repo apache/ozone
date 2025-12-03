@@ -2197,8 +2197,11 @@ public class TestOzoneShellHA {
   @Test
   public void testListAllKeys()
       throws Exception {
-    String volumeName = "vollst";
-    // Create volume vollst
+    testListAllKeysInternal("vollst");
+  }
+
+  protected void testListAllKeysInternal(String volumeName) throws Exception {
+    // Create volume
     String[] args = new String[] {
         "volume", "create", "o3://" + omServiceId +
           OZONE_URI_DELIMITER + volumeName};
@@ -2481,5 +2484,9 @@ public class TestOzoneShellHA {
     }
     return KMSClientProvider.SCHEME_NAME + "://" +
         kms.getKMSUrl().toExternalForm().replace("://", "@");
+  }
+
+  protected MiniOzoneHAClusterImpl getCluster() {
+    return cluster;
   }
 }
