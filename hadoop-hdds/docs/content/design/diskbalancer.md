@@ -120,7 +120,7 @@ containers repeatedly, it caches the list of containers for each volume which au
 used time or if the container iterator for that is invalidated on full utilisation.
 
 ## Security Design
-DiskBalancer implements a two-tier security model:
+DiskBalancer follows the same security model as other services:
 
 * **Authentication**: Clients communicate directly with datanodes via RPC. In secure clusters, RPC authentication is required (Kerberos).
 
