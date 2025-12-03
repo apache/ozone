@@ -63,7 +63,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
-import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.junit.jupiter.api.AfterEach;
@@ -73,7 +72,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Integration tests for HDDS-13443: Unified and controlled sync access to
+ * Unified and controlled sync access to
  * retrigger of build of NSSummary tree using queue-based architecture.
  *
  * <p>These tests verify that the queue-based unified control mechanism
@@ -96,6 +95,7 @@ import org.slf4j.LoggerFactory;
  * task.reprocess()              [Only ONE execution at a time]
  * </pre>
  */
+@SuppressWarnings("PMD.SingularField") // nsSummaryTask used via taskController across all tests
 public class TestNSSummaryUnifiedControl {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestNSSummaryUnifiedControl.class);
@@ -104,7 +104,6 @@ public class TestNSSummaryUnifiedControl {
   private NSSummaryTask nsSummaryTask;
   private ReconNamespaceSummaryManager mockNamespaceSummaryManager;
   private ReconOMMetadataManager mockReconOMMetadataManager;
-  private OMMetadataManager mockOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
 
   @BeforeEach
@@ -115,7 +114,6 @@ public class TestNSSummaryUnifiedControl {
     // Create mocks
     mockNamespaceSummaryManager = mock(ReconNamespaceSummaryManager.class);
     mockReconOMMetadataManager = mock(ReconOMMetadataManager.class);
-    mockOMMetadataManager = mock(OMMetadataManager.class);
     ozoneConfiguration = new OzoneConfiguration();
 
     // Configure small buffer for easier testing
@@ -442,7 +440,7 @@ public class TestNSSummaryUnifiedControl {
                 }
 
                 // Small staggered delay to create realistic race conditions
-                Thread.sleep(threadId * 10);
+                Thread.sleep(threadId * 10L);
 
                 LOG.info("Thread {} calling queueReInitializationEvent()", threadId);
                 totalQueueAttempts.incrementAndGet();
@@ -485,16 +483,34 @@ public class TestNSSummaryUnifiedControl {
       // Allow time for all queued events to be processed
       Thread.sleep(3000);
 
-      // Collect results
-      List<ReconTaskController.ReInitializationResult> results = new ArrayList<>();
+      // Collect and analyze results
+      long successResultCount = 0;
+      long retryLaterCount = 0;
+      long maxRetriesCount = 0;
+
       for (CompletableFuture<ReconTaskController.ReInitializationResult> future : futures) {
-        results.add(future.get());
+        ReconTaskController.ReInitializationResult result = future.get();
+        switch (result) {
+        case SUCCESS:
+          successResultCount++;
+          break;
+        case RETRY_LATER:
+          retryLaterCount++;
+          break;
+        case MAX_RETRIES_EXCEEDED:
+          maxRetriesCount++;
+          break;
+        default:
+          LOG.warn("Unexpected result: {}", result);
+        }
       }
 
       // Debug output
       LOG.info("Test completed - Total queue attempts: {}, Successful queues: {}, " +
+              "Result breakdown: SUCCESS={}, RETRY_LATER={}, MAX_RETRIES={}, " +
               "ClearTable calls: {}, Max concurrent: {}, Final state: {}",
           totalQueueAttempts.get(), successfulQueueCount.get(),
+          successResultCount, retryLaterCount, maxRetriesCount,
           clearTableCallCount.get(), maxConcurrentExecutions.get(),
           NSSummaryTask.getRebuildState());
 
