@@ -842,7 +842,7 @@ public class TestContainerStateMachineFailures {
       fail();
     } catch (IOException ex) {
       assertTrue(ex.getMessage().contains("Retry request failed. retries get failed due to exceeded" +
-          " maximum allowed retries number: 5"));
+          " maximum allowed retries number: 5"), ex.getMessage());
     } finally {
       increasedVolumeSpace.forEach(e -> e.getLeft().getVolumeUsage().ifPresent(
           p -> p.decrementUsedSpace(e.getRight())));
