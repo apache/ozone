@@ -28,7 +28,6 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -36,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -90,7 +90,7 @@ public final class RocksDatabase implements Closeable {
   private final ManagedRocksDB db;
   private final ManagedDBOptions dbOptions;
   private final ManagedWriteOptions writeOptions;
-  private final List<ColumnFamilyDescriptor> descriptors;
+  private final Map<String, ColumnFamilyDescriptor> descriptors;
   /** column family names -> {@link ColumnFamily}. */
   private final Map<String, ColumnFamily> columnFamilies;
   /** {@link ColumnFamilyHandle#getID()} -> column family names. */
@@ -202,7 +202,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   private static void close(Map<String, ColumnFamily> columnFamilies,
-      ManagedRocksDB db, List<ColumnFamilyDescriptor> descriptors,
+      ManagedRocksDB db, Collection<ColumnFamilyDescriptor> descriptors,
       ManagedWriteOptions writeOptions, ManagedDBOptions dbOptions) {
     if (columnFamilies != null) {
       for (ColumnFamily f : columnFamilies.values()) {
@@ -371,13 +371,16 @@ public final class RocksDatabase implements Closeable {
     this.db = db;
     this.dbOptions = dbOptions;
     this.writeOptions = writeOptions;
-    this.descriptors = descriptors;
+    this.descriptors = descriptors.stream().collect(Collectors.toMap(d -> bytes2String(d.getName()), d -> d,
+        (d1, d2) -> {
+        throw new IllegalStateException("Duplicate key " + bytes2String(d1.getName()));
+      }, ConcurrentHashMap::new));
     this.columnFamilies = toColumnFamilyMap(handles);
     this.columnFamilyNames = MemoizedSupplier.valueOf(() -> toColumnFamilyNameMap(columnFamilies.values()));
   }
 
   private Map<String, ColumnFamily> toColumnFamilyMap(List<ColumnFamilyHandle> handles) throws RocksDBException {
-    final Map<String, ColumnFamily> map = new HashMap<>();
+    final Map<String, ColumnFamily> map = new ConcurrentHashMap<>(handles.size());
     for (ColumnFamilyHandle h : handles) {
       final ColumnFamily f = new ColumnFamily(h);
       map.put(f.getName(), f);
@@ -422,14 +425,14 @@ public final class RocksDatabase implements Closeable {
       try {
         Thread.currentThread().sleep(1);
       } catch (InterruptedException e) {
-        close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+        close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
         Thread.currentThread().interrupt();
         return;
       }
     }
 
     // close when counter is 0, no more operation
-    close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+    close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
   }
 
   private void closeOnError(RocksDBException e) {
@@ -672,21 +675,13 @@ public final class RocksDatabase implements Closeable {
       if (columnFamily != null) {
         try {
           getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
-          byte[] handleNameBytes = columnFamily.getHandle().getName();
-          ColumnFamilyDescriptor descriptor = null;
-          for (int i = 0; i < descriptors.size(); i++) {
-            ColumnFamilyDescriptor desc = descriptors.get(i);
-            if (Arrays.equals(desc.getName(), handleNameBytes)) {
-              descriptor = desc;
-              descriptors.remove(i);
-              break;
-            }
-          }
+          ColumnFamilyDescriptor descriptor = descriptors.get(tableName);
           columnFamily.getHandle().close();
           if (descriptor != null) {
             RocksDatabase.close(descriptor);
           }
           columnFamilies.remove(tableName);
+          descriptors.remove(tableName);
         } catch (RocksDBException e) {
           closeOnError(e);
           throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
