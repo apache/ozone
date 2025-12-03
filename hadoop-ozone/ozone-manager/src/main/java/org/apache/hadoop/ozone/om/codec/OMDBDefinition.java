@@ -49,13 +49,14 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * OM database definitions.
  * <pre>
  * {@code
- * User, Token and Secret Tables:
+ * User, Token, Secret and Revoked STS Token Tables:
  * |------------------------------------------------------------------------|
- * |        Column Family |                 Mapping                         |
+ * |          Column Family |                 Mapping                       |
  * |------------------------------------------------------------------------|
- * |            userTable |             /user :- UserVolumeInfo             |
- * |          dTokenTable |      OzoneTokenID :- renew_time                 |
- * |        s3SecretTable | s3g_access_key_id :- s3Secret                   |
+ * |              userTable |             /user :- UserVolumeInfo           |
+ * |            dTokenTable |      OzoneTokenID :- renew_time               |
+ * |          s3SecretTable | s3g_access_key_id :- s3Secret                 |
+ * | s3RevokedStsTokenTable | sts_access_key_id :- sessionToken             |
  * |------------------------------------------------------------------------|
  * }
  * </pre>
@@ -139,7 +140,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 public final class OMDBDefinition extends DBDefinition.WithMap {
 
   //---------------------------------------------------------------------------
-  // User, Token and Secret Tables:
+  // User, Token, Secret and Revoked STS Token Tables:
   public static final String USER_TABLE = "userTable";
   /** userTable: /user :- UserVolumeInfo. */
   public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo> USER_TABLE_DEF
@@ -160,6 +161,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
       = new DBColumnFamilyDefinition<>(S3_SECRET_TABLE,
           StringCodec.get(),
           S3SecretValue.getCodec());
+
+  public static final String S3_REVOKED_STS_TOKEN_TABLE = "s3RevokedStsTokenTable";
+  /** s3RevokedStsTokenTable: sts_access_key_id :- sessionToken.*/
+  public static final DBColumnFamilyDefinition<String, String> S3_REVOKED_STS_TOKEN_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(S3_REVOKED_STS_TOKEN_TABLE,
+          StringCodec.get(),
+          StringCodec.get());
 
   //---------------------------------------------------------------------------
   // Volume, Bucket, Prefix and Transaction Tables:
@@ -339,7 +347,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          S3_REVOKED_STS_TOKEN_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

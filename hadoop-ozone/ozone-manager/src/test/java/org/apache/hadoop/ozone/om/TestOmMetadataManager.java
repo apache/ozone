@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
@@ -52,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,7 +139,8 @@ public class TestOmMetadataManager {
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
+      COMPACTION_LOG_TABLE,
+      S3_REVOKED_STS_TOKEN_TABLE
   };
 
   private OMMetadataManager omMetadataManager;
@@ -1288,5 +1291,30 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix, null, null, 10, true);
 
     assertEquals(25, noPagination.size());
+  }
+
+  @Test
+  public void testS3RevokedStsTokenTablePutAndGet() throws Exception {
+    // Ensure the table is initialized
+    assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
+
+    final String tempAccessKeyId1 = "ASIA7VUS1EOBCW8RRJVR";
+    final String sessionToken1 = "test-session-token-1";
+    final String tempAccessKeyId2 = "ASIA904E65QIGL9ON305";
+    final String sessionToken2 = "test-session-token-2";
+
+    omMetadataManager.getS3RevokedStsTokenTable()
+        .put(tempAccessKeyId1, sessionToken1);
+    omMetadataManager.getS3RevokedStsTokenTable()
+        .put(tempAccessKeyId2, sessionToken2);
+
+    // Verify get and getIfExist return the stored value
+    assertEquals(sessionToken1, omMetadataManager.getS3RevokedStsTokenTable().get(tempAccessKeyId1));
+    assertEquals(sessionToken1, omMetadataManager.getS3RevokedStsTokenTable().getIfExist(tempAccessKeyId1));
+    assertEquals(sessionToken2, omMetadataManager.getS3RevokedStsTokenTable().get(tempAccessKeyId2));
+    assertEquals(sessionToken2, omMetadataManager.getS3RevokedStsTokenTable().getIfExist(tempAccessKeyId2));
+
+    // Unknown key should return null for getIfExist
+    assertNull(omMetadataManager.getS3RevokedStsTokenTable().getIfExist("ASIA_UNKNOWN_ACCESS_KEY"));
   }
 }
