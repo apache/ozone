@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -2689,6 +2690,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return OmLifecycleConfiguration.getFromProtobuf(
         resp.getLifecycleConfiguration());
+  }
+
+  @Override
+  public GetLifecycleServiceStatusResponse getLifecycleServiceStatus() throws IOException {
+    OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+        getLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest
+            .newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleServiceStatus)
+        .setGetLifecycleServiceStatusRequest(getLifecycleServiceStatusRequest)
+        .build();
+
+    return handleError(submitRequest(omRequest))
+        .getGetLifecycleServiceStatusResponse();
   }
 
   @Override

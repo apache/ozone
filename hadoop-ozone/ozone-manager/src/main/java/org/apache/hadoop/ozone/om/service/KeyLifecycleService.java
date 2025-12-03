@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -84,6 +85,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
@@ -105,8 +107,8 @@ public class KeyLifecycleService extends BackgroundService {
   private int listMaxSize;
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
+  private final AtomicBoolean isServiceEnabled;
   private KeyLifecycleServiceMetrics metrics;
-  private boolean isServiceEnabled;
   // A set of bucket name that have LifecycleActionTask scheduled
   private final ConcurrentHashMap<String, LifecycleActionTask> inFlight;
   private OMMetadataManager omMetadataManager;
@@ -132,8 +134,8 @@ public class KeyLifecycleService extends BackgroundService {
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
-    this.isServiceEnabled = conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT);
+    this.isServiceEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
+        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT));
     this.inFlight = new ConcurrentHashMap();
     this.omMetadataManager = ozoneManager.getMetadataManager();
     int limit = (int) conf.getStorageSize(
@@ -192,7 +194,7 @@ public class KeyLifecycleService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return isServiceEnabled && !suspended.get() && getOzoneManager().isLeaderReady();
+    return isServiceEnabled.get() && !suspended.get() && getOzoneManager().isLeaderReady();
   }
 
   public KeyLifecycleServiceMetrics getMetrics() {
@@ -219,10 +221,24 @@ public class KeyLifecycleService extends BackgroundService {
     suspended.set(false);
   }
 
+  public void setServiceEnabled(boolean enabled) {
+    this.isServiceEnabled.set(enabled);
+    LOG.info("KeyLifecycleService is {}", enabled ? "enabled" : "disabled");
+  }
+
   @Override
   public void shutdown() {
     super.shutdown();
     KeyLifecycleServiceMetrics.unregister();
+  }
+
+  public GetLifecycleServiceStatusResponse status() {
+    Set<String> runningBuckets = new HashSet<>(inFlight.keySet());
+    return GetLifecycleServiceStatusResponse.newBuilder()
+        .setIsRunning(!runningBuckets.isEmpty())
+        .setIsEnabled(isServiceEnabled.get())
+        .addAllRunningBuckets(runningBuckets)
+        .build();
   }
 
   /**
@@ -327,6 +343,11 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
           LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
+          onSuccess(bucketKey);
+          return result;
+        }
+
+        if (!shouldRun()) {
           onSuccess(bucketKey);
           return result;
         }
@@ -470,6 +491,11 @@ public class KeyLifecycleService extends BackgroundService {
 
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
+        if (!shouldRun()) {
+          LOG.info("KeyLifecycleService is suspended or disabled." +
+              "Stopping LifecycleActionTask for bucket {}.", bucketName);
+          return;
+        }
         PendingEvaluateDirectory item = stack.pop();
         OmDirectoryInfo currentDir = item.getDirectoryInfo();
         String currentDirPath = item.getDirPath();
@@ -698,6 +724,9 @@ public class KeyLifecycleService extends BackgroundService {
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                keyTable.iterator(omMetadataManager.getBucketKey(volumeName, bucketName))) {
         while (keyTblItr.hasNext()) {
+          if (!shouldRun()) {
+            return;
+          }
           Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
           OmKeyInfo key = keyValue.getValue();
           numKeyIterated++;
