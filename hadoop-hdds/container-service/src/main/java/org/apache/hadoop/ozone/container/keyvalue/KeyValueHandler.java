@@ -1458,7 +1458,7 @@ public class KeyValueHandler extends Handler {
              getBlockIterator(container.getContainerData().getContainerID())) {
       while (blockIterator.hasNext()) {
         BlockData blockData = blockIterator.nextBlock();
-        merkleTree.addBlock(blockData.getLocalID());
+        merkleTree.addBlock(blockData.getLocalID(), blockData.getBlockCommitSequenceId());
         // Assume all chunks are healthy when building the tree from metadata. Scanner will identify corruption when
         // it runs after.
         List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
@@ -1685,8 +1685,8 @@ public class KeyValueHandler extends Handler {
               LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
                   "present. Our container merkle tree is stale.", localID, containerID);
             } else {
-              long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
-                  missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
+              long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, missingBlock,
+                           updatedTreeWriter, chunkByteBuffer);
               if (chunksInBlockRetrieved != 0) {
                 allBlocksUpdated.add(localID);
                 numMissingBlocksRepaired++;
@@ -1698,15 +1698,26 @@ public class KeyValueHandler extends Handler {
           }
         }
 
+        // Create a mapping for blockID to BlockMerkleTree to use it for reconciliation.
+        Map<Long, ContainerProtos.BlockMerkleTree> peerBlockIDtoMerkleTree = new HashMap<>();
+        for (ContainerProtos.BlockMerkleTree blockTree : peerChecksumInfo.getContainerMerkleTree()
+            .getBlockMerkleTreeList()) {
+          peerBlockIDtoMerkleTree.put(blockTree.getBlockID(), blockTree);
+        }
+
         // Handle missing chunks
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (missingChunksRepaired != 0) {
-              allBlocksUpdated.add(localID);
-              numMissingChunksRepaired += missingChunksRepaired;
+            // Create a BlockMerkleTree from the peer's info for this block
+            ContainerProtos.BlockMerkleTree peerBlockTree = peerBlockIDtoMerkleTree.getOrDefault(localID, null);
+            if (peerBlockTree != null) {
+              long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, peerBlockTree,
+                  updatedTreeWriter, chunkByteBuffer);
+              if (missingChunksRepaired != 0) {
+                allBlocksUpdated.add(localID);
+                numMissingChunksRepaired += missingChunksRepaired;
+              }
             }
           } catch (IOException e) {
             LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
@@ -1718,11 +1729,15 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (corruptChunksRepaired != 0) {
-              allBlocksUpdated.add(localID);
-              numCorruptChunksRepaired += corruptChunksRepaired;
+            // Create a BlockMerkleTree from the peer's info for this block
+            ContainerProtos.BlockMerkleTree peerBlockTree = peerBlockIDtoMerkleTree.getOrDefault(localID, null);
+            if (peerBlockTree != null) {
+              long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, peerBlockTree,
+                  updatedTreeWriter, chunkByteBuffer);
+              if (corruptChunksRepaired != 0) {
+                allBlocksUpdated.add(localID);
+                numCorruptChunksRepaired += corruptChunksRepaired;
+              }
             }
           } catch (IOException e) {
             LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
@@ -1814,10 +1829,14 @@ public class KeyValueHandler extends Handler {
    * @return The number of chunks that were reconciled in our container.
    */
   private long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
-      DNContainerOperationClient dnClient, long localID, List<ContainerProtos.ChunkMerkleTree> peerChunkList,
+      DNContainerOperationClient dnClient, ContainerProtos.BlockMerkleTree peerBlockMerkleTree,
       ContainerMerkleTreeWriter treeWriter, ByteBuffer chunkByteBuffer) throws IOException {
     long containerID = container.getContainerData().getContainerID();
     DatanodeDetails peer = pipeline.getFirstNode();
+
+    long localID = peerBlockMerkleTree.getBlockID();
+    List<ContainerProtos.ChunkMerkleTree> peerChunkList = peerBlockMerkleTree.getChunkMerkleTreeList();
+    long peerBcsid = peerBlockMerkleTree.getBlockCommitSequenceId();
 
     BlockID blockID = new BlockID(containerID, localID);
     // The length of the block is not known, so instead of passing the default block length we pass 0. As the length
@@ -1861,8 +1880,9 @@ public class KeyValueHandler extends Handler {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
       // initializes ChunkInputStream for each chunk.
       blockInputStream.initialize();
-      ContainerProtos.BlockData peerBlockData = blockInputStream.getStreamBlockData();
-      long maxBcsId = Math.max(localBcsid, peerBlockData.getBlockID().getBlockCommitSequenceId());
+      // Use the BCSID from the peer's merkle tree instead of making a separate getBlock call
+      long maxBcsId = Math.max(localBcsid, peerBcsid);
+      treeWriter.addBlock(localID, maxBcsId);
 
       for (ContainerProtos.ChunkMerkleTree chunkMerkleTree : peerChunkList) {
         long chunkOffset = chunkMerkleTree.getOffset();
@@ -1925,7 +1945,9 @@ public class KeyValueHandler extends Handler {
         }
         // Stop block repair once we fail to pull a chunk from the peer.
         // Our write chunk API currently does not have a good way to handle writing around holes in a block.
+        // Keep the BcsId as the same since we have not fully ingested all the chunks from the peer.
         if (!allChunksSuccessful) {
+          maxBcsId = localBcsid;
           break;
         }
       }
