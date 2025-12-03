@@ -56,14 +56,16 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // Call parent preExecute to perform ACL check
+    OMRequest omRequest = super.preExecute(ozoneManager);
+    
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
-        getOmRequest().getSetAclRequest().toBuilder()
+        omRequest.getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    return omRequest.toBuilder()
         .setSetAclRequest(setAclRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 
