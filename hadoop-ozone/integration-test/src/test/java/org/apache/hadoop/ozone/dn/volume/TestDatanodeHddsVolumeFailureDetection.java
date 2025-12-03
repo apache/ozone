@@ -156,8 +156,7 @@ class TestDatanodeHddsVolumeFailureDetection {
         // refer to HddsVolume.check()
         DatanodeTestUtils.simulateBadVolume(vol0);
 
-        // close container to trigger checkVolumeAsync after 2 seconds as minGap to check
-        Thread.sleep(2000);
+        // close container to trigger checkVolumeAsync
         assertThrows(IOException.class, c1::close);
 
         // should trigger CheckVolumeAsync and
@@ -328,7 +327,7 @@ class TestDatanodeHddsVolumeFailureDetection {
     DatanodeConfiguration dnConf =
         ozoneConfig.getObject(DatanodeConfiguration.class);
     dnConf.setFailedDataVolumesTolerated(1);
-    dnConf.setDiskCheckMinGap(Duration.ofSeconds(2));
+    dnConf.setDiskCheckMinGap(Duration.ofSeconds(0));
     ozoneConfig.setFromObject(dnConf);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)

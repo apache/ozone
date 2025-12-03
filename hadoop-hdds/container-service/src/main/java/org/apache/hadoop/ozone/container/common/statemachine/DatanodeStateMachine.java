@@ -787,6 +787,11 @@ public class DatanodeStateMachine implements Closeable {
     return volumeChoosingPolicy;
   }
 
+  /**
+   * Sets the next heartbeat time. Setting to current time will trigger HB immediately as will be less than time
+   * compared to Time.monotonicNow() when compared.
+   * @param time
+   */
   public void setNextHB(long time) {
     nextHB.set(time);
   }
