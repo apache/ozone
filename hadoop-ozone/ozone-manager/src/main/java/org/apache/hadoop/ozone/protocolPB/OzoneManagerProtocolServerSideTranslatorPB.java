@@ -193,7 +193,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     }
     // === 2. Leader local read (skip ReadIndex if allowed) ===
     if (raftServerStatus == LEADER_AND_READY || request.getCmdType().equals(PrepareStatus)) {
-      if (ozoneManager.isAllowLeaderSkipLinearizableRead()) {
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
         ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
         // leader directly serves local committed data
         return handler.handleReadRequest(request);
