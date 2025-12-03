@@ -4678,10 +4678,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return config.isFileSystemPathEnabled();
   }
 
-  public boolean isAllowLeaderSkipLinearizableRead() {
-    return config.isAllowLeaderSkipLinearizableRead();
-  }
-
   public boolean getKeyPathLockEnabled() {
     return configuration.getBoolean(OZONE_OM_KEY_PATH_LOCK_ENABLED,
         OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);

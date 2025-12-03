@@ -141,8 +141,8 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean listAllVolumesAllowed = Defaults.LIST_ALL_VOLUMES_ALLOWED;
 
-  @Config(key = "allow.leader.skip.linearizable.read",
-      defaultValue = "FALSE",
+  @Config(key = "ozone.om.allow.leader.skip.linearizable.read",
+      defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA},
       description = "Allow leader to handler requests directly, no need to check the leadership " +
