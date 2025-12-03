@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1231,7 +1232,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       for (PartETag part : completedParts) {
         completionXml.append("  <Part>\n");
         completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
-        completionXml.append("    <ETag>").append(part.getETag()).append("</ETag>\n");
+        completionXml.append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n");
         completionXml.append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");

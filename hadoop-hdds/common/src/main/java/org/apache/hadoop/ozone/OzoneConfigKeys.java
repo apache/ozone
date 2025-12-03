@@ -690,6 +690,10 @@ public final class OzoneConfigKeys {
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
+      "ozone.client.elastic.byte.buffer.pool.max.size";
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
+
   /**
    * There is no need to instantiate this class.
    */
