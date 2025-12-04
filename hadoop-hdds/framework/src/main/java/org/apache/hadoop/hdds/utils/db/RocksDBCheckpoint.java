@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
-
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import javax.validation.constraints.NotNull;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -80,14 +77,5 @@ public class RocksDBCheckpoint implements DBCheckpoint {
     LOG.info("Cleaning up RocksDB checkpoint at {}",
             checkpointLocation.toString());
     FileUtils.deleteDirectory(checkpointLocation.toFile());
-  }
-
-  @Override
-  public Path getCheckpointDataDir() throws IOException {
-    Path parent = checkpointLocation.getParent();
-    if (parent == null) {
-      throw new IOException("Checkpoint parent path is null");
-    }
-    return Paths.get(parent.toString(), OM_CHECKPOINT_DATA_DIR);
   }
 }

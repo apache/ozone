@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -123,10 +124,10 @@ public class TestOzoneManagerSnapshotProvider {
       throws Exception {
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     assertNotNull(checkpointLocation);
-    OmSnapshotUtils.createHardLinks(checkpointLocation, true);
-    Path checkpointDataDir = dbCheckpoint.getCheckpointDataDir();
-    assertNotNull(checkpointDataDir);
-    Path omDbLocation = Paths.get(checkpointDataDir.toString(),
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(checkpointLocation);
+    assertNotNull(obtainedCheckpoint);
+    Path omDbLocation = Paths.get(checkpointLocation.toString(),
         OzoneConsts.OM_DB_NAME
     );
 

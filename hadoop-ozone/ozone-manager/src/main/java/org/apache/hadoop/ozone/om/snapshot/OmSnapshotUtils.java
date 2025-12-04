@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DATA_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
 import java.io.File;
@@ -32,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,64 +110,6 @@ public final class OmSnapshotUtils {
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
-  }
-
-  /**
-   * Create hard links listed in OM_HARDLINK_FILE.
-   *
-   * @param dbPath Path to db to have links created.
-   * @param deleteSourceFiles - Whether to delete the source files after creating the links.
-   */
-  public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
-    File hardLinkFile =
-        new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
-    Path dbPathParent = dbPath.getParent();
-    if (dbPathParent == null) {
-      throw new IOException("Invalid dbPath: parent is null: " + dbPath);
-    }
-    Path checkpointDataDirPath = Paths.get(dbPathParent.toString(), OM_CHECKPOINT_DATA_DIR);
-    if (!checkpointDataDirPath.toFile().exists()) {
-      boolean dirCreated = checkpointDataDirPath.toFile().mkdirs();
-      if (!dirCreated) {
-        throw new IOException("Failed to create directory: " + checkpointDataDirPath);
-      }
-    }
-    if (hardLinkFile.exists()) {
-      // Read file.
-      try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
-        List<String> lines = s.collect(Collectors.toList());
-
-        // Create a link for each line.
-        for (String l : lines) {
-          String[] parts = l.split("\t");
-          if (parts.length != 2) {
-            LOG.warn("Skipping malformed line in hardlink file: {}", l);
-            continue;
-          }
-          String from = parts[1];
-          String to = parts[0];
-          Path fullFromPath = Paths.get(dbPath.toString(), from);
-          Path fullToPath = Paths.get(checkpointDataDirPath.toString(), to);
-          // Make parent dir if it doesn't exist.
-          Path parent = fullToPath.getParent();
-          if ((parent != null) && (!parent.toFile().exists())) {
-            if (!parent.toFile().mkdirs()) {
-              throw new IOException(
-                  "Failed to create directory: " + parent.toString());
-            }
-          }
-          Files.createLink(fullToPath, fullFromPath);
-        }
-        if (!hardLinkFile.delete()) {
-          throw new IOException("Failed to delete: " + hardLinkFile);
-        }
-      }
-    } else  {
-      LOG.error("Hardlink file : {} does not exist.", hardLinkFile);
-    }
-    if (deleteSourceFiles) {
-      FileUtil.fullyDelete(dbPath.toFile());
-    }
   }
 
   /**

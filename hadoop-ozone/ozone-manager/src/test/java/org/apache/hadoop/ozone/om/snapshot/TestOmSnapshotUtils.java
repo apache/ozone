@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -28,7 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -87,7 +88,6 @@ public class TestOmSnapshotUtils {
     assertTrue(testDir.mkdir(), "Failed to create test dir");
     // Create source file
     File sourceFile = new File(testDir, "source.sst");
-    File checkpointDataDir = new File(testDir.getParent(), OzoneConsts.OM_CHECKPOINT_DATA_DIR);
     Files.write(sourceFile.toPath(), "test content".getBytes(UTF_8));
 
     // Create hardlink file with "om.db/" prefixed paths
@@ -98,12 +98,13 @@ public class TestOmSnapshotUtils {
     Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
 
     // Execute createHardLinks
-    OmSnapshotUtils.createHardLinks(testDir.toPath(), false);
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(testDir.toPath());
+    assertNotNull(obtainedCheckpoint);
 
-    assertTrue(checkpointDataDir.exists());
     // Verify hard links created correctly
-    File target1 = new File(checkpointDataDir, "om.db/target1.sst");
-    File target2 = new File(checkpointDataDir, "target2.sst");
+    File target1 = new File(testDir, "om.db/target1.sst");
+    File target2 = new File(testDir, "target2.sst");
 
     assertTrue(target1.exists(),
         "Hard link should be created");

@@ -289,7 +289,6 @@ import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -4046,14 +4045,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     TermIndex termIndex = null;
     try {
-      // Install hard links.
-      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation(), false);
       Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
       if (checkpointLocation == null) {
         throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
       }
-      Path checkpointDataDir = omDBCheckpoint.getCheckpointDataDir();
-      termIndex = installCheckpoint(leaderId, checkpointDataDir);
+      termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
@@ -4062,29 +4058,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Install checkpoint obtained from leader using the dbCheckpoint endpoint.
-   * The unpacked directory after installing hardlinks would contain a
-   * checkpoint_data dir that comprises both active OM DB dir and the
-   * db.snapshots directory.
+   * The unpacked directory after installing hardlinks would comprise of
+   * both active OM DB dir and the db.snapshots directory.
    * If the checkpoint snapshot index is greater than
    * OM's last applied transaction index, then re-initialize the OM
    * state via this checkpoint. Before re-initializing OM state, the OM Ratis
    * server should be stopped so that no new transactions can be applied
    */
-  TermIndex installCheckpoint(String leaderId, Path checkpointDataDir)
+  TermIndex installCheckpoint(String leaderId, Path checkpointLocation)
       throws Exception {
-    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
     TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(configuration, omDbPath);
     LOG.info("Installing checkpoint with OMTransactionInfo {}",
         checkpointTrxnInfo);
-    return installCheckpoint(leaderId, checkpointDataDir, checkpointTrxnInfo);
+    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
   }
 
-  TermIndex installCheckpoint(String leaderId, Path checkpointDataDir,
+  TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
       TransactionInfo checkpointTrxnInfo) throws Exception {
     long startTime = Time.monotonicNow();
     File oldDBLocation = metadataManager.getStore().getDbLocation();
-    Path omDbPath = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
+    Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
     try {
       // Stop Background services
       keyManager.stop();
@@ -4141,7 +4136,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try {
         time = Time.monotonicNow();
-        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation, checkpointDataDir);
+        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation, checkpointLocation);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
@@ -4245,115 +4240,115 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Replace the current OM DB with the new DB checkpoint.
+   * Replaces the OM DB with checkpoint data from leader.
+   * Creates a single parent backup directory containing all current state.
    *
-   * @param lastAppliedIndex the last applied index in the current OM DB.
-   * @param checkpointDataDir   path to the checkpoint_data dir consisting of om.db and db.snapshots
-   * @return location of backup of the original DB
+   * @param lastAppliedIndex last applied transaction index
+   * @param oldDB current DB directory
+   * @param checkpointLocation checkpoint data directory from leader
+   * @return backup directory containing original state
+   * @throws IOException if operations fail
    */
   File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
-      Path checkpointDataDir) throws IOException {
+      Path checkpointLocation) throws IOException {
 
-    // Take a backup of the current DB
+    // Create single parent backup directory
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
     File dbDir = oldDB.getParentFile();
-
-    // Backup the active fs and snapshot dirs.
     File dbBackupDir = new File(dbDir, dbBackupName);
+
     if (!dbBackupDir.mkdirs()) {
-      throw new IOException("Failed to make db backup dir: " +
-          dbBackupDir);
-    }
-    File dbBackup = new File(dbBackupDir, oldDB.getName());
-    File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_DIR);
-    File dbSnapshotsBackup = new File(dbBackupDir, OM_SNAPSHOT_DIR);
-    Files.move(oldDB.toPath(), dbBackup.toPath());
-    if (dbSnapshotsDir.exists()) {
-      Files.move(dbSnapshotsDir.toPath(),
-          dbSnapshotsBackup.toPath());
+      throw new IOException("Failed to create backup directory: " + dbBackupDir);
     }
 
-    moveCheckpointFiles(oldDB, checkpointDataDir, dbDir, dbBackup, dbSnapshotsDir,
-        dbSnapshotsBackup);
+    // Move entire current state to backup (everything in dbDir that we care about)
+    File[] currentContents = dbDir.listFiles();
+    if (currentContents != null) {
+      for (File item : currentContents) {
+        // Skip backup directories and marker files
+        if (item.getName().startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
+            item.getName().equals(DB_TRANSIENT_MARKER)) {
+          continue;
+        }
+
+        // Move to backup - Files.move handles both files and directories recursively
+        Path targetPath = dbBackupDir.toPath().resolve(item.getName());
+        Files.move(item.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+      }
+    }
+
+    // Move checkpoint files
+    moveCheckpointFiles(oldDB, checkpointLocation, dbDir, dbBackupDir);
+
     return dbBackupDir;
   }
 
-  private void moveCheckpointFiles(File oldDB, Path checkpointDataDir, File dbDir,
-                                   File dbBackup, File dbSnapshotsDir,
-                                   File dbSnapshotsBackup) throws IOException {
+  /**
+   * Moves all contents from checkpointLocation to dbDir, replacing existing files/dirs.
+   * Uses a single parent backup for rollback on failure.
+   *
+   * @param oldDB the old DB directory (will be replaced)
+   * @param checkpointLocation source directory containing checkpoint data
+   * @param dbDir target directory (parent of oldDB)
+   * @param dbBackupDir backup directory containing the original state
+   * @throws IOException if file operations fail
+   */
+  private void moveCheckpointFiles(File oldDB, Path checkpointLocation, File dbDir,
+      File dbBackupDir) throws IOException {
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
-    Path newDb = Paths.get(checkpointDataDir.toString(), OM_DB_NAME);
-    Path newDbSnapshotsDir = Paths.get(checkpointDataDir.toString(), OM_SNAPSHOT_DIR);
-    // Now that we have backed up the old DB data, we just need to move the
-    // directories in checkpoint_data to the main path
-    // 1. replace oldDb with newDb
-    // 2. replace dbSnapshotsDir with newDbSnapshotsDir
+
     try {
-      // Create a Transient Marker file. This file will be deleted if the
-      // checkpoint DB is successfully moved to the old DB location or if the
-      // old DB backup is reset to its location. If not, then the OM DB is in
-      // an inconsistent state and this marker file will fail OM from
-      // starting up.
+      // Create transient marker file
       Files.createFile(markerFile);
-      // replace the dbDir and dbSnapshotDir
-      replaceDir(oldDB, newDb);
-      replaceDir(dbSnapshotsDir, newDbSnapshotsDir);
+      // Move everything from checkpointLocation to dbDir, replacing existing
+      if (!Files.exists(checkpointLocation) || !Files.isDirectory(checkpointLocation)) {
+        throw new IOException("Checkpoint data directory does not exist: " + checkpointLocation);
+      }
+      try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
+        for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
+          Path targetPath = dbDir.toPath().resolve(sourcePath.getFileName());
+          // Delete target if it exists (file or directory)
+          if (Files.exists(targetPath)) {
+            if (Files.isDirectory(targetPath)) {
+              FileUtil.fullyDelete(targetPath.toFile());
+            } else {
+              Files.delete(targetPath);
+            }
+          }
+          // Move source to target
+          Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+      }
+      // Success - delete marker file
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
-      LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
-              "directory . Exception: {}. Resetting to original DB.",
-          checkpointDataDir, oldDB.toPath(), e);
+      LOG.error("Failed to move checkpoint data from {} to {}. " +
+              "Restoring from backup.",
+          checkpointLocation, dbDir, e);
+      // Rollback: restore everything from backup
       try {
+        // Delete current state
         FileUtil.fullyDelete(oldDB);
-        Files.move(dbBackup.toPath(), oldDB.toPath());
-        if (dbSnapshotsBackup.exists()) {
-          Files.move(dbSnapshotsBackup.toPath(), dbSnapshotsDir.toPath());
+        if (Files.exists(dbDir.toPath().resolve(OM_SNAPSHOT_DIR))) {
+          FileUtil.fullyDelete(dbDir.toPath().resolve(OM_SNAPSHOT_DIR).toFile());
+        }
+        // Restore from backup - move everything back from backupDir
+        if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
+          File[] backupContents = dbBackupDir.listFiles();
+          if (backupContents != null) {
+            for (File backupItem : backupContents) {
+              Path targetPath = dbDir.toPath().resolve(backupItem.getName());
+              Files.move(backupItem.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+          }
         }
         Files.deleteIfExists(markerFile);
       } catch (IOException ex) {
-        String errorMsg = "Failed to reset to original DB. OM is in an " +
-            "inconsistent state.";
+        String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
         exitManager.exitSystem(1, errorMsg, ex, LOG);
       }
       throw e;
-    }
-  }
-
-  /**
-   * Replaces the contents of the target directory with contents from the source directory.
-   * Deletes all existing files in dbDir and moves all files from newDbDir into dbDir.
-   *
-   * @param dbDir target directory whose contents will be replaced
-   * @param newDbDir source directory containing new contents to move
-   * @throws IOException if file operations fail
-   */
-  private void replaceDir(File dbDir, Path newDbDir) throws IOException {
-    // First, delete all existing content in the target directory
-    if (dbDir.exists()) {
-      // Delete all files and subdirectories in dbDir, but keep the directory itself
-      File[] files = dbDir.listFiles();
-      if (files != null) {
-        for (File file : files) {
-          FileUtil.fullyDelete(file);
-        }
-      }
-    } else {
-      // Create the directory if it doesn't exist
-      Files.createDirectories(dbDir.toPath());
-    }
-
-    // Move all content from newDbDir to dbDir
-    if (Files.exists(newDbDir) && Files.isDirectory(newDbDir)) {
-      try (Stream<Path> files = Files.list(newDbDir)) {
-        for (Path sourceFile : files.collect(Collectors.toList())) {
-          Path targetFile = dbDir.toPath().resolve(sourceFile.getFileName());
-          Files.move(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
-        }
-      }
-    } else {
-      throw new IOException("The source directory from which the DB contents are" +
-          " to be moved does not exist at" + newDbDir.toFile().getAbsolutePath());
     }
   }
 
