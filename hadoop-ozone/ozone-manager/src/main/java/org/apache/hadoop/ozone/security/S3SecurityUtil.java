@@ -43,6 +43,8 @@ import org.apache.hadoop.security.token.SecretManager;
 @InterfaceStability.Evolving
 public final class S3SecurityUtil {
 
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
+
   private S3SecurityUtil() {
   }
 
@@ -61,7 +63,7 @@ public final class S3SecurityUtil {
         final String token = omRequest.getS3Authentication().getSessionToken();
         if (!token.isEmpty()) {
           final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
-              token, ozoneManager.getSecretKeyClient(), Clock.system(ZoneOffset.UTC));
+              token, ozoneManager.getSecretKeyClient(), CLOCK);
           // HMAC signature and expiration were validated above.  Now validate AWS signature.
           validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
           OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);

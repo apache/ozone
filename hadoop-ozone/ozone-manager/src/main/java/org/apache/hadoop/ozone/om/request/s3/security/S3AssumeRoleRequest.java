@@ -71,6 +71,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
       "abcdefghijklmnopqrstuvwxyz/+";
   private static final int CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH = CHARS_FOR_SECRET_ACCESS_KEYS.length();
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   public static final String STS_TOKEN_PREFIX = "ASIA";
 
@@ -200,7 +201,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
         tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy, Clock.system(ZoneOffset.UTC));
+        sessionPolicy, CLOCK);
   }
 
   /**
