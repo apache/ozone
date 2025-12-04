@@ -48,8 +48,10 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   private static final long DEFAULT_CONTAINER_CACHE_SIZE = 1000000;
   private final ContainerOperationClient containerOperationClient;
   private final XceiverClientManager xceiverClientManager;
-  // cache for container info and encodedToken from the SCM
+  // cache for container lifecycle state and encodedToken from the SCM
   private final Cache<Long, ContainerInfoToken> encodedTokenCache;
+  // cache for container-level replication status strings used in CLI output
+  private final Cache<Long, String> replicationStatusCache;
 
   private static final Set<ContainerDataProto.State> GOOD_REPLICA_STATES =
       EnumSet.of(
@@ -76,7 +78,12 @@ public class ContainerStateVerifier implements ReplicaVerifier {
               ". Falling back to default: " + DEFAULT_CONTAINER_CACHE_SIZE);
       containerCacheSize = DEFAULT_CONTAINER_CACHE_SIZE;
     }
-    encodedTokenCache = CacheBuilder.newBuilder().maximumSize(containerCacheSize).build();
+    encodedTokenCache = CacheBuilder.newBuilder()
+        .maximumSize(containerCacheSize)
+        .build();
+    replicationStatusCache = CacheBuilder.newBuilder()
+        .maximumSize(containerCacheSize)
+        .build();
   }
 
   @Override
@@ -108,7 +115,8 @@ public class ContainerStateVerifier implements ReplicaVerifier {
       // Replication status check evaluates container-level health by counting healthy replicas
       // across all datanodes. Therefore, when a container is UNDER_REPLICATED or OVER_REPLICATED,
       // this information should be reflected in all replica outputs, not just the unhealthy ones.
-      if (replicationStatus.contains("HEALTHY_REPLICATION") && replicaStateGood) {
+      if (replicationStatus.startsWith(ContainerHealthResult.HealthState.HEALTHY.name())
+          && replicaStateGood) {
         pass = true;
       }
 
@@ -163,46 +171,58 @@ public class ContainerStateVerifier implements ReplicaVerifier {
     if (cachedData != null) {
       return cachedData;
     }
-    // Cache miss - fetch and store
+    // Cache miss - fetch and store only the state and encoded token
     ContainerInfo info = containerOperationClient.getContainer(containerId);
     String encodeToken = containerOperationClient.getEncodedContainerToken(containerId);
-    cachedData = new ContainerInfoToken(info.getState(), encodeToken, info);
+    cachedData = new ContainerInfoToken(info.getState(), encodeToken);
     encodedTokenCache.put(containerId, cachedData);
     return cachedData;
   }
 
   private String checkReplicationStatus(long containerId) {
     try {
-      ContainerInfoToken token = getContainerInfoToken(containerId);
-      ContainerInfo containerInfo = token.getContainerInfo();
-      
-      // Get container replicas from SCM
-      List<ContainerReplicaInfo> replicaInfos = 
-          containerOperationClient.getContainerReplicas(containerId);
-      
-      if (replicaInfos.isEmpty()) {
-        return ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED + ": no replicas found";
+      String cachedStatus = replicationStatusCache.getIfPresent(containerId);
+      if (cachedStatus != null) {
+        return cachedStatus;
       }
-      
-      int replicationFactor = containerInfo.getReplicationFactor().getNumber();
+
+      // Fetch container info and replicas from SCM to compute replication health once per container
+      ContainerInfo containerInfo = containerOperationClient.getContainer(containerId);
+      List<ContainerReplicaInfo> replicaInfos =
+          containerOperationClient.getContainerReplicas(containerId);
+
+      if (replicaInfos.isEmpty()) {
+        String status = ContainerHealthResult.HealthState.UNDER_REPLICATED
+            + ": no replicas found";
+        replicationStatusCache.put(containerId, status);
+        return status;
+      }
+
+      int requiredNodes =
+          containerInfo.getReplicationConfig().getRequiredNodes();
       int healthyReplicas = 0;
-      
+
       for (ContainerReplicaInfo replicaInfo : replicaInfos) {
-        if (!replicaInfo.getState().equals("UNHEALTHY")) {
+        if (!"UNHEALTHY".equals(replicaInfo.getState())) {
           healthyReplicas++;
         }
       }
-      
-      if (healthyReplicas < replicationFactor) {
-        return String.format("%s: %d/%d healthy replicas", 
-            ContainerHealthResult.ReplicationStatus.UNDER_REPLICATED, healthyReplicas, replicationFactor);
-      } else if (healthyReplicas > replicationFactor) {
-        return String.format("%s: %d/%d healthy replicas", 
-            ContainerHealthResult.ReplicationStatus.OVER_REPLICATED, healthyReplicas, replicationFactor);
-      } else {
-        return ContainerHealthResult.ReplicationStatus.HEALTHY_REPLICATION.toString();
+
+      if (healthyReplicas == requiredNodes) {
+        String status = ContainerHealthResult.HealthState.HEALTHY.toString();
+        replicationStatusCache.put(containerId, status);
+        return status;
       }
-      
+
+      ContainerHealthResult.HealthState status =
+          healthyReplicas < requiredNodes
+              ? ContainerHealthResult.HealthState.UNDER_REPLICATED
+              : ContainerHealthResult.HealthState.OVER_REPLICATED;
+
+      String formatted = String.format("%s: %d/%d healthy replicas",
+          status, healthyReplicas, requiredNodes);
+      replicationStatusCache.put(containerId, formatted);
+      return formatted;
     } catch (Exception e) {
       return "REPLICATION_CHECK_FAILED: " + e.getMessage();
     }
@@ -211,12 +231,10 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   private static class ContainerInfoToken {
     private HddsProtos.LifeCycleState state;
     private final String encodedToken;
-    private final ContainerInfo containerInfo;
 
-    ContainerInfoToken(HddsProtos.LifeCycleState lifeState, String token, ContainerInfo info) {
+    ContainerInfoToken(HddsProtos.LifeCycleState lifeState, String token) {
       this.state = lifeState;
       this.encodedToken = token;
-      this.containerInfo = info;
     }
 
     @Override
@@ -243,10 +261,6 @@ public class ContainerStateVerifier implements ReplicaVerifier {
 
     public String getEncodedToken() {
       return encodedToken;
-    }
-    
-    public ContainerInfo getContainerInfo() {
-      return containerInfo;
     }
   }
 
