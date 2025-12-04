@@ -50,7 +50,16 @@ public class ContainerEntry {
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    return copyAndUpdate(map -> map.remove(datanodeID));
+    return copyAndUpdate(map -> {
+      ContainerReplica replicaToRemove = null;
+      for (ContainerReplica replica : map.keySet()) {
+        if (replica.getDatanodeDetails().getID().equals(datanodeID)) {
+          replicaToRemove = replica;
+          break;
+        }
+      }
+      return replicaToRemove != null ? map.remove(replicaToRemove) : null;
+    });
   }
 
   private <T> T copyAndUpdate(java.util.function.Function<Map<ContainerReplica, ContainerReplica>, T> update) {
