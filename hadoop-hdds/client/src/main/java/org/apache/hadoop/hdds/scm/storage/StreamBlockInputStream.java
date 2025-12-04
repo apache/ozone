@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
@@ -27,13 +28,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -51,6 +50,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.Preconditions;
@@ -61,11 +61,13 @@ import org.slf4j.LoggerFactory;
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
  * container.
  */
-public class StreamBlockInputStream extends BlockExtendedInputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+public class StreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
+  private static final AtomicInteger STREAM_ID = new AtomicInteger(0);
+  private static final AtomicInteger READER_ID = new AtomicInteger(0);
 
+  private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
   private final long blockLength;
   private final int responseDataSize = 1 << 20; // 1 MB
@@ -119,7 +121,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   @Override
   public synchronized int read() throws IOException {
     checkOpen();
-    if (!dataAvailableToRead(1)) {
+    if (!dataAvailableToRead(1, true)) {
       return EOF;
     }
     position++;
@@ -134,10 +136,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized int read(ByteBuffer targetBuf) throws IOException {
+    return readFully(targetBuf, true);
+  }
+
+  synchronized int readFully(ByteBuffer targetBuf, boolean preRead) throws IOException {
     checkOpen();
     int read = 0;
     while (targetBuf.hasRemaining()) {
-      if (!dataAvailableToRead(targetBuf.remaining())) {
+      if (!dataAvailableToRead(targetBuf.remaining(), preRead)) {
         break;
       }
       int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
@@ -151,7 +157,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     return read > 0 ? read : EOF;
   }
 
-  private synchronized boolean dataAvailableToRead(int length) throws IOException {
+  private synchronized boolean dataAvailableToRead(int length, boolean preRead) throws IOException {
     if (position >= blockLength) {
       return false;
     }
@@ -160,7 +166,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     if (bufferHasRemaining()) {
       return true;
     }
-    buffer = streamingReader.read(length);
+    buffer = streamingReader.read(length, preRead);
     return bufferHasRemaining();
   }
 
@@ -180,11 +186,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       throw new IOException("Cannot seek to negative offset");
     }
     if (pos > blockLength) {
-      throw new IOException("Cannot seek after the end of the block");
+      throw new EOFException("Failed to seek to position " + pos + " > block length = " + blockLength);
     }
     if (pos == position) {
       return;
     }
+    LOG.debug("{}: seek {} -> {}", this, position, pos);
     closeStream();
     position = pos;
     requestedLength = pos;
@@ -204,6 +211,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   private synchronized void closeStream() {
     if (streamingReader != null) {
+      LOG.debug("Closing {}", streamingReader);
       streamingReader.onCompleted();
       streamingReader = null;
     }
@@ -252,13 +260,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  synchronized void readBlock(int length) throws IOException {
+  synchronized void readBlock(int length, boolean preRead) throws IOException {
     final long required = position + length - requestedLength;
-    final long readLength = required + preReadSize;
+    final long preReadLength = preRead ? preReadSize : 0;
+    final long readLength = required + preReadLength;
 
     if (readLength > 0) {
       LOG.debug("position {}, length {}, requested {}, diff {}, readLength {}, preReadSize={}",
-          position, length, requestedLength, required, readLength, preReadSize);
+          position, length, requestedLength, required, readLength, preReadLength);
       readBlockImpl(readLength);
       requestedLength += readLength;
     }
@@ -314,10 +323,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
+  @Override
+  public String toString() {
+    return name;
+  }
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
   public class StreamingReader implements StreamingReaderSpi {
+    private final String name = StreamBlockInputStream.this.name + "-reader" + READER_ID.getAndIncrement();
 
     /** Response queue: poll is blocking while offer is non-blocking. */
     private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
@@ -336,7 +351,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       }
     }
 
-    ReadBlockResponseProto poll() throws IOException {
+    ReadBlockResponseProto poll(int timeout, TimeUnit timeoutUnit) throws IOException {
+      final long timeoutNanos = timeoutUnit.toNanos(timeout);
+      final long startTime = System.nanoTime();
+      final long pollTimeoutNanos = Math.min(timeoutNanos / 10, 100_000_000);
+
       while (true) {
         checkError();
         if (future.isDone()) {
@@ -345,7 +364,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
         final ReadBlockResponseProto proto;
         try {
-          proto = responseQueue.poll(1, TimeUnit.SECONDS);
+          proto = responseQueue.poll(pollTimeoutNanos, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           throw new IOException("Interrupted while waiting for response", e);
@@ -353,46 +372,53 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
         if (proto != null) {
           return proto;
         }
+
+        final long elapsedNanos = System.nanoTime() - startTime;
+        if (elapsedNanos >= timeoutNanos) {
+          setFailedAndThrow(new TimeoutIOException(
+              "Timed out " + timeout + " " + timeoutUnit + " waiting for response"));
+          return null;
+        }
       }
     }
 
-    private ByteBuffer read(int length) throws IOException {
+    private ByteBuffer read(int length, boolean preRead) throws IOException {
       checkError();
       if (future.isDone()) {
         return null; // Stream ended
       }
 
-      readBlock(length);
+      readBlock(length, preRead);
 
       while (true) {
         final ByteBuffer buf = readFromQueue();
-        if (buf.hasRemaining()) {
+        if (buf != null && buf.hasRemaining()) {
           return buf;
         }
       }
     }
 
     ByteBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll();
+      final ReadBlockResponseProto readBlock = poll(10, TimeUnit.SECONDS);
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind
-      ByteBuffer buf = readBlock.getData().asReadOnlyByteBuffer();
-      long blockOffset = readBlock.getOffset();
-      long pos = getPos();
+      final ByteString data = readBlock.getData();
+      final ByteBuffer dataBuffer = data.asReadOnlyByteBuffer();
+      final long blockOffset = readBlock.getOffset();
+      final long pos = getPos();
       if (pos < blockOffset) {
         // This should not happen, and if it does, we have a bug.
-        throw new IOException("Received data out of order. Position is " + pos + " but received data at "
-            + blockOffset);
+        setFailedAndThrow(new IllegalStateException(
+            this + ": out of order, position " + pos + " < block offset " + blockOffset));
       }
-      if (pos > readBlock.getOffset()) {
-        int offset = (int)(pos - readBlock.getOffset());
-        if (offset > buf.limit()) {
-          offset = buf.limit();
-        }
-        buf.position(offset);
+      final long offset = pos - blockOffset;
+      if (offset > 0) {
+        dataBuffer.position(Math.toIntExact(Math.min(offset, dataBuffer.limit())));
       }
-      return buf;
+      LOG.debug("{}: return response positon {}, length {} (block offset {}, length {})",
+          name, pos, dataBuffer.remaining(), blockOffset, data.size());
+      return dataBuffer;
     }
 
     private void releaseResources() {
@@ -448,20 +474,32 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       return response.get();
     }
 
-    private void setFailed(Throwable throwable) {
+    private <T extends Throwable> void setFailedAndThrow(T throwable) throws T {
+      if (setFailed(throwable)) {
+        throw throwable;
+      }
+    }
+
+    private boolean setFailed(Throwable throwable) {
       final boolean completed = future.completeExceptionally(throwable);
       if (!completed) {
-        LOG.warn("Already failed: suppressed ", throwable);
+        LOG.warn("{}: Already completed, suppress ", this, throwable);
       }
+      return completed;
     }
 
     private void setCompleted() {
       final boolean changed = future.complete(null);
-      if (!changed) {
+      if (changed) {
+        LOG.debug("{} setCompleted success", this);
+      } else {
         try {
           future.get();
-        } catch (InterruptedException | ExecutionException e) {
-          LOG.warn("Failed to setCompleted", e);
+          LOG.debug("{} Failed to setCompleted: Already completed", this);
+        } catch (InterruptedException e) {
+          LOG.warn("{}: Interrupted setCompleted", this, e);
+        } catch (ExecutionException e) {
+          LOG.warn("{}: Failed to setCompleted: already completed exceptionally", this, e);
         }
       }
 
@@ -471,8 +509,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private void offerToQueue(ReadBlockResponseProto item) {
       if (LOG.isDebugEnabled()) {
         final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.debug("offerToQueue {} bytes, numChecksums {}, bytesPerChecksum={}",
-            item.getData().size(), checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+        LOG.debug("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
+            name, item.getOffset(), item.getData().size(),
+            checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);
@@ -482,6 +521,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     public void setStreamingReadResponse(StreamingReadResponse streamingReadResponse) {
       final boolean set = response.compareAndSet(null, streamingReadResponse);
       Preconditions.assertTrue(set, () -> "Failed to set streamingReadResponse");
+    }
+
+    @Override
+    public String toString() {
+      return name;
     }
   }
 }
