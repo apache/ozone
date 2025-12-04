@@ -17,8 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,36 +64,48 @@ public class DataNodeMetricsService {
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private final ReconNodeManager reconNodeManager;
   private final int threadCount;
+  private final int httpRequestTimeout;
+  private final int httpConnectionTimeout;
+  private final int httpSocketTimeout;
 
   @Inject
   public DataNodeMetricsService(OzoneStorageContainerManager reconSCM, OzoneConfiguration conf) {
     reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
-    threadCount = conf.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY, OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
+    threadCount = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
+        OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
+    httpRequestTimeout = conf.getInt(OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT, OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT);
+    httpConnectionTimeout = conf.getInt(OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT,
+        OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT);
+    httpSocketTimeout = conf.getInt(OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT, OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT);
   }
 
   public void startTask() {
     Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
-    pendingDeletionList = new ArrayList<>();
+    pendingDeletionList = new ArrayList<>(nodes.size());
     totalPendingDeletion = 0L;
     currentStatus = MetricCollectionStatus.IN_PROGRESS;
     ExecutorService executor = Executors.newFixedThreadPool(threadCount);
     List<Future<DatanodePendingDeletionMetrics>> futures = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      String hostName = node.getHostName();
-      String uuid = node.getUuidString();
       int port = node.getPort(DatanodeDetails.Port.Name.HTTP).getValue();
-      DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(hostName, port, uuid);
+      DataNodeMetricsCollectionTask task = DataNodeMetricsCollectionTask.newBuilder()
+          .setHost(node.getHostName())
+          .setPort(port)
+          .setNodeUuid(node.getUuidString())
+          .setHttpConnectionTimeout(httpConnectionTimeout)
+          .setHttpSocketTimeout(httpSocketTimeout)
+          .build();
       futures.add(executor.submit(task));
     }
     boolean hasTimedOut = false;
     for (Future<DatanodePendingDeletionMetrics> future : futures) {
       try {
-        DatanodePendingDeletionMetrics result = future.get(30, TimeUnit.SECONDS);
+        DatanodePendingDeletionMetrics result = future.get(httpRequestTimeout, TimeUnit.SECONDS);
         totalPendingDeletion += result.getPendingBlockSize();
         pendingDeletionList.add(result);
       } catch (TimeoutException e) {
         hasTimedOut = true;
-        LOG.error("Task timed out after " + 30 + " seconds: {}", e.getMessage());
+        LOG.error("Task timed out after " + httpRequestTimeout + " seconds: {}", e.getMessage());
       } catch (Exception e) {
         System.err.println("Task failed or was interrupted: " + e.getMessage());
       }

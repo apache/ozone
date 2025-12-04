@@ -46,11 +46,16 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private final int port;
   private final String nodeUuid;
   private static ObjectMapper objectMapper = new ObjectMapper();
+  private final int httpConnectionTimeout;
+  private final int httpSocketTimeout;
 
-  public DataNodeMetricsCollectionTask(String host, int port, String nodeUuid) {
-    this.host = host;
-    this.port = port;
-    this.nodeUuid = nodeUuid;
+  public DataNodeMetricsCollectionTask(Builder builder) {
+    this.host = builder.host;
+    this.port = builder.port;
+    this.nodeUuid = builder.nodeUuid;
+
+    httpConnectionTimeout = builder.httpConnectionTimeout;
+    httpSocketTimeout = builder.httpSocketTimeout;
   }
 
   @Override
@@ -58,8 +63,8 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     LOG.debug("Collecting pending deletion metrics from DataNode {}:{}", host, port);
     try (CloseableHttpClient httpClient = HttpClients.custom()
         .setDefaultRequestConfig(RequestConfig.custom()
-            .setConnectTimeout(60000)
-            .setSocketTimeout(60000)
+            .setConnectTimeout(httpConnectionTimeout)
+            .setSocketTimeout(httpSocketTimeout)
             .build())
         .build()) {
 
@@ -96,7 +101,52 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   }
 
   private String getJmxMetricsUrl() {
-    return String.format("%s://%s:%d/jmx?qry=Hadoop:service=%s,name=%s", "http",
-        host, port, "HddsDatanode", "BlockDeletingService");
+    return String.format(
+        "%s://%s:%d/jmx?qry=Hadoop:service=HddsDatanode,name=BlockDeletingService", "http", host, port);
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  /**
+   * Builder class used to construct instances of {@link DataNodeMetricsCollectionTask}.
+   * Provides methods to set configuration parameters for the task.
+   */
+  public static class Builder {
+    private String host;
+    private int port;
+    private String nodeUuid;
+    private int httpConnectionTimeout;
+    private int httpSocketTimeout;
+
+    public Builder setHost(String host) {
+      this.host = host;
+      return this;
+    }
+
+    public Builder setPort(int port) {
+      this.port = port;
+      return this;
+    }
+
+    public Builder setNodeUuid(String nodeUuid) {
+      this.nodeUuid = nodeUuid;
+      return this;
+    }
+
+    public Builder setHttpConnectionTimeout(int httpConnectionTimeout) {
+      this.httpConnectionTimeout = httpConnectionTimeout;
+      return this;
+    }
+
+    public Builder setHttpSocketTimeout(int httpSocketTimeout) {
+      this.httpSocketTimeout = httpSocketTimeout;
+      return this;
+    }
+
+    public DataNodeMetricsCollectionTask build() {
+      return new DataNodeMetricsCollectionTask(this);
+    }
   }
 }

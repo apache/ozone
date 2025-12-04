@@ -3505,6 +3505,40 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.thread.count</name>
+    <value>1</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      The number of threads running to get metrics from jmx endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.http.request.timeout</name>
+    <value>30</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Timeout for the request submitted directly to datanode metrics.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.http.connection.timeout</name>
+    <value>30</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      The maximum time allowed for a client to establish
+      the initial physical connection (TCP handshake) with the dn.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.http.socket.timeout</name>
+    <value>30</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      The maximum time of inactivity allowed between any two consecutive data packets
+      when exchanging data with a server, after the connection is established.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
