@@ -21,7 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
@@ -58,7 +60,6 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
   private static final int MIN_TOKEN_EXPIRATION_SECONDS = 900;    // 15 minutes in seconds
   private static final int MAX_TOKEN_EXPIRATION_SECONDS = 43200;  // 12 hours in seconds
-  private static final String STS_TOKEN_PREFIX = "ASIA";
   private static final int STS_ACCESS_KEY_ID_LENGTH = 20;
   private static final int STS_SECRET_ACCESS_KEY_LENGTH = 40;
   private static final int STS_ROLE_ID_LENGTH = 16;
@@ -70,6 +71,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
       "abcdefghijklmnopqrstuvwxyz/+";
   private static final int CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH = CHARS_FOR_SECRET_ACCESS_KEYS.length();
+
+  public static final String STS_TOKEN_PREFIX = "ASIA";
 
   public S3AssumeRoleRequest(OMRequest omRequest) {
     super(omRequest);
@@ -197,7 +200,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
         tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy);
+        sessionPolicy, Clock.system(ZoneOffset.UTC));
   }
 
   /**

@@ -888,7 +888,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // If session token is present, try to resolve originalAccessKeyId from token
     if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-      final String originalAccessKeyId = getStsTokenIdentifier().getOriginalAccessKeyId();
+      final STSTokenIdentifier stsTokenIdentifier = getStsTokenIdentifier();
+      if (stsTokenIdentifier == null) {
+        throw new OMException(
+            "OMClientRequest has session token but no token identifier in OzoneManager", INVALID_REQUEST);
+      }
+      final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
       if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
         return originalAccessKeyId;
       } else {

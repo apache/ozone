@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -34,6 +35,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -50,6 +52,7 @@ public class TestSTSSecurityUtil {
   private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
   private final STSTokenSecretManager tokenSecretManager = new STSTokenSecretManager(secretKeyClient);
   private final UUID secretKeyId = secretKeyClient.getCurrentSecretKey().getId();
+  private final TestClock clock = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
 
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidProtobuf() throws IOException {
@@ -61,7 +64,7 @@ public class TestSTSSecurityUtil {
     final String tokenString = token.encodeToUrlString();
 
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage(
             "Invalid STS token format: Invalid STS token - could not parse protocol buffer: Protocol message " +
@@ -70,13 +73,13 @@ public class TestSTSSecurityUtil {
 
   @Test
   public void testConstructValidateAndDecryptSTSTokenSuccess() throws IOException {
-    final long before = Instant.now().getEpochSecond();
     // Create a valid token
     final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Validate and decrypt the token
-    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient);
+    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        tokenString, secretKeyClient, clock);
 
     // Verify the result
     assertThat(result.getOwnerId()).isEqualTo(TEMP_ACCESS_KEY);
@@ -84,20 +87,20 @@ public class TestSTSSecurityUtil {
     assertThat(result.getRoleArn()).isEqualTo(ROLE_ARN);
     assertThat(result.getSecretAccessKey()).isEqualTo(SECRET_ACCESS_KEY);
     assertThat(result.getSessionPolicy()).isEqualTo(SESSION_POLICY);
-    assertThat(result.isExpired(Instant.now())).isFalse();
-    final long after = Instant.now().getEpochSecond();
-    final long expirationEpochSeconds = result.getExpiry().getEpochSecond();
-    assertThat(expirationEpochSeconds).isBetween(before + DURATION_SECONDS - 1, after + DURATION_SECONDS + 1);
+    assertThat(result.isExpired(clock.instant())).isFalse();
+    final long expirationEpochMillis = result.getExpiry().toEpochMilli();
+    assertThat(expirationEpochMillis).isEqualTo(clock.millis() + (DURATION_SECONDS * 1000));
   }
 
   @Test
   public void testConstructValidateAndDecryptSTSTokenSuccessWithNullSessionPolicy() throws Exception {
     // Create a valid token with null session policy
     final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock);
 
     // Validate and decrypt the token
-    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient);
+    final STSTokenIdentifier result = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        tokenString, secretKeyClient, clock);
 
     // Verify the result
     assertThat(result.getSessionPolicy()).isEmpty();
@@ -107,7 +110,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenInvalidFormat() {
     // Try to decrypt an invalid token string
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken("invalid-token-format", secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("invalid-token-format", secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessageContaining("Invalid STS token format: Failed to decode STS token string");
   }
@@ -116,7 +119,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenInvalidKind() throws Exception {
     // Create a valid identifier to use as base
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -130,7 +133,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token with wrong kind
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage("Invalid STS token format: Invalid STS token - kind is incorrect: WRONG_KIND");
   }
@@ -139,7 +142,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenInvalidService() throws Exception {
     // Create a token with incorrect service
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -151,7 +154,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token with wrong service
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage("Invalid STS token format: Invalid STS token - service is incorrect: WRONG_SERVICE");
   }
@@ -160,14 +163,14 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenExpired() throws Exception {
     // Create a token that expires immediately (durationSeconds of 0)
     final String tokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, 0, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, 0, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
-    // Wait a bit to ensure token is expired
-    Thread.sleep(100);
+    // Fast-forward time to ensure token is expired
+    clock.fastForward(100);
 
     // Try to validate the expired token
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessageContaining("Invalid STS token format: Invalid STS token - token expired at");
   }
@@ -176,7 +179,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenSecretKeyNotFound() throws Exception {
     // Create a valid token string
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Create a mock secret key client that returns null for the key
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
@@ -184,7 +187,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token when secret key is not found
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage(
             "Invalid STS token format: Invalid STS token - could not readFromByteArray: Secret key not found for " +
@@ -195,7 +198,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenInvalidSecretKeyId() throws Exception {
     // Create a valid identifier to use as base
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -212,7 +215,7 @@ public class TestSTSSecurityUtil {
     final String invalidTokenString = brokenToken.encodeToUrlString();
 
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage("Invalid STS token format: Invalid STS token - secretKeyId was not valid: not-a-uuid");
   }
@@ -221,7 +224,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenExpiredSecretKey() throws Exception {
     // Create a valid token string
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Create a mock secret key that is expired
     final ManagedSecretKey expiredSecretKey = mock(ManagedSecretKey.class);
@@ -232,7 +235,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token with expired secret key
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage(
             "Invalid STS token format: Invalid STS token - could not readFromByteArray: Token cannot be " +
@@ -243,7 +246,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenSecretKeyRetrievalException() throws Exception {
     // Create a valid token string
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Create a mock secret key client that throws an exception
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
@@ -251,7 +254,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token when secret key retrieval fails
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage(
             "Invalid STS token format: Invalid STS token - could not readFromByteArray: Failed to retrieve secret " +
@@ -262,7 +265,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenInvalidSignature() throws Exception {
     // Create a valid token string
     final String validTokenString = tokenSecretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     final Token<STSTokenIdentifier> validToken = new Token<>();
     validToken.decodeFromUrlString(validTokenString);
@@ -276,7 +279,7 @@ public class TestSTSSecurityUtil {
 
     // Try to validate the token with invalid signature
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(invalidTokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessageContaining("Invalid STS token format: Invalid STS token - signature is not correct for token");
   }
@@ -285,7 +288,7 @@ public class TestSTSSecurityUtil {
   public void testConstructValidateAndDecryptSTSTokenEmptyString() {
     // Try to decrypt an empty token string
     assertThatThrownBy(() ->
-        STSSecurityUtil.constructValidateAndDecryptSTSToken("", secretKeyClient))
+        STSSecurityUtil.constructValidateAndDecryptSTSToken("", secretKeyClient, clock))
         .isInstanceOf(OMException.class)
         .hasMessage("Invalid STS token format: Failed to decode STS token string: java.io.EOFException");
   }
@@ -295,14 +298,16 @@ public class TestSTSSecurityUtil {
     // Create multiple tokens and validate them all
     final String token1 = tokenSecretManager.createSTSTokenString(
         "temp-key-1", "orig-key-1", "role-arn-1", DURATION_SECONDS,
-        "secret-key-1", "policy-1");
+        "secret-key-1", "policy-1", clock);
 
     final String token2 = tokenSecretManager.createSTSTokenString(
         "temp-key-2", "orig-key-2", "role-arn-2", DURATION_SECONDS,
-        "secret-key-2", "policy-2");
+        "secret-key-2", "policy-2", clock);
 
-    final STSTokenIdentifier result1 = STSSecurityUtil.constructValidateAndDecryptSTSToken(token1, secretKeyClient);
-    final STSTokenIdentifier result2 = STSSecurityUtil.constructValidateAndDecryptSTSToken(token2, secretKeyClient);
+    final STSTokenIdentifier result1 = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        token1, secretKeyClient, clock);
+    final STSTokenIdentifier result2 = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        token2, secretKeyClient, clock);
 
     assertThat(result1.getOwnerId()).isEqualTo("temp-key-1");
     assertThat(result1.getOriginalAccessKeyId()).isEqualTo("orig-key-1");

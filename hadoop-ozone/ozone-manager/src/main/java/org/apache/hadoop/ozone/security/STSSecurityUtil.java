@@ -21,7 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -43,16 +43,18 @@ public final class STSSecurityUtil {
 
   /**
    * Constructs, validates and decrypts STS session token.
-   * @param sessionToken        the session token from the x-amz-security-token header
-   * @param secretKeyClient     the Ozone Manager secretKeyClient
+   *
+   * @param sessionToken    the session token from the x-amz-security-token header
+   * @param secretKeyClient the Ozone Manager secretKeyClient
+   * @param clock           the system clock
    * @return the STSTokenIdentifier with decrypted secretAccessKey
-   * @throws OMException        if the token is not valid or processing failed otherwise
+   * @throws OMException if the token is not valid or processing failed otherwise
    */
   public static STSTokenIdentifier constructValidateAndDecryptSTSToken(String sessionToken,
-      SecretKeyClient secretKeyClient) throws OMException {
+      SecretKeyClient secretKeyClient, Clock clock) throws OMException {
     try {
       final Token<STSTokenIdentifier> token = decodeTokenFromString(sessionToken);
-      return verifyAndDecryptToken(token, secretKeyClient);
+      return verifyAndDecryptToken(token, secretKeyClient, clock);
     } catch (SecretManager.InvalidToken e) {
       throw new OMException("Invalid STS token format: " + e.getMessage(), e, INVALID_TOKEN);
     }
@@ -61,12 +63,13 @@ public final class STSSecurityUtil {
   /**
    * Verifies an STS Token by performing multiple checks.
    *
-   * @param token                         the token to verify
+   * @param token the token to verify
+   * @param clock the system clock
    * @return the STSTokenIdentifier with decrypted secretAccessKey
-   * @throws SecretManager.InvalidToken   if the token is invalid
+   * @throws SecretManager.InvalidToken if the token is invalid
    */
   private static STSTokenIdentifier verifyAndDecryptToken(Token<STSTokenIdentifier> token,
-      SecretKeyClient secretKeyClient) throws SecretManager.InvalidToken {
+      SecretKeyClient secretKeyClient, Clock clock) throws SecretManager.InvalidToken {
     if (!STSTokenIdentifier.KIND_NAME.equals(token.getKind())) {
       throw new SecretManager.InvalidToken("Invalid STS token - kind is incorrect: " + token.getKind());
     }
@@ -100,7 +103,7 @@ public final class STSSecurityUtil {
     }
 
     // Check expiration
-    if (tokenId.isExpired(Instant.now())) {
+    if (tokenId.isExpired(clock.instant())) {
       throw new SecretManager.InvalidToken("Invalid STS token - token expired at " + tokenId.getExpiry());
     }
 

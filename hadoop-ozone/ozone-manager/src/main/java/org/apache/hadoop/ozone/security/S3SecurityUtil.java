@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 import com.google.protobuf.ServiceException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.Text;
@@ -59,7 +61,7 @@ public final class S3SecurityUtil {
         final String token = omRequest.getS3Authentication().getSessionToken();
         if (!token.isEmpty()) {
           final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
-              token, ozoneManager.getSecretKeyClient());
+              token, ozoneManager.getSecretKeyClient(), Clock.system(ZoneOffset.UTC));
           // HMAC signature and expiration were validated above.  Now validate AWS signature.
           validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
           OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
