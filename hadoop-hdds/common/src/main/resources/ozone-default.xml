@@ -3506,7 +3506,7 @@
   </property>
   <property>
     <name>ozone.recon.dn.metrics.collection.thread.count</name>
-    <value>1</value>
+    <value>10</value>
     <tag>OZONE, RECON, DN</tag>
     <description>
       The number of threads running to get metrics from jmx endpoint.
@@ -3514,7 +3514,7 @@
   </property>
   <property>
     <name>ozone.recon.dn.http.request.timeout</name>
-    <value>30</value>
+    <value>60</value>
     <tag>OZONE, RECON, DN</tag>
     <description>
       Timeout for the request submitted directly to datanode metrics.
@@ -3522,7 +3522,7 @@
   </property>
   <property>
     <name>ozone.recon.dn.http.connection.timeout</name>
-    <value>30</value>
+    <value>10</value>
     <tag>OZONE, RECON, DN</tag>
     <description>
       The maximum time allowed for a client to establish

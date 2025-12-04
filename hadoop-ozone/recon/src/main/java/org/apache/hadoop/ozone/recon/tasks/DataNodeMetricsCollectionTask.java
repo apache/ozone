@@ -64,8 +64,8 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     LOG.debug("Collecting pending deletion metrics from DataNode {}", nodeDetails.getHostName());
     try (CloseableHttpClient httpClient = HttpClients.custom()
         .setDefaultRequestConfig(RequestConfig.custom()
-            .setConnectTimeout(httpConnectionTimeout)
-            .setSocketTimeout(httpSocketTimeout)
+            .setConnectTimeout(httpConnectionTimeout * 1000)
+            .setSocketTimeout(httpSocketTimeout * 1000)
             .build())
         .build()) {
 
