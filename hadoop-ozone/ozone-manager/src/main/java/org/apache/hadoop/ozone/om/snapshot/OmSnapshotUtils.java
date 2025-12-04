@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -41,8 +39,6 @@ public final class OmSnapshotUtils {
 
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmSnapshotUtils.class);
   public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
