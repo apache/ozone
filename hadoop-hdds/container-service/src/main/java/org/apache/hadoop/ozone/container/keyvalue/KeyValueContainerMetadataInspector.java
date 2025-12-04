@@ -34,6 +34,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreWithIncrementalChunkList;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -239,6 +241,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         metadataTable.get(containerData.getBytesUsedKey()));
     dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
         metadataTable.get(containerData.getPendingDeleteBlockCountKey()));
+    if (metadataTable.get(containerData.getPendingDeleteBlockBytesKey()) != null) {
+      dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+          metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    }
     dBMetadata.put(OzoneConsts.DELETE_TRANSACTION_KEY,
         metadataTable.get(containerData.getLatestDeleteTxnKey()));
     dBMetadata.put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
@@ -247,7 +253,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return dBMetadata;
   }
 
-  static ObjectNode getAggregateValues(DatanodeStore store,
+  private static ObjectNode getAggregateValues(DatanodeStore store,
       KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
 
@@ -267,6 +273,23 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // Count pending delete blocks.
+    final PendingDelete pendingDelete = getAggregatePendingDelete(store, containerData, schemaVersion);
+
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
+      blockCountTotal += pendingDelete.getCount();
+      usedBytesTotal += pendingDelete.getBytes();
+    }
+
+    aggregates.put("blockCount", blockCountTotal);
+    aggregates.put("usedBytes", usedBytesTotal);
+    pendingDelete.addToJson(aggregates);
+
+    return aggregates;
+  }
+
+  public static PendingDelete getAggregatePendingDelete(DatanodeStore store,
+      KeyValueContainerData containerData, String schemaVersion)
+      throws IOException {
     final PendingDelete pendingDelete;
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       long pendingDeleteBlockCountTotal = 0;
@@ -276,10 +299,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
                    containerData.getDeletingBlockKeyFilter())) {
 
         while (blockIter.hasNext()) {
-          blockCountTotal++;
           pendingDeleteBlockCountTotal++;
           final long bytes = getBlockLength(blockIter.nextBlock());
-          usedBytesTotal += bytes;
           pendingDeleteBytes += bytes;
         }
       }
@@ -297,14 +318,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
-              "container schema " + schemaVersion);
+          "container schema " + schemaVersion);
     }
-
-    aggregates.put("blockCount", blockCountTotal);
-    aggregates.put("usedBytes", usedBytesTotal);
-    pendingDelete.addToJson(aggregates);
-
-    return aggregates;
+    return pendingDelete;
   }
 
   static ObjectNode getChunksDirectoryJson(File chunksDir) throws IOException {
@@ -329,9 +345,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData, DatanodeStore store) {
     ArrayNode errors = JsonUtils.createArrayNode();
     boolean passed = true;
-
     Table<String, Long> metadataTable = store.getMetadataTable();
-
     ObjectNode dBMetadata = (ObjectNode) parent.get("dBMetadata");
     ObjectNode aggregates = (ObjectNode) parent.get("aggregates");
 
@@ -342,7 +356,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // If block count is absent from the DB, it is only an error if there are
     // a non-zero amount of block keys in the DB.
     long blockCountDBLong = blockCountDB.isNull() ? 0 : blockCountDB.asLong();
-
     if (blockCountDBLong != blockCountAggregate.asLong()) {
       passed = false;
 
@@ -425,6 +438,32 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       errors.add(deleteCountError);
     }
 
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      // check and repair if db delete bytes mismatches delete transaction
+      JsonNode pendingDeletionBlockSize = dBMetadata.path(
+          OzoneConsts.PENDING_DELETE_BLOCK_BYTES);
+      final long dbDeleteBytes = jsonToLong(pendingDeletionBlockSize);
+      final JsonNode pendingDeleteBytesAggregate = aggregates.path(PendingDelete.BYTES);
+      final long deleteTransactionBytes = jsonToLong(pendingDeleteBytesAggregate);
+      if (dbDeleteBytes != deleteTransactionBytes) {
+        passed = false;
+        final BooleanSupplier deleteBytesRepairAction = () -> {
+          final String key = containerData.getPendingDeleteBlockBytesKey();
+          try {
+            metadataTable.put(key, deleteTransactionBytes);
+          } catch (IOException ex) {
+            LOG.error("Failed to reset {} for container {}.",
+                key, containerData.getContainerID(), ex);
+          }
+          return false;
+        };
+        final ObjectNode deleteBytesError = buildErrorAndRepair(
+            "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+            pendingDeleteBytesAggregate, pendingDeletionBlockSize, deleteBytesRepairAction);
+        errors.add(deleteBytesError);
+      }
+    }
+
     // check and repair chunks dir.
     JsonNode chunksDirPresent = parent.path("chunksDirectory").path("present");
     if (!chunksDirPresent.asBoolean()) {
@@ -447,7 +486,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           JsonNodeFactory.instance.booleanNode(true), chunksDirPresent, dirRepairAction);
       errors.add(chunksDirError);
     }
-
     parent.put("correct", passed);
     parent.set("errors", errors);
     return passed;
@@ -471,24 +509,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     error.put("repaired", repaired);
 
     return error;
-  }
-
-  static class PendingDelete {
-    static final String COUNT = "pendingDeleteBlocks";
-    static final String BYTES = "pendingDeleteBytes";
-
-    private final long count;
-    private final long bytes;
-
-    PendingDelete(long count, long bytes) {
-      this.count = count;
-      this.bytes = bytes;
-    }
-
-    void addToJson(ObjectNode json) {
-      json.put(COUNT, count);
-      json.put(BYTES, bytes);
-    }
   }
 
   static PendingDelete countPendingDeletesSchemaV2(

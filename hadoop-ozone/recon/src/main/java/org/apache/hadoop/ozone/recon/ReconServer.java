@@ -160,11 +160,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
 
-      LOG.debug("Now starting all services of Recon...");
-      // Start all services
-      start();
-      isStarted = true;
-
       LOG.info("Finalizing Layout Features.");
       // Handle Recon Schema Versioning
       ReconSchemaVersionTableManager versionTableManager =
@@ -177,6 +172,11 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       layoutVersionManager.finalizeLayoutFeatures();
 
       LOG.info("Recon schema versioning completed.");
+
+      LOG.debug("Now starting all services of Recon...");
+      // Start all services
+      start();
+      isStarted = true;
 
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {

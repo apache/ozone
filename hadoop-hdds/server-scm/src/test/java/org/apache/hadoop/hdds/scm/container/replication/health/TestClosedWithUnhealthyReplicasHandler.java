@@ -64,10 +64,12 @@ public class TestClosedWithUnhealthyReplicasHandler {
   public void setup() {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     replicationManager = mock(ReplicationManager.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
     handler = new ClosedWithUnhealthyReplicasHandler(replicationManager);
     requestBuilder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport());
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()));
   }
 
   @Test
