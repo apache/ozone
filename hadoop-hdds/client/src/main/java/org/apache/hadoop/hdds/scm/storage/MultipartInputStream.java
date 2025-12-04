@@ -22,9 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.IntFunction;
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.FileRange;
+import org.apache.hadoop.hdds.utils.VectoredReadUtils;
 
 /**
  * A stream for accessing multipart streams.
@@ -230,6 +234,72 @@ public class MultipartInputStream extends ExtendedInputStream {
     long toSkip = Math.min(n, length - getPos());
     seek(getPos() + toSkip);
     return toSkip;
+  }
+
+  /**
+   * Implements vectored read for multipart input stream.
+   * This method reads multiple byte ranges asynchronously, potentially
+   * from different underlying part streams.
+   *
+   * @param ranges list of file ranges to read
+   * @param allocate function to allocate ByteBuffer for each range
+   * @throws IOException if there is an error performing the reads
+   */
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate
+  ) throws IOException {
+    checkOpen();
+    if (!initialized) {
+      initialize();
+    }
+
+    // Save the initial position
+    final long initialPosition = getPos();
+
+    try {
+      VectoredReadUtils.performVectoredRead(ranges, allocate,
+          (offset, buffer) -> readRangeData(offset, buffer, initialPosition));
+    } finally {
+      // Restore position
+      synchronized (this) {
+        seek(initialPosition);
+      }
+    }
+  }
+
+  /**
+   * Helper method to read data for a specific range.
+   * Uses synchronized seeks to read data from the correct position.
+   *
+   * @param offset the starting offset in the stream
+   * @param buffer the buffer to read data into
+   * @throws IOException if there is an error reading data
+   */
+  private void readRangeData(long offset, ByteBuffer buffer, long initialPosition) throws IOException {
+    synchronized (this) {
+      try {
+        seek(offset);
+        int totalBytesToRead = buffer.remaining();
+        byte[] temp = new byte[totalBytesToRead];
+        int totalBytesRead = 0;
+
+        // Read in a loop to handle partial reads
+        while (totalBytesRead < totalBytesToRead) {
+          int bytesRead = read(temp, totalBytesRead, totalBytesToRead - totalBytesRead);
+          if (bytesRead < 0) {
+            throw new EOFException("End of file reached before reading fully. " +
+                "Requested: " + totalBytesToRead + ", Read: " + totalBytesRead);
+          }
+          totalBytesRead += bytesRead;
+        }
+
+        buffer.put(temp, 0, totalBytesRead);
+      } finally {
+        // Restore position
+        seek(initialPosition);
+      }
+    }
   }
 
   @Override
