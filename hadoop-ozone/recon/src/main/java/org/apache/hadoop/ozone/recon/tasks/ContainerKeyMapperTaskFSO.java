@@ -66,7 +66,7 @@ public class ContainerKeyMapperTaskFSO implements ReconOmTask {
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
     boolean result = ContainerKeyMapperHelper.reprocess(
         omMetadataManager, reconContainerMetadataManager,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED, getTaskName(), 200000,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED, getTaskName(), containerKeyFlushToDBMaxThreshold,
         maxIterators, maxWorkers, maxKeysInMemory);
     return buildTaskResult(result);
   }
