@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.SchedulingMode;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -91,7 +92,7 @@ public class BlockDeletingService extends BackgroundService {
       ReconfigurationHandler reconfigurationHandler
   ) {
     super("BlockDeletingService", serviceInterval, timeUnit,
-        workerSize, serviceTimeout, threadNamePrefix);
+        workerSize, serviceTimeout, threadNamePrefix, SchedulingMode.FIXED_RATE);
     this.ozoneContainer = ozoneContainer;
     this.checksumTreeManager = checksumTreeManager;
     try {
