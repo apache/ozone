@@ -134,12 +134,13 @@ public class OpenKeysInsightHandler implements OmTableHandler {
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    Table<String, ?> table = (Table<String, ?>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
+    @SuppressWarnings("unchecked")
+    Table<String, OmKeyInfo> table = (Table<String, OmKeyInfo>) omMetadataManager.getTable(tableName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
+          OmKeyInfo omKeyInfo = kv.getValue();
           unReplicatedSize += omKeyInfo.getDataSize();
           replicatedSize += omKeyInfo.getReplicatedSize();
           count++;

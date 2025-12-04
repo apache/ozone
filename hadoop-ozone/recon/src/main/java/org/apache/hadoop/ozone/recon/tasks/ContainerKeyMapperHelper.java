@@ -96,6 +96,7 @@ public abstract class ContainerKeyMapperHelper {
       String taskName) {
     
     synchronized (INITIALIZATION_LOCK) {
+      ACTIVE_TASK_COUNT.incrementAndGet();
       // Check if already initialized by another task
       if (ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.compareAndSet(false, true)) {
         try {
@@ -104,12 +105,10 @@ public abstract class ContainerKeyMapperHelper {
           
           // Step 2: Clear shared map
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
-          
-          // Step 3: Increment the refrence counter for active tasks
-          ACTIVE_TASK_COUNT.incrementAndGet();
 
         } catch (Exception e) {
-          // CRITICAL: Reset flag so another task can retry
+          // CRITICAL: Decrement counter and reset flag so another task can retry
+          ACTIVE_TASK_COUNT.decrementAndGet();
           ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
           LOG.error("{}: Container Key Mapper initialization failed. Resetting flag for retry.", taskName, e);
           throw new RuntimeException("Container Key Mapper initialization failed", e);

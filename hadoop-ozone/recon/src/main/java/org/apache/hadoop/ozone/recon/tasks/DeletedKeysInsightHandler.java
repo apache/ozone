@@ -119,13 +119,14 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    Table<String, ?> table = (Table<String, ?>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = table.iterator()) {
+    @SuppressWarnings("unchecked")
+    Table<String, RepeatedOmKeyInfo> table = 
+        (Table<String, RepeatedOmKeyInfo>) omMetadataManager.getTable(tableName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          RepeatedOmKeyInfo repeatedOmKeyInfo = (RepeatedOmKeyInfo) kv
-              .getValue();
+          RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
           Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
           unReplicatedSize += result.getRight();
           replicatedSize += result.getLeft();
