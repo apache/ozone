@@ -24,7 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,7 +78,7 @@ public class TestReconstructECContainersCommandHandler {
     CommandHandlerMetrics metrics = CommandHandlerMetrics.create(handlerMap);
     try {
       byte[] missingIndexes = {1, 2};
-      ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(missingIndexes);
+      ByteString missingContainerIndexes = ProtoUtils.unsafeByteString(missingIndexes);
       ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
       List<DatanodeDetails> dnDetails = getDNDetails(5);
       List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources =

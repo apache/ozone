@@ -224,7 +224,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     this.running = false;
     this.clock = clock;
-    this.containerReport = new ReplicationManagerReport();
+    this.containerReport = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -364,7 +365,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     ReplicationQueue newRepQueue = new ReplicationQueue();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
@@ -1259,6 +1261,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
+    @Config(key = "container.sample.limit",
+        type = ConfigType.INT,
+        defaultValue = "100",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "The number of containers to sample in each state per " +
+            "iteration of the replication manager. This is useful for " +
+            "debugging when Recon is not available. The samples are included " +
+            "in the ReplicationManagerReport for each lifecycle and health state."
+    )
+    private int containerSampleLimit = 100;
+
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }
@@ -1341,6 +1355,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public boolean isPush() {
       return push;
+    }
+
+    public int getContainerSampleLimit() {
+      return containerSampleLimit;
+    }
+
+    public void setContainerSampleLimit(int sampleLimit) {
+      this.containerSampleLimit = sampleLimit;
     }
 
     @PostConstruct
