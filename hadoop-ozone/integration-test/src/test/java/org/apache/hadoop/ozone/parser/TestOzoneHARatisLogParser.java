@@ -23,11 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.UUID;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
@@ -100,7 +100,7 @@ class TestOzoneHARatisLogParser {
         cluster.getOMLeader().getConfiguration();
 
     StorageContainerManager scm = cluster.getActiveSCM();
-    Preconditions.checkNotNull(scm);
+    Objects.requireNonNull(scm, "scm == null");
     OzoneConfiguration leaderSCMConfig = scm.getConfiguration();
 
     cluster.stop();

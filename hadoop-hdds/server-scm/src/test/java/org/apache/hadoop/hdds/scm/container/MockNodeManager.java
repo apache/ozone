@@ -72,7 +72,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.assertj.core.util.Preconditions;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -520,7 +520,7 @@ public class MockNodeManager implements NodeManager {
   public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
     if (commandMap.containsKey(datanodeID)) {
       List<SCMCommand<?>> commandList = commandMap.get(datanodeID);
-      Preconditions.checkNotNull(commandList);
+      Objects.requireNonNull(commandList, "commandList == null");
       commandList.add(command);
     } else {
       List<SCMCommand<?>> commandList = new LinkedList<>();
