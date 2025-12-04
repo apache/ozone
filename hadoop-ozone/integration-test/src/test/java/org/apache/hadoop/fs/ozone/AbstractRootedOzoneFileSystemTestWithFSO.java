@@ -140,6 +140,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
     String bucketStr2 = "bucket3";
     Path bucketPath2 = new Path(volumePath1, bucketStr2);
+    int totalFilesCount = 6;
 
     for (int i = 1; i <= 5; i++) {
       String dirStr1 = "dir1" + i;
@@ -177,7 +178,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     assertTrue(getFs().delete(bucketPath2, true));
     assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
-    assertEquals(prevDeletes + 1, deletes);
+    assertEquals(prevDeletes + totalFilesCount, deletes);
   }
 
   /**

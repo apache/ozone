@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
 import static org.apache.hadoop.ozone.OzoneConsts.DATA_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEYS_LIST;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEY_SOURCE_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICATION_CONFIG;
 import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
@@ -70,6 +71,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -100,6 +102,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     List<String> deleteKeys = new ArrayList<>(deleteKeyArgs.getKeysList());
+    RequestSource sourceType = deleteKeyRequest.getSourceType();
     List<OmKeyInfo> deleteKeysInfo = new ArrayList<>();
 
     Exception exception = null;
@@ -108,7 +111,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     Map<String, ErrorInfo> keyToError = new HashMap<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumKeyDeletes();
     OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     String volumeName = deleteKeyArgs.getVolumeName();
     String bucketName = deleteKeyArgs.getBucketName();
@@ -263,24 +265,48 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       }
     }
 
-    addDeletedKeys(auditMap, deleteKeysInfo, unDeletedKeys.getKeysList());
+    addDeletedKeys(auditMap, deleteKeysInfo, unDeletedKeys.getKeysList(), sourceType);
 
     markForAudit(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
 
     switch (result) {
     case SUCCESS:
+      switch (sourceType) {
+      case LIFECYCLE:
+        omMetrics.incNumKeyLifecycleDeletes(deleteKeys.size());
+        omMetrics.incNumKeyLifecycleDeleteFails(unDeletedKeys.getKeysList().size());
+        break;
+      case TRASH:
+        omMetrics.incNumKeyTrashDeletes(deleteKeys.size());
+        omMetrics.incNumKeyTrashDeleteFails(unDeletedKeys.getKeysList().size());
+        break;
+      default:
+        break;
+      }
+      omMetrics.incNumKeyDeletes(deleteKeys.size());
+      omMetrics.incNumKeyDeleteFails(unDeletedKeys.getKeysList().size());
       omMetrics.decNumKeys(deleteKeys.size());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
-            volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
+        LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}, sourceType:{}",
+            volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST), sourceType);
       }
       break;
     case FAILURE:
-      omMetrics.incNumKeyDeleteFails();
+      switch (sourceType) {
+      case LIFECYCLE:
+        omMetrics.incNumKeyLifecycleDeleteFails(unDeletedKeys.getKeysList().size());
+        break;
+      case TRASH:
+        omMetrics.incNumKeyTrashDeleteFails(unDeletedKeys.getKeysList().size());
+        break;
+      default:
+        break;
+      }
+      omMetrics.incNumKeyDeleteFails(unDeletedKeys.getKeysList().size());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, "
-                + "UnDeletedKeys:{}", volumeName, bucketName,
+        LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, sourceType:{}, DeletedKeys:{}, " +
+                "UnDeletedKeys:{}", volumeName, bucketName, sourceType,
             auditMap.get(DELETED_KEYS_LIST), auditMap.get(UNDELETED_KEYS_LIST),
             exception);
       }
@@ -374,7 +400,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
    * Add key info to audit map for DeleteKeys request.
    */
   protected static void addDeletedKeys(Map<String, String> auditMap,
-      List<OmKeyInfo> deletedKeyInfos, List<String> unDeletedKeys) {
+      List<OmKeyInfo> deletedKeyInfos, List<String> unDeletedKeys, RequestSource sourceType) {
     StringBuilder keys = new StringBuilder();
     for (int i = 0; i < deletedKeyInfos.size(); i++) {
       OmKeyInfo key = deletedKeyInfos.get(i);
@@ -387,6 +413,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
     auditMap.put(DELETED_KEYS_LIST, keys.toString());
     auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
+    auditMap.put(DELETED_KEY_SOURCE_TYPE, String.valueOf(sourceType));
   }
 
   /**

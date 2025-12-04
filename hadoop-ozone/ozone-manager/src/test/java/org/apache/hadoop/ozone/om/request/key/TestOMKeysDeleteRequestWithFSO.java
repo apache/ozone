@@ -32,7 +32,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Class tests OMKeysDeleteRequestWithFSO.
@@ -42,31 +45,38 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
   private static final int KEY_COUNT = 3;
 
   @Override
-  @Test
-  public void testKeysDeleteRequest() throws Exception {
+  @ParameterizedTest
+  @MethodSource("requestSourceType")
+  public void testKeysDeleteRequest(RequestSource sourceType) throws Exception {
 
-    createPreRequisites();
+    createPreRequisites(sourceType);
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
         new OmKeysDeleteRequestWithFSO(getOmRequest(),
             getBucketLayout());
-    checkDeleteKeysResponse(omKeysDeleteRequest);
+    checkDeleteKeysResponse(omKeysDeleteRequest, sourceType);
 
   }
 
   @Override
-  @Test
-  public void testKeysDeleteRequestFail() throws Exception {
-    createPreRequisites();
+  @ParameterizedTest
+  @MethodSource("requestSourceType")
+  public void testKeysDeleteRequestFail(RequestSource sourceType) throws Exception {
+    createPreRequisites(sourceType);
     setOmRequest(getOmRequest().toBuilder().setDeleteKeysRequest(
-        OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder().setDeleteKeys(
-            OzoneManagerProtocolProtos.DeleteKeyArgs.newBuilder()
-                .setBucketName(bucketName).setVolumeName(volumeName)
-                .addAllKeys(getDeleteKeyList()).addKeys("dummy"))).build());
+        OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
+            .setSourceType(sourceType)
+            .setDeleteKeys(OzoneManagerProtocolProtos.DeleteKeyArgs
+                .newBuilder()
+                .setBucketName(bucketName)
+                .setVolumeName(volumeName)
+                .addAllKeys(getDeleteKeyList())
+                .addKeys("dummy")))
+        .build());
 
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
         new OmKeysDeleteRequestWithFSO(getOmRequest(),
             getBucketLayout());
-    checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.PARTIAL_DELETE);
+    checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.PARTIAL_DELETE, sourceType);
   }
 
   @Test
@@ -92,6 +102,11 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
   @Override
   protected void createPreRequisites() throws Exception {
+    createPreRequisites(RequestSource.USER);
+  }
+
+  @Override
+  protected void createPreRequisites(RequestSource sourceType) throws Exception {
     setDeleteKeyList(new ArrayList<>());
     // Add volume, bucket and key entries to OM DB.
     OMRequestTestUtils
@@ -130,8 +145,12 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     setOmRequest(OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString()).setCmdType(DeleteKeys)
         .setDeleteKeysRequest(
-            OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
-                .setDeleteKeys(deleteKeyArgs).build()).build());
+            OzoneManagerProtocolProtos.DeleteKeysRequest
+                .newBuilder()
+                .setSourceType(sourceType)
+                .setDeleteKeys(deleteKeyArgs)
+                .build())
+        .build());
   }
 
   @Override
