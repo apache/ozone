@@ -62,12 +62,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_I
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -509,10 +503,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
 
-  private boolean followerReadLocalLeaseEnabled;
-  private int followerReadLocalLeaseLagLimit;
-  private long followerReadLocalLeaseTimeMs;
-
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -540,10 +530,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
-            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion)
-            .register(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY, this::reconfOMFollowerReadLocalLease)
-            .register(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT, this::reconfOMFollowerReadLocalLeaseLagLimit)
-            .register(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS, this::reconfOMFollowerReadLocalLeaseTimeMs);
+            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
@@ -591,16 +578,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
-
-    this.followerReadLocalLeaseEnabled = conf.getBoolean(
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY,
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT);
-    this.followerReadLocalLeaseLagLimit = conf.getInt(
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT,
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT);
-    this.followerReadLocalLeaseTimeMs = conf.getLong(
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS,
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT);
 
     String defaultBucketLayoutString =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -879,30 +856,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /** Returns the ThreadName prefix for the current OM. */
   public String getThreadNamePrefix() {
     return threadPrefix;
-  }
-
-  private void setFollowerReadLocalLeaseEnabled(boolean value) {
-    this.followerReadLocalLeaseEnabled = value;
-  }
-
-  public boolean isFollowerReadLocalLeaseEnabled() {
-    return followerReadLocalLeaseEnabled;
-  }
-
-  private void setFollowerReadLocalLeaseLagLimit(int lagLimit) {
-    this.followerReadLocalLeaseLagLimit = lagLimit;
-  }
-
-  public int getFollowerReadLocalLeaseLagLimit() {
-    return followerReadLocalLeaseLagLimit;
-  }
-
-  private void setFollowerReadLocalLeaseTimeMs(long timeMs) {
-    this.followerReadLocalLeaseTimeMs = timeMs;
-  }
-
-  public long getFollowerReadLocalLeaseTimeMs() {
-    return followerReadLocalLeaseTimeMs;
   }
 
   /**
@@ -5317,27 +5270,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
     }
-    return newVal;
-  }
-
-  private String reconfOMFollowerReadLocalLease(String newVal) {
-    boolean enabled = StringUtils.isEmpty(newVal) ?
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT : Boolean.parseBoolean(newVal);
-    this.setFollowerReadLocalLeaseEnabled(enabled);
-    return newVal;
-  }
-
-  private String reconfOMFollowerReadLocalLeaseLagLimit(String newVal) {
-    int lagLimit = StringUtils.isEmpty(newVal) ?
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT : Integer.parseInt(newVal);
-    this.setFollowerReadLocalLeaseLagLimit(lagLimit);
-    return newVal;
-  }
-
-  private String reconfOMFollowerReadLocalLeaseTimeMs(String newVal) {
-    long timeMs = StringUtils.isEmpty(newVal) ?
-        OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT : Long.parseLong(newVal);
-    this.setFollowerReadLocalLeaseTimeMs(timeMs);
     return newVal;
   }
 

@@ -76,18 +76,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_GRPC_PORT_KEY =
       "ozone.om.grpc.port";
 
-  public static final String OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY =
-      "ozone.om.follower.read.local.lease.enabled";
-  public static final boolean OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_DEFAULT = false;
-
-  public static final String OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT =
-      "ozone.om.follower.read.local.lease.lag.limit";
-  public static final int OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT_DEFAULT = 10000;
-
-  public static final String OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS =
-      "ozone.om.follower.read.local.lease.time.ms";
-  public static final long OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS_DEFAULT = 5000;
-
   public static final String OZONE_OM_GRPC_BOSSGROUP_SIZE_KEY =
       "ozone.om.grpc.bossgroup.size";
   public static final int OZONE_OM_GRPC_BOSSGROUP_SIZE_DEFAULT = 8;

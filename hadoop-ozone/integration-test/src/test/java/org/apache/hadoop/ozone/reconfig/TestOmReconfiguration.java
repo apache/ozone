@@ -22,11 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -68,9 +63,6 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
         .add(OZONE_THREAD_NUMBER_DIR_DELETION)
         .add(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL)
-        .add(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_ENABLED_KEY)
-        .add(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_LAG_LIMIT)
-        .add(OZONE_OM_FOLLOWER_READ_LOCAL_LEASE_TIME_MS)
         .addAll(new OmConfig().reconfigurableProperties())
         .build();
 

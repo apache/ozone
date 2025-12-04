@@ -190,10 +190,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
     // Read from leader or followers using linearizable read
-    if (ozoneManager.isFollowerReadLocalLeaseEnabled() &&
+    if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
         allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
-            ozoneManager.getFollowerReadLocalLeaseLagLimit(),
-            ozoneManager.getFollowerReadLocalLeaseTimeMs())) {
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
       return handler.handleReadRequest(request);
     } 
     // Get current OM's role
