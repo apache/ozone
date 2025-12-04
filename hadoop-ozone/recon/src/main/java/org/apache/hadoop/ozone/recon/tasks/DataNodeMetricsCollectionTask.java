@@ -17,16 +17,20 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
+import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
@@ -42,25 +46,22 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDeletionMetrics> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsCollectionTask.class);
-  private final String host;
-  private final int port;
-  private final String nodeUuid;
-  private static ObjectMapper objectMapper = new ObjectMapper();
+  private final DatanodeDetails nodeDetails;
   private final int httpConnectionTimeout;
   private final int httpSocketTimeout;
+  private final boolean httpsEnabled;
 
   public DataNodeMetricsCollectionTask(Builder builder) {
-    this.host = builder.host;
-    this.port = builder.port;
-    this.nodeUuid = builder.nodeUuid;
-
-    httpConnectionTimeout = builder.httpConnectionTimeout;
-    httpSocketTimeout = builder.httpSocketTimeout;
+    this.nodeDetails = builder.nodeDetails;
+    this.httpConnectionTimeout = builder.httpConnectionTimeout;
+    this.httpSocketTimeout = builder.httpSocketTimeout;
+    this.httpsEnabled = builder.httpsEnabled;
   }
 
   @Override
-  public DatanodePendingDeletionMetrics call() throws Exception {
-    LOG.debug("Collecting pending deletion metrics from DataNode {}:{}", host, port);
+  public DatanodePendingDeletionMetrics call() {
+
+    LOG.debug("Collecting pending deletion metrics from DataNode {}", nodeDetails.getHostName());
     try (CloseableHttpClient httpClient = HttpClients.custom()
         .setDefaultRequestConfig(RequestConfig.custom()
             .setConnectTimeout(httpConnectionTimeout)
@@ -68,41 +69,60 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
             .build())
         .build()) {
 
-      InputStream in = httpClient.execute(new HttpGet(getJmxMetricsUrl())).getEntity().getContent();
-      byte[] responseBytes = IOUtils.toByteArray(in);
-      String jsonResponse = new String(responseBytes, StandardCharsets.UTF_8);
-      return new DatanodePendingDeletionMetrics(host, nodeUuid,
-          parseMetrics(jsonResponse, "BlockDeletingService", "TotalPendingBlockBytes"));
-    }
-  }
-
-  private static long parseMetrics(String jsonResponse, String serviceName, String keyName)
-      throws IOException {
-    if (jsonResponse == null || jsonResponse.isEmpty()) {
-      return -1L;
-    }
-    JsonNode root = objectMapper.readTree(jsonResponse);
-    JsonNode beans = root.get("beans");
-    if (beans != null && beans.isArray()) {
-      // Find the bean matching the service name
-      for (JsonNode bean : beans) {
-        String beanName = bean.path("name").asText("");
-        if (beanName.contains(serviceName)) {
-          // Extract and return the metric value from the bean
-          return extractMetrics(bean, keyName);
+      HttpGet httpGet = new HttpGet(getJmxMetricsUrl());
+      try {
+        HttpEntity entity = httpClient.execute(httpGet).getEntity();
+        if (entity == null) {
+          LOG.warn("Empty response received from DataNode {}", nodeDetails.getHostName());
+          return new DatanodePendingDeletionMetrics(
+              nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
         }
-      }
-    }
-    return -1L;
-  }
 
-  private static long extractMetrics(JsonNode beanNode, String keyName) {
-    return beanNode.path(keyName).asLong(0L);
+        InputStream in = entity.getContent();
+        if (in == null) {
+          LOG.warn("No content stream available from DataNode {}", nodeDetails.getHostName());
+          return new DatanodePendingDeletionMetrics(
+              nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+        }
+
+        byte[] responseBytes = IOUtils.toByteArray(in);
+        if (responseBytes.length == 0) {
+          LOG.warn("Empty response body received from DataNode {}", nodeDetails.getHostName());
+          return new DatanodePendingDeletionMetrics(
+              nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+        }
+        String jsonResponse = new String(responseBytes, StandardCharsets.UTF_8);
+        long metrics = ReconUtils.parseMetrics(
+            jsonResponse, "BlockDeletingService", "TotalPendingBlockBytes");
+        return new DatanodePendingDeletionMetrics(
+            nodeDetails.getHostName(), nodeDetails.getUuidString(), metrics);
+      } finally {
+        httpGet.releaseConnection();
+      }
+    } catch (ConnectTimeoutException e) {
+      LOG.error("Connection timeout while collecting metrics from DataNode {}", nodeDetails.getHostName(), e);
+      return new DatanodePendingDeletionMetrics(
+          nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+    } catch (SocketTimeoutException e) {
+      LOG.error("Socket timeout while collecting metrics from DataNode {}", nodeDetails.getHostName(), e);
+      return new DatanodePendingDeletionMetrics(
+          nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+    } catch (IOException e) {
+      LOG.error("IO error while collecting metrics from DataNode {}", nodeDetails.getHostName(), e);
+      return new DatanodePendingDeletionMetrics(
+          nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+    } catch (Exception e) {
+      LOG.error("Unexpected error while collecting metrics from DataNode {}", nodeDetails.getHostName(), e);
+      return new DatanodePendingDeletionMetrics(
+          nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
+    }
   }
 
   private String getJmxMetricsUrl() {
-    return String.format(
-        "%s://%s:%d/jmx?qry=Hadoop:service=HddsDatanode,name=BlockDeletingService", "http", host, port);
+    String protocol = httpsEnabled ? "https" : "http";
+    Name portName = httpsEnabled ?  DatanodeDetails.Port.Name.HTTPS : DatanodeDetails.Port.Name.HTTP;
+    return String.format("%s://%s:%d/jmx?qry=Hadoop:service=HddsDatanode,name=BlockDeletingService",
+        protocol, nodeDetails.getHostName(), nodeDetails.getPort(portName).getValue());
   }
 
   public static Builder newBuilder() {
@@ -114,24 +134,13 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
    * Provides methods to set configuration parameters for the task.
    */
   public static class Builder {
-    private String host;
-    private int port;
-    private String nodeUuid;
+    private DatanodeDetails nodeDetails;
     private int httpConnectionTimeout;
     private int httpSocketTimeout;
+    private boolean httpsEnabled;
 
-    public Builder setHost(String host) {
-      this.host = host;
-      return this;
-    }
-
-    public Builder setPort(int port) {
-      this.port = port;
-      return this;
-    }
-
-    public Builder setNodeUuid(String nodeUuid) {
-      this.nodeUuid = nodeUuid;
+    public Builder setNodeDetails(DatanodeDetails nodeDetails) {
+      this.nodeDetails = nodeDetails;
       return this;
     }
 
@@ -142,6 +151,11 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
 
     public Builder setHttpSocketTimeout(int httpSocketTimeout) {
       this.httpSocketTimeout = httpSocketTimeout;
+      return this;
+    }
+
+    public Builder setHttpsEnabled(boolean httpsEnabled) {
+      this.httpsEnabled = httpsEnabled;
       return this;
     }
 

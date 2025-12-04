@@ -39,6 +39,7 @@ import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -67,6 +68,7 @@ public class DataNodeMetricsService {
   private final int httpRequestTimeout;
   private final int httpConnectionTimeout;
   private final int httpSocketTimeout;
+  private final boolean httpsEnabled;
 
   @Inject
   public DataNodeMetricsService(OzoneStorageContainerManager reconSCM, OzoneConfiguration conf) {
@@ -77,6 +79,7 @@ public class DataNodeMetricsService {
     httpConnectionTimeout = conf.getInt(OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT,
         OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT);
     httpSocketTimeout = conf.getInt(OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT, OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT);
+    httpsEnabled = HttpConfig.getHttpPolicy(conf).isHttpsEnabled();
   }
 
   public void startTask() {
@@ -87,13 +90,11 @@ public class DataNodeMetricsService {
     ExecutorService executor = Executors.newFixedThreadPool(threadCount);
     List<Future<DatanodePendingDeletionMetrics>> futures = new ArrayList<>();
     for (DatanodeDetails node : nodes) {
-      int port = node.getPort(DatanodeDetails.Port.Name.HTTP).getValue();
       DataNodeMetricsCollectionTask task = DataNodeMetricsCollectionTask.newBuilder()
-          .setHost(node.getHostName())
-          .setPort(port)
-          .setNodeUuid(node.getUuidString())
+          .setNodeDetails(node)
           .setHttpConnectionTimeout(httpConnectionTimeout)
           .setHttpSocketTimeout(httpSocketTimeout)
+          .setHttpsEnabled(httpsEnabled)
           .build();
       futures.add(executor.submit(task));
     }
@@ -110,7 +111,7 @@ public class DataNodeMetricsService {
         System.err.println("Task failed or was interrupted: " + e.getMessage());
       }
     }
-    executor.shutdownNow();
+    executor.shutdown();
     if (hasTimedOut) {
       currentStatus = MetricCollectionStatus.FAILED;
     } else {
