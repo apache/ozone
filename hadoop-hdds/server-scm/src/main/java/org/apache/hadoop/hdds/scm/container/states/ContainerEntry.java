@@ -19,9 +19,7 @@ package org.apache.hadoop.hdds.scm.container.states;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -33,9 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  // Most containers will have 3 replicas, and some may have 14, for example, in the case of EC 10-4
-  // so an initial capacity of 8 should be sufficient to avoid resize for most cases
-  private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>(8);
+  private Map<ContainerReplica, ContainerReplica> replicas = new HashMap<>();
   private Set<ContainerReplica> replicaSet;
 
   ContainerEntry(ContainerInfo info) {
@@ -47,29 +43,22 @@ public class ContainerEntry {
   }
 
   public Set<ContainerReplica> getReplicas() {
-    if (replicaSet == null) {
-      replicaSet = Collections.unmodifiableSet(new HashSet<>(replicas.values()));
-    }
-    return replicaSet;
+    return Collections.unmodifiableSet(replicas.keySet());
   }
 
   public ContainerReplica put(ContainerReplica r) {
-    final ContainerReplica previous =
-        replicas.put(r.getDatanodeDetails().getID(), r);
-    // Invalidate the cached replica set if it has changed.
-    // A null previous value means a new replica was added.
-    if (!Objects.equals(previous, r)) {
-      replicaSet = null;
-    }
-    return previous;
+    // Modifications are rare compared to reads, so to optimize for read we return and unmodifable view of the
+    // map in getReplicas. That means for any modification we need to copy the map.
+    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(8);
+    map.putAll(this.replicas);
+    replicas = map;
+    return replicas.put(r, r);
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    final ContainerReplica removed = replicas.remove(datanodeID);
-    if (removed != null) {
-      // Invalidate the cached replica set as it has changed.
-      replicaSet = null;
-    }
-    return removed;
+    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(8);
+    map.putAll(this.replicas);
+    replicas = map;
+    return replicas.remove(datanodeID);
   }
 }
