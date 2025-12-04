@@ -1835,6 +1835,15 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testLifecycleStatus() throws UnsupportedEncodingException {
+    String[] args = new String[] {"om", "lifecycle", "status", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    String output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("IsEnabled:");
+    assertThat(output).contains("IsRunning:");
+  }
+
+  @Test
   public void testCreateBucketWithECReplicationConfigWithoutReplicationParam() {
     getVolume("volume102");
     String[] args =

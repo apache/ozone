@@ -278,6 +278,7 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
     case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

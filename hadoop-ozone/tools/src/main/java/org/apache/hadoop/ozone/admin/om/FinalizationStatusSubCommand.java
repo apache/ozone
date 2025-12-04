@@ -52,12 +52,12 @@ public class FinalizationStatusSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client =
-        parent.createOmClient(omServiceId, omHost, false);
-    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
-    UpgradeFinalization.StatusAndMessages progress =
-        client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
-    System.out.println(progress.status());
+    try (OzoneManagerProtocol client = parent.createOmClient(omServiceId, omHost, false)) {
+      String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
+      UpgradeFinalization.StatusAndMessages progress =
+          client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
+      System.out.println(progress.status());
+    }
     return null;
   }
 }
