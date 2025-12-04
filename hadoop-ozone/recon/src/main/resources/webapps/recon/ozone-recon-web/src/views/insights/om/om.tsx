@@ -19,17 +19,17 @@
 import React from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tabs, Menu, Dropdown, Tooltip } from 'antd';
-import { MenuProps } from 'antd/es/menu';
-import { TablePaginationConfig } from 'antd/es/table';
-import { FunnelPlotFilled, InfoCircleOutlined } from '@ant-design/icons';
-import { ActionMeta, ValueType } from "react-select";
+import {Dropdown, Menu, Table, Tabs, Tooltip} from 'antd';
+import {MenuProps} from 'antd/es/menu';
+import {TablePaginationConfig} from 'antd/es/table';
+import {FunnelPlotFilled, InfoCircleOutlined} from '@ant-design/icons';
+import {ActionMeta, ValueType} from "react-select";
 import CreatableSelect from "react-select/creatable";
 
-import { ColumnSearch } from '@/utils/columnSearch';
-import { showDataFetchError, byteToSize } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { IOption } from "@/components/multiSelect/multiSelect";
+import {ColumnSearch} from '@/utils/columnSearch';
+import {byteToSize, showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import {IOption} from "@/components/multiSelect/multiSelect";
 
 import './om.less';
 
@@ -548,7 +548,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -594,7 +594,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
   };
@@ -653,7 +653,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -730,7 +730,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -764,7 +764,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -835,13 +835,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        if (error.name === "CanceledError") {
-          showDataFetchError(cancelRowExpandSignal.signal.reason)
-        }
-        else {
-          console.log(error);
-          showDataFetchError(error.toString());
-        }
+        showDataFetchError(error);
       });
     }
     else {

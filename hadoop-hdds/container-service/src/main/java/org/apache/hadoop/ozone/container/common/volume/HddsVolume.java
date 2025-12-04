@@ -25,13 +25,16 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -41,6 +44,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -89,6 +93,9 @@ public class HddsVolume extends StorageVolume {
   private ContainerController controller;
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
+  private Function<HddsVolume, Long> gatherContainerUsages = (K) -> 0L;
+
+  private final ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
 
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
@@ -286,6 +293,7 @@ public class HddsVolume extends StorageVolume {
   @Override
   public synchronized VolumeCheckResult check(@Nullable Boolean unused)
       throws Exception {
+    volumeInfoMetrics.incNumScans();
     checkVolumeUsages();
 
     VolumeCheckResult result = super.check(unused);
@@ -399,6 +407,38 @@ public class HddsVolume extends StorageVolume {
     return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
   }
 
+  @Override
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    this.gatherContainerUsages = gatherContainerUsages;
+  }
+
+  @Override
+  protected long containerUsedSpace() {
+    return gatherContainerUsages.apply(this);
+  }
+
+  @Override
+  public File getContainerDirsPath() {
+    if (getStorageState() != VolumeState.NORMAL) {
+      return null;
+    }
+    File hddsVolumeRootDir = getHddsRootDir();
+    //filtering storage directory
+    File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
+    if (storageDirs == null) {
+      LOG.error("IO error for the volume {}, directory not found", hddsVolumeRootDir);
+      return null;
+    }
+    File clusterIDDir = new File(hddsVolumeRootDir, getClusterID());
+    if (storageDirs.length == 1 && !clusterIDDir.exists()) {
+      // If this volume was formatted pre SCM HA, this will be the SCM ID.
+      // A cluster ID symlink will exist in this case only if this cluster is finalized for SCM HA.
+      // If the volume was formatted post SCM HA, this will be the cluster ID.
+      clusterIDDir = storageDirs[0];
+    }
+    return new File(clusterIDDir, Storage.STORAGE_DIR_CURRENT);
+  }
+
   public void setDbVolume(DbVolume dbVolume) {
     this.dbVolume = dbVolume;
   }
@@ -491,6 +531,22 @@ public class HddsVolume extends StorageVolume {
       return controller.getContainerCount(this);
     }
     return 0;
+  }
+
+  public void addContainer(long containerId) {
+    containerIds.add(containerId);
+  }
+
+  public void removeContainer(long containerId) {
+    containerIds.remove(containerId);
+  }
+
+  public Iterator<Long> getContainerIterator() {
+    return containerIds.iterator();
+  }
+
+  public long getContainerCount() {
+    return containerIds.size();
   }
 
   /**

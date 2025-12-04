@@ -25,11 +25,13 @@ import EChart from '@/v2/components/eChart/eChart';
 import { StorageReport } from '@/v2/types/overview.types';
 import { InfoCircleFilled } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
   loading?: boolean;
   storageReport: StorageReport;
+  error?: string | null;
 }
 
 const size = filesize.partial({ round: 1 });
@@ -74,8 +76,13 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
     used: 0,
     remaining: 0,
     committed: 0
-  }
+  },
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title='Cluster Capacity' />
+  }
 
   const [isInfoOpen, setInfoOpen] = useState<boolean>(false);
 

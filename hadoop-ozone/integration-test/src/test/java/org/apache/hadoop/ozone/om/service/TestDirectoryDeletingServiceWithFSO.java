@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -52,7 +54,6 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -197,7 +198,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(1, metrics.getNumDirsPurged());
     assertEquals(1, metrics.getNumDirsSentForPurge());
 
-    try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
+    try (Table.KeyValueIterator<?, OmDirectoryInfo>
         iterator = dirTable.iterator()) {
       assertTrue(iterator.hasNext());
       assertEquals(root.getName(), iterator.next().getValue().getName());
@@ -272,7 +273,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(15, metrics.getNumSubFilesMovedToDeletedTable());
     assertEquals(19, metrics.getNumDirsPurged());
     assertEquals(19, metrics.getNumDirsSentForPurge());
-    assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(18, metrics.getNumSubDirsSentForPurge());
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -328,7 +329,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
     assertEquals(5, metrics.getNumDirsSentForPurge());
     assertEquals(5, metrics.getNumDirsPurged());
-    assertEquals(4, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(4, metrics.getNumSubDirsSentForPurge());
     assertEquals(3, metrics.getNumSubFilesSentForPurge());
     assertEquals(3, metrics.getNumSubFilesMovedToDeletedTable());
@@ -382,7 +383,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     assertEquals(2, metrics.getNumDirsSentForPurge());
     assertEquals(2, metrics.getNumDirsPurged());
-    assertEquals(1, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(1, metrics.getNumSubDirsSentForPurge());
     assertEquals(1, metrics.getNumSubFilesSentForPurge());
     assertEquals(1, metrics.getNumSubFilesMovedToDeletedTable());
@@ -574,7 +575,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     DirectoryDeletingService dirDeletingService = cluster.getOzoneManager().getKeyManager().getDirDeletingService();
     // Suspend KeyDeletingService
     dirDeletingService.suspend();
-    GenericTestUtils.waitFor(() -> !dirDeletingService.isRunningOnAOS(), 1000, 10000);
     Random random = new Random();
     final String testVolumeName = "volume" + random.nextInt();
     final String testBucketName = "bucket" + random.nextInt();
@@ -624,9 +624,9 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return null;
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), any(),
-        any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), any(),
-        anyLong());
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
+        any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
+        anyLong(), any(AtomicInteger.class));
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);
@@ -658,7 +658,23 @@ public class TestDirectoryDeletingServiceWithFSO {
     store.deleteSnapshot(testVolumeName, testBucketName, snap2);
     service.runPeriodicalTaskNow();
     store.deleteSnapshot(testVolumeName, testBucketName, snap1);
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
+    cluster.waitForClusterToBeReady();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    SnapshotDeletingService snapshotDeletingService =
+        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        snapshotDeletingService.runPeriodicalTaskNow();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        long currentSnapshotCount = cluster.getOzoneManager().getMetadataManager()
+            .countRowsInTable(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable());
+        return currentSnapshotCount <= initialSnapshotCount;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10000);
     assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }
@@ -780,20 +796,20 @@ public class TestDirectoryDeletingServiceWithFSO {
     OMMetadataManager metadataManager =
         cluster.getOzoneManager().getMetadataManager();
 
-    try (TableIterator<?, ?> it = metadataManager.getDeletedDirTable()
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = metadataManager.getDeletedDirTable()
         .iterator()) {
       removeAllFromDB(it);
     }
-    try (TableIterator<?, ?> it = metadataManager.getFileTable().iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = metadataManager.getFileTable().iterator()) {
       removeAllFromDB(it);
     }
-    try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = metadataManager.getDirectoryTable()
         .iterator()) {
       removeAllFromDB(it);
     }
   }
 
-  private static void removeAllFromDB(TableIterator<?, ?> iterator)
+  private static void removeAllFromDB(Table.KeyValueIterator<?, ?> iterator)
       throws IOException {
     while (iterator.hasNext()) {
       iterator.next();

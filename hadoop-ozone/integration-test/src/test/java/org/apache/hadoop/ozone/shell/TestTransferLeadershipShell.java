@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -45,42 +44,33 @@ import org.junit.jupiter.api.TestInstance;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestTransferLeadershipShell {
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_OMS = 3;
+  private static final int NUM_OF_SCMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
-  private OzoneConfiguration conf;
-  private String omServiceId;
-  private String scmServiceId;
-  private int numOfOMs = 3;
-  private int numOfSCMs = 3;
   private OzoneAdmin ozoneAdmin;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException Exception
-   */
   @BeforeAll
   public void init() throws Exception {
     ozoneAdmin = new OzoneAdmin();
-    conf = ozoneAdmin.getOzoneConf();
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
+    OzoneConfiguration conf = ozoneAdmin.getOzoneConf();
+
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
-        .setNumOfStorageContainerManagers(numOfSCMs)
-        .setNumOfActiveSCMs(numOfSCMs).setNumOfActiveOMs(numOfOMs)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setSCMServiceId(SCM_SERVICE_ID).setNumOfOzoneManagers(NUM_OF_OMS)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS)
+        .setNumOfActiveSCMs(NUM_OF_SCMS).setNumOfActiveOMs(NUM_OF_OMS)
         .build();
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {

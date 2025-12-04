@@ -158,7 +158,6 @@ public class TestKeyManagerImpl {
   private static File dir;
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
-  private static NodeManager nodeManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationProtocol mockScmContainerClient;
@@ -184,7 +183,7 @@ public class TestKeyManagerImpl {
         conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager schemaManager = NodeSchemaManager.getInstance();
@@ -194,7 +193,7 @@ public class TestKeyManagerImpl {
       node.setNetworkName(node.getUuidString());
       clusterMap.add(node);
     });
-    ((MockNodeManager)nodeManager).setNetworkTopology(clusterMap);
+    ((MockNodeManager) nodeManager).setNetworkTopology(clusterMap);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setNetworkTopology(clusterMap);
@@ -364,18 +363,20 @@ public class TestKeyManagerImpl {
     // Create directory where the parent directory does not exist
     StringBuffer keyNameBuf = new StringBuffer();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
-    OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(keyNameBuf.toString())
-        .build();
     for (int i = 0; i < 5; i++) {
       keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
+    OmKeyArgs keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .build();
+
     writeClient.createDirectory(keyArgs);
+
     Path path = Paths.get(keyName);
     while (path != null) {
       // verify parent directories are created
-      assertTrue(keyManager.getFileStatus(keyArgs).isDirectory());
+      assertIsDirectory(BUCKET_NAME, path.toString());
       path = path.getParent();
     }
 
@@ -1906,7 +1907,8 @@ public class TestKeyManagerImpl {
       OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
       assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
       assertEquals(bucketName, keyInfo.getBucketName());
-      assertEquals(keyName, keyInfo.getFileName());
+      assertEquals(keyName + '/', keyInfo.getKeyName());
+      assertEquals(Paths.get(keyName).getFileName().toString(), keyInfo.getFileName());
       assertTrue(ozoneFileStatus.isDirectory());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1947,7 +1949,6 @@ public class TestKeyManagerImpl {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName() + "/")
-        .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
         .setOmKeyLocationInfos(null)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())

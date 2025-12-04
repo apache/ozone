@@ -18,16 +18,15 @@
 
 import React, { useState } from 'react';
 
+import { NUSubpath } from '@/v2/types/namespaceUsage.types';
 import { Breadcrumb, Menu, Input } from 'antd';
 import { CaretDownOutlined, HomeFilled } from '@ant-design/icons';
 import { MenuProps } from 'antd/es/menu';
 
-import { DUSubpath } from '@/v2/types/diskUsage.types';
-
 
 type File = {
   path: string;
-  subPaths: DUSubpath[];
+  subPaths: NUSubpath[];
   updateHandler: (arg0: string) => void;
 };
 

@@ -48,6 +48,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -244,6 +245,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     assertEquals(initialUsedSpace, savedUsedSpace.get());
     assertEquals(expectedUsedSpace, volume.getCurrentUsage().getUsedSpace());
@@ -299,6 +301,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -354,6 +357,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -381,6 +385,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -527,14 +532,35 @@ public class TestHddsVolume {
     volume.createTmpDirs(CLUSTER_ID);
 
     VolumeCheckResult result = volume.check(false);
+    assertEquals(1, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
     File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
     FileUtils.deleteDirectory(dbFile);
 
     result = volume.check(false);
+    assertEquals(2, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.FAILED, result);
 
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPath() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File expectedPath = new File(new File(volume.getStorageDir(), CLUSTER_ID), Storage.STORAGE_DIR_CURRENT);
+    assertEquals(expectedPath, volume.getContainerDirsPath());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPathWhenNotFormatted() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    assertNull(volume.getContainerDirsPath());
     volume.shutdown();
   }
 

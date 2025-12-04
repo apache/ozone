@@ -56,39 +56,30 @@ import org.slf4j.event.Level;
  * Tests failover with SCM HA setup.
  */
 public class TestFailoverWithSCMHA {
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_OMS = 1;
+  private static final int NUM_OF_SCMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private String scmServiceId;
-  private int numOfOMs = 1;
-  private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
             SNAPSHOT_THRESHOLD);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
-        .setNumOfStorageContainerManagers(numOfSCMs).setNumOfActiveSCMs(3)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setSCMServiceId(SCM_SERVICE_ID).setNumOfOzoneManagers(NUM_OF_OMS)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS).setNumOfActiveSCMs(3)
         .build();
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {
@@ -112,7 +103,7 @@ public class TestFailoverWithSCMHA {
     failoverProxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
-            failoverProxyProvider);
+            failoverProxyProvider, conf);
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);

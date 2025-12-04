@@ -115,3 +115,12 @@ Copy Object with user defined metadata size larger than 2 KB
     ${custom_metadata_value} =  Generate Random String    3000
     ${result} =                 Execute AWSS3ApiCli and checkrc       copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key1=${custom_metadata_value}" --metadata-directive REPLACE       255
                                 Should contain                        ${result}   MetadataTooLarge
+
+Check Bucket Ownership Verification
+    Run Keyword if      '${DESTBUCKET}' == 'generated1'    Create Dest Bucket
+    Execute              echo "Randomtext" > /tmp/testfile
+    ${correct_dest_owner} =     Get bucket owner    ${DESTBUCKET}
+    ${correct_source_owner} =   Get bucket owner    ${BUCKET}
+
+    Execute AWSS3ApiCli                             put-object --bucket ${BUCKET} --key ${PREFIX}/copyowner/key=value/f1 --body /tmp/testfile
+    Execute AWSS3APICli with bucket owner check     copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyowner/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyowner/key=value/f1  ${correct_dest_owner}  ${correct_source_owner}

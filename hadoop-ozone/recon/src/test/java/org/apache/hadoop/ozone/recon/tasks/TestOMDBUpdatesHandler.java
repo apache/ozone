@@ -306,7 +306,7 @@ public class TestOMDBUpdatesHandler {
     omMetadataManager.getFileTable().put("/sampleVol/bucketOne/parentId/sameName", fileKeyInfo);
 
     // Step 2: Delete the file by adding its information to the deletedTable
-    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(fileKeyInfo);
+    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(fileKeyInfo, 0);
     omMetadataManager.getDeletedTable().put("/sampleVol/bucketOne/parentId/sameName", repeatedKeyInfo);
 
     // Step 3: Create a directory with the same name "sameName" in the directoryTable

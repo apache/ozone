@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -73,6 +74,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test OM directory create request - prefix layout.
@@ -85,7 +88,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
-  private AuditLogger auditLogger;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -101,7 +103,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
@@ -710,6 +712,45 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<>();
+    String keyName = createDirKey(dirs, 3);
+
+    // Add volume and bucket entries to DB.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    String ozoneAll = "user:ozone:a";
+    List<OzoneAcl> aclList = new ArrayList<>();
+    aclList.add(OzoneAcl.parseAcl(ozoneAll));
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+        OzoneFSUtils.addTrailingSlashIfNeeded(keyName), aclList);
+    OMDirectoryCreateRequest omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
+
+    OMRequest modifiedOmRequest = omDirectoryCreateRequest.preExecute(ozoneManager);
+    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+
+    OMClientResponse omClientResponse = omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    OmKeyInfo keyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(
+        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName));
+
+    if (ignoreClientACLs) {
+      assertFalse(keyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    } else {
+      assertTrue(keyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
+  }
+
   private void verifyDirectoriesInheritAcls(List<String> dirs,
       long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
       throws IOException {
@@ -789,22 +830,34 @@ public class TestOMDirectoryCreateRequestWithFSO {
     }
   }
 
+  private OMRequest createDirectoryRequest(String volumeName, String bucketName, String keyName) {
+    return createDirectoryRequest(volumeName, bucketName, keyName, null);
+  }
+
   /**
    * Create OMRequest which encapsulates CreateDirectory request.
    *
    * @param volumeName
    * @param bucketName
    * @param keyName
+   * @param acls
    * @return OMRequest
    */
   private OMRequest createDirectoryRequest(String volumeName, String bucketName,
-                                           String keyName) {
-    return OMRequest.newBuilder().setCreateDirectoryRequest(
-            CreateDirectoryRequest.newBuilder().setKeyArgs(
-                    KeyArgs.newBuilder().setVolumeName(volumeName)
-                            .setBucketName(bucketName).setKeyName(keyName)))
-            .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-            .setClientId(UUID.randomUUID().toString()).build();
+      String keyName, List<OzoneAcl> acls) {
+    KeyArgs.Builder builder = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName);
+    if (acls != null) {
+      for (OzoneAcl acl : acls) {
+        builder.addAcls(OzoneAcl.toProtobuf(acl));
+      }
+    }
+    return OMRequest.newBuilder()
+        .setCreateDirectoryRequest(CreateDirectoryRequest.newBuilder().setKeyArgs(builder))
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
+        .setClientId(UUID.randomUUID().toString()).build();
   }
 
   private BucketLayout getBucketLayout() {

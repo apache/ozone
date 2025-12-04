@@ -58,9 +58,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -243,9 +245,11 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, keyPath);
       }
       OzoneVolume volume = getVolume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_TAGGING;
-        return putObjectTagging(volume, bucketName, keyPath, body);
+        return putObjectTagging(bucket, keyPath, body);
       }
 
       if (uploadID != null && !uploadID.equals("")) {
@@ -255,7 +259,7 @@ public class ObjectEndpoint extends EndpointBase {
           s3GAction = S3GAction.CREATE_MULTIPART_KEY_BY_COPY;
         }
         // If uploadID is specified, it is a request for upload part
-        return createMultipartKey(volume, bucketName, keyPath, length,
+        return createMultipartKey(volume, bucket, keyPath, length,
             partNumber, uploadID, body, perf);
       }
 
@@ -265,7 +269,6 @@ public class ObjectEndpoint extends EndpointBase {
       boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
-      OzoneBucket bucket = volume.getBucket(bucketName);
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType, storageConfig);
 
@@ -428,16 +431,18 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (taggingMarker != null) {
         s3GAction = S3GAction.GET_OBJECT_TAGGING;
-        return getObjectTagging(bucketName, keyPath);
+        return getObjectTagging(bucket, keyPath);
       }
 
       if (uploadId != null) {
         // When we have uploadId, this is the request for list Parts.
         s3GAction = S3GAction.LIST_PARTS;
         int partMarker = parsePartNumberMarker(partNumberMarker);
-        Response response = listParts(bucketName, keyPath, uploadId,
+        Response response = listParts(bucket, keyPath, uploadId,
             partMarker, maxParts, perf);
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
             getAuditParameters(), perf));
@@ -622,6 +627,10 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
+      if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+        OzoneBucket bucket = getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      }
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
@@ -743,6 +752,10 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneVolume volume = getVolume();
+      if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+        OzoneBucket bucket = volume.getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      }
       if (taggingMarker != null) {
         s3GAction = S3GAction.DELETE_OBJECT_TAGGING;
         return deleteObjectTagging(volume, bucketName, keyPath);
@@ -818,6 +831,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
+      S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
@@ -889,16 +903,17 @@ public class ObjectEndpoint extends EndpointBase {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      OzoneBucket ozoneBucket = volume.getBucket(bucket);
+      S3Owner.verifyBucketOwnerCondition(headers, bucket, ozoneBucket.getOwner());
+
       for (CompleteMultipartUploadRequest.Part part : partList) {
-        partsMap.put(part.getPartNumber(), part.getETag());
+        partsMap.put(part.getPartNumber(), stripQuotes(part.getETag()));
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = getClientProtocol()
-          .completeMultipartUpload(volume.getName(), bucket, key, uploadID,
-              partsMap);
+      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(key, uploadID, partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -948,13 +963,14 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
-  private Response createMultipartKey(OzoneVolume volume, String bucket,
+  private Response createMultipartKey(OzoneVolume volume, OzoneBucket ozoneBucket,
       String key, long length, int partNumber, String uploadID,
       final InputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String copyHeader = null;
     DigestInputStream digestInputStream = null;
+    final String bucketName = ozoneBucket.getName();
     try {
       String amzDecodedLength = headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(
@@ -965,7 +981,6 @@ public class ObjectEndpoint extends EndpointBase {
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
       String storageConfig = headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
-      final OzoneBucket ozoneBucket = volume.getBucket(bucket);
       ReplicationConfig replicationConfig =
           getReplicationConfig(ozoneBucket, storageType, storageConfig);
 
@@ -990,6 +1005,11 @@ public class ObjectEndpoint extends EndpointBase {
         Pair<String, String> result = parseSourceHeader(copyHeader);
         String sourceBucket = result.getLeft();
         String sourceKey = result.getRight();
+        if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+          String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+          S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucket, sourceBucketOwner, bucketName,
+              ozoneBucket.getOwner());
+        }
 
         OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
             volume.getName(), sourceBucket, sourceKey);
@@ -1026,29 +1046,21 @@ public class ObjectEndpoint extends EndpointBase {
                   "Bytes to skip: "
                       + rangeHeader.getStartOffset() + " actual: " + skipped);
             }
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucket, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(
-                  sourceObject, ozoneOutputStream, 0, length, new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              outputStream = ozoneOutputStream;
+          }
+          try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+              .createMultipartKey(volume.getName(), bucketName, key, length,
+                  partNumber, uploadID)) {
+            metadataLatencyNs =
+                getMetrics().updateCopyKeyMetadataStats(startNanos);
+            copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
+                new byte[getIOBufferSize(length)]);
+            ozoneOutputStream.getMetadata()
+                .putAll(sourceKeyDetails.getMetadata());
+            String raw = ozoneOutputStream.getMetadata().get(ETAG);
+            if (raw != null) {
+              ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
             }
-          } else {
-            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-                .createMultipartKey(volume.getName(), bucket, key, length,
-                    partNumber, uploadID)) {
-              metadataLatencyNs =
-                  getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
-                  new byte[getIOBufferSize(length)]);
-              ozoneOutputStream.getMetadata()
-                  .putAll(sourceKeyDetails.getMetadata());
-              outputStream = ozoneOutputStream;
-            }
+            outputStream = ozoneOutputStream;
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
           perf.appendSizeBytes(copyLength);
@@ -1056,7 +1068,7 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         long putLength;
         try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
-            .createMultipartKey(volume.getName(), bucket, key, length,
+            .createMultipartKey(volume.getName(), bucketName, key, length,
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
@@ -1081,6 +1093,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (StringUtils.isEmpty(eTag)) {
         eTag = omMultipartCommitUploadPartInfo.getPartName();
       }
+      eTag = wrapInQuotes(eTag);
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
@@ -1099,7 +1112,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName + "/" + key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_PART) {
         OS3Exception os3Exception = newError(
             S3ErrorTable.INVALID_ARGUMENT, String.valueOf(partNumber), ex);
@@ -1119,7 +1132,7 @@ public class ObjectEndpoint extends EndpointBase {
   /**
    * Returns response for the listParts request.
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
-   * @param bucket
+   * @param ozoneBucket
    * @param key
    * @param uploadID
    * @param partNumberMarker
@@ -1128,16 +1141,16 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(String bucket, String key, String uploadID,
+  private Response listParts(OzoneBucket ozoneBucket, String key, String uploadID,
       int partNumberMarker, int maxParts, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     ListPartsResponse listPartsResponse = new ListPartsResponse();
+    String bucketName = ozoneBucket.getName();
     try {
-      OzoneBucket ozoneBucket = getBucket(bucket);
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
           ozoneBucket.listParts(key, uploadID, partNumberMarker, maxParts);
-      listPartsResponse.setBucket(bucket);
+      listPartsResponse.setBucket(bucketName);
       listPartsResponse.setKey(key);
       listPartsResponse.setUploadID(uploadID);
       listPartsResponse.setMaxParts(maxParts);
@@ -1172,7 +1185,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
-            bucket + "/" + key + "/" + uploadID, ex);
+            bucketName + "/" + key + "/" + uploadID, ex);
       }
       throw ex;
     }
@@ -1236,6 +1249,12 @@ public class ObjectEndpoint extends EndpointBase {
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
     DigestInputStream sourceDigestInputStream = null;
+
+    if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+      String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+      // The destBucket owner has already been checked in the caller method
+      S3Owner.verifyBucketOwnerConditionOnCopyOperation(headers, sourceBucket, sourceBucketOwner, null, null);
+    }
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
@@ -1418,7 +1437,7 @@ public class ObjectEndpoint extends EndpointBase {
         (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
 
-  private Response putObjectTagging(OzoneVolume volume, String bucketName, String keyName, InputStream body)
+  private Response putObjectTagging(OzoneBucket bucket, String keyName, InputStream body)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3Tagging tagging = null;
@@ -1438,7 +1457,7 @@ public class ObjectEndpoint extends EndpointBase {
     );
 
     try {
-      volume.getBucket(bucketName).putObjectTagging(keyName, tags);
+      bucket.putObjectTagging(keyName, tags);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyName);
@@ -1456,12 +1475,10 @@ public class ObjectEndpoint extends EndpointBase {
     return Response.ok().build();
   }
 
-  private Response getObjectTagging(String bucketName, String keyName) throws IOException {
+  private Response getObjectTagging(OzoneBucket bucket, String keyName) throws IOException {
     long startNanos = Time.monotonicNowNanos();
 
-    OzoneVolume volume = getVolume();
-
-    Map<String, String> tagMap = volume.getBucket(bucketName).getObjectTagging(keyName);
+    Map<String, String> tagMap = bucket.getObjectTagging(keyName);
 
     getMetrics().updateGetObjectTaggingSuccessStats(startNanos);
     return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
@@ -1494,10 +1511,6 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
-  }
-
-  static String wrapInQuotes(String value) {
-    return "\"" + value + "\"";
   }
 
   @VisibleForTesting
@@ -1534,7 +1547,7 @@ public class ObjectEndpoint extends EndpointBase {
    */
   private S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
-    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
     final long effectiveLength;
     if (hasMultiChunksPayload(amzContentSha256Header)) {

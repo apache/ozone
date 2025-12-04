@@ -19,9 +19,8 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.net.BindException;
 import java.util.Collections;
@@ -77,7 +76,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeDetails datanodeDetails;
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
-  private Class<? extends ServerChannel> channelType;
 
   /**
    * Constructs a Grpc server class.
@@ -119,6 +117,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             "ChunkReader-ELG-%d")
         .build();
 
+    Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
       channelType = EpollServerSocketChannel.class;
@@ -222,7 +221,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignore = span.makeCurrent()) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {
@@ -230,7 +229,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             response.getResult());
       }
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

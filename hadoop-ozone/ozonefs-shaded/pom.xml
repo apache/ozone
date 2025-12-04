@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-filesystem-shaded</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone FileSystem Shaded</name>
 
@@ -28,10 +28,8 @@
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <mdep.analyze.skip>true</mdep.analyze.skip>
-    <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <!-- refer to ratis thirdparty ratis.thirdparty.shaded.native.prefix -->
     <ratis.thirdparty.shaded.native.prefix>org_apache_ratis_thirdparty_</ratis.thirdparty.shaded.native.prefix>
-    <shaded.prefix>org.apache.ozone.shaded</shaded.prefix>
   </properties>
 
   <dependencies>
@@ -133,7 +131,6 @@
             </goals>
             <phase>package</phase>
             <configuration>
-              <skip>${maven.shade.skip}</skip>
               <artifactSet>
                 <excludes>
                   <exclude>com.sun.javadoc:*</exclude>
@@ -194,7 +191,7 @@
               <relocations>
                 <relocation>
                   <pattern>org</pattern>
-                  <shadedPattern>${shaded.prefix}.org</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
@@ -214,13 +211,12 @@
                 </relocation>
                 <relocation>
                   <pattern>org.apache.ratis</pattern>
-                  <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org.apache.ratis</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
-                  <shadedPattern>${shaded.prefix}.com</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.com</shadedPattern>
                   <excludes>
-                    <exclude>com.google.protobuf.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                     To prevent conflicts, we do not include these packages in the ozone client release package.
                     Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -234,43 +230,43 @@
                 </relocation>
                 <relocation>
                   <pattern>google</pattern>
-                  <shadedPattern>${shaded.prefix}.google</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.google</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>net.jcip</pattern>
-                  <shadedPattern>${shaded.prefix}.net.jcip</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.net.jcip</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javassist</pattern>
-                  <shadedPattern>${shaded.prefix}.javassist</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javassist</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javax.xml.bind</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.xml.bind</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javax.activation</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.activation</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.activation</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>jakarta.annotation</pattern>
-                  <shadedPattern>${shaded.prefix}.jakarta.annotation</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>kotlin</pattern>
-                  <shadedPattern>${shaded.prefix}.kotlin</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.kotlin</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>
-                  <shadedPattern>${shaded.prefix}.picocli</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.picocli</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>info</pattern>
-                  <shadedPattern>${shaded.prefix}.info</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.info</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>io</pattern>
-                  <shadedPattern>${shaded.prefix}.io</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.io</shadedPattern>
                   <excludes>
                     <exclude>io!netty!*</exclude>
                     <!-- Exclude config keys for Hadoop that look like package names -->
@@ -291,11 +287,11 @@
                 <!-- handling some special packages with special names -->
                 <relocation>
                   <pattern>okio</pattern>
-                  <shadedPattern>${shaded.prefix}.okio</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okio</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>okhttp3</pattern>
-                  <shadedPattern>${shaded.prefix}.okhttp3</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okhttp3</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>
@@ -313,12 +309,12 @@
             </goals>
             <phase>validate</phase>
             <configuration>
-              <includeGroupIds>io.netty</includeGroupIds>
+              <includeGroupIds>io.netty,org.apache.ratis</includeGroupIds>
               <includes>**/META-INF/native/*</includes>
               <includeArtifactIds>netty-resolver-dns-native-macos,
                 netty-tcnative-boringssl-static,
                 netty-transport-native-epoll,
-                netty-transport-native-kqueue</includeArtifactIds>
+                netty-transport-native-kqueue,ratis-thirdparty-misc</includeArtifactIds>
               <outputDirectory>${project.build.directory}/classes/</outputDirectory>
               <overWriteReleases>true</overWriteReleases>
               <overWriteSnapshots>true</overWriteSnapshots>
@@ -341,40 +337,76 @@
             <configuration>
               <fileSets>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_x86_64.jnilib</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_aarch_64.so</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_aarch_64.so</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_aarch_64.so</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_x86_64.so</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_x86_64.so</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_x86_64.so</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_x86_64.jnilib</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_x86_64.jnilib</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_aarch_64.so</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_aarch_64.so</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_aarch_64.so</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_x86_64.so</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_x86_64.so</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_x86_64.so</destinationFile>
                 </fileSet>
                 <fileSet>
-                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</sourceFile>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_tcnative_osx_aarch_64.jnilib</sourceFile>
                   <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_osx_aarch_64.jnilib</destinationFile>
                 </fileSet>
                 <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/lib${ratis.thirdparty.shaded.native.prefix}netty_tcnative_osx_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_osx_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_resolver_dns_native_macos_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_aarch_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_epoll_aarch_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_x86_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_epoll_x86_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_transport_native_kqueue_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_aarch_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_linux_aarch_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_x86_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_linux_x86_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_osx_aarch_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_x86_64.jnilib</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}libnetty_tcnative_osx_x86_64.jnilib</destinationFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_netty_tcnative_osx_x86_64.jnilib</destinationFile>
                 </fileSet>
                 <fileSet>
                   <sourceFile>${project.build.directory}/classes/META-INF/native/netty_tcnative_windows_x86_64.dll</sourceFile>
-                  <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</destinationFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_netty_tcnative_windows_x86_64.dll</destinationFile>
                 </fileSet>
               </fileSets>
             </configuration>

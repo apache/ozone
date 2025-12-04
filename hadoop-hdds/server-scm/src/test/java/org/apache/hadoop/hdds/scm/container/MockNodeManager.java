@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -83,6 +84,8 @@ public class MockNodeManager implements NodeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(MockNodeManager.class);
 
+  private static final int NUM_RAFT_LOG_DISKS_PER_DATANODE = 1;
+
   public static final int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private static final NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
@@ -108,7 +111,6 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
-  private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
 
   {
@@ -143,8 +145,7 @@ public class MockNodeManager implements NodeManager {
     }
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -169,8 +170,7 @@ public class MockNodeManager implements NodeManager {
 
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -203,8 +203,7 @@ public class MockNodeManager implements NodeManager {
 
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -833,6 +832,21 @@ public class MockNodeManager implements NodeManager {
     return node == null ? null : (DatanodeDetails)node;
   }
 
+  @Nullable
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    DatanodeDetails node = getNode(datanodeDetails.getID());
+    if (node == null) {
+      return null;
+    }
+
+    DatanodeInfo datanodeInfo = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), null);
+    long capacity = 50L * 1024 * 1024 * 1024;
+    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), capacity, capacity,
+        0L));
+    return datanodeInfo;
+  }
+
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     List<DatanodeDetails> results = new LinkedList<>();
@@ -891,10 +905,6 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
-  }
-
-  public void setNumMetaDataVolumes(int value) {
-    numRaftLogDisksPerDatanode = value;
   }
 
   /**

@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -205,7 +206,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @param replicaPendingOps The pendingOps instance
    */
   @SuppressWarnings("parameternumber")
-  public ReplicationManager(final ConfigurationSource conf,
+  public ReplicationManager(final ReplicationManagerConfiguration rmConf,
+             final ConfigurationSource conf,
              final ContainerManager containerManager,
              final PlacementPolicy ratisContainerPlacement,
              final PlacementPolicy ecContainerPlacement,
@@ -217,12 +219,13 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
              throws IOException {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
-    this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
+    this.rmConf = rmConf;
     this.replicationServerConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     this.running = false;
     this.clock = clock;
-    this.containerReport = new ReplicationManagerReport();
+    this.containerReport = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -362,7 +365,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     ReplicationQueue newRepQueue = new ReplicationQueue();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
@@ -688,13 +692,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
       List<DatanodeDetails> targets = rcc.getTargetDatanodes();
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
+      long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
       for (int i = 0; i < targetIndexes.size(); i++) {
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
+            targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
+      long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
 
       if (rcc.getTargetDatanode() == null) {
         /*
@@ -702,17 +708,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         op's target Datanode should be the Datanode this command is being
         sent to.
          */
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(),
-            targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targetDatanode,
+            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       } else {
         /*
         This means the source will push replica to the target, so the op's
         target Datanode should be the Datanode the replica will be pushed to.
          */
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(),
-            rcc.getTargetDatanode(), rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
+            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
 
       if (rcc.getReplicaIndex() > 0) {
@@ -1257,6 +1261,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
+    @Config(key = "container.sample.limit",
+        type = ConfigType.INT,
+        defaultValue = "100",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "The number of containers to sample in each state per " +
+            "iteration of the replication manager. This is useful for " +
+            "debugging when Recon is not available. The samples are included " +
+            "in the ReplicationManagerReport for each lifecycle and health state."
+    )
+    private int containerSampleLimit = 100;
+
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }
@@ -1339,6 +1355,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public boolean isPush() {
       return push;
+    }
+
+    public int getContainerSampleLimit() {
+      return containerSampleLimit;
+    }
+
+    public void setContainerSampleLimit(int sampleLimit) {
+      this.containerSampleLimit = sampleLimit;
     }
 
     @PostConstruct
@@ -1482,6 +1506,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } catch (NodeNotFoundException e) {
       throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
     }
+  }
+
+  public NodeManager getNodeManager() {
+    return nodeManager;
   }
 
   private int getRemainingMaintenanceRedundancy(boolean isEC) {

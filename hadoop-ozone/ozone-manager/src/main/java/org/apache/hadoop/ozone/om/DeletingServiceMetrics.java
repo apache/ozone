@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -67,6 +70,56 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numKeysPurged;
   @Metric("Total no. of rename entries purged")
   private MutableGaugeLong numRenameEntriesPurged;
+
+  /*
+   * Key deletion metrics in the last 24 hours.
+   */
+  private static final long METRIC_RESET_INTERVAL = TimeUnit.DAYS.toSeconds(1);
+  @Metric("Last time the metrics were reset")
+  private MutableGaugeLong metricsResetTimeStamp;
+  @Metric("No. of reclaimed keys in the last interval")
+  private MutableGaugeLong keysReclaimedInInterval;
+  @Metric("Replicated size of reclaimed keys in the last interval (bytes)")
+  private MutableGaugeLong reclaimedSizeInInterval;
+
+  /*
+   * Deletion service state metrics.
+   */
+  @Metric("Key Deleting Service last run timestamp in ms")
+  private MutableGaugeLong kdsLastRunTimestamp;
+  @Metric("Key Deleting Service current run timestamp in ms")
+  private MutableGaugeLong kdsCurRunTimestamp;
+
+  /*
+   * Deletion service last run metrics.
+   */
+  @Metric("AOS: No. of reclaimed keys in the last run")
+  private MutableGaugeLong aosKeysReclaimedLast;
+  @Metric("AOS: Replicated size of reclaimed keys in the last run (bytes)")
+  private MutableGaugeLong aosReclaimedSizeLast;
+  @Metric("AOS: No. of iterated keys in the last run")
+  private MutableGaugeLong aosKeysIteratedLast;
+  @Metric("AOS: No. of not reclaimable keys the last run")
+  private MutableGaugeLong aosKeysNotReclaimableLast;
+  @Metric("Snapshot: No. of reclaimed keys in the last run")
+  private MutableGaugeLong snapKeysReclaimedLast;
+  @Metric("Snapshot: Replicated size of reclaimed keys in the last run (bytes)")
+  private MutableGaugeLong snapReclaimedSizeLast;
+  @Metric("Snapshot: No. of iterated keys in the last run")
+  private MutableGaugeLong snapKeysIteratedLast;
+  @Metric("Snapshot: No. of not reclaimable keys the last run")
+  private MutableGaugeLong snapKeysNotReclaimableLast;
+
+  /**
+   * Metric to track the term ID of the last key that was purged from the
+   * Active Object Store (AOS). This term ID represents the state of the
+   * most recent successful purge operation in the AOS. This value would be used ensure that a background
+   * KeyDeletingService/DirectoryDeletingService doesn't start the next run until the previous run has been flushed.
+   */
+  @Metric("Last Purge Key termIndex on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTermId;
+  @Metric("Last Purge Key transactionId on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTransactionId;
 
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -158,6 +211,104 @@ public final class DeletingServiceMetrics {
 
   public void incrNumRenameEntriesPurged(long renameEntriesPurged) {
     this.numRenameEntriesPurged.incr(renameEntriesPurged);
+  }
+
+  public void setKdsLastRunTimestamp(long timestamp) {
+    this.kdsLastRunTimestamp.set(timestamp);
+  }
+
+  public void setKdsCurRunTimestamp(long timestamp) {
+    this.kdsCurRunTimestamp.set(timestamp);
+  }
+
+  private void resetMetrics() {
+    this.keysReclaimedInInterval.set(0);
+    this.reclaimedSizeInInterval.set(0);
+  }
+
+  private void checkAndResetMetrics() {
+    long currentTime = Instant.now().getEpochSecond();
+    if (metricsResetTimeStamp.value() == 0) {
+      this.metricsResetTimeStamp.set(currentTime);
+    }
+    if (currentTime - metricsResetTimeStamp.value() > METRIC_RESET_INTERVAL) {
+      resetMetrics();
+      this.metricsResetTimeStamp.set(currentTime);
+    }
+  }
+
+  public void updateIntervalCumulativeMetrics(long keysReclaimed, long replicatedSizeBytes) {
+    checkAndResetMetrics();
+    this.keysReclaimedInInterval.incr(keysReclaimed);
+    this.reclaimedSizeInInterval.incr(replicatedSizeBytes);
+  }
+
+  public long getKeysReclaimedInInterval() {
+    return keysReclaimedInInterval.value();
+  }
+
+  public long getReclaimedSizeInInterval() {
+    return reclaimedSizeInInterval.value();
+  }
+
+  public void updateAosLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
+      long notReclaimableKeys) {
+    this.aosKeysReclaimedLast.set(keysReclaimed);
+    this.aosReclaimedSizeLast.set(replicatedSizeBytes);
+    this.aosKeysIteratedLast.set(iteratedKeys);
+    this.aosKeysNotReclaimableLast.set(notReclaimableKeys);
+  }
+
+  public long getAosKeysReclaimedLast() {
+    return aosKeysReclaimedLast.value();
+  }
+
+  public long getAosReclaimedSizeLast() {
+    return aosReclaimedSizeLast.value();
+  }
+
+  public long getAosKeysIteratedLast() {
+    return aosKeysIteratedLast.value();
+  }
+
+  public long getAosKeysNotReclaimableLast() {
+    return aosKeysNotReclaimableLast.value();
+  }
+
+  public void updateSnapLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
+      long notReclaimableKeys) {
+    this.snapKeysReclaimedLast.set(keysReclaimed);
+    this.snapReclaimedSizeLast.set(replicatedSizeBytes);
+    this.snapKeysIteratedLast.set(iteratedKeys);
+    this.snapKeysNotReclaimableLast.set(notReclaimableKeys);
+  }
+
+  public long getSnapKeysReclaimedLast() {
+    return snapKeysReclaimedLast.value();
+  }
+
+  public long getSnapReclaimedSizeLast() {
+    return snapReclaimedSizeLast.value();
+  }
+
+  public long getSnapKeysIteratedLast() {
+    return snapKeysIteratedLast.value();
+  }
+
+  public long getSnapKeysNotReclaimableLast() {
+    return snapKeysNotReclaimableLast.value();
+  }
+
+  public synchronized TransactionInfo getLastAOSTransactionInfo() {
+    return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
+  }
+
+  public synchronized void setLastAOSTransactionInfo(TransactionInfo transactionInfo) {
+    TransactionInfo previousTransactionInfo = getLastAOSTransactionInfo();
+    if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
+      this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
+      this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
+    }
   }
 
   @VisibleForTesting

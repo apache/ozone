@@ -82,6 +82,17 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
     Preconditions.checkNotNull(tenantId);
 
+    // Check if there are any accessIds in the tenant.
+    // This must be done before we attempt to delete policies from Ranger.
+    if (!multiTenantManager.isTenantEmpty(tenantId)) {
+      LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
+          tenantId);
+      throw new OMException("Tenant '" + tenantId + "' is not empty. " +
+          "All accessIds associated to this tenant must be revoked before " +
+          "the tenant can be deleted. See `ozone tenant user revoke`",
+          TENANT_NOT_EMPTY);
+    }
+
     // Get tenant object by tenant name
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
 
@@ -149,16 +160,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
-      // Check if there are any accessIds in the tenant
-      if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
-        LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
-            tenantId);
-        throw new OMException("Tenant '" + tenantId + "' is not empty. " +
-            "All accessIds associated to this tenant must be revoked before " +
-            "the tenant can be deleted. See `ozone tenant user revoke`",
-            TENANT_NOT_EMPTY);
-      }
-
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
@@ -173,9 +174,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
               volumeName, null, null);
         }
 
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-        // Decrement volume ref count
-        omVolumeArgs.decRefCount();
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .decRefCount()
+            .build();
 
         // Update omVolumeArgs
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

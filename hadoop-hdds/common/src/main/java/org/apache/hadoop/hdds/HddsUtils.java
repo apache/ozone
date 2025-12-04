@@ -70,16 +70,20 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcException;
-import org.apache.hadoop.ipc.RpcNoSuchMethodException;
-import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RpcException;
+import org.apache.hadoop.ipc_.RpcNoSuchMethodException;
+import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -88,6 +92,7 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.SizeInBytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +106,8 @@ public final class HddsUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
-  public static final ByteString REDACTED =
-      ByteString.copyFromUtf8("<redacted>");
+  public static final String REDACTED_STRING = "<redacted>";
+  public static final ByteString REDACTED = ByteString.copyFromUtf8(REDACTED_STRING);
 
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
@@ -413,12 +418,14 @@ public final class HddsUtils {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
+    case ReadBlock:
     case ListBlock:
     case GetBlock:
     case GetSmallFile:
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case GetContainerChecksumInfo:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -462,8 +469,7 @@ public final class HddsUtils {
    * false if block token does not apply to the command.
    *
    */
-  public static boolean requireBlockToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireBlockToken(Type cmdType) {
     switch (cmdType) {
     case DeleteBlock:
     case DeleteChunk:
@@ -473,6 +479,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case ReadChunk:
+    case ReadBlock:
     case WriteChunk:
     case FinalizeBlock:
       return true;
@@ -481,8 +488,7 @@ public final class HddsUtils {
     }
   }
 
-  public static boolean requireContainerToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireContainerToken(Type cmdType) {
     switch (cmdType) {
     case CloseContainer:
     case CreateContainer:
@@ -502,7 +508,7 @@ public final class HddsUtils {
    * @return block ID.
    */
   public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
-    ContainerProtos.DatanodeBlockID blockID = null;
+    DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
     case DeleteBlock:
       if (msg.hasDeleteBlock()) {
@@ -547,6 +553,11 @@ public final class HddsUtils {
     case ReadChunk:
       if (msg.hasReadChunk()) {
         blockID = msg.getReadChunk().getBlockID();
+      }
+      break;
+    case ReadBlock:
+      if (msg.hasReadBlock()) {
+        blockID = msg.getReadBlock().getBlockID();
       }
       break;
     case WriteChunk:
@@ -726,42 +737,62 @@ public final class HddsUtils {
    * Remove binary data from request {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandRequestProto processForDebug(
-      ContainerProtos.ContainerCommandRequestProto msg) {
-
+  public static String processForDebug(ContainerCommandRequestProto msg) {
     if (msg == null) {
       return null;
     }
 
-    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
-      ContainerProtos.ContainerCommandRequestProto.Builder builder =
-          msg.toBuilder();
+    if (msg.hasWriteChunk() || msg.hasPutBlock() || msg.hasPutSmallFile()) {
+      final ContainerCommandRequestProto.Builder builder = msg.toBuilder();
       if (msg.hasWriteChunk()) {
-        builder.getWriteChunkBuilder().setData(REDACTED);
+        if (builder.getWriteChunkBuilder().hasData()) {
+          builder.getWriteChunkBuilder()
+              .setData(REDACTED);
+        }
+
+        if (builder.getWriteChunkBuilder().hasChunkData()) {
+          builder.getWriteChunkBuilder()
+              .getChunkDataBuilder()
+              .clearChecksumData();
+        }
+
+        if (builder.getWriteChunkBuilder().hasBlock()) {
+          builder.getWriteChunkBuilder()
+              .getBlockBuilder()
+              .getBlockDataBuilder()
+              .getChunksBuilderList()
+              .forEach(ContainerProtos.ChunkInfo.Builder::clearChecksumData);
+        }
       }
+
+      if (msg.hasPutBlock()) {
+        builder.getPutBlockBuilder()
+            .getBlockDataBuilder()
+            .getChunksBuilderList()
+            .forEach(ContainerProtos.ChunkInfo.Builder::clearChecksumData);
+      }
+
       if (msg.hasPutSmallFile()) {
         builder.getPutSmallFileBuilder().setData(REDACTED);
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
    * Remove binary data from response {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandResponseProto processForDebug(
-      ContainerProtos.ContainerCommandResponseProto msg) {
+  public static String processForDebug(ContainerCommandResponseProto msg) {
 
     if (msg == null) {
       return null;
     }
 
     if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
-      ContainerProtos.ContainerCommandResponseProto.Builder builder =
-          msg.toBuilder();
+      final ContainerCommandResponseProto.Builder builder = msg.toBuilder();
       if (msg.hasReadChunk()) {
         if (msg.getReadChunk().hasData()) {
           builder.getReadChunkBuilder().setData(REDACTED);
@@ -783,10 +814,10 @@ public final class HddsUtils {
                   .addBuffers(REDACTED);
         }
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
@@ -858,6 +889,11 @@ public final class HddsUtils {
     return logger.isDebugEnabled()
         ? Thread.currentThread().getStackTrace()
         : null;
+  }
+
+  /** @return Hex string representation of {@code value} */
+  public static String checksumToString(long value) {
+    return Long.toHexString(value);
   }
 
   /**

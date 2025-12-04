@@ -53,6 +53,17 @@ public class OmConfig extends ReconfigurableConfig {
   private boolean fileSystemPathEnabled;
 
   @Config(
+      key = "ozone.om.keyname.character.check.enabled",
+      defaultValue = "false",
+      description = "If true, then enable to check if the key name " +
+          "contains illegal characters when creating/renaming key. " +
+          "For the definition of illegal characters, follow the " +
+          "rules in Amazon S3's object key naming guide.",
+      tags = { ConfigTag.OM, ConfigTag.OZONE }
+  )
+  private boolean keyNameCharacterCheckEnabled;
+
+  @Config(
       key = "server.list.max.size",
       defaultValue = "1000",
       description = "Configuration property to configure the max server side response size for list calls on om.",
@@ -106,6 +117,30 @@ public class OmConfig extends ReconfigurableConfig {
   private String groupDefaultRights;
   private Set<ACLType> groupDefaultRightSet;
 
+  @Config(key = "object.creation.ignore.client.acls",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "Ignore ACLs sent by client to OzoneManager during volume/bucket/key creation."
+  )
+  private boolean ignoreClientACLs;
+
+  @Config(key = "ozone.om.volume.listall.allowed",
+      defaultValue = "true",
+      reconfigurable = true,
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.MANAGEMENT},
+      description =
+          "Allows everyone to list all volumes when set to true. Defaults to true. " +
+          "When set to false, non-admin users can only list the volumes they have " +
+          "access to. Admins can always list all volumes. Note that this config " +
+          "only applies to OzoneNativeAuthorizer. For other authorizers, admin " +
+          "needs to set policies accordingly to allow all volume listing " +
+          "e.g. for Ranger, a new policy with special volume \"/\" can be added to " +
+          "allow group public LIST access."
+  )
+  private boolean listAllVolumesAllowed = Defaults.LIST_ALL_VOLUMES_ALLOWED;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -116,6 +151,22 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setFileSystemPathEnabled(boolean newValue) {
     fileSystemPathEnabled = newValue;
+  }
+
+  public boolean isListAllVolumesAllowed() {
+    return listAllVolumesAllowed;
+  }
+
+  public void setListAllVolumesAllowed(boolean newValue) {
+    listAllVolumesAllowed = newValue;
+  }
+
+  public boolean isKeyNameCharacterCheckEnabled() {
+    return keyNameCharacterCheckEnabled;
+  }
+
+  public void setKeyNameCharacterCheckEnabled(boolean newValue) {
+    this.keyNameCharacterCheckEnabled = newValue;
   }
 
   public long getMaxListSize() {
@@ -162,6 +213,14 @@ public class OmConfig extends ReconfigurableConfig {
         : ACLType.parseList(groupDefaultRights);
   }
 
+  public boolean ignoreClientACLs() {
+    return ignoreClientACLs;
+  }
+
+  public void setIgnoreClientACLs(boolean ignore) {
+    ignoreClientACLs = ignore;
+  }
+
   @PostConstruct
   public void validate() {
     if (maxListSize <= 0) {
@@ -183,6 +242,8 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setFrom(OmConfig other) {
     fileSystemPathEnabled = other.fileSystemPathEnabled;
+    keyNameCharacterCheckEnabled = other.keyNameCharacterCheckEnabled;
+    listAllVolumesAllowed = other.listAllVolumesAllowed;
     maxListSize = other.maxListSize;
     maxUserVolumeCount = other.maxUserVolumeCount;
     userDefaultRights = other.userDefaultRights;
@@ -196,6 +257,7 @@ public class OmConfig extends ReconfigurableConfig {
    */
   public static final class Keys {
     public static final String ENABLE_FILESYSTEM_PATHS = "ozone.om.enable.filesystem.paths";
+    public static final String LIST_ALL_VOLUMES_ALLOWED = "ozone.om.volume.listall.allowed";
     public static final String SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
     public static final String USER_MAX_VOLUME = "ozone.om.user.max.volume";
   }
@@ -205,6 +267,7 @@ public class OmConfig extends ReconfigurableConfig {
    */
   public static final class Defaults {
     public static final boolean ENABLE_FILESYSTEM_PATHS = false;
+    public static final boolean LIST_ALL_VOLUMES_ALLOWED = true;
     public static final long SERVER_LIST_MAX_SIZE = 1000;
   }
 

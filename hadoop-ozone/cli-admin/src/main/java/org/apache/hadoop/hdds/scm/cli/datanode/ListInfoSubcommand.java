@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,21 +46,6 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class ListInfoSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"--ip"},
-      description = "Show info by ip address.",
-      defaultValue = "")
-  private String ipaddress;
-
-  @CommandLine.Option(names = {"--id"},
-      description = "Show info by datanode UUID.",
-      defaultValue = "")
-  private String uuid;
-
-  @CommandLine.Option(names = {"--hostname"},
-      description = "Show info by datanode hostname.",
-      defaultValue = "")
-  private String hostname;
-
   @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
           "IN_SERVICE, " +
@@ -78,37 +65,50 @@ public class ListInfoSubcommand extends ScmSubcommand {
        defaultValue = "false")
   private boolean json;
 
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
+  private ExclusiveNodeOptions exclusiveNodeOptions;
+
   @CommandLine.Mixin
   private ListLimitOptions listLimitOptions;
 
   private List<Pipeline> pipelines;
 
+  static class ExclusiveNodeOptions extends NodeSelectionMixin {
+    @CommandLine.Option(names = {"--most-used"},
+        description = "Show datanodes sorted by Utilization (most to least).")
+    private boolean mostUsed;
+
+    @CommandLine.Option(names = {"--least-used"},
+        description = "Show datanodes sorted by Utilization (least to most).")
+    private boolean leastUsed;
+  }
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (!Strings.isNullOrEmpty(uuid)) {
-      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(uuid));
-      DatanodeWithAttributes dwa = new DatanodeWithAttributes(DatanodeDetails
-          .getFromProtoBuf(node.getNodeID()),
-          node.getNodeOperationalStates(0),
-          node.getNodeStates(0));
-      
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
+      Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
+      Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
+      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo.Builder(
+          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0),
+          node.getNodeStates(0)).withVolumeCounts(totalVolumeCount, healthyVolumeCount).build();
       if (json) {
-        List<DatanodeWithAttributes> singleList = Collections.singletonList(dwa);
-        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(singleList));
+        List<BasicDatanodeInfo> dtoList = Collections.singletonList(singleNodeInfo);
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
       } else {
-        printDatanodeInfo(dwa);
+        printDatanodeInfo(singleNodeInfo);
       }
       return;
     }
-    Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
-    if (!Strings.isNullOrEmpty(ipaddress)) {
-      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
-          .compareToIgnoreCase(ipaddress) == 0);
+    Stream<BasicDatanodeInfo> allNodes = getAllNodes(scmClient).stream();
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getIp())) {
+      allNodes = allNodes.filter(p -> p.getIpAddress()
+          .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0);
     }
-    if (!Strings.isNullOrEmpty(hostname)) {
-      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getHostName()
-          .compareToIgnoreCase(hostname) == 0);
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getHostname())) {
+      allNodes = allNodes.filter(p -> p.getHostName()
+          .compareToIgnoreCase(exclusiveNodeOptions.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
       allNodes = allNodes.filter(p -> p.getOpState().toString()
@@ -124,31 +124,72 @@ public class ListInfoSubcommand extends ScmSubcommand {
     }
     
     if (json) {
-      List<DatanodeWithAttributes> datanodeList = allNodes.collect(
-              Collectors.toList());
-      System.out.println(
-              JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
+      List<BasicDatanodeInfo> datanodeList = allNodes.collect(Collectors.toList());
+      System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);
     }
   }
 
-  private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)
+  private List<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
       throws IOException {
+
+    // If sorting is requested
+    if (exclusiveNodeOptions != null && (exclusiveNodeOptions.mostUsed || exclusiveNodeOptions.leastUsed)) {
+      boolean sortByMostUsed = exclusiveNodeOptions.mostUsed;
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfos;
+      try {
+        usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, Integer.MAX_VALUE);
+      } catch (Exception e) {
+        System.err.println("Failed to get datanode usage info: " + e.getMessage());
+        return Collections.emptyList();
+      }
+
+      return usageInfos.stream()
+          .map(p -> {
+            try {
+              String uuidStr = p.getNode().getUuid();
+              UUID parsedUuid = UUID.fromString(uuidStr);
+              HddsProtos.Node node = scmClient.queryNode(parsedUuid);
+              long capacity = p.getCapacity();
+              long used = capacity - p.getRemaining();
+              double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
+              Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
+              Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
+              return new BasicDatanodeInfo.Builder(
+                  DatanodeDetails.getFromProtoBuf(node.getNodeID()),
+                  node.getNodeOperationalStates(0), node.getNodeStates(0))
+                  .withUsageInfo(used, capacity, percentUsed)
+                  .withVolumeCounts(totalVolumeCount, healthyVolumeCount).build();
+            } catch (Exception e) {
+              String reason = "Could not process info for an unknown datanode";
+              if (p != null && p.getNode() != null && !Strings.isNullOrEmpty(p.getNode().getUuid())) {
+                reason = "Could not process node info for " + p.getNode().getUuid();
+              }
+              System.err.printf("Error: %s: %s%n", reason, e.getMessage());
+              return null;
+            }
+          })
+          .filter(Objects::nonNull)
+          .collect(Collectors.toList());
+    }
+    
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
-    return nodes.stream()
-        .map(p -> new DatanodeWithAttributes(
-            DatanodeDetails.getFromProtoBuf(p.getNodeID()),
-            p.getNodeOperationalStates(0), p.getNodeStates(0)))
-        .sorted((o1, o2) -> o1.healthState.compareTo(o2.healthState))
+    return nodes.stream().map(p -> {
+      Integer totalVolumeCount = p.hasTotalVolumeCount() ? p.getTotalVolumeCount() : null;
+      Integer healthyVolumeCount = p.hasHealthyVolumeCount() ? p.getHealthyVolumeCount() : null;
+      return new BasicDatanodeInfo.Builder(
+          DatanodeDetails.getFromProtoBuf(p.getNodeID()), p.getNodeOperationalStates(0), p.getNodeStates(0))
+          .withVolumeCounts(totalVolumeCount, healthyVolumeCount).build(); })
+        .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
         .collect(Collectors.toList());
   }
 
-  private void printDatanodeInfo(DatanodeWithAttributes dna) {
+  private void printDatanodeInfo(BasicDatanodeInfo dn) {
     StringBuilder pipelineListInfo = new StringBuilder();
-    DatanodeDetails datanode = dna.getDatanodeDetails();
+    DatanodeDetails datanode = dn.getDatanodeDetails();
     int relatedPipelineNum = 0;
     if (!pipelines.isEmpty()) {
       List<Pipeline> relatedPipelines = pipelines.stream().filter(
@@ -174,34 +215,18 @@ public class ListInfoSubcommand extends ScmSubcommand {
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
-    System.out.println("Operational State: " + dna.getOpState());
-    System.out.println("Health State: " + dna.getHealthState());
+    System.out.println("Operational State: " + dn.getOpState());
+    System.out.println("Health State: " + dn.getHealthState());
+    if (dn.getTotalVolumeCount() != null && dn.getHealthyVolumeCount() != null) {
+      System.out.println("Total volume count: " + dn.getTotalVolumeCount() + "\n" +
+          "Healthy volume count: " + dn.getHealthyVolumeCount());
+    }
     System.out.println("Related pipelines:\n" + pipelineListInfo);
-  }
 
-  private static class DatanodeWithAttributes {
-    private DatanodeDetails datanodeDetails;
-    private HddsProtos.NodeOperationalState operationalState;
-    private HddsProtos.NodeState healthState;
-
-    DatanodeWithAttributes(DatanodeDetails dn,
-        HddsProtos.NodeOperationalState opState,
-        HddsProtos.NodeState healthState) {
-      this.datanodeDetails = dn;
-      this.operationalState = opState;
-      this.healthState = healthState;
-    }
-
-    public DatanodeDetails getDatanodeDetails() {
-      return datanodeDetails;
-    }
-
-    public HddsProtos.NodeOperationalState getOpState() {
-      return operationalState;
-    }
-
-    public HddsProtos.NodeState getHealthState() {
-      return healthState;
+    if (dn.getUsed() != null && dn.getCapacity() != null && dn.getUsed() >= 0 && dn.getCapacity() > 0) {
+      System.out.println("Capacity: " + dn.getCapacity());
+      System.out.println("Used: " + dn.getUsed());
+      System.out.printf("Percentage Used : %.2f%%%n%n", dn.getPercentUsed());
     }
   }
 }

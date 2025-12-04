@@ -18,27 +18,14 @@
 
 import React from 'react';
 import moment from 'moment';
-import {
-  Row,
-  Button,
-  Input,
-  Menu,
-  Dropdown,
-  Tooltip
-} from 'antd';
-import { MenuProps } from 'antd/es/menu';
-import {
-  CloseOutlined,
-  InfoCircleOutlined,
-  LeftOutlined,
-  LoadingOutlined,
-  RedoOutlined
-} from '@ant-design/icons';
+import {Button, Dropdown, Input, Menu, Row, Tooltip} from 'antd';
+import {MenuProps} from 'antd/es/menu';
+import {InfoCircleOutlined, LeftOutlined, LoadingOutlined, RedoOutlined} from '@ant-design/icons';
 
-import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
-import { EChart } from '@/components/eChart/eChart';
-import { byteToSize, showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {DetailPanel} from '@/components/rightDrawer/rightDrawer';
+import {EChart} from '@/components/eChart/eChart';
+import {byteToSize, showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
 
@@ -254,7 +241,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -341,7 +328,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               isLoading: false,
               showPanel: false
             });
-            showDataFetchError(error.toString());
+            showDataFetchError(error);
           });
           return;
         }
@@ -493,7 +480,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         isLoading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
@@ -538,7 +525,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         isLoading: false,
         showPanel: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 

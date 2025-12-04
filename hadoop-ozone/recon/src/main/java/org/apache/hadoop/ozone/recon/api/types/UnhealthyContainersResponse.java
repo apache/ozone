@@ -50,6 +50,29 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
+   * Total count of containers that have replicas with mismatched data checksums.
+   */
+  @JsonProperty("replicaMismatchCount")
+  private long replicaMismatchCount = 0;
+
+  /**
+   * The smallest container ID in the current response batch.
+   * Used for pagination to determine the lower bound for the next page.
+   */
+  @JsonProperty("firstKey")
+  private long firstKey = 0;
+
+
+  /**
+   * The largest container ID in the current response batch.
+   * Used for pagination to determine the upper bound for the next page.
+   */
+  @JsonProperty("lastKey")
+  private long lastKey = 0;
+
+
+
+  /**
    * A collection of unhealthy containers.
    */
   @JsonProperty("containers")
@@ -76,6 +99,9 @@ public class UnhealthyContainersResponse {
     } else if (state.equals(
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
+    } else if (state.equals(
+        UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
+      this.replicaMismatchCount = count;
     }
   }
 
@@ -95,7 +121,27 @@ public class UnhealthyContainersResponse {
     return misReplicatedCount;
   }
 
+  public long getReplicaMismatchCount() {
+    return replicaMismatchCount;
+  }
+
+  public long getLastKey() {
+    return lastKey;
+  }
+
+  public long getFirstKey() {
+    return firstKey;
+  }
+
   public Collection<UnhealthyContainerMetadata> getContainers() {
     return containers;
+  }
+
+  public void setFirstKey(long firstKey) {
+    this.firstKey = firstKey;
+  }
+
+  public void setLastKey(long lastKey) {
+    this.lastKey = lastKey;
   }
 }

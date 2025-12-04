@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -110,8 +111,8 @@ public class TestReclaimableRenameEntryFilter extends AbstractReclaimableFilterT
 
   private <T> Table<String, T> getFailingMockedTable() throws IOException {
     Table<String, T> table = mock(Table.class);
-    when(table.get(anyString())).thenThrow(new IOException());
-    when(table.getIfExist(anyString())).thenThrow(new IOException());
+    when(table.get(anyString())).thenThrow(new RocksDatabaseException());
+    when(table.getIfExist(anyString())).thenThrow(new RocksDatabaseException());
     return table;
   }
 

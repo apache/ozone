@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -105,9 +106,6 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
 
   @BeforeAll
   public void setup() throws Exception {
@@ -131,9 +129,6 @@ public class TestOmMetrics {
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -740,7 +735,7 @@ public class TestOmMetrics {
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     OMMetadataManager spy = spy(metadataManager);
     Table<String, ?> table = getTable.apply(spy);
-    doThrow(exception).when(table).isExist(any());
+    doThrow(new RocksDatabaseException()).when(table).isExist(any());
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", spy);
 

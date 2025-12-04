@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.tools.contract;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IOSTATISTICS_LOGGING_LEVEL_INFO;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
@@ -124,10 +123,6 @@ public abstract class AbstractContractDistCpTest
 
   private Path inputFile5;
 
-  private Path outputDir;
-
-  private Path outputSubDir1;
-
   private Path outputSubDir2;
 
   private Path outputSubDir4;
@@ -188,7 +183,7 @@ public abstract class AbstractContractDistCpTest
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.
-    logIOStatisticsAtLevel(LOG, IOSTATISTICS_LOGGING_LEVEL_INFO, getRemoteFS());
+    logIOStatisticsAtLevel(LOG, "info", getRemoteFS());
     super.teardown();
   }
 
@@ -207,10 +202,10 @@ public abstract class AbstractContractDistCpTest
    * @param path path to set up
    */
   protected void initOutputFields(final Path path) {
-    outputDir = new Path(path, "outputDir");
+    Path outputDir = new Path(path, "outputDir");
     inputDirUnderOutputDir = new Path(outputDir, "inputDir");
     outputFile1 = new Path(inputDirUnderOutputDir, "file1");
-    outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
+    Path outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
     outputFile2 = new Path(outputSubDir1, "file2");
     outputSubDir2 = new Path(inputDirUnderOutputDir, "subDir2/subDir2");
     outputFile3 = new Path(outputSubDir2, "file3");

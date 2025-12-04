@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Codec for parsing {@link org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfoList}
@@ -44,6 +47,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  * always be present.
  */
 public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
+  public static final Logger LOG = LoggerFactory.getLogger(SchemaOneChunkInfoListCodec.class);
+  private static final AtomicBoolean LOGGED = new AtomicBoolean(false);
 
   private static final Codec<ChunkInfoList> INSTANCE =
       new SchemaOneChunkInfoListCodec();
@@ -72,9 +77,12 @@ public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
       return ChunkInfoList.getFromProtoBuf(
               ContainerProtos.ChunkInfoList.parseFrom(rawData));
     } catch (InvalidProtocolBufferException ex) {
-      throw new CodecException("Invalid chunk information. " +
+      if (LOGGED.compareAndSet(false, true)) {
+        LOG.warn("Invalid chunk information. " +
               "This data may have been written using datanode " +
               "schema version one, which did not save chunk information.", ex);
+      }
+      return null;
     }
   }
 

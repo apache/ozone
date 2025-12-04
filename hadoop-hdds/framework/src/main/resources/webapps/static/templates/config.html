@@ -81,8 +81,8 @@
       <tbody>
       <tr
           ng-repeat="config in $ctrl.configs | filter:search | orderBy:$ctrl.propertyName:$ctrl.reverse">
-        <td style="word-wrap: break-word;">{{config.name}}</td>
-        <td style="word-wrap: break-word;">{{config.value}}</td>
+        <td style="word-wrap: break-word; font-family: monospace;">{{config.name}}</td>
+        <td style="word-wrap: break-word; font-family: monospace;">{{config.value}}</td>
         <td style="word-wrap: break-word;">{{config.description}}</td>
       </tr>
       </tbody>

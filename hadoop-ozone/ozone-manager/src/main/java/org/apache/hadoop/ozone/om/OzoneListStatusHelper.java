@@ -277,7 +277,6 @@ public class OzoneListStatusHelper {
     } else {
       Preconditions.checkArgument(value instanceof OmKeyInfo);
       keyInfo = (OmKeyInfo) value;
-      keyInfo.setFileName(keyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixPath,
           keyInfo.getKeyName());
       keyInfo.setKeyName(fullKeyPath);

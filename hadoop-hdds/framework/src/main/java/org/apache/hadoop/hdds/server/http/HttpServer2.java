@@ -59,21 +59,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.utils.LogLevel;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
-import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -183,6 +182,8 @@ public final class HttpServer2 implements FilterContainer {
   private static final String NO_CACHE_FILTER = "NoCacheFilter";
 
   private static final String BIND_ADDRESS = "bind.address";
+  private static final String HADOOP_JETTY_LOGS_SERVE_ALIASES = "hadoop.jetty.logs.serve.aliases";
+  private static final boolean DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES = true;
 
   private final AccessControlList adminsAcl;
 
@@ -507,7 +508,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpsChannelConnector(server.webServer,
               httpConfig);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "unknown scheme for endpoint:" + ep);
         }
         connector.setHost(ep.getHost());
@@ -643,13 +644,12 @@ public final class HttpServer2 implements FilterContainer {
           LegacyHadoopConfigurationSource.asHadoopConfiguration(builder.conf);
       Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
           builder.authFilterConfigurationPrefix);
+      // create copy of the config with each <prefix>.<key> also added as hadoop.http.authentication.<key>
+      // (getFilterConfigMap removes prefix)
+      OzoneConfiguration copy = new OzoneConfiguration(hadoopConf);
+      filterConfig.forEach((k, v) -> copy.set("hadoop.http.authentication." + k, v));
       for (FilterInitializer c : initializers) {
-        if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
-          addFilter("authentication",
-              AuthenticationFilter.class.getName(), filterConfig);
-        } else {
-          c.initFilter(this, hadoopConf);
-        }
+        c.initFilter(this, copy);
       }
     }
 
@@ -761,16 +761,14 @@ public final class HttpServer2 implements FilterContainer {
     // and it's enabled.
     String logDir = System.getProperty("hadoop.log.dir");
     boolean logsEnabled = conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_HTTP_LOGS_ENABLED,
-        CommonConfigurationKeys.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
+        CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED,
+        CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
     if (logDir != null && logsEnabled) {
       ServletContextHandler logContext =
           new ServletContextHandler(parent, "/logs");
       logContext.setResourceBase(logDir);
       logContext.addServlet(AdminAuthorizedServlet.class, "/*");
-      if (conf.getBoolean(
-          CommonConfigurationKeys.HADOOP_JETTY_LOGS_SERVE_ALIASES,
-          CommonConfigurationKeys.DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
+      if (conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
         Map<String, String> params = logContext.getInitParams();
         params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
       }
@@ -1441,7 +1439,7 @@ public final class HttpServer2 implements FilterContainer {
 
     boolean access = true;
     boolean adminAccess = conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN,
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN,
         false);
     if (adminAccess) {
       access = hasAdministratorAccess(servletContext, request, response);
@@ -1466,7 +1464,7 @@ public final class HttpServer2 implements FilterContainer {
             .getAttribute(CONF_CONTEXT_ATTRIBUTE);
     // If there is no authorization, anybody has administrator access.
     if (!conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       return true;
     }
 

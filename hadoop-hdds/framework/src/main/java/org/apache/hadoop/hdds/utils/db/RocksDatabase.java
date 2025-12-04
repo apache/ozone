@@ -130,7 +130,7 @@ public final class RocksDatabase implements Closeable {
         .stream()
         .map(TableConfig::toName)
         .filter(familyName -> !existingFamilyNames.contains(familyName))
-        .map(TableConfig::newTableConfig)
+        .map(familyName -> TableConfig.newTableConfig(file.toPath(), familyName))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);
@@ -159,8 +159,9 @@ public final class RocksDatabase implements Closeable {
     List<ColumnFamilyDescriptor> descriptors = null;
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();
+    List<TableConfig> extra = null;
     try {
-      final List<TableConfig> extra = getExtraColumnFamilies(dbFile, families);
+      extra = getExtraColumnFamilies(dbFile, families);
       descriptors = Stream.concat(families.stream(), extra.stream())
           .map(TableConfig::getDescriptor)
           .collect(Collectors.toList());
@@ -178,6 +179,10 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
       throw toRocksDatabaseException(RocksDatabase.class, "open " + dbFile, e);
+    } finally {
+      if (extra != null) {
+        extra.forEach(TableConfig::close);
+      }
     }
   }
 
@@ -299,6 +304,16 @@ public final class RocksDatabase implements Closeable {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDelete key " + bytes2String(key), e);
+      }
+    }
+
+    public void batchDeleteRange(ManagedWriteBatch writeBatch, byte[] beginKey, byte[] endKey)
+        throws RocksDatabaseException {
+      try (UncheckedAutoCloseable ignored = acquire()) {
+        writeBatch.deleteRange(getHandle(), beginKey, endKey);
+      } catch (RocksDBException e) {
+        throw toRocksDatabaseException(this, "batchDeleteRange key " + bytes2String(beginKey) + " - " +
+            bytes2String(endKey), e);
       }
     }
 
@@ -839,17 +854,13 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs a map of TableName to prefixUsed.
+   * @param prefixInfo a map of TableName to prefixUsed.
    */
-  public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs) throws RocksDatabaseException {
+  public void deleteFilesNotMatchingPrefix(TablePrefixInfo prefixInfo) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
       for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
-
-        if (!prefixPairs.containsKey(sstFileColumnFamily)) {
-          continue;
-        }
 
         // RocksDB #deleteFile API allows only to delete the last level of
         // SST Files. Any level < last level won't get deleted and
@@ -861,7 +872,7 @@ public final class RocksDatabase implements Closeable {
           continue;
         }
 
-        String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
+        String prefixForColumnFamily = prefixInfo.getTablePrefix(sstFileColumnFamily);
         String firstDbKey = StringUtils.bytes2String(liveFileMetaData.smallestKey());
         String lastDbKey = StringUtils.bytes2String(liveFileMetaData.largestKey());
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
