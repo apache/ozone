@@ -1,0 +1,26 @@
+---
+title: "S3 Gateway Load Balancing"
+linkTitle: "S3 Gateway Load Balancing"
+date: 2023-11-29
+weight: 1
+description: >
+  This document describes how to set up multiple S3 gateways with a proxy for load balancing.
+menu:
+  main:
+    parent: "Ozone S3 Gateway"
+---
+
+## Using Multiple S3 Gateways for Load Balancing
+
+The Ozone S3 Gateway is designed to be stateless, which means it does not store any data on the node where it is running. This stateless architecture allows you to run multiple S3 Gateway nodes and load balance traffic between them.
+
+If you find that a single S3 Gateway is becoming a bottleneck for your S3 traffic, you can improve the throughput by adding more S3 Gateway nodes to your cluster. You can then use a load balancer, such as HAProxy, to distribute the traffic among the S3 Gateway nodes in a round-robin fashion.
+
+### Docker Compose Example
+
+The Ozone source code includes a Docker Compose example for running multiple S3 Gateways with HAProxy. You can find it in the `hadoop-ozone/dist/src/main/compose/common` directory.
+
+*   [s3-haproxy.cfg](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/common/s3-haproxy.cfg)
+*   [s3-haproxy.yaml](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/common/s3-haproxy.yaml)
+
+These examples can help you get started with running a load-balanced S3 Gateway setup.
