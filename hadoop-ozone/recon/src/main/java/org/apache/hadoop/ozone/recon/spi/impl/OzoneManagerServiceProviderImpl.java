@@ -118,7 +118,7 @@ public class OzoneManagerServiceProviderImpl
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
   private URLConnectionFactory connectionFactory;
-
+  private final AtomicBoolean reInitializeTasksCalled = new AtomicBoolean(false);
   private File omSnapshotDBParentDir = null;
   private File reconDbDir = null;
   private String omDBSnapshotUrl;
@@ -364,17 +364,6 @@ public class OzoneManagerServiceProviderImpl
 
   private void stopSyncDataFromOMThread() {
     scheduler.shutdown();
-    try {
-      if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
-        scheduler.shutdownNow();
-        if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-          LOG.error("OM sync scheduler failed to terminate");
-        }
-      }
-    } catch (InterruptedException e) {
-      scheduler.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
     tarExtractor.stop();
     LOG.debug("Shutdown the OM DB sync scheduler.");
   }
