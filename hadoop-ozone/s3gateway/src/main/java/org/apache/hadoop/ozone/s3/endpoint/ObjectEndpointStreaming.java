@@ -125,10 +125,9 @@ final class ObjectEndpointStreaming {
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
 
       final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
-      // If x-amz-content-sha256 is present and is not an unsigned payload or multi-chunk payload, validate the sha256.
+      // If sha256Digest exists, this request must validate x-amz-content-sha256
       MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
-      if (sha256Digest != null && !hasUnsignedPayload(amzContentSha256Header) &&
-          !hasMultiChunksPayload(amzContentSha256Header)) {
+      if (sha256Digest != null) {
         final String actualSha256 = DatatypeConverter.printHexBinary(
             sha256Digest.digest()).toLowerCase();
         streamOutput.getKeyDataStreamOutput().setPreCommit(() -> {
