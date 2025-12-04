@@ -542,14 +542,14 @@ public class KeyManagerImpl implements KeyManager {
         });
     long generateEDEKTime = monotonicNow() - generateEDEKStartTime;
     LOG.debug("generateEDEK takes {} ms", generateEDEKTime);
-    Preconditions.checkNotNull(edek);
+    Objects.requireNonNull(edek, "edek == null");
     return edek;
   }
 
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
-    Preconditions.checkNotNull(args);
+    Objects.requireNonNull(args, "args == null");
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
         () -> readKeyInfo(args, bucket.bucketLayout()));
@@ -768,8 +768,8 @@ public class KeyManagerImpl implements KeyManager {
   public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix,
       int maxKeys) throws IOException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
+    Objects.requireNonNull(bucketName, "bucketName == null");
     OmBucketInfo omBucketInfo = getBucketInfo(volumeName, bucketName);
     if (omBucketInfo == null) {
       throw new OMException("Bucket " + bucketName + " not found.",
@@ -993,7 +993,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
-    Preconditions.checkNotNull(args);
+    Objects.requireNonNull(args, "args == null");
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
         () -> readKeyInfo(args, bucket.bucketLayout()));
@@ -1064,8 +1064,8 @@ public class KeyManagerImpl implements KeyManager {
       String bucketName,
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws OMException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
+    Objects.requireNonNull(bucketName, "bucketName == null");
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1103,10 +1103,10 @@ public class KeyManagerImpl implements KeyManager {
   public OmMultipartUploadListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
-    Preconditions.checkNotNull(keyName);
-    Preconditions.checkNotNull(uploadID);
+    Objects.requireNonNull(volumeName, "volumeName == null");
+    Objects.requireNonNull(bucketName, "bucketName == null");
+    Objects.requireNonNull(keyName, "keyName == null");
+    Objects.requireNonNull(uploadID, "uploadID == null");
     boolean isTruncated = false;
     int nextPartNumberMarker = 0;
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
@@ -1726,7 +1726,6 @@ public class KeyManagerImpl implements KeyManager {
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
-        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
@@ -2338,7 +2337,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
-    Preconditions.checkNotNull(args);
+    Objects.requireNonNull(args, "args == null");
 
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),

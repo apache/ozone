@@ -137,6 +137,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -506,7 +507,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
     // Load HA related configurations
     OMHANodeDetails omhaNodeDetails =
@@ -5259,7 +5260,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (this.isFilesystemSnapshotEnabled()) {
       if (wasSstFilteringSvcEnabled) {
         // Sanity check
-        Preconditions.checkNotNull(keyManager.getSnapshotSstFilteringService(),
+        Objects.requireNonNull(keyManager.getSnapshotSstFilteringService(),
             "sstFilteringService should not be null when SST filtering service is enabled.");
         ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
       }

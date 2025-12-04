@@ -129,6 +129,9 @@ public class RunningDatanodeState implements DatanodeState {
       EndpointStateMachine endpoint) {
     switch (endpoint.getState()) {
     case GETVERSION:
+      // set the next heartbeat time to current to avoid wait for next heartbeat as REGISTER can be triggered
+      // immediately after GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
       return new VersionEndpointTask(endpoint, conf,
           context.getParent().getContainer());
     case REGISTER:

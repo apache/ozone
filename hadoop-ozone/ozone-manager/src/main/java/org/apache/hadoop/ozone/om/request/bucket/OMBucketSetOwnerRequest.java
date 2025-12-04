@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -80,7 +80,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     final long transactionLogIndex = context.getIndex();
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-    Preconditions.checkNotNull(setBucketPropertyRequest);
+    Objects.requireNonNull(setBucketPropertyRequest, "setBucketPropertyRequest == null");
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -114,7 +115,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
-    Preconditions.checkNotNull(request);
+    Objects.requireNonNull(request, "request == null");
     final String tenantId = request.getTenantId();
 
     // Check tenantId validity
@@ -235,7 +236,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
-    Preconditions.checkNotNull(volumeName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

@@ -141,6 +141,15 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean listAllVolumesAllowed = Defaults.LIST_ALL_VOLUMES_ALLOWED;
 
+  @Config(key = "ozone.om.allow.leader.skip.linearizable.read",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA},
+      description = "Allow leader to handler requests directly, no need to check the leadership " +
+          "for every request."
+  )
+  private boolean allowLeaderSkipLinearizableRead;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -171,6 +180,14 @@ public class OmConfig extends ReconfigurableConfig {
 
   public long getMaxListSize() {
     return maxListSize;
+  }
+
+  public boolean isAllowLeaderSkipLinearizableRead() {
+    return allowLeaderSkipLinearizableRead;
+  }
+
+  public void setAllowLeaderSkipLinearizableRead(boolean newValue) {
+    allowLeaderSkipLinearizableRead = newValue;
   }
 
   public void setMaxListSize(long newValue) {
@@ -248,6 +265,7 @@ public class OmConfig extends ReconfigurableConfig {
     maxUserVolumeCount = other.maxUserVolumeCount;
     userDefaultRights = other.userDefaultRights;
     groupDefaultRights = other.groupDefaultRights;
+    allowLeaderSkipLinearizableRead = other.allowLeaderSkipLinearizableRead;
 
     validate();
   }

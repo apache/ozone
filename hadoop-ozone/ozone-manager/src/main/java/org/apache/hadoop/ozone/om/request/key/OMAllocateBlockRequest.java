@@ -21,12 +21,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -83,7 +83,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     AllocateBlockRequest allocateBlockRequest =
         super.preExecute(ozoneManager).getAllocateBlockRequest();
 
-    Preconditions.checkNotNull(allocateBlockRequest);
+    Objects.requireNonNull(allocateBlockRequest, "allocateBlockRequest == null");
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
@@ -158,7 +158,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyLocation blockLocation =
         allocateBlockRequest.getKeyLocation();
-    Preconditions.checkNotNull(blockLocation);
+    Objects.requireNonNull(blockLocation, "blockLocation == null");
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

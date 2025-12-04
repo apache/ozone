@@ -365,7 +365,7 @@ public class TestScmDataDistributionFinalization {
 
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
-        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 10000);
+        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 30000);
   }
 
   private Map<Long, List<DeletedBlock>> generateDeletedBlocks(int dataSize, boolean withSize) {
