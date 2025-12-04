@@ -71,7 +71,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
   private @Metric MutableGaugeLong numSnapshots;
 
   private final AtomicLong lastUpdateTime = new AtomicLong(0);
-  // Change the field declaration:
   private final AtomicReference<CompletableFuture<Void>> currentUpdateFutureRef =
       new AtomicReference<>();
   private final OMMetadataManager metadataManager;
@@ -82,7 +81,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
 
   private Timer updateTimer;
 
-  // Add start method (after unRegister method)
   /**
    * Starts the periodic metrics update task.
    *
@@ -100,9 +98,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
         updateMetricsAsync();
       }
     }, 0, updateInterval);
-
-    // Do initial update
-    updateMetricsAsync();
   }
 
   /**
@@ -175,7 +170,19 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
       }
     });
 
-    currentUpdateFutureRef.set(newFuture);
+    // Atomically set the future only if the current value matches what we checked
+    // This prevents race conditions where multiple threads try to set a new future
+    CompletableFuture<Void> expected = currentUpdateFutureRef.get();
+    if (expected == null || expected.isDone()) {
+      // Only set if still null or done (double-check after creating future)
+      if (!currentUpdateFutureRef.compareAndSet(expected, newFuture)) {
+        // Another thread set a future, cancel this one
+        newFuture.cancel(false);
+      }
+    } else {
+      // Another thread started an update, cancel this one
+      newFuture.cancel(false);
+    }
   }
 
   /**
@@ -219,10 +226,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
         snapshotCount = checkpointDirs.length;
 
         for (File checkpointDir : checkpointDirs) {
-          if (!checkpointDir.isDirectory()) {
-            continue;
-          }
-
           String checkpointDirName = checkpointDir.getName();
           long checkpointSize = 0;
           int sstFileCount = 0;
@@ -252,7 +255,7 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
       numSnapshots.set(snapshotCount);
 
       // Atomically update per-checkpoint metrics map
-      checkpointMetricsMap = newCheckpointMetricsMap;
+      checkpointMetricsMap = Collections.unmodifiableMap(newCheckpointMetricsMap);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Updated snapshot directory metrics: size={}, sstFiles={}, snapshots={}",
@@ -324,7 +327,7 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
 
   @VisibleForTesting
   public Map<String, CheckpointMetrics> getCheckpointMetricsMap() {
-    return Collections.unmodifiableMap(new HashMap<>(checkpointMetricsMap));
+    return Collections.unmodifiableMap(checkpointMetricsMap);
   }
 
   /**

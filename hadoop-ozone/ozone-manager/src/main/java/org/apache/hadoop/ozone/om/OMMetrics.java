@@ -264,8 +264,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     return dbCheckpointMetrics;
   }
 
-  // Add getter with lazy initialization check
-  public OMSnapshotDirectoryMetrics getSnapshotDirectoryMetrics() {
+  /**
+   * @return an instance of OMSnapshotDirectoryMetrics.
+   * @throws IllegalStateException if the metric is null
+   */
+  public OMSnapshotDirectoryMetrics getSnapshotDirectoryMetrics() throws IllegalStateException {
     if (snapshotDirectoryMetrics == null) {
       throw new IllegalStateException(
           "SnapshotDirectoryMetrics not initialized. Call startSnapshotDirectoryMetrics() first.");
@@ -288,7 +291,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     snapshotDirectoryMetrics.start(configuration);
   }
 
-  // Add stop method (for cleanup)
   public void stopSnapshotDirectoryMetrics() {
     if (snapshotDirectoryMetrics != null) {
       snapshotDirectoryMetrics.stop();

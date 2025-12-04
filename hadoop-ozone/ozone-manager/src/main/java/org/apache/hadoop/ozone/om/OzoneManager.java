@@ -1954,7 +1954,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
-    // Start snapshot directory metrics updates
+    // Restart snapshot directory metrics updates
+    metrics.stopSnapshotDirectoryMetrics();
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
