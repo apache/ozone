@@ -31,9 +31,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private Map<ContainerReplica, ContainerReplica> replicas = new HashMap<>();
-  private Set<ContainerReplica> replicaSet;
-
+  private Map<ContainerReplica, ContainerReplica> replicaMap = Collections.emptyMap();
+  private Set<ContainerReplica> replicas = Collections.emptySet();
   ContainerEntry(ContainerInfo info) {
     this.info = info;
   }
@@ -43,22 +42,22 @@ public class ContainerEntry {
   }
 
   public Set<ContainerReplica> getReplicas() {
-    return Collections.unmodifiableSet(replicas.keySet());
+    return replicas;
   }
 
   public ContainerReplica put(ContainerReplica r) {
-    // Modifications are rare compared to reads, so to optimize for read we return and unmodifable view of the
-    // map in getReplicas. That means for any modification we need to copy the map.
-    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(8);
-    map.putAll(this.replicas);
-    replicas = map;
-    return replicas.put(r, r);
+    return copyAndUpdate(map -> map.put(r, r));
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(8);
-    map.putAll(this.replicas);
-    replicas = map;
-    return replicas.remove(datanodeID);
+    return copyAndUpdate(map -> map.remove(datanodeID));
+  }
+
+  private <T> T copyAndUpdate(java.util.function.Function<Map<ContainerReplica, ContainerReplica>, T> update) {
+    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(this.replicaMap);
+    T result = update.apply(map);
+    this.replicaMap = map;
+    this.replicas = Collections.unmodifiableSet(map.keySet());
+    return result;
   }
 }
