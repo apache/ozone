@@ -363,7 +363,7 @@ public class OzoneManagerServiceProviderImpl
   }
 
   private void stopSyncDataFromOMThread() {
-    scheduler.shutdown();
+    scheduler.shutdownNow();
     tarExtractor.stop();
     LOG.debug("Shutdown the OM DB sync scheduler.");
   }
