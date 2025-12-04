@@ -194,6 +194,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
             ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
             ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
       return handler.handleReadRequest(request);
     } 
     // Get current OM's role
@@ -238,6 +239,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
     if (leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
       LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
       return false; // lease time expired
     }
 
@@ -257,6 +259,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
     boolean ret = divisionInfo.getLastAppliedIndex() + leaseLogLimit >= leaderCommit;
     if (!ret) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailLog();
       LOG.debug("FollowerRead Local Lease not allowed: Index Lag exceeds limit. ");
     }
     return ret;
