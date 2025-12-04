@@ -49,7 +49,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -1166,7 +1166,7 @@ public class TestReplicationManager {
 
     ReconstructECContainersCommand command = new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sourceNodes, targetNodes,
-        Proto2Utils.unsafeByteString(missingIndexes), ecRepConfig);
+        ProtoUtils.unsafeByteString(missingIndexes), ecRepConfig);
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target4);
 
@@ -1486,7 +1486,7 @@ public class TestReplicationManager {
     byte[] missingIndexes = new byte[]{4, 5};
     return new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sources,
-        Arrays.asList(targets), Proto2Utils.unsafeByteString(missingIndexes),
+        Arrays.asList(targets), ProtoUtils.unsafeByteString(missingIndexes),
         (ECReplicationConfig) repConfig);
   }
 
