@@ -19,9 +19,14 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -31,9 +36,12 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -42,7 +50,6 @@ import org.mockito.Mockito;
  * Test class to test out OzoneManagerRequestHandler.
  */
 public class TestOzoneManagerRequestHandler {
-
 
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
     OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
@@ -74,6 +81,39 @@ public class TestOzoneManagerRequestHandler {
 
   private OzoneFileStatus getMockedOzoneFileStatus() {
     return new OzoneFileStatus(getMockedOmKeyInfo(), 256, false);
+  }
+
+  /**
+   * Create OmKeyInfo object with or without FileEncryptionInfo.
+   */
+  private OmKeyInfo createOmKeyInfoWithEncryption(String keyName, boolean isEncrypted) {
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName("testVolume")
+        .setBucketName("testBucket")
+        .setKeyName(keyName)
+        .setDataSize(1024L)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, Collections.emptyList())))
+        .setAcls(Collections.emptyList())
+        .setObjectID(1L)
+        .setUpdateID(1L)
+        .setOwnerName("testOwner");
+
+    if (isEncrypted) {
+      FileEncryptionInfo fileEncryptionInfo = new FileEncryptionInfo(
+          CipherSuite.AES_CTR_NOPADDING,
+          CryptoProtocolVersion.ENCRYPTION_ZONES,
+          new byte[32],
+          new byte[16],
+          "testkey1",
+          "testkey1@0"
+      );
+      builder.setFileEncryptionInfo(fileEncryptionInfo);
+    }
+
+    return builder.build();
   }
 
   private void mockOmRequest(OzoneManagerProtocolProtos.OMRequest request,
@@ -167,5 +207,39 @@ public class TestOzoneManagerRequestHandler {
       int expectedSize = Math.max(Math.min(Math.min(10, requestSize), resultSize), 0);
       Assertions.assertEquals(expectedSize, omResponse.getListStatusResponse().getStatusesList().size());
     }
+  }
+
+  /**
+   * Test to verify BasicOmKeyInfo encryption field works in listKeysLight.
+   */
+  @Test
+  public void testListKeysLightEncryptionFromOmKeyInfo() throws IOException {
+    // Create OmKeyInfo objects with and without FileEncryptionInfo
+    OmKeyInfo encryptedOmKeyInfo = createOmKeyInfoWithEncryption("encrypted-key", true);
+    OmKeyInfo normalOmKeyInfo = createOmKeyInfoWithEncryption("normal-key", false);
+
+    // Convert to BasicOmKeyInfo
+    BasicOmKeyInfo encryptedBasicKey = BasicOmKeyInfo.fromOmKeyInfo(encryptedOmKeyInfo);
+    BasicOmKeyInfo normalBasicKey = BasicOmKeyInfo.fromOmKeyInfo(normalOmKeyInfo);
+
+    Assertions.assertTrue(encryptedBasicKey.isEncrypted());
+    Assertions.assertFalse(normalBasicKey.isEncrypted());
+
+    List<BasicOmKeyInfo> keyInfos = Arrays.asList(encryptedBasicKey, normalBasicKey);
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    Mockito.when(ozoneManager.listKeysLight(Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(new ListKeysLightResult(keyInfos, false));
+    OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    mockOmRequest(request, OzoneManagerProtocolProtos.Type.ListKeysLight, 10);
+    OzoneManagerProtocolProtos.OMResponse omResponse = requestHandler.handleReadRequest(request);
+
+    List<OzoneManagerProtocolProtos.BasicKeyInfo> basicKeyInfoList =
+        omResponse.getListKeysLightResponse().getBasicKeyInfoList();
+
+    Assertions.assertEquals(2, basicKeyInfoList.size());
+    Assertions.assertTrue(basicKeyInfoList.get(0).getIsEncrypted(), "encrypted-key should have isEncrypted=true");
+    Assertions.assertFalse(basicKeyInfoList.get(1).getIsEncrypted(), "normal-key should have isEncrypted=false");
   }
 }

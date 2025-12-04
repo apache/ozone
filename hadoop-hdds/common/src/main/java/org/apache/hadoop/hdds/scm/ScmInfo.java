@@ -29,7 +29,6 @@ public final class ScmInfo {
   private final String clusterId;
   private final String scmId;
   private final List<String> peerRoles;
-  private final boolean scmRatisEnabled;
 
   /**
    * Builder for ScmInfo.
@@ -38,7 +37,6 @@ public final class ScmInfo {
     private String clusterId;
     private String scmId;
     private final List<String> peerRoles;
-    private boolean scmRatisEnabled;
 
     public Builder() {
       peerRoles = new ArrayList<>();
@@ -66,36 +64,23 @@ public final class ScmInfo {
 
     /**
      * Set peer address in Scm HA.
-     * @param roles ratis peer address in the format of [ip|hostname]:port
+     * @param roles peer address in the format of [ip|hostname]:port
      * @return  Builder for scmInfo
      */
-    public Builder setRatisPeerRoles(List<String> roles) {
+    public Builder setPeerRoles(List<String> roles) {
       peerRoles.addAll(roles);
       return this;
     }
 
-    /**
-     * Set whether SCM enables Ratis.
-     *
-     * @param ratisEnabled If it is true, it means that the Ratis mode is turned on.
-     * If it is false, it means that the Ratis mode is not turned on.
-     * @return Builder for scmInfo
-     */
-    public Builder setScmRatisEnabled(boolean ratisEnabled) {
-      scmRatisEnabled = ratisEnabled;
-      return this;
-    }
-
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId, peerRoles, scmRatisEnabled);
+      return new ScmInfo(clusterId, scmId, peerRoles);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId, List<String> peerRoles, boolean ratisEnabled) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
     this.clusterId = clusterId;
     this.scmId = scmId;
     this.peerRoles = Collections.unmodifiableList(peerRoles);
-    this.scmRatisEnabled = ratisEnabled;
   }
 
   /**
@@ -115,14 +100,11 @@ public final class ScmInfo {
   }
 
   /**
-   * Gets the list of peer roles (currently address) in Scm HA.
+   * Gets the list of peer roles (currently address) in SCM.
    * @return List of peer address
    */
-  public List<String> getRatisPeerRoles() {
+  public List<String> getPeerRoles() {
     return peerRoles;
   }
 
-  public boolean getScmRatisEnabled() {
-    return scmRatisEnabled;
-  }
 }

@@ -24,14 +24,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_A
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -76,8 +76,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -122,8 +120,38 @@ import org.slf4j.LoggerFactory;
  * Ozone containers.
  */
 public final class XceiverServerRatis implements XceiverServerSpi {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(XceiverServerRatis.class);
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverServerRatis.class);
+
+  private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
+
+  private int serverPort;
+  private int adminPort;
+  private int clientPort;
+
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
+  @SuppressWarnings("PMD.SingularField")
+  private int dataStreamPort;
+  private final RaftServer server;
+  private final String name;
+  private final List<ThreadPoolExecutor> chunkExecutors;
+  private final ContainerDispatcher dispatcher;
+  private final ContainerController containerController;
+  private final ClientId clientId = ClientId.randomId();
+  private final StateContext context;
+  private boolean isStarted = false;
+  private final DatanodeDetails datanodeDetails;
+  private final ConfigurationSource conf;
+  // TODO: Remove the gids set when Ratis supports an api to query active
+  // pipelines
+  private final ConcurrentMap<RaftGroupId, ActivePipelineContext> activePipelines = new ConcurrentHashMap<>();
+  // Timeout used while calling submitRequest directly.
+  private final long requestTimeout;
+  private final boolean shouldDeleteRatisLogDirectory;
+  private final boolean streamEnable;
+  private final DatanodeRatisServerConfig ratisServerConfig;
+  private final HddsDatanodeService datanodeService;
 
   private static class ActivePipelineContext {
     /** The current datanode is the current leader of the pipeline. */
@@ -145,38 +173,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
   }
 
-  private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
-  private static final List<Integer> DEFAULT_PRIORITY_LIST =
-      new ArrayList<>(
-          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
-
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
   }
-
-  private int serverPort;
-  private int adminPort;
-  private int clientPort;
-  private int dataStreamPort;
-  private final RaftServer server;
-  private final String name;
-  private final List<ThreadPoolExecutor> chunkExecutors;
-  private final ContainerDispatcher dispatcher;
-  private final ContainerController containerController;
-  private final ClientId clientId = ClientId.randomId();
-  private final StateContext context;
-  private boolean isStarted = false;
-  private final DatanodeDetails datanodeDetails;
-  private final ConfigurationSource conf;
-  // TODO: Remove the gids set when Ratis supports an api to query active
-  // pipelines
-  private final ConcurrentMap<RaftGroupId, ActivePipelineContext> activePipelines = new ConcurrentHashMap<>();
-  // Timeout used while calling submitRequest directly.
-  private final long requestTimeout;
-  private final boolean shouldDeleteRatisLogDirectory;
-  private final boolean streamEnable;
-  private final DatanodeRatisServerConfig ratisServerConfig;
-  private final HddsDatanodeService datanodeService;
 
   private XceiverServerRatis(HddsDatanodeService hddsDatanodeService, DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -387,6 +386,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         leaderElectionMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
         TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        conf, properties, HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY);
   }
 
   private void setTimeoutForRetryCache(RaftProperties properties) {
@@ -660,8 +661,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
-
+    try (Scope ignored = span.makeCurrent()) {
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
@@ -677,7 +677,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       processReply(reply);
     } finally {
-      span.finish();
+      span.end();
     }
   }
 
@@ -739,9 +739,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, b.toString(), ClosePipelineInfo.Reason.PIPELINE_FAILED);
   }
 
-  private void triggerPipelineClose(RaftGroupId groupId, String detail,
+  @VisibleForTesting
+  public void triggerPipelineClose(RaftGroupId groupId, String detail,
       ClosePipelineInfo.Reason reasonCode) {
     PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
+
+    if (context != null) {
+      if (context.isPipelineCloseInProgress(pipelineID.getId())) {
+        LOG.debug("Skipped triggering pipeline close for {} as it is already in progress. Reason: {}",
+            pipelineID.getId(), detail);
+        return;
+      }
+    }
+
     ClosePipelineInfo.Builder closePipelineInfo =
         ClosePipelineInfo.newBuilder()
             .setPipelineID(pipelineID.getProtobuf())
@@ -753,7 +763,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setAction(PipelineAction.Action.CLOSE)
         .build();
     if (context != null) {
-      context.addPipelineActionIfAbsent(action);
+      if (context.addPipelineActionIfAbsent(action)) {
+        LOG.warn("pipeline Action {} on pipeline {}.Reason : {}",
+            action.getAction(), pipelineID,
+            action.getClosePipeline().getDetailedReason());
+      }
       if (!activePipelines.get(groupId).isPendingClose()) {
         // if pipeline close action has not been triggered before, we need trigger pipeline close immediately to
         // prevent SCM to allocate blocks on the failed pipeline
@@ -762,27 +776,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             (key, value) -> new ActivePipelineContext(value.isPipelineLeader(), true));
       }
     }
-    LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
-            action.getAction(), pipelineID,
-            action.getClosePipeline().getDetailedReason());
   }
 
   @Override
   public boolean isExist(HddsProtos.PipelineID pipelineId) {
     return activePipelines.containsKey(
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
-  }
-
-  private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
-    long bytesWritten = 0;
-    for (Container<?> container : containerController.getContainers()) {
-      ContainerData containerData = container.getContainerData();
-      if (containerData.getOriginPipelineId()
-          .compareTo(pipelineID.getId()) == 0) {
-        bytesWritten += containerData.getWriteBytes();
-      }
-    }
-    return bytesWritten;
   }
 
   @Override
@@ -798,7 +797,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(pipelineID)
             .setIsLeader(isLeader)
-            .setBytesWritten(calculatePipelineBytesWritten(pipelineID))
             .build());
       }
       return reports;
@@ -878,6 +876,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, msg,
         ClosePipelineInfo.Reason.STATEMACHINE_TRANSACTION_FAILED);
   }
+
   /**
    * The fact that the snapshot contents cannot be used to actually catch up
    * the follower, it is the reason to initiate close pipeline and

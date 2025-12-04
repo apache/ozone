@@ -42,10 +42,6 @@ public class OmDirectoryInfo extends WithParentObjectId
       OmDirectoryInfo::getProtobuf,
       OmDirectoryInfo.class);
 
-  public static Codec<OmDirectoryInfo> getCodec() {
-    return CODEC;
-  }
-
   private final String name; // directory name
   private String owner;
 
@@ -63,6 +59,10 @@ public class OmDirectoryInfo extends WithParentObjectId
     this.modificationTime = builder.modificationTime;
   }
 
+  public static Codec<OmDirectoryInfo> getCodec() {
+    return CODEC;
+  }
+
   /**
    * Returns new builder class that builds a OmPrefixInfo.
    *
@@ -75,7 +75,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
     private String name;
     private String owner;
 
@@ -153,7 +153,8 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
-    public OmDirectoryInfo build() {
+    @Override
+    protected OmDirectoryInfo buildObject() {
       return new OmDirectoryInfo(this);
     }
   }
@@ -209,11 +210,11 @@ public class OmDirectoryInfo extends WithParentObjectId
   }
 
   /**
-   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
+   * Parses DirectoryInfo protobuf and creates OmDirectoryInfo Builder.
    * @param dirInfo
-   * @return instance of OmDirectoryInfo
+   * @return Builder instance
    */
-  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+  public static Builder builderFromProtobuf(DirectoryInfo dirInfo) {
     OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
             .setName(dirInfo.getName())
             .setCreationTime(dirInfo.getCreationTime())
@@ -235,7 +236,16 @@ public class OmDirectoryInfo extends WithParentObjectId
     if (dirInfo.hasOwnerName()) {
       opib.setOwner(dirInfo.getOwnerName());
     }
-    return opib.build();
+    return opib;
+  }
+
+  /**
+   * Parses DirectoryInfo protobuf and creates OmDirectoryInfo.
+   * @param dirInfo
+   * @return instance of OmDirectoryInfo
+   */
+  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+    return builderFromProtobuf(dirInfo).build();
   }
 
   @Override

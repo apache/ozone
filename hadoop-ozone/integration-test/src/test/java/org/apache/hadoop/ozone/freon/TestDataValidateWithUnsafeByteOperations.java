@@ -17,25 +17,16 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -44,9 +35,6 @@ public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
     startCluster(conf);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     shutdownCluster();

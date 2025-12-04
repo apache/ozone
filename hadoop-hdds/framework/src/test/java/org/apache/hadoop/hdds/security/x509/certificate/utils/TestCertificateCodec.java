@@ -29,7 +29,7 @@ import java.security.cert.CertPath;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -185,12 +185,12 @@ public class TestCertificateCodec {
   private X509Certificate generateTestCert() throws Exception {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(securityConfig);
-    LocalDateTime startDate = LocalDateTime.now();
-    LocalDateTime endDate = startDate.plusDays(1);
+    ZonedDateTime startDate = ZonedDateTime.now();
+    ZonedDateTime endDate = startDate.plusDays(1);
     return SelfSignedCertificate.newBuilder()
-        .setSubject(RandomStringUtils.randomAlphabetic(4))
-        .setClusterID(RandomStringUtils.randomAlphabetic(4))
-        .setScmID(RandomStringUtils.randomAlphabetic(4))
+        .setSubject(RandomStringUtils.secure().nextAlphabetic(4))
+        .setClusterID(RandomStringUtils.secure().nextAlphabetic(4))
+        .setScmID(RandomStringUtils.secure().nextAlphabetic(4))
         .setBeginDate(startDate)
         .setEndDate(endDate)
         .setConfiguration(securityConfig)

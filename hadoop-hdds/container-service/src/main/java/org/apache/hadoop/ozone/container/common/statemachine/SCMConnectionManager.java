@@ -40,8 +40,8 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -78,7 +78,6 @@ public class SCMConnectionManager
         this);
   }
 
-
   /**
    * Returns Config.
    *
@@ -96,7 +95,6 @@ public class SCMConnectionManager
   public int getRpcTimeout() {
     return rpcTimeout;
   }
-
 
   /**
    * Takes a read lock.

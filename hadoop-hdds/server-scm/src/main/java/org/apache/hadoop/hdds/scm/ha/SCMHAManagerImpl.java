@@ -428,7 +428,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return ratisServer.removeSCM(request);
   }
 
-
   void stopServices() throws Exception {
 
     // just stop the SCMMetaData store. All other background
@@ -446,7 +445,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
-        metadataStore.getDeletedBlocksTXTable());
+        metadataStore.getDeletedBlocksTXTable(), metadataStore.getStatefulServiceConfigTable());
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -470,8 +469,4 @@ public class SCMHAManagerImpl implements SCMHAManager {
     grpcServer.stop();
   }
 
-  @VisibleForTesting
-  public static Logger getLogger() {
-    return LOG;
-  }
 }

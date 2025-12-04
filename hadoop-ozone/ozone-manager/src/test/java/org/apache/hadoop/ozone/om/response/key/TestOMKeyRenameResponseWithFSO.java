@@ -25,7 +25,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 
@@ -76,6 +75,7 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         getDBKeyName(toKeyInfo), fromKeyParent, toKeyParent, toKeyInfo,
         bucketInfo, false, getBucketLayout());
   }
+
   protected void createParent() {
     long bucketId = random.nextLong();
     String fromKeyParentName = UUID.randomUUID().toString();
@@ -88,14 +88,11 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         .build();
     fromKeyParent.setParentObjectID(bucketId);
     toKeyParent.setParentObjectID(bucketId);
-    fromKeyParent.setFileName(OzoneFSUtils.getFileName(
-        fromKeyParent.getKeyName()));
-    toKeyParent.setFileName(OzoneFSUtils.getFileName(
-        toKeyParent.getKeyName()));
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     bucketInfo = TestOMResponseUtils.createBucket(volumeName, bucketName);
   }
+
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;

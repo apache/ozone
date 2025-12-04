@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -50,6 +50,10 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
   private static final VolumeAclOp VOLUME_ADD_ACL_OP =
       (acls, volArgs) -> volArgs.addAcl(acls.get(0));
 
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
@@ -65,15 +69,11 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
     return super.preExecute(ozoneManager);
   }
 
-  private final List<OzoneAcl> ozoneAcls;
-  private final String volumeName;
-  private final OzoneObj obj;
-
   public OMVolumeAddAclRequest(OMRequest omRequest) {
     super(omRequest, VOLUME_ADD_ACL_OP);
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
         getOmRequest().getAddAclRequest();
-    Preconditions.checkNotNull(addAclRequest);
+    Objects.requireNonNull(addAclRequest, "addAclRequest == null");
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(addAclRequest.getAcl()));
     obj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());

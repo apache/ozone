@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,7 +87,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -94,29 +94,23 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private ContainerManager mapping;
   private MockNodeManager nodeManager;
   private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
-  private SCMHAManager scmHAManager;
-  private SequenceIdGenerator sequenceIdGen;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private EventQueue eventQueue;
-  private SCMContext scmContext;
-  private SCMServiceManager serviceManager;
   private int numContainerPerOwnerInPipeline;
-  private OzoneConfiguration conf;
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
   @BeforeEach
   void setUp(@TempDir File tempDir) throws Exception {
-    conf = SCMTestUtils.getConf(tempDir);
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     numContainerPerOwnerInPipeline = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
-
+    conf.setBoolean(HDDS_SCM_SAFEMODE_ENABLED, false);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
@@ -124,16 +118,16 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();
-    scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    sequenceIdGen = new SequenceIdGenerator(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
@@ -159,14 +153,9 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable(),
             new ContainerReplicaPendingOps(
-                Clock.system(ZoneId.systemDefault())));
+                Clock.system(ZoneId.systemDefault()), null));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager, pipelineManager, eventQueue, serviceManager, scmContext) {
-      @Override
-      public void emitSafeModeStatus() {
-        // skip
-      }
-    };
+        nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setPipelineManager(pipelineManager);
@@ -180,7 +169,7 @@ public class TestBlockManager {
     configurator.getLeaseManager().start();
 
     // Initialize these fields so that the tests can pass.
-    mapping = scm.getContainerManager();
+    ContainerManager mapping = scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
@@ -191,7 +180,7 @@ public class TestBlockManager {
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
 
-    scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
   }
 
   @AfterEach
@@ -324,7 +313,6 @@ public class TestBlockManager {
     });
   }
 
-
   @Test
   void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
@@ -391,7 +379,6 @@ public class TestBlockManager {
         numContainerPerOwnerInPipeline;
     int numMetaDataVolumes = 2;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
-    nodeManager.setNumMetaDataVolumes(numMetaDataVolumes);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -454,11 +441,9 @@ public class TestBlockManager {
         t.getMessage());
   }
 
-
   @Test
   public void testAllocateBlockFailureInSafeMode() {
-    scm.getScmContext().updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
@@ -475,7 +460,6 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testMultipleBlockAllocation()
       throws IOException, TimeoutException, InterruptedException {
 
@@ -518,7 +502,6 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testMultipleBlockAllocationWithClosedContainer()
       throws IOException, TimeoutException, InterruptedException {
     nodeManager.setNumPipelinePerDatanode(1);
@@ -573,11 +556,10 @@ public class TestBlockManager {
   }
 
   @Test
-  @Timeout(100)
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
     assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
     assertNotNull(blockManager

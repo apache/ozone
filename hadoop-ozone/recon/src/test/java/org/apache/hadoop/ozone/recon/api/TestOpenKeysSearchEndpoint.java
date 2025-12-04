@@ -81,18 +81,14 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
   private Path temporaryFolder;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private static final String ROOT_PATH = "/";
   private static final String TEST_USER = "TestUser";
-  private OMMetadataManager omMetadataManager;
-
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 100);
-    omMetadataManager = initializeNewOmMetadataManager(
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
@@ -110,7 +106,8 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(OMDBInsightEndpoint.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    reconNamespaceSummaryManager = reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
+    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
@@ -344,7 +341,6 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
   }
-
 
   @Test
   public void testSearchUnderNestedDirectory() throws IOException {

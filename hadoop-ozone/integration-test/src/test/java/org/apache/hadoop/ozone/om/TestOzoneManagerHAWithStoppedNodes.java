@@ -40,15 +40,15 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -95,6 +95,7 @@ import org.slf4j.LoggerFactory;
 public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
+
   /**
    * After restarting OMs we need to wait
    * for a leader to be elected and ready.
@@ -220,7 +221,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
+      IOUtils.readFully(ozoneInputStream, fileContent);
       assertEquals(value, new String(fileContent, UTF_8));
     }
   }
@@ -272,17 +273,15 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
-    // Get follower OMs
+    // Get follower OM
     OzoneManager followerOM1 = getCluster().getOzoneManager(
         leaderOM.getPeerNodes().get(0).getNodeId());
-    OzoneManager followerOM2 = getCluster().getOzoneManager(
-        leaderOM.getPeerNodes().get(1).getNodeId());
 
     // Do some transactions so that the log index increases
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -455,7 +454,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         GenericTestUtils.waitFor(() -> {
           Table<String, RepeatedOmKeyInfo> deletedTable =
               om.getMetadataManager().getDeletedTable();
-          try (TableIterator<?, ?> iterator = deletedTable.iterator()) {
+          try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> iterator = deletedTable.iterator()) {
             return !iterator.hasNext();
           } catch (Exception ex) {
             return false;
@@ -467,6 +466,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
       }
     });
   }
+
   /**
    * 1. Stop one of the OM
    * 2. make a call to OM, this will make failover attempts to find new node.
@@ -584,7 +584,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();
 
-    String prefix = "vol-" + RandomStringUtils.randomNumeric(10) + "-";
+    String prefix = "vol-" + RandomStringUtils.secure().nextNumeric(10) + "-";
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(userName)
@@ -611,9 +611,9 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   @Test
   void testRetryCacheWithDownedOM() throws Exception {
     // Create a volume, a bucket and a key
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     String bucketName = UUID.randomUUID().toString();
     String keyTo = UUID.randomUUID().toString();
 

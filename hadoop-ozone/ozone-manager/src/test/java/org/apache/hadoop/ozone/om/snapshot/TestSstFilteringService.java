@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,10 +49,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
@@ -67,6 +66,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -161,10 +162,10 @@ public class TestSstFilteringService {
     }
 
     createKeys(volumeName, bucketName1, keyCount / 2);
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
 
     createKeys(volumeName, bucketName1, keyCount / 2);
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
 
     int level0FilesCount = 0;
     int totalFileCount = 0;
@@ -179,7 +180,7 @@ public class TestSstFilteringService {
 
     assertEquals(totalFileCount - totalFileCountDiff, level0FilesCount - level0FilesCountDiff);
 
-    activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().compactRange(KEY_TABLE);
 
     int nonLevel0FilesCountAfterCompact = 0;
 
@@ -198,7 +199,7 @@ public class TestSstFilteringService {
     addBucketToVolume(volumeName, bucketName2);
     createKeys(volumeName, bucketName2, keyCount);
 
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
     List<LiveFileMetaData> allFiles = activeDbStore.getDb().getSstFileList();
     String snapshotName1 = "snapshot1";
     createSnapshot(volumeName, bucketName2, snapshotName1);
@@ -218,7 +219,7 @@ public class TestSstFilteringService {
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
 
     String snapshotDirName =
-        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
+        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, 0);
 
     for (LiveFileMetaData file : allFiles) {
       //Skipping the previous files from this check even those also works.
@@ -242,8 +243,7 @@ public class TestSstFilteringService {
 
     String snapshotName2 = "snapshot2";
     final long count;
-    try (BootstrapStateHandler.Lock lock =
-             filteringService.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = filteringService.getBootstrapStateLock().acquireWriteLock()) {
       count = filteringService.getSnapshotFilteredCount().get();
       createSnapshot(volumeName, bucketName2, snapshotName2);
 
@@ -279,8 +279,8 @@ public class TestSstFilteringService {
       for (int i = 1; i <= keyCount; i++) {
         createKey(writeClient, volumeName, bucketName, "key" + i);
       }
-      activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
-      activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+      activeDbStore.getDb().flush(KEY_TABLE);
+      activeDbStore.getDb().compactRange(KEY_TABLE);
     }
 
     SstFilteringService sstFilteringService =
@@ -293,11 +293,11 @@ public class TestSstFilteringService {
     SnapshotInfo snapshot1Info = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap1"));
     File snapshot1Dir =
-        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot1Info));
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot1Info, 0));
     SnapshotInfo snapshot2Info = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap2"));
     File snapshot2Dir =
-        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot2Info));
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot2Info, 0));
 
     File snap1Current = new File(snapshot1Dir, "CURRENT");
     File snap2Current = new File(snapshot2Dir, "CURRENT");
@@ -335,7 +335,7 @@ public class TestSstFilteringService {
                           int keyCount)
       throws IOException {
     for (int x = 0; x < keyCount; x++) {
-      String keyName = "key-" + RandomStringUtils.randomAlphanumeric(5);
+      String keyName = "key-" + RandomStringUtils.secure().nextAlphanumeric(5);
       createKey(writeClient, volumeName, bucketName, keyName);
     }
   }
@@ -428,8 +428,8 @@ public class TestSstFilteringService {
       }
       createKey(writeClient, volumeName, bucketName, keyName);
       if (i % 50 == 0) {
-        activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
-        activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+        activeDbStore.getDb().flush(KEY_TABLE);
+        activeDbStore.getDb().compactRange(KEY_TABLE);
       }
     }
 
@@ -489,7 +489,7 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
              om.getOmSnapshotManager().getActiveSnapshot(
                  snapshotInfo.getVolumeName(),
                  snapshotInfo.getBucketName(),

@@ -31,19 +31,16 @@ import org.junit.jupiter.api.Test;
  * */
 public class TestOzoneObjInfo {
 
-  private OzoneObjInfo objInfo;
-  private OzoneObjInfo.Builder builder;
   private String volume = "vol1";
   private String bucket = "bucket1";
   private String key = "key1";
   private static final OzoneObj.StoreType STORE = OzoneObj.StoreType.OZONE;
 
-
   @Test
   public void testGetVolumeName() {
 
-    builder = getBuilder(volume, bucket, key);
-    objInfo = builder.build();
+    OzoneObjInfo.Builder builder = getBuilder(volume, bucket, key);
+    OzoneObjInfo objInfo = builder.build();
     assertEquals(objInfo.getVolumeName(), volume);
 
     objInfo = getBuilder(null, null, null).build();
@@ -66,7 +63,7 @@ public class TestOzoneObjInfo {
 
   @Test
   public void testGetBucketName() {
-    objInfo = getBuilder(volume, bucket, key).build();
+    OzoneObjInfo objInfo = getBuilder(volume, bucket, key).build();
     assertEquals(objInfo.getBucketName(), bucket);
 
     objInfo = getBuilder(volume, null, null).build();
@@ -78,7 +75,7 @@ public class TestOzoneObjInfo {
 
   @Test
   public void testGetKeyName() {
-    objInfo = getBuilder(volume, bucket, key).build();
+    OzoneObjInfo objInfo = getBuilder(volume, bucket, key).build();
     assertEquals(objInfo.getKeyName(), key);
 
     objInfo = getBuilder(volume, null, null).build();
@@ -103,7 +100,7 @@ public class TestOzoneObjInfo {
             bucket + OZONE_URI_DELIMITER + key)
         .build();
 
-    objInfo = OzoneObjInfo.fromProtobuf(protoObj);
+    OzoneObjInfo objInfo = OzoneObjInfo.fromProtobuf(protoObj);
     assertEquals(objInfo.getKeyName(), key);
     objInfo = getBuilder(volume, null, null).build();
     assertNull(objInfo.getKeyName());

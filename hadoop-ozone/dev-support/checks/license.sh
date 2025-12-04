@@ -42,7 +42,7 @@ DEFAULT_SRC="target/generated-sources/license/THIRD-PARTY.txt"
 src="${1:-${DEFAULT_SRC}}"
 
 if [[ ! -e ${src} ]]; then
-  MAVEN_OPTIONS="-B -fae -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
+  MAVEN_OPTIONS="-B -fae -DskipDocs -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
   mvn ${MAVEN_OPTIONS} license:aggregate-add-third-party | tee "${REPORT_DIR}/output.log"
   src="${DEFAULT_SRC}"
 fi
@@ -59,7 +59,7 @@ grep '(' ${src} \
     -e "(CDDL\>" -e ' CDDL '\
     -e "(EDL\>" -e "Eclipse Distribution ${L}" \
     -e "(EPL\>" -e "Eclipse Public ${L}" \
-    -e "(MIT)" -e "\<MIT ${L}" \
+    -e "(MIT)" -e "(MIT-0)" -e "\<MIT ${L}" \
     -e "Modified BSD\>" \
     -e "New BSD ${L}" \
     -e "Public Domain" \

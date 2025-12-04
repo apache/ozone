@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
@@ -166,34 +167,32 @@ public class OMPrepareRequest extends OMClientRequest {
    * - the applied index is updated after the transaction is flushed to db.
    * - after a transaction (i) is committed, ratis will append another ratis-metadata transaction (i+1).
    *
-   * @return the last Ratis commit index
+   * @return the last Ratis applied index
    */
   private static long waitForLogIndex(long minOMDBFlushIndex,
       OzoneManager om, OzoneManagerStateMachine stateMachine,
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
-    long endTime = System.currentTimeMillis() + flushTimeout.toMillis();
+    long endTime = Time.monotonicNow() + flushTimeout.toMillis();
 
     boolean omDBFlushed = false;
     boolean ratisStateMachineApplied = false;
 
-    // Wait for Ratis commit index after the specified index to be applied to
-    // Ratis' state machine. This index will not appear in the OM DB until a
+    // Wait for the given Ratis commit index to be applied to Ratis'
+    // state machine. This index will not appear in the OM DB until a
     // snapshot is taken.
     // If we purge logs without waiting for this index, it may not make it to
     // the RocksDB snapshot, and then the log entry is lost on this OM.
-    long minRatisStateMachineIndex = minOMDBFlushIndex + 1; // for the ratis-metadata transaction
-    long lastRatisCommitIndex = RaftLog.INVALID_LOG_INDEX;
 
     // Wait OM state machine to apply the given index.
     long lastOMDBFlushIndex = RaftLog.INVALID_LOG_INDEX;
+    long lastRatisAppliedIndex = RaftLog.INVALID_LOG_INDEX;
 
-    LOG.info("{} waiting for index {} to flush to OM DB and index {} to flush" +
-            " to Ratis state machine.", om.getOMNodeId(), minOMDBFlushIndex,
-        minRatisStateMachineIndex);
+    LOG.info("{} waiting for index {} to flush to OM DB and flush" +
+            " to Ratis state machine.", om.getOMNodeId(), minOMDBFlushIndex);
     while (!(omDBFlushed && ratisStateMachineApplied) &&
-        System.currentTimeMillis() < endTime) {
+        Time.monotonicNow() < endTime) {
       // Check OM DB.
       lastOMDBFlushIndex = om.getRatisSnapshotIndex();
       omDBFlushed = (lastOMDBFlushIndex >= minOMDBFlushIndex);
@@ -201,11 +200,10 @@ public class OMPrepareRequest extends OMClientRequest {
           lastOMDBFlushIndex);
 
       // Check ratis state machine.
-      lastRatisCommitIndex = stateMachine.getLastNotifiedTermIndex().getIndex();
-      ratisStateMachineApplied = (lastRatisCommitIndex >=
-          minRatisStateMachineIndex);
+      lastRatisAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
+      ratisStateMachineApplied = lastRatisAppliedIndex >= minOMDBFlushIndex;
       LOG.debug("{} Current Ratis state machine transaction index {}.",
-          om.getOMNodeId(), lastRatisCommitIndex);
+          om.getOMNodeId(), lastRatisAppliedIndex);
 
       if (!(omDBFlushed && ratisStateMachineApplied)) {
         Thread.sleep(flushCheckInterval.toMillis());
@@ -224,10 +222,10 @@ public class OMPrepareRequest extends OMClientRequest {
       throw new IOException(String.format("After waiting for %d seconds, " +
               "Ratis state machine applied index %d which is less than" +
               " the minimum required index %d.",
-          flushTimeout.getSeconds(), lastRatisCommitIndex,
-          minRatisStateMachineIndex));
+          flushTimeout.getSeconds(), lastRatisAppliedIndex,
+          minOMDBFlushIndex));
     }
-    return lastRatisCommitIndex;
+    return lastRatisAppliedIndex;
   }
 
   /**

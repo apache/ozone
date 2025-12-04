@@ -60,11 +60,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class  HASecurityUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HASecurityUtils.class);
+
   private HASecurityUtils() {
   }
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HASecurityUtils.class);
 
   /**
    * Initialize Security which generates public, private key pair and get SCM

@@ -48,6 +48,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -244,6 +245,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     assertEquals(initialUsedSpace, savedUsedSpace.get());
     assertEquals(expectedUsedSpace, volume.getCurrentUsage().getUsedSpace());
@@ -299,6 +301,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -354,6 +357,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -381,6 +385,7 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
@@ -527,13 +532,64 @@ public class TestHddsVolume {
     volume.createTmpDirs(CLUSTER_ID);
 
     VolumeCheckResult result = volume.check(false);
+    assertEquals(1, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
     File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
     FileUtils.deleteDirectory(dbFile);
 
     result = volume.check(false);
+    assertEquals(2, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.FAILED, result);
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPath() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File expectedPath = new File(new File(volume.getStorageDir(), CLUSTER_ID), Storage.STORAGE_DIR_CURRENT);
+    assertEquals(expectedPath, volume.getContainerDirsPath());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPathWhenNotFormatted() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    assertNull(volume.getContainerDirsPath());
+    volume.shutdown();
+  }
+
+  @Test
+  public void testVolumeUsagesMetrics() throws Exception {
+    // Build a volume with mocked usage, with reserved: 100B, Min free: 10B
+    CONF.set("hdds.datanode.volume.min.free.space", "10B");
+    volumeBuilder.usageCheckFactory(MockSpaceUsageCheckFactory.of(new SpaceUsageSource.Fixed(1000, 100, 700),
+        Duration.ZERO, inMemory(new AtomicLong(0))));
+    HddsVolume volume = volumeBuilder.build();
+    volume.incCommittedBytes(100);
+
+    // available space (>= 0) available - committed - min.free.space = 100 - 100 - 10 = -10,
+    // insufficient space unavailable
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+    // reserved used = capacity - available - used = 1000 - 100 - 700 = 200 more than 100B for reserved,
+    // reserve usages crosses limit true
+    assertEquals(1, volume.getVolumeInfoStats().getReservedCrossesLimit());
+
+    // remove committed, sufficient space is available, reset the flag of metrics
+    volume.incCommittedBytes(-100);
+    volume.checkVolumeUsages();
+    assertEquals(0, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+
+    // reduce available less then min.free.space
+    volume.incrementUsedSpace(100);
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
 
     volume.shutdown();
   }

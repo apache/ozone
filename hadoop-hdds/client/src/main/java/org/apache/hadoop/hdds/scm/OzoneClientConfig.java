@@ -113,6 +113,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long streamBufferMaxSize = 32 * 1024 * 1024;
 
+  @Config(key = "stream.readblock.enable",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow ReadBlock to stream all the readChunk in one request.",
+      tags = ConfigTag.CLIENT)
+  private boolean streamReadBlock = false;
+
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -151,7 +158,7 @@ public class OzoneClientConfig {
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "ozone.client.bytes.per.checksum",
@@ -160,7 +167,7 @@ public class OzoneClientConfig {
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
           + "this config is 8KB.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private int bytesPerChecksum = 16 * 1024;
 
   @Config(key = "ozone.client.verify.checksum",
@@ -194,7 +201,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.read.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly read" +
+      description = "Thread pool max size for parallel read" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   // For the largest recommended EC policy rs-10-4-1024k,
@@ -205,7 +212,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.write.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly write" +
+      description = "Thread pool max size for parallel write" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
@@ -536,6 +543,14 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
+  }
+
+  public boolean isStreamReadBlock() {
+    return streamReadBlock;
+  }
+
+  public void setStreamReadBlock(boolean streamReadBlock) {
+    this.streamReadBlock = streamReadBlock;
   }
 
   /**

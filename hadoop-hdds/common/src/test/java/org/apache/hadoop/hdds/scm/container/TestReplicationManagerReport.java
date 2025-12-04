@@ -43,7 +43,7 @@ class TestReplicationManagerReport {
 
   @BeforeEach
   void setup() {
-    report = new ReplicationManagerReport();
+    report = new ReplicationManagerReport(100);
   }
 
   @Test
@@ -71,7 +71,6 @@ class TestReplicationManagerReport {
         report.getStat(HddsProtos.LifeCycleState.QUASI_CLOSED));
   }
 
-
   @Test
   void testJsonOutput() throws IOException {
     report.increment(HddsProtos.LifeCycleState.OPEN);
@@ -80,13 +79,13 @@ class TestReplicationManagerReport {
 
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(1));
+        ContainerID.valueOf(1));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(2));
+        ContainerID.valueOf(2));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        new ContainerID(3));
+        ContainerID.valueOf(3));
     report.setComplete();
 
     String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(report);
@@ -124,13 +123,13 @@ class TestReplicationManagerReport {
   void testContainerIDsCanBeSampled() {
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(1));
+        ContainerID.valueOf(1));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(2));
+        ContainerID.valueOf(2));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        new ContainerID(3));
+        ContainerID.valueOf(3));
 
     assertEquals(2,
         report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
@@ -141,13 +140,13 @@ class TestReplicationManagerReport {
 
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    assertEquals(new ContainerID(1), sample.get(0));
-    assertEquals(new ContainerID(2), sample.get(1));
+    assertEquals(ContainerID.valueOf(1), sample.get(0));
+    assertEquals(ContainerID.valueOf(2), sample.get(1));
     assertEquals(2, sample.size());
 
     sample =
         report.getSample(ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    assertEquals(new ContainerID(3), sample.get(0));
+    assertEquals(ContainerID.valueOf(3), sample.get(0));
     assertEquals(1, sample.size());
 
     sample =
@@ -157,16 +156,31 @@ class TestReplicationManagerReport {
 
   @Test
   void testSamplesAreLimited() {
-    for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT * 2; i++) {
-      report.incrementAndSample(
+    verifySampleLimit(report, 100);
+  }
+
+  @Test
+  void testCustomSampleLimit() {
+    ReplicationManagerReport customReport = new ReplicationManagerReport(50);
+    verifySampleLimit(customReport, 50);
+  }
+
+  /**
+   * Helper method to verify that samples are limited to the expected size.
+   */
+  private void verifySampleLimit(ReplicationManagerReport testReport, int expectedSampleSize) {
+    assertEquals(testReport.getSampleLimit(), expectedSampleSize);
+
+    for (int i = 0; i < expectedSampleSize * 2; i++) {
+      testReport.incrementAndSample(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          new ContainerID(i));
+          ContainerID.valueOf(i));
     }
     List<ContainerID> sample =
-        report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    assertEquals(ReplicationManagerReport.SAMPLE_LIMIT, sample.size());
-    for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT; i++) {
-      assertEquals(new ContainerID(i), sample.get(i));
+        testReport.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+    assertEquals(expectedSampleSize, sample.size());
+    for (int i = 0; i < expectedSampleSize; i++) {
+      assertEquals(ContainerID.valueOf(i), sample.get(i));
     }
   }
 
@@ -191,6 +205,8 @@ class TestReplicationManagerReport {
         = ReplicationManagerReport.fromProtobuf(proto);
     assertEquals(report.getReportTimeStamp(),
         newReport.getReportTimeStamp());
+    assertEquals(report.getSampleLimit(),
+        newReport.getSampleLimit());
 
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
       assertEquals(report.getStat(s), newReport.getStat(s));
@@ -207,6 +223,7 @@ class TestReplicationManagerReport {
     HddsProtos.ReplicationManagerReportProto.Builder proto =
         HddsProtos.ReplicationManagerReportProto.newBuilder();
     proto.setTimestamp(12345);
+    proto.setSampleLimit(100);
 
     proto.addStat(HddsProtos.KeyIntValue.newBuilder()
         .setKey("unknownValue")
@@ -229,6 +246,7 @@ class TestReplicationManagerReport {
         ReplicationManagerReport.fromProtobuf(proto.build());
     assertEquals(20, newReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(100, newReport.getSampleLimit());
   }
 
   @Test

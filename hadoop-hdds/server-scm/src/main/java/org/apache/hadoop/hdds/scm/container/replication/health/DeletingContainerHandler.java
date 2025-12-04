@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class DeletingContainerHandler extends AbstractCheck {
   private final ReplicationManager replicationManager;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletingContainerHandler.class);
 
   public DeletingContainerHandler(ReplicationManager replicationManager) {
@@ -88,6 +89,7 @@ public class DeletingContainerHandler extends AbstractCheck {
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))
+        .filter(ContainerReplica::isEmpty)
         .forEach(rp -> {
           try {
             replicationManager.sendDeleteCommand(
@@ -96,7 +98,7 @@ public class DeletingContainerHandler extends AbstractCheck {
           } catch (NotLeaderException e) {
             LOG.warn("Failed to delete empty replica with index {} for " +
                     "container {} on datanode {}", rp.getReplicaIndex(),
-                cID, rp.getDatanodeDetails().getUuidString(), e);
+                cID, rp.getDatanodeDetails(), e);
           }
         });
     return true;

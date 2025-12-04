@@ -26,13 +26,21 @@
 # - $REPORT_FILE should be defined
 # - Maven output should be saved in $REPORT_DIR/output.log
 
-# script failed, but report file is empty (does not reflect failure)
-if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
-  # do we know what to look for?
+if [[ ! -d "${REPORT_DIR}" ]]; then
+  mkdir -p "${REPORT_DIR}"
+fi
+
+if [[ ! -s "${REPORT_FILE}" ]]; then
+  # check if there are errors in the log
   if [[ -n "${ERROR_PATTERN:-}" ]]; then
-    grep -m25 "${ERROR_PATTERN}" "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+    if [[ -e "${REPORT_DIR}/output.log" ]]; then
+      grep -m25 "${ERROR_PATTERN}" "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+    else
+      echo "Unknown failure, output.log missing" > "${REPORT_FILE}"
+    fi
   fi
-  if [[ ! -s "${REPORT_FILE}" ]]; then
+  # script failed, but report file is empty (does not reflect failure)
+  if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
     echo "Unknown failure, check output.log" > "${REPORT_FILE}"
   fi
 fi

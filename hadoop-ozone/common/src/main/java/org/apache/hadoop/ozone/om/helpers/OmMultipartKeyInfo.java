@@ -45,6 +45,35 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       OmMultipartKeyInfo::getProto,
       OmMultipartKeyInfo.class);
 
+  private final String uploadID;
+  private final long creationTime;
+  private final ReplicationConfig replicationConfig;
+  private PartKeyInfoMap partKeyInfoMap;
+
+  /**
+   * A pointer to parent directory used for path traversal. ParentID will be
+   * used only when the multipart key is created into a FileSystemOptimized(FSO)
+   * bucket.
+   * <p>
+   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
+   * path component will be assigned an ObjectId and linked to its parent path
+   * component using parent's objectID.
+   * <p>
+   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
+   * element.
+   * <p>
+   * ------------------------------------------|
+   * PathComponent |   ObjectID   |   ParentID |
+   * ------------------------------------------|
+   *      a        |     1024     |     512    |
+   * ------------------------------------------|
+   *      b        |     1025     |     1024   |
+   * ------------------------------------------|
+   *   multiKey1   |     1026     |     1025   |
+   * ------------------------------------------|
+   */
+  private final long parentID;
+
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
   }
@@ -62,6 +91,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
           ((PartKeyInfo) o2).getPartNumber() : (int) o2;
       return Integer.compare(partNumber1, partNumber2);
     };
+
+    private final List<PartKeyInfo> sorted;
 
     /**
      * Adds a PartKeyInfo to sortedPartKeyInfoList.
@@ -92,8 +123,6 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       put(partKeyInfo, list);
       return new PartKeyInfoMap(list);
     }
-
-    private final List<PartKeyInfo> sorted;
 
     PartKeyInfoMap(List<PartKeyInfo> sorted) {
       this.sorted = Collections.unmodifiableList(sorted);
@@ -129,35 +158,6 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return sorted.get(size() - 1);
     }
   }
-
-  private final String uploadID;
-  private final long creationTime;
-  private final ReplicationConfig replicationConfig;
-  private PartKeyInfoMap partKeyInfoMap;
-
-  /**
-   * A pointer to parent directory used for path traversal. ParentID will be
-   * used only when the multipart key is created into a FileSystemOptimized(FSO)
-   * bucket.
-   * <p>
-   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
-   * path component will be assigned an ObjectId and linked to its parent path
-   * component using parent's objectID.
-   * <p>
-   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
-   * element.
-   * <p>
-   * ------------------------------------------|
-   * PathComponent |   ObjectID   |   ParentID |
-   * ------------------------------------------|
-   *      a        |     1024     |     512    |
-   * ------------------------------------------|
-   *      b        |     1025     |     1024   |
-   * ------------------------------------------|
-   *   multiKey1   |     1026     |     1025   |
-   * ------------------------------------------|
-   */
-  private final long parentID;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
@@ -222,10 +222,14 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   /**
    * Builder of OmMultipartKeyInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmMultipartKeyInfo> {
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
@@ -234,6 +238,18 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
 
     public Builder() {
       this.partKeyInfoList = new TreeMap<>();
+    }
+
+    public Builder(OmMultipartKeyInfo multipartKeyInfo) {
+      super(multipartKeyInfo);
+      this.uploadID = multipartKeyInfo.uploadID;
+      this.creationTime = multipartKeyInfo.creationTime;
+      this.replicationConfig = multipartKeyInfo.replicationConfig;
+      this.partKeyInfoList = new TreeMap<>();
+      for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
+        this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
+      }
+      this.parentID = multipartKeyInfo.parentID;
     }
 
     public Builder setUploadID(String uploadId) {
@@ -282,17 +298,18 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
-    public OmMultipartKeyInfo build() {
+    @Override
+    protected OmMultipartKeyInfo buildObject() {
       return new OmMultipartKeyInfo(this);
     }
   }
 
   /**
-   * Construct OmMultipartInfo from MultipartKeyInfo proto object.
+   * Construct OmMultipartInfo Builder from MultipartKeyInfo proto object.
    * @param multipartKeyInfo
-   * @return OmMultipartKeyInfo
+   * @return Builder instance
    */
-  public static OmMultipartKeyInfo getFromProto(
+  public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
     multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
@@ -311,8 +328,17 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
         .setPartKeyInfoList(list)
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
-        .setParentID(multipartKeyInfo.getParentID())
-        .build();
+        .setParentID(multipartKeyInfo.getParentID());
+  }
+
+  /**
+   * Construct OmMultipartInfo from MultipartKeyInfo proto object.
+   * @param multipartKeyInfo
+   * @return OmMultipartKeyInfo
+   */
+  public static OmMultipartKeyInfo getFromProto(
+      MultipartKeyInfo multipartKeyInfo) {
+    return builderFromProto(multipartKeyInfo).build();
   }
 
   /**

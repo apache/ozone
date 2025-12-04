@@ -34,8 +34,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
@@ -61,7 +64,6 @@ public class RDBStore implements DBStore {
       LoggerFactory.getLogger(RDBStore.class);
   private final RocksDatabase db;
   private final File dbLocation;
-  private final CodecRegistry codecRegistry;
   private RocksDBStoreMetrics metrics;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
@@ -74,36 +76,37 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
-  private final String threadNamePrefix;
+  private final boolean readOnly;
 
   @SuppressWarnings("parameternumber")
-  public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
+  RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanName, boolean enableCompactionDag,
+                  boolean readOnly,
+                  String dbJmxBeanName,
+                  boolean enableCompactionDag, Function<Boolean, UncheckedAutoCloseable> differLockSupplier,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
-                  ConfigurationSource configuration, String threadNamePrefix)
-
-      throws IOException {
-    this.threadNamePrefix = threadNamePrefix;
+                  ConfigurationSource configuration,
+                  boolean enableRocksDBMetrics)
+      throws RocksDatabaseException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
-    codecRegistry = registry;
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
 
     try {
       if (enableCompactionDag) {
+        Preconditions.checkNotNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
+            "compaction dag is enabled");
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR,
             DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
-            configuration);
+            configuration, differLockSupplier);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -111,6 +114,7 @@ public class RDBStore implements DBStore {
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
+      this.readOnly = readOnly;
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
@@ -118,13 +122,18 @@ public class RDBStore implements DBStore {
         dbJmxBeanName = dbFile.getName();
       }
       // Use statistics instead of dbOptions.statistics() to avoid repeated init.
-      metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
-      if (metrics == null) {
-        LOG.warn("Metrics registration failed during RocksDB init, " +
+      if (!enableRocksDBMetrics) {
+        LOG.debug("Skipped Metrics registration during RocksDB init, " +
             "db path :{}", dbJmxBeanName);
       } else {
-        LOG.debug("Metrics registration succeed during RocksDB init, " +
-            "db path :{}", dbJmxBeanName);
+        metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
+        if (metrics == null) {
+          LOG.warn("Metrics registration failed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        } else {
+          LOG.debug("Metrics registration succeed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        }
       }
 
       // Create checkpoints and snapshot directories if not exists.
@@ -166,17 +175,13 @@ public class RDBStore implements DBStore {
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
-
-    } catch (Exception e) {
-      // Close DB and other things if got initialized.
-      close();
-      String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
-          + ", " + "exception :" + (e.getCause() == null ?
-          e.getClass().getCanonicalName() + " " + e.getMessage() :
-          e.getCause().getClass().getCanonicalName() + " " +
-              e.getCause().getMessage());
-
-      throw new IOException(msg, e);
+    } catch (IOException | RuntimeException e) {
+      try {
+        close();
+      } catch (Exception suppressed) {
+        e.addSuppressed(suppressed);
+      }
+      throw new RocksDatabaseException("Failed to create RDBStore from " + dbFile, e);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -191,6 +196,7 @@ public class RDBStore implements DBStore {
     return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
   }
 
+  @Override
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
@@ -200,7 +206,6 @@ public class RDBStore implements DBStore {
     return rocksDBCheckpointDiffer;
   }
 
-
   /**
    * Returns the RocksDB's DBOptions.
    */
@@ -209,7 +214,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void compactDB() throws IOException {
+  public void compactDB() throws RocksDatabaseException {
     try (ManagedCompactRangeOptions options =
              new ManagedCompactRangeOptions()) {
       db.compactDB(options);
@@ -217,7 +222,23 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void close() throws IOException {
+  public void compactTable(String tableName) throws RocksDatabaseException {
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      compactTable(tableName, options);
+    }
+  }
+
+  @Override
+  public void compactTable(String tableName, ManagedCompactRangeOptions options) throws RocksDatabaseException {
+    RocksDatabase.ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily == null) {
+      throw new RocksDatabaseException("Table not found: " + tableName);
+    }
+    db.compactRange(columnFamily, null, null, options);
+  }
+
+  @Override
+  public void close() {
     if (metrics != null) {
       metrics.unregister();
       metrics = null;
@@ -232,40 +253,21 @@ public class RDBStore implements DBStore {
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
     }
+    if (!readOnly) {
+      try {
+        // Flush to ensure all data is persisted to disk before closing.
+        flushDB();
+        LOG.debug("Successfully flushed DB before close");
+      } catch (Exception e) {
+        LOG.warn("Failed to flush DB before close", e);
+        // Continue with close even if flush fails
+      }
+    }
     IOUtils.close(LOG, db);
   }
 
   @Override
-  public <K, V> void move(K key, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    try (BatchOperation batchOperation = initBatchOperation()) {
-
-      V value = source.get(key);
-      dest.putWithBatch(batchOperation, key, value);
-      source.deleteWithBatch(batchOperation, key);
-      commitBatchOperation(batchOperation);
-    }
-  }
-
-  @Override
-  public <K, V> void move(K key, V value, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    move(key, key, value, source, dest);
-  }
-
-  @Override
-  public <K, V> void move(K sourceKey, K destKey, V value,
-                                Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    try (BatchOperation batchOperation = initBatchOperation()) {
-      dest.putWithBatch(batchOperation, destKey, value);
-      source.deleteWithBatch(batchOperation, sourceKey);
-      commitBatchOperation(batchOperation);
-    }
-  }
-
-  @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() throws RocksDatabaseException {
     return db.estimateNumKeys();
   }
 
@@ -276,37 +278,29 @@ public class RDBStore implements DBStore {
 
   @Override
   public void commitBatchOperation(BatchOperation operation)
-      throws IOException {
+      throws RocksDatabaseException {
     ((RDBBatchOperation) operation).commit(db);
   }
 
   @Override
-  public RDBTable getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws RocksDatabaseException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
-      throw new IOException("No such table in this DB. TableName : " + name);
+      throw new RocksDatabaseException("No such table in this DB. TableName : " + name);
     }
     return new RDBTable(this.db, handle, rdbMetrics);
   }
 
   @Override
-  public <K, V> TypedTable<K, V> getTable(String name,
-      Class<K> keyType, Class<V> valueType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType);
+  public <K, V> TypedTable<K, V> getTable(
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
+    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
   }
 
   @Override
-  public <K, V> Table<K, V> getTable(String name,
-      Class<K> keyType, Class<V> valueType,
-      TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType, cacheType, threadNamePrefix);
-  }
-
-  @Override
-  public ArrayList<Table> listTables() {
-    ArrayList<Table> returnList = new ArrayList<>();
+  public List<Table<?, ?>> listTables() {
+    final List<Table<?, ?>> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
       returnList.add(new RDBTable(db, family, rdbMetrics));
     }
@@ -314,19 +308,19 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void flushDB() throws IOException {
+  public void flushDB() throws RocksDatabaseException {
     db.flush();
   }
 
   @Override
-  public void flushLog(boolean sync) throws IOException {
+  public void flushLog(boolean sync) throws RocksDatabaseException {
     // for RocksDB it is sufficient to flush the WAL as entire db can
     // be reconstructed using it.
     db.flushWal(sync);
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
+  public DBCheckpoint getCheckpoint(boolean flush) throws RocksDatabaseException {
     if (flush) {
       this.flushDB();
     }
@@ -334,14 +328,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(String parentPath, boolean flush) throws IOException {
+  public DBCheckpoint getCheckpoint(String parentPath, boolean flush) throws RocksDatabaseException {
     if (flush) {
       this.flushDB();
     }
     return checkPointManager.createCheckpoint(parentPath, null);
   }
 
-  public DBCheckpoint getSnapshot(String name) throws IOException {
+  public DBCheckpoint getSnapshot(String name) throws RocksDatabaseException {
     this.flushLog(true);
     return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
@@ -356,19 +350,42 @@ public class RDBStore implements DBStore {
     return db.getColumnFamilyNames();
   }
 
+  /**
+  /**
+   * Drops a table from the database by removing its associated column family.
+   * <p>
+   * <b>Warning:</b> This operation should be used with extreme caution. If the table needs to be used again,
+   * it is recommended to reinitialize the entire DB store, as the column family will be permanently
+   * removed from the database. This method is suitable for truncating a RocksDB column family in a single operation.
+   *
+   * @param tableName the name of the table to be dropped
+   * @throws RocksDatabaseException if an error occurs while attempting to drop the table
+   */
+  @Override
+  public void dropTable(String tableName) throws RocksDatabaseException {
+    ColumnFamily columnFamily = db.getColumnFamily(tableName);
+    if (columnFamily != null) {
+      try {
+        db.getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+      } catch (RocksDBException e) {
+        throw new RocksDatabaseException("Failed to drop " + tableName, e);
+      }
+    }
+  }
+
   public Collection<ColumnFamily> getColumnFamilies() {
     return db.getExtraColumnFamilies();
   }
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws IOException {
+      throws SequenceNumberNotFoundException {
     return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
   }
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws IOException {
+      throws SequenceNumberNotFoundException {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
@@ -437,7 +454,7 @@ public class RDBStore implements DBStore {
       // Throw the exception back to Recon. Expect Recon to fall back to
       // full snapshot.
       throw e;
-    } catch (RocksDBException | IOException e) {
+    } catch (RocksDBException | RocksDatabaseException e) {
       LOG.error("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
@@ -465,20 +482,16 @@ public class RDBStore implements DBStore {
     return db;
   }
 
-  public String getProperty(String property) throws IOException {
+  public String getProperty(String property) throws RocksDatabaseException {
     return db.getProperty(property);
   }
 
   public String getProperty(ColumnFamily family, String property)
-      throws IOException {
+      throws RocksDatabaseException {
     return db.getProperty(family, property);
   }
 
   public RDBMetrics getMetrics() {
     return rdbMetrics;
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 }

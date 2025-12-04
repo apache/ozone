@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static java.lang.Math.min;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getInitialReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -41,6 +43,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -55,7 +58,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -68,6 +71,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
@@ -102,7 +107,7 @@ public class StateContext {
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
-  private final Queue<SCMCommand> commandQueue;
+  private final Queue<SCMCommand<?>> commandQueue;
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
   private final DatanodeStateMachine parentDatanodeStateMachine;
@@ -149,9 +154,9 @@ public class StateContext {
    * real HB frequency after scm registration. With this method the
    * initial registration could be significant faster.
    */
-  private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong heartbeatFrequency;
 
-  private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong reconHeartbeatFrequency;
 
   private final int maxCommandQueueLimit;
 
@@ -192,6 +197,8 @@ public class StateContext {
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     this.threadNamePrefix = threadNamePrefix;
+    heartbeatFrequency = new AtomicLong(getScmInitialHeartbeatInterval(conf));
+    reconHeartbeatFrequency = new AtomicLong(getInitialReconHeartbeatInterval(conf));
     initReportTypeCollection();
   }
 
@@ -528,12 +535,14 @@ public class StateContext {
    *
    * @param pipelineAction PipelineAction to be added
    */
-  public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
+  public boolean addPipelineActionIfAbsent(PipelineAction pipelineAction) {
     // Put only if the pipeline id with the same action is absent.
     final PipelineKey key = new PipelineKey(pipelineAction);
+    boolean added = false;
     for (InetSocketAddress endpoint : endpoints) {
-      pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction);
+      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
+    return added;
   }
 
   /**
@@ -738,7 +747,7 @@ public class StateContext {
    *
    * @return SCMCommand or Null.
    */
-  public SCMCommand getNextCommand() {
+  public SCMCommand<?> getNextCommand() {
     lock.lock();
     try {
       initTermOfLeaderSCM();
@@ -772,7 +781,7 @@ public class StateContext {
    *
    * @param command - SCMCommand.
    */
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     lock.lock();
     try {
       if (commandQueue.size() >= maxCommandQueueLimit) {
@@ -788,17 +797,23 @@ public class StateContext {
     this.addCmdStatus(command);
   }
 
-  public Map<SCMCommandProto.Type, Integer> getCommandQueueSummary() {
-    Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
+  public EnumCounters<SCMCommandProto.Type> getCommandQueueSummary() {
+    EnumCounters<SCMCommandProto.Type> summary = new EnumCounters<>(SCMCommandProto.Type.class);
     lock.lock();
     try {
-      for (SCMCommand cmd : commandQueue) {
-        summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
+      for (SCMCommand<?> cmd : commandQueue) {
+        summary.add(cmd.getType(), 1);
       }
     } finally {
       lock.unlock();
     }
     return summary;
+  }
+
+  public boolean isPipelineCloseInProgress(UUID pipelineID) {
+    ClosePipelineCommandHandler handler = parentDatanodeStateMachine.getCommandDispatcher()
+        .getClosePipelineCommandHandler();
+    return handler.isPipelineCloseInProgress(pipelineID);
   }
 
   /**
@@ -832,7 +847,7 @@ public class StateContext {
    *
    * @param cmd - {@link SCMCommand}.
    */
-  public void addCmdStatus(SCMCommand cmd) {
+  public void addCmdStatus(SCMCommand<?> cmd) {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
@@ -954,9 +969,9 @@ public class StateContext {
       return map.size();
     }
 
-    synchronized void putIfAbsent(PipelineKey key,
+    synchronized boolean putIfAbsent(PipelineKey key,
         PipelineAction pipelineAction) {
-      map.putIfAbsent(key, pipelineAction);
+      return map.putIfAbsent(key, pipelineAction) == null;
     }
 
     synchronized List<PipelineAction> getActions(List<PipelineReport> reports,

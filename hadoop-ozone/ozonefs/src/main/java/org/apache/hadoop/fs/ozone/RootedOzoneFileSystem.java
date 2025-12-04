@@ -19,8 +19,6 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
-import com.google.common.base.Strings;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -62,7 +60,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   public RootedOzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
     String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
-    forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
+    forceRecovery = Boolean.parseBoolean(force);
   }
 
   @Override
@@ -144,8 +142,9 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     return TracingUtil.executeInNewSpan("ofs recoverLease",
         () -> recoverLeaseTraced(f));
   }
+
   private boolean recoverLeaseTraced(final Path f) throws IOException {
-    GlobalTracer.get().activeSpan().setTag("path", f.toString());
+    TracingUtil.getActiveSpan().setAttribute("path", f.toString());
     statistics.incrementWriteOps(1);
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
@@ -183,7 +182,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   }
 
   private boolean isFileClosedTraced(Path f) throws IOException {
-    GlobalTracer.get().activeSpan().setTag("path", f.toString());
+    TracingUtil.getActiveSpan().setAttribute("fs.operation", "isFileClosed");
     statistics.incrementWriteOps(1);
     LOG.trace("isFileClosed() path:{}", f);
     Path qualifiedPath = makeQualified(f);

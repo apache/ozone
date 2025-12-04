@@ -23,8 +23,8 @@ import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.collections.MapIterator;
-import org.apache.commons.collections.map.LRUMap;
+import org.apache.commons.collections4.MapIterator;
+import org.apache.commons.collections4.map.LRUMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -44,6 +44,7 @@ public final class ContainerCache extends LRUMap {
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
   private static ContainerCacheMetrics metrics;
+
   /**
    * Constructs a cache that holds DBHandle references.
    */

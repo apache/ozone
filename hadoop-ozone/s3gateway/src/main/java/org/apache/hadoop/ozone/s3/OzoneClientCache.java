@@ -26,10 +26,13 @@ import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -37,30 +40,49 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Cached ozone client for s3 requests.
  */
-@ApplicationScoped
-public final class OzoneClientCache {
+@Singleton
+public class OzoneClientCache {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientCache.class);
-  // single, cached OzoneClient established on first connection
-  // for s3g gRPC OmTransport, OmRequest - OmResponse channel
-  private static OzoneClientCache instance;
-  private OzoneClient client;
-  private SecurityConfig secConfig;
 
-  private OzoneClientCache(OzoneConfiguration ozoneConfiguration)
-      throws IOException {
+  private final OzoneConfiguration conf;
+  private OzoneClient client;
+
+  @Inject
+  OzoneClientCache(OzoneConfiguration conf) {
+    this.conf = conf;
+    LOG.debug("{}: Created", this);
+  }
+
+  @PostConstruct
+  public void initialize() throws IOException {
+    conf.set("ozone.om.group.rights", "NONE");
     // Set the expected OM version if not set via config.
-    ozoneConfiguration.setIfUnset(OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
+    conf.setIfUnset(OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
         OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT);
+    conf.setBoolean(S3Auth.S3_AUTH_CHECK, true);
+
+    client = createClient(conf);
+    Preconditions.assertTrue(conf.getBoolean(S3Auth.S3_AUTH_CHECK, false), S3Auth.S3_AUTH_CHECK);
+
+    LOG.debug("{}: Initialized", this);
+  }
+
+  public OzoneClient getClient() {
+    return client;
+  }
+
+  public static OzoneClient createClient(OzoneConfiguration ozoneConfiguration) throws IOException {
     String omServiceID = OmUtils.getOzoneManagerServiceId(ozoneConfiguration);
-    secConfig = new SecurityConfig(ozoneConfiguration);
-    client = null;
+    SecurityConfig secConfig = new SecurityConfig(ozoneConfiguration);
     try {
       if (secConfig.isGrpcTlsEnabled()) {
         if (ozoneConfiguration
@@ -70,43 +92,23 @@ public final class OzoneClientCache {
           // Grpc transport selected
           // need to get certificate for TLS through
           // hadoop rpc first via ServiceInfo
-          setCertificate(omServiceID,
-              ozoneConfiguration);
+          setCertificate(secConfig, omServiceID, ozoneConfiguration);
         }
       }
       if (omServiceID == null) {
-        client = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+        return OzoneClientFactory.getRpcClient(ozoneConfiguration);
       } else {
         // As in HA case, we need to pass om service ID.
-        client = OzoneClientFactory.getRpcClient(omServiceID,
+        return OzoneClientFactory.getRpcClient(omServiceID,
             ozoneConfiguration);
       }
     } catch (IOException e) {
       LOG.warn("cannot create OzoneClient", e);
       throw e;
     }
-    // S3 Gateway should always set the S3 Auth.
-    ozoneConfiguration.setBoolean(S3Auth.S3_AUTH_CHECK, true);
   }
 
-  public static OzoneClient getOzoneClientInstance(OzoneConfiguration
-                                                      ozoneConfiguration)
-      throws IOException {
-    if (instance == null) {
-      instance = new OzoneClientCache(ozoneConfiguration);
-    }
-    return instance.client;
-  }
-
-  public static void closeClient() throws IOException {
-    if (instance != null) {
-      instance.client.close();
-      instance = null;
-    }
-  }
-
-  private void setCertificate(String omServiceID,
-                              OzoneConfiguration conf)
+  private static void setCertificate(SecurityConfig secConfig, String omServiceID, OzoneConfiguration conf)
       throws IOException {
 
     // create local copy of config incase exception occurs
@@ -119,6 +121,7 @@ public final class OzoneClientCache {
       // get certificates with service list request
       config.set(OZONE_OM_TRANSPORT_CLASS,
           OZONE_OM_TRANSPORT_CLASS_DEFAULT);
+      config.setBoolean(S3Auth.S3_AUTH_CHECK, false);
 
       if (omServiceID == null) {
         certClient = OzoneClientFactory.getRpcClient(config);
@@ -160,9 +163,9 @@ public final class OzoneClientCache {
     }
   }
 
-
   @PreDestroy
-  public void destroy() throws IOException {
-    OzoneClientCache.closeClient();
+  public void cleanup() {
+    LOG.debug("{}: Closing cached client", this);
+    IOUtils.close(LOG, client);
   }
 }

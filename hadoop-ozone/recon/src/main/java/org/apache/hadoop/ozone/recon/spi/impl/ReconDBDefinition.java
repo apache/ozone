@@ -22,12 +22,15 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 
 /**
  * RocksDB definition for the DB internal to Recon.
@@ -35,11 +38,6 @@ import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 public class ReconDBDefinition extends DBDefinition.WithMap {
 
   private final String dbName;
-
-  public ReconDBDefinition(String dbName) {
-    super(COLUMN_FAMILIES);
-    this.dbName = dbName;
-  }
 
   public static final DBColumnFamilyDefinition<ContainerKeyPrefix, Integer>
       CONTAINER_KEY =
@@ -83,6 +81,20 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           LongCodec.get(),
           ContainerReplicaHistoryList.getCodec());
 
+  public static final DBColumnFamilyDefinition<FileSizeCountKey, Long>
+      FILE_COUNT_BY_SIZE =
+      new DBColumnFamilyDefinition<>(
+          "fileCountBySizeTable",
+          FileSizeCountKey.getCodec(),
+          LongCodec.get());
+
+  public static final DBColumnFamilyDefinition<String, GlobalStatsValue>
+      GLOBAL_STATS =
+      new DBColumnFamilyDefinition<>(
+          "globalStatsTable",
+          StringCodec.get(),
+          GlobalStatsValue.getCodec());
+
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           CONTAINER_KEY,
@@ -90,7 +102,14 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           KEY_CONTAINER,
           NAMESPACE_SUMMARY,
           REPLICA_HISTORY,
-          REPLICA_HISTORY_V2);
+          REPLICA_HISTORY_V2,
+          FILE_COUNT_BY_SIZE,
+          GLOBAL_STATS);
+
+  public ReconDBDefinition(String dbName) {
+    super(COLUMN_FAMILIES);
+    this.dbName = dbName;
+  }
 
   @Override
   public String getName() {
@@ -101,4 +120,5 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_DB_DIR;
   }
+
 }

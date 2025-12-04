@@ -57,7 +57,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -66,7 +65,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Tests Snapshot Restore function.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneHAClusterImpl cluster;
@@ -100,7 +98,7 @@ public class TestOzoneSnapshotRestore {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
+    String serviceID = OM_SERVICE_ID + RandomStringUtils.secure().nextNumeric(5);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
             .setOMServiceId(serviceID)
@@ -136,7 +134,7 @@ public class TestOzoneSnapshotRestore {
 
   private void createFileKey(OzoneBucket bucket, String key)
           throws IOException {
-    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
@@ -161,7 +159,7 @@ public class TestOzoneSnapshotRestore {
             .getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName = OmSnapshotManager
-        .getSnapshotPath(clientConf, snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
+        .getSnapshotPath(clientConf, snapshotInfo, 0) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
             1000, 120000);
     return snapshotKeyPrefix;

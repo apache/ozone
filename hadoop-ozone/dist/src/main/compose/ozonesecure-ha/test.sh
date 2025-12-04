@@ -17,6 +17,8 @@
 
 #suite:HA-secure
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -33,6 +35,9 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
+#Run this test before kinit on a SCM HA secure cluster
+execute_robot_test s3g scmha/container-create.robot
+
 execute_robot_test s3g kinit.robot
 
 execute_robot_test s3g freon
@@ -43,9 +48,12 @@ execute_robot_test s3g basic/links.robot
 
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
-for bucket in encrypted link; do
+for bucket in link; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   ## Exclude virtual-host.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
 done
+
+# Run Fault Injection tests at the end
+execute_robot_test s3g ozone-fi/byteman_faults_sample.robot

@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -99,7 +100,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
@@ -120,7 +122,6 @@ public class TestContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerEndpoint.class);
 
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
@@ -188,7 +189,7 @@ public class TestContainerEndpoint {
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
 
-    ozoneStorageContainerManager =
+    OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
@@ -297,10 +298,13 @@ public class TestContainerEndpoint {
   }
 
   private void reprocessContainerKeyMapper() {
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
-            omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
+
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
   }
 
   private void setUpFSOData() throws IOException {
@@ -731,7 +735,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 0, 0, 0);
+    createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
     MissingContainersResponse responseWithLimitObject
@@ -744,6 +748,9 @@ public class TestContainerEndpoint {
     assertTrue(containerWithLimit.getReplicas().stream()
         .map(ContainerHistory::getState)
         .allMatch(s -> s.equals("UNHEALTHY")));
+    assertTrue(containerWithLimit.getReplicas().stream()
+            .map(ContainerHistory::getDataChecksum)
+            .allMatch(s -> s.equals(1234L)));
 
     Collection<MissingContainerMetadata> recordsWithLimit
         = responseWithLimitObject.getContainers();
@@ -796,7 +803,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testUnhealthyContainers() throws IOException, TimeoutException {
-    Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
+    Response response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
 
     UnhealthyContainersResponse responseObject =
         (UnhealthyContainersResponse) response.getEntity();
@@ -808,20 +815,21 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    putContainerInfos(14);
+    putContainerInfos(15);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
 
-    response = containerEndpoint.getUnhealthyContainers(1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
     assertEquals(5, responseObject.getMissingCount());
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getReplicaMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
@@ -890,6 +898,21 @@ public class TestContainerEndpoint {
     assertEquals(12345L, misRep.get(0).getUnhealthySince());
     assertEquals(13L, misRep.get(0).getContainerID());
     assertEquals("some reason", misRep.get(0).getReason());
+
+    List<UnhealthyContainerMetadata> replicaMismatch = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+        .collect(Collectors.toList());
+    assertEquals(1, replicaMismatch.size());
+    assertEquals(3, replicaMismatch.get(0).getExpectedReplicaCount());
+    assertEquals(3, replicaMismatch.get(0).getActualReplicaCount());
+    assertEquals(0, replicaMismatch.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, replicaMismatch.get(0).getUnhealthySince());
+    assertEquals(15L, replicaMismatch.get(0).getContainerID());
+    List<ContainerHistory> replicas = replicaMismatch.get(0).getReplicas();
+    assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 1234L));
+    assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 2345L));
   }
 
   @Test
@@ -901,7 +924,7 @@ public class TestContainerEndpoint {
 
     // Initial empty response verification
     Response response = containerEndpoint
-        .getUnhealthyContainers(missing, 1000, 1);
+        .getUnhealthyContainers(missing, 1000, 0, 0);
 
     UnhealthyContainersResponse responseObject =
         (UnhealthyContainersResponse) response.getEntity();
@@ -918,12 +941,12 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
     createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
     createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
-    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
 
@@ -932,6 +955,7 @@ public class TestContainerEndpoint {
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getReplicaMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records = responseObject.getContainers();
     assertTrue(records.stream()
@@ -947,47 +971,59 @@ public class TestContainerEndpoint {
 
     // Check for empty missing containers, should return zero
     Response filteredEmptyMissingResponse = containerEndpoint
-        .getUnhealthyContainers(emptyMissing, 1000, 1);
+        .getUnhealthyContainers(emptyMissing, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
 
     // Check for negative size containers, should return zero
     Response filteredNegativeSizeResponse = containerEndpoint
-        .getUnhealthyContainers(negativeSize, 1000, 1);
+        .getUnhealthyContainers(negativeSize, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
   }
 
-
   @Test
   public void testUnhealthyContainersInvalidState() {
     WebApplicationException e = assertThrows(WebApplicationException.class,
-        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 1));
+        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 0, 0));
     assertEquals("HTTP 400 Bad Request", e.getMessage());
   }
 
   @Test
   public void testUnhealthyContainersPaging()
       throws IOException, TimeoutException {
-    putContainerInfos(6);
+
+    // Clear any existing unhealthy container records from previous tests
+    containerHealthSchemaManager.clearAllUnhealthyContainerRecords();
+    // Create containers for all IDs that will be used in unhealthy records
+    // createUnhealthyRecords(5, 4, 3, 2) will create records for containers 1-14
+    // So we need to create 14 containers instead of just 6
+    putContainerInfos(14);  // Changed from 6 to 14
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 0);
+
+    // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
-            3, 1).getEntity();
+            3, 0, 0).getEntity();
     assertTrue(firstBatch.getContainers().stream()
         .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
             .map(ContainerHistory::getState))
         .allMatch(s -> s.equals("UNHEALTHY")));
 
+    // For pagination, use the last container ID from the first batch as prevLastKey
+    long lastContainerIdFromFirstBatch = firstBatch.getContainers().stream()
+        .map(i -> i.getContainerID()).max(Long::compareTo).get();
+
+    // Get second batch using correct pagination parameters
     UnhealthyContainersResponse secondBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
-            3, 2).getEntity();
+            3, 0, lastContainerIdFromFirstBatch).getEntity();
 
     ArrayList<UnhealthyContainerMetadata> records
         = new ArrayList<>(firstBatch.getContainers());
@@ -995,7 +1031,6 @@ public class TestContainerEndpoint {
     assertEquals(1L, records.get(0).getContainerID());
     assertEquals(2L, records.get(1).getContainerID());
     assertEquals(3L, records.get(2).getContainerID());
-
     records
         = new ArrayList<>(secondBatch.getContainers());
     assertEquals(3, records.size());
@@ -1011,12 +1046,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN");
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", 1234L);
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", 1234L);
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -1024,6 +1059,9 @@ public class TestContainerEndpoint {
     assertTrue(histories.stream()
         .map(ContainerHistory::getState)
         .allMatch(s -> s.equals("OPEN")));
+    assertTrue(histories.stream()
+            .map(ContainerHistory::getDataChecksum)
+            .allMatch(s -> s.equals(1234L)));
     Set<String> datanodes = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             u1.toString(), u2.toString(), u3.toString(), u4.toString())));
@@ -1050,7 +1088,7 @@ public class TestContainerEndpoint {
 
   UUID newDatanode(String hostName, String ipAddress) throws IOException {
     final UUID uuid = UUID.randomUUID();
-    reconContainerManager.getNodeDB().put(uuid,
+    reconContainerManager.getNodeDB().put(DatanodeID.of(uuid),
         DatanodeDetails.newBuilder()
             .setUuid(uuid)
             .setHostName(hostName)
@@ -1063,7 +1101,7 @@ public class TestContainerEndpoint {
     int cid = 0;
     for (int i = 0; i < emptyMissing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
-          3, 3, 0, null);
+          3, 3, 0, null, false);
     }
   }
 
@@ -1071,37 +1109,41 @@ public class TestContainerEndpoint {
     int cid = 0;
     for (int i = 0; i < negativeSize; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-          3, 3, 0, null); // Added for NEGATIVE_SIZE state
+          3, 3, 0, null, false); // Added for NEGATIVE_SIZE state
     }
   }
 
-
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
-                                      int misRep) {
+                                      int misRep, int dataChecksum) {
     int cid = 0;
     for (int i = 0; i < missing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
-          3, 0, 3, null);
+          3, 0, 3, null, false);
     }
     for (int i = 0; i < overRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.OVER_REPLICATED.toString(),
-          3, 5, -2, null);
+          3, 5, -2, null, false);
     }
     for (int i = 0; i < underRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-          3, 1, 2, null);
+          3, 1, 2, null, false);
     }
     for (int i = 0; i < misRep; i++) {
       createUnhealthyRecord(++cid,
           UnHealthyContainerStates.MIS_REPLICATED.toString(),
-          2, 1, 1, "some reason");
+          2, 1, 1, "some reason", false);
+    }
+    for (int i = 0; i < dataChecksum; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.REPLICA_MISMATCH.toString(),
+          3, 3, 0, null, true);
     }
   }
 
   private void createUnhealthyRecord(int id, String state, int expected,
-                                     int actual, int delta, String reason) {
+                                     int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
     UnhealthyContainers missing = new UnhealthyContainers();
     missing.setContainerId(cID);
@@ -1116,14 +1158,16 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
+    long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
+
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", differentChecksum);
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", differentChecksum);
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", 1234L);
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY");
+        "UNHEALTHY", 1234L);
   }
 
   protected ContainerWithPipeline getTestContainer(
@@ -1144,6 +1188,11 @@ public class TestContainerEndpoint {
     return new ContainerWithPipeline(containerInfo, localPipeline);
   }
 
+  void assertContainerCount(HddsProtos.LifeCycleState state, int expected) {
+    final int computed = containerStateManager.getContainerCount(state);
+    assertEquals(expected, computed);
+  }
+
   @Test
   public void testGetSCMDeletedContainers() throws Exception {
     reconContainerManager.addNewContainer(
@@ -1161,9 +1210,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(102L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1172,14 +1219,10 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.DELETE);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 0);
@@ -1212,9 +1255,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(104L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1226,9 +1267,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(105L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(1, 0);
@@ -1258,9 +1297,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(106L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1272,9 +1309,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(107L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 106L);
@@ -1332,7 +1367,6 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
   }
-
 
   @Test
   public void testGetContainerInsightsNonSCMContainersWithPrevKey()
@@ -1484,7 +1518,6 @@ public class TestContainerEndpoint {
     assertEquals("SCM", containerDiscrepancyInfo2.getExistsAt());
   }
 
-
   @Test
   public void testContainerMissingFilter()
       throws IOException, TimeoutException {
@@ -1536,7 +1569,6 @@ public class TestContainerEndpoint {
     assertThat(missingContainerIdsSCM).contains(2L);
   }
 
-
   @Test
   public void testGetOmContainersDeletedInSCM() throws Exception {
     Map<Long, ContainerMetadata> omContainers =
@@ -1554,16 +1586,12 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.DELETE);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETING, 1);
 
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1593,6 +1621,41 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testGetOmContainersDeletedInSCMPagination() throws Exception {
+    Map<Long, ContainerMetadata> omContainers = reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 2 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(2);
+
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
+
+    List<ContainerInfo> deletedSCMContainers = reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response omContainersDeletedInSCMResponse =
+        containerEndpoint.getOmContainersDeletedInSCM(1, 0);
+    assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap = (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertEquals(1, containerDiscrepancyInfoList.size());
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("lastKey");
+    assertEquals(containerDiscrepancyInfoList.get(containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+    assertEquals(2, responsePrevKey);
+
+    assertEquals(omContainers.get(2L).getNumberOfKeys(), containerDiscrepancyInfoList.get(0).getNumberOfKeys());
+    assertEquals(1, containerDiscrepancyInfoList.size());
+  }
+
+  @Test
   public void testGetOmContainersDeletedInSCMLimitParam() throws Exception {
     Map<Long, ContainerMetadata> omContainers =
         reconContainerMetadataManager.getContainers(-1, 0);
@@ -1603,9 +1666,7 @@ public class TestContainerEndpoint {
     // and then to DELETED
     updateContainerStateToDeleted(1);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1647,9 +1708,7 @@ public class TestContainerEndpoint {
     updateContainerStateToDeleted(1);
     updateContainerStateToDeleted(2);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1677,5 +1736,121 @@ public class TestContainerEndpoint {
         .getNumberOfKeys());
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals(2, containerDiscrepancyInfoList.get(0).getContainerID());
+  }
+
+  /**
+   * Helper method that creates duplicate FSO file keys – two keys having the same file
+   * name but under different directories. It creates the necessary volume, bucket, and
+   * directory entries, and then writes two keys using writeKeyToOm.
+   */
+  private void setUpDuplicateFSOFileKeys() throws IOException {
+    // Ensure the volume exists.
+    String volumeKey = reconOMMetadataManager.getVolumeKey(VOLUME_NAME);
+    OmVolumeArgs volArgs = OmVolumeArgs.newBuilder()
+        .setVolume(VOLUME_NAME)
+        .setAdminName("TestUser")
+        .setOwnerName("TestUser")
+        .setObjectID(VOL_OBJECT_ID)
+        .build();
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, volArgs);
+
+    // Ensure the bucket exists.
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setObjectID(BUCKET_OBJECT_ID)
+        .build();
+    String bucketKey = reconOMMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME);
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    // Create two directories: "dirA" and "dirB" with unique object IDs.
+    // For a top-level directory in a bucket, the parent's object id is the bucket's id.
+    OmDirectoryInfo dirA = OmDirectoryInfo.newBuilder()
+        .setName("dirA")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(5L)   // Unique object id for dirA.
+        .build();
+    OmDirectoryInfo dirB = OmDirectoryInfo.newBuilder()
+        .setName("dirB")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(6L)   // Unique object id for dirB.
+        .build();
+    // Build DB directory keys. (The third parameter is used to form a unique key.)
+    String dirKeyA = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 5L, "dirA");
+    String dirKeyB = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 6L, "dirB");
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyA, dirA);
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyB, dirB);
+
+    // Use a common OmKeyLocationInfoGroup.
+    OmKeyLocationInfoGroup locationInfoGroup = getLocationInfoGroup1();
+
+    // Write two FSO keys with the same file name ("dupFile") but in different directories.
+    // The file name stored in OM is the full path (e.g., "dirA/dupFile" vs. "dirB/dupFile").
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the first key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the first key
+        100L,                    // object id (example)
+        5L,                      // parent's object id for dirA (same as dirA's object id)
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the second key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the second key
+        100L,
+        6L,                      // parent's object id for dirB
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+  }
+
+  /**
+   * Test method that sets up two duplicate FSO file keys (same file name but in different directories)
+   * and then verifies that the ContainerEndpoint returns two distinct key records.
+   */
+  @Test
+  public void testDuplicateFSOKeysForContainerEndpoint() throws IOException {
+    // Set up duplicate FSO file keys.
+    setUpDuplicateFSOFileKeys();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, 10);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+    // Reprocess the container key mappings so that the new keys are loaded.
+    reprocessContainerKeyMapper();
+
+    // Assume that FSO keys are mapped to container ID 20L (as in previous tests for FSO).
+    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    KeysResponse keysResponse = (KeysResponse) response.getEntity();
+    Collection<KeyMetadata> keyMetadataList = keysResponse.getKeys();
+
+    // We expect two distinct keys.
+    assertEquals(2, keysResponse.getTotalCount());
+    assertEquals(2, keyMetadataList.size());
+
+    for (KeyMetadata km : keyMetadataList) {
+      String completePath = km.getCompletePath();
+      assertNotNull(completePath);
+      // Verify that the complete path reflects either directory "dirA" or "dirB"
+      if (completePath.contains("dirA")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirA/dupFileKey1", completePath);
+      } else if (completePath.contains("dirB")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirB/dupFileKey1", completePath);
+      } else {
+        throw new AssertionError("Unexpected complete path: " + completePath);
+      }
+    }
   }
 }

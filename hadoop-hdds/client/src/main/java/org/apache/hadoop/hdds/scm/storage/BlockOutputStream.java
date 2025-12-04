@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockOutputStream extends OutputStream {
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
@@ -819,7 +819,6 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-
   public IOException setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
@@ -1245,6 +1244,7 @@ public class BlockOutputStream extends OutputStream {
    */
   private static class FlushRuntimeException extends RuntimeException {
     private final IOException cause;
+
     FlushRuntimeException(IOException cause) {
       this.cause = cause;
     }

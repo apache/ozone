@@ -39,4 +39,18 @@ public interface OMAdminProtocol extends Closeable {
    * Remove OM from HA ring.
    */
   void decommission(OMNodeDetails removeOMNode) throws IOException;
+
+  /**
+   * Requests compaction of a column family of om.db.
+   * @param columnFamily
+   */
+  void compactOMDB(String columnFamily) throws IOException;
+
+  /**
+   * Triggers the Snapshot Defragmentation Service to run immediately.
+   * @param noWait if true, return immediately without waiting for completion
+   * @return true if defragmentation completed successfully (when noWait is false),
+   *         or if the task was triggered successfully (when noWait is true)
+   */
+  boolean triggerSnapshotDefrag(boolean noWait) throws IOException;
 }

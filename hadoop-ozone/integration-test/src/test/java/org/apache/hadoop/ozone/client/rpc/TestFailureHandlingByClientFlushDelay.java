@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -64,39 +63,25 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Exception handling by Ozone Client by set flush delay.
  */
-@Timeout(300)
 public class TestFailureHandlingByClientFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 4 * CHUNK_SIZE;
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String volumeName;
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void init() throws Exception {
-    conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 4 * chunkSize;
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
 
     RatisClientConfig ratisClientConfig =
@@ -132,10 +117,10 @@ public class TestFailureHandlingByClientFlushDelay {
         "/rack1");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -156,9 +141,6 @@ public class TestFailureHandlingByClientFlushDelay {
     init();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -172,9 +154,9 @@ public class TestFailureHandlingByClientFlushDelay {
     startCluster();
     String keyName = UUID.randomUUID().toString();
     OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, blockSize);
+        createKey(keyName, ReplicationType.RATIS, BLOCK_SIZE);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize);
+        .getFixedLengthString(keyString, CHUNK_SIZE);
 
     // get the name of a valid container
     KeyOutputStream keyOutputStream =

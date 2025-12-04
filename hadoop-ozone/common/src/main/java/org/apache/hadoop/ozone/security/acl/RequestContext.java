@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import java.net.InetAddress;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -139,7 +139,6 @@ public class RequestContext {
   public static Builder newBuilder() {
     return new Builder();
   }
-
 
   public static RequestContext.Builder getBuilder(
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,

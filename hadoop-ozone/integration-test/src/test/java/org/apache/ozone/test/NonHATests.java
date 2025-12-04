@@ -17,8 +17,48 @@
 
 package org.apache.ozone.test;
 
+import org.apache.hadoop.fs.ozone.TestOzoneFSBucketLayout;
+import org.apache.hadoop.fs.ozone.TestOzoneFSInputStream;
+import org.apache.hadoop.fs.ozone.TestOzoneFSWithObjectStoreCreate;
+import org.apache.hadoop.fs.ozone.TestOzoneFileSystemMetrics;
+import org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent;
+import org.apache.hadoop.hdds.scm.TestAllocateContainer;
 import org.apache.hadoop.hdds.scm.TestContainerOperations;
+import org.apache.hadoop.hdds.scm.TestContainerReportWithKeys;
+import org.apache.hadoop.hdds.scm.TestContainerSmallFile;
+import org.apache.hadoop.hdds.scm.TestGetCommittedBlockLengthAndPutKey;
+import org.apache.hadoop.hdds.scm.TestSCMMXBean;
+import org.apache.hadoop.hdds.scm.TestSCMNodeManagerMXBean;
+import org.apache.hadoop.hdds.scm.TestXceiverClientManager;
+import org.apache.hadoop.hdds.scm.container.metrics.TestSCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.pipeline.TestNode2PipelineMap;
+import org.apache.hadoop.hdds.scm.pipeline.TestPipelineManagerMXBean;
+import org.apache.hadoop.hdds.scm.pipeline.TestSCMPipelineMetrics;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestCpuMetrics;
+import org.apache.hadoop.ozone.admin.om.lease.TestLeaseRecoverer;
+import org.apache.hadoop.ozone.client.rpc.TestCloseContainerHandlingByClient;
+import org.apache.hadoop.ozone.client.rpc.TestContainerStateMachineStream;
+import org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks;
+import org.apache.hadoop.ozone.client.rpc.TestOzoneClientMultipartUploadWithFSO;
+import org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion;
+import org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient;
+import org.apache.hadoop.ozone.om.TestListKeys;
+import org.apache.hadoop.ozone.om.TestListKeysWithFSO;
+import org.apache.hadoop.ozone.om.TestListStatus;
+import org.apache.hadoop.ozone.om.TestObjectStore;
+import org.apache.hadoop.ozone.om.TestObjectStoreWithFSO;
+import org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS;
+import org.apache.hadoop.ozone.om.TestOmBlockVersioning;
+import org.apache.hadoop.ozone.om.TestOzoneManagerListVolumes;
+import org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface;
+import org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration;
+import org.apache.hadoop.ozone.reconfig.TestOmReconfiguration;
+import org.apache.hadoop.ozone.reconfig.TestScmReconfiguration;
+import org.apache.hadoop.ozone.shell.TestOzoneDebugReplicasVerify;
+import org.apache.hadoop.ozone.shell.TestOzoneDebugShell;
+import org.apache.hadoop.ozone.shell.TestReconfigShell;
+import org.apache.hadoop.ozone.shell.TestReplicationConfigPreference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -38,7 +78,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneFSBucketLayout extends org.apache.hadoop.fs.ozone.TestOzoneFSBucketLayout {
+  class OzoneClientMultipartUploadWithFSO extends TestOzoneClientMultipartUploadWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -46,7 +86,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneFSInputStream extends org.apache.hadoop.fs.ozone.TestOzoneFSInputStream {
+  class OzoneFSBucketLayout extends TestOzoneFSBucketLayout {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -54,7 +94,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneFSWithObjectStoreCreate extends org.apache.hadoop.fs.ozone.TestOzoneFSWithObjectStoreCreate {
+  class OzoneFSInputStream extends TestOzoneFSInputStream {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -62,7 +102,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneFileSystemMetrics extends org.apache.hadoop.fs.ozone.TestOzoneFileSystemMetrics {
+  class OzoneFSWithObjectStoreCreate extends TestOzoneFSWithObjectStoreCreate {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -70,7 +110,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneFileSystemMissingParent extends org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent {
+  class OzoneFileSystemMetrics extends TestOzoneFileSystemMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -78,7 +118,15 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class AllocateContainer extends org.apache.hadoop.hdds.scm.TestAllocateContainer {
+  class OzoneFileSystemMissingParent extends TestOzoneFileSystemMissingParent {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class AllocateContainer extends TestAllocateContainer {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -94,7 +142,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ContainerReportWithKeys extends org.apache.hadoop.hdds.scm.TestContainerReportWithKeys {
+  class ContainerReportWithKeys extends TestContainerReportWithKeys {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -102,7 +150,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ContainerSmallFile extends org.apache.hadoop.hdds.scm.TestContainerSmallFile {
+  class ContainerSmallFile extends TestContainerSmallFile {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -110,7 +158,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class GetCommittedBlockLengthAndPutKey extends org.apache.hadoop.hdds.scm.TestGetCommittedBlockLengthAndPutKey {
+  class GetCommittedBlockLengthAndPutKey extends TestGetCommittedBlockLengthAndPutKey {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -118,7 +166,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class SCMMXBean extends org.apache.hadoop.hdds.scm.TestSCMMXBean {
+  class SCMMXBean extends TestSCMMXBean {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -126,7 +174,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class SCMNodeManagerMXBean extends org.apache.hadoop.hdds.scm.TestSCMNodeManagerMXBean {
+  class SCMNodeManagerMXBean extends TestSCMNodeManagerMXBean {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -134,7 +182,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class XceiverClientManager extends org.apache.hadoop.hdds.scm.TestXceiverClientManager {
+  class XceiverClientManager extends TestXceiverClientManager {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -142,7 +190,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class SCMContainerManagerMetrics extends org.apache.hadoop.hdds.scm.container.metrics.TestSCMContainerManagerMetrics {
+  class SCMContainerManagerMetrics extends TestSCMContainerManagerMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -150,7 +198,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class Node2PipelineMap extends org.apache.hadoop.hdds.scm.pipeline.TestNode2PipelineMap {
+  class Node2PipelineMap extends TestNode2PipelineMap {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -158,7 +206,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class PipelineManagerMXBean extends org.apache.hadoop.hdds.scm.pipeline.TestPipelineManagerMXBean {
+  class PipelineManagerMXBean extends TestPipelineManagerMXBean {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -166,7 +214,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class SCMPipelineMetrics extends org.apache.hadoop.hdds.scm.pipeline.TestSCMPipelineMetrics {
+  class ReplicationConfigPreference extends TestReplicationConfigPreference {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -174,7 +222,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class CpuMetrics extends org.apache.hadoop.ozone.TestCpuMetrics {
+  class SCMPipelineMetrics extends TestSCMPipelineMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -182,7 +230,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class DiscardPreallocatedBlocks extends org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks {
+  class CloseContainerHandlingByClient extends TestCloseContainerHandlingByClient {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -190,7 +238,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class LeaseRecoverer extends org.apache.hadoop.ozone.admin.om.lease.TestLeaseRecoverer {
+  class ContainerStateMachineStream extends TestContainerStateMachineStream {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -198,7 +246,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class BucketLayoutWithOlderClient extends org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient {
+  class CpuMetrics extends TestCpuMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -206,7 +254,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ListKeys extends org.apache.hadoop.ozone.om.TestListKeys {
+  class DiscardPreallocatedBlocks extends TestDiscardPreallocatedBlocks {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -214,7 +262,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ListKeysWithFSO extends org.apache.hadoop.ozone.om.TestListKeysWithFSO {
+  class LeaseRecoverer extends TestLeaseRecoverer {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -222,7 +270,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ListStatus extends org.apache.hadoop.ozone.om.TestListStatus {
+  class BucketLayoutWithOlderClient extends TestBucketLayoutWithOlderClient {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -230,7 +278,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
+  class ListKeys extends TestListKeys {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -238,7 +286,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ObjectStoreWithFSO extends org.apache.hadoop.ozone.om.TestObjectStoreWithFSO {
+  class ListKeysWithFSO extends TestListKeysWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -246,7 +294,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ObjectStoreWithLegacyFS extends org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS {
+  class ListStatus extends TestListStatus {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -254,7 +302,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OmBlockVersioning extends org.apache.hadoop.ozone.om.TestOmBlockVersioning {
+  class ObjectStore extends TestObjectStore {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -262,7 +310,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneManagerListVolumes extends org.apache.hadoop.ozone.om.TestOzoneManagerListVolumes {
+  class ObjectStoreWithFSO extends TestObjectStoreWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -270,7 +318,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneManagerRestInterface extends org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface {
+  class ObjectStoreWithLegacyFS extends TestObjectStoreWithLegacyFS {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -278,7 +326,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class DatanodeReconfiguration extends org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration {
+  class OmBlockVersioning extends TestOmBlockVersioning {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -286,7 +334,7 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OmReconfiguration extends org.apache.hadoop.ozone.reconfig.TestOmReconfiguration {
+  class OzoneManagerListVolumes extends TestOzoneManagerListVolumes {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -294,11 +342,66 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ScmReconfiguration extends org.apache.hadoop.ozone.reconfig.TestScmReconfiguration {
+  class OzoneManagerRestInterface extends TestOzoneManagerRestInterface {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
     }
   }
 
+  @Nested
+  class OzoneRpcClientWithKeyLatestVersion extends TestOzoneRpcClientWithKeyLatestVersion {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class DatanodeReconfiguration extends TestDatanodeReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OmReconfiguration extends TestOmReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneDebugShell extends TestOzoneDebugShell {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ReconfigShell extends TestReconfigShell {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ScmReconfiguration extends TestScmReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneDebugReplicasVerify extends TestOzoneDebugReplicasVerify {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
 }

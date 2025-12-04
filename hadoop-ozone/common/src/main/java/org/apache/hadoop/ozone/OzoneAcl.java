@@ -26,13 +26,14 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -56,7 +57,7 @@ import org.apache.ratis.util.MemoizedSupplier;
  * </ul>
  */
 @Immutable
-public class OzoneAcl {
+public final class OzoneAcl {
 
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
   /**
@@ -64,7 +65,7 @@ public class OzoneAcl {
    * which is similar to Linux POSIX symbolic.
    */
   public static final OzoneAcl LINK_BUCKET_DEFAULT_ACL =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
 
   private final ACLIdentityType type;
   private final String name;
@@ -77,12 +78,12 @@ public class OzoneAcl {
   @JsonIgnore
   private final Supplier<Integer> hashCodeMethod;
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, Set<ACLType> acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, int acls) {
@@ -96,7 +97,6 @@ public class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
-
 
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
@@ -194,7 +194,7 @@ public class OzoneAcl {
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], aclScope, acls);
+    return OzoneAcl.of(aclType, parts[1], aclScope, acls);
   }
 
   /**
@@ -310,7 +310,7 @@ public class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return Proto2Utils.unsafeByteString(bytes);
+    return ProtoUtils.unsafeByteString(bytes);
   }
 
   @JsonIgnore
@@ -320,6 +320,10 @@ public class OzoneAcl {
 
   public List<ACLType> getAclList() {
     return getAclList(aclBits, Function.identity());
+  }
+
+  public Set<ACLType> getAclSet() {
+    return Collections.unmodifiableSet(EnumSet.copyOf(getAclList()));
   }
 
   private static <T> List<T> getAclList(int aclBits, Function<ACLType, T> converter) {

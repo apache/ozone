@@ -86,14 +86,15 @@ public abstract class TestMisReplicationHandler {
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY);
         });
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
     when(replicationManager.getConfig()).thenReturn(rmConf);
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(mock(ContainerReplicaPendingOps.class));
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendDatanodeCommand(
@@ -132,6 +133,7 @@ public abstract class TestMisReplicationHandler {
   protected abstract MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration configuration,
           ReplicationManager rm);
+
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
                                   List<ContainerReplicaOp> pendingOp,
                                   int maintenanceCnt, int misreplicationCount,

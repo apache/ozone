@@ -232,7 +232,6 @@ public final class OzoneObjInfo extends OzoneObj {
       return this;
     }
 
-
     public OzoneObjInfo build() {
       return new OzoneObjInfo(resType, storeType, volumeName, bucketName,
           name, ozonePrefixPath);

@@ -62,6 +62,16 @@ import org.slf4j.Logger;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface OMMultiTenantManager {
+
+  String OZONE_TENANT_RANGER_POLICY_DESCRIPTION =
+      "Created by Ozone. WARNING: "
+          + "Changes will be lost when this tenant is deleted.";
+
+  String OZONE_TENANT_RANGER_ROLE_DESCRIPTION =
+      "Managed by Ozone. WARNING: "
+          + "Changes will be overridden. "
+          + "Use Ozone tenant CLI to manage users in this tenant role instead.";
+
   /* TODO: Outdated
    * Init multi-tenant manager. Performs initialization e.g.
    *  - Initialize Multi-Tenant-Gatekeeper-Plugin
@@ -136,6 +146,7 @@ public interface OMMultiTenantManager {
    */
   TenantUserList listUsersInTenant(String tenantID, String prefix)
       throws IOException;
+
   /**
    * Given an access ID return its corresponding tenant.
    * @param accessID
@@ -339,15 +350,6 @@ public interface OMMultiTenantManager {
 
     return true;
   }
-
-  String OZONE_TENANT_RANGER_POLICY_DESCRIPTION =
-      "Created by Ozone. WARNING: "
-          + "Changes will be lost when this tenant is deleted.";
-
-  String OZONE_TENANT_RANGER_ROLE_DESCRIPTION =
-      "Managed by Ozone. WARNING: "
-          + "Changes will be overridden. "
-          + "Use Ozone tenant CLI to manage users in this tenant role instead.";
 
   /**
    * Returns default VolumeAccess policy given tenant and role names.

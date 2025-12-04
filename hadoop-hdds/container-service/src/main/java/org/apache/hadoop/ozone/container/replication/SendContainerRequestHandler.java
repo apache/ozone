@@ -50,10 +50,11 @@ class SendContainerRequestHandler
   private long containerId = -1;
   private long nextOffset;
   private OutputStream output;
-  private HddsVolume volume;
+  private HddsVolume volume = null;
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
+  private long spaceToReserve = 0;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -84,7 +85,13 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
-        volume = importer.chooseNextVolume();
+        
+        // Use container size if available, otherwise fall back to default
+        spaceToReserve = importer.getSpaceToReserve(
+            req.hasSize() ? req.getSize() : null);
+
+        volume = importer.chooseNextVolume(spaceToReserve);
+
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
@@ -110,32 +117,44 @@ class SendContainerRequestHandler
 
   @Override
   public void onError(Throwable t) {
-    LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
-    closeOutput();
-    deleteTarball();
-    responseObserver.onError(t);
+    try {
+      LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
+      closeOutput();
+      deleteTarball();
+      responseObserver.onError(t);
+    } finally {
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
+      }
+    }
   }
 
   @Override
   public void onCompleted() {
-    if (output == null) {
-      LOG.warn("Received container without any parts");
-      return;
-    }
-
-    LOG.info("Container {} is downloaded with size {}, starting to import.",
-        containerId, nextOffset);
-    closeOutput();
-
     try {
-      importer.importContainer(containerId, path, volume, compression);
-      LOG.info("Container {} is replicated successfully", containerId);
-      responseObserver.onNext(SendContainerResponse.newBuilder().build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      LOG.warn("Failed to import container {}", containerId, t);
-      deleteTarball();
-      responseObserver.onError(t);
+      if (output == null) {
+        LOG.warn("Received container without any parts");
+        return;
+      }
+
+      LOG.info("Container {} is downloaded with size {}, starting to import.",
+          containerId, nextOffset);
+      closeOutput();
+
+      try {
+        importer.importContainer(containerId, path, volume, compression);
+        LOG.info("Container {} is replicated successfully", containerId);
+        responseObserver.onNext(SendContainerResponse.newBuilder().build());
+        responseObserver.onCompleted();
+      } catch (Throwable t) {
+        LOG.warn("Failed to import container {}", containerId, t);
+        deleteTarball();
+        responseObserver.onError(t);
+      }
+    } finally {
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
+      }
     }
   }
 

@@ -50,7 +50,6 @@ public class TestReconContainerMetadataManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -58,7 +57,7 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -309,25 +308,25 @@ public class TestReconContainerMetadataManagerImpl {
 
     Map<ContainerKeyPrefix, Integer> keyPrefixMap =
         reconContainerMetadataManager.getKeyPrefixesForContainer(containerId,
-            keyPrefix1);
+            keyPrefix1, 1000);
     assertEquals(1, keyPrefixMap.size());
     assertEquals(2, keyPrefixMap.get(containerKeyPrefix2).longValue());
 
     keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
-        nextContainerId, keyPrefix3);
+        nextContainerId, keyPrefix3, 1000);
     assertEquals(0, keyPrefixMap.size());
 
     // test for negative cases
     keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
-        containerId, "V3/B1/invalid");
+        containerId, "V3/B1/invalid", 1000);
     assertEquals(0, keyPrefixMap.size());
 
     keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
-        containerId, keyPrefix3);
+        containerId, keyPrefix3, 1000);
     assertEquals(0, keyPrefixMap.size());
 
     keyPrefixMap = reconContainerMetadataManager.getKeyPrefixesForContainer(
-        10L, "");
+        10L, "", 1000);
     assertEquals(0, keyPrefixMap.size());
   }
 
@@ -365,8 +364,8 @@ public class TestReconContainerMetadataManagerImpl {
         reconContainerMetadataManager.getContainers(-1, 0L);
     assertEquals(2, containerMap.size());
 
-    assertEquals(3, containerMap.get(containerId).getNumberOfKeys());
-    assertEquals(3, containerMap.get(nextContainerId).getNumberOfKeys());
+    assertEquals(2, containerMap.get(containerId).getNumberOfKeys());
+    assertEquals(1, containerMap.get(nextContainerId).getNumberOfKeys());
 
     // test if limit works
     containerMap = reconContainerMetadataManager.getContainers(

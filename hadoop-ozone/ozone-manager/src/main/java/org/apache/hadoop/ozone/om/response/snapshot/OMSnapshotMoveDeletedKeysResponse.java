@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -35,10 +36,10 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
@@ -52,21 +53,17 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
   private List<HddsProtos.KeyValue> renamedKeysList;
   private List<String> movedDirs;
+  private long bucketId;
 
-  public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-      @Nonnull SnapshotInfo fromSnapshot,
-      SnapshotInfo nextSnapshot,
-      List<SnapshotMoveKeyInfos> nextDBKeysList,
-      List<SnapshotMoveKeyInfos> reclaimKeysList,
-      List<HddsProtos.KeyValue> renamedKeysList,
-      List<String> movedDirs) {
-    super(omResponse);
-    this.fromSnapshot = fromSnapshot;
-    this.nextSnapshot = nextSnapshot;
-    this.nextDBKeysList = nextDBKeysList;
-    this.reclaimKeysList = reclaimKeysList;
-    this.renamedKeysList = renamedKeysList;
-    this.movedDirs = movedDirs;
+  public OMSnapshotMoveDeletedKeysResponse(Builder builder) {
+    super(builder.omResponse);
+    this.fromSnapshot = builder.fromSnapshot;
+    this.nextSnapshot = builder.nextSnapshot;
+    this.nextDBKeysList = builder.nextDBKeysList;
+    this.reclaimKeysList = builder.reclaimKeysList;
+    this.renamedKeysList = builder.renamedKeysList;
+    this.movedDirs = builder.movedDirs;
+    this.bucketId = builder.bucketId;
   }
 
   /**
@@ -89,13 +86,13 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         ((OmMetadataManagerImpl) omMetadataManager)
             .getOzoneManager().getOmSnapshotManager();
 
-    try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
-        omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmFromSnapshot =
+             omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
       OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
-        try (ReferenceCounted<OmSnapshot>
+        try (UncheckedAutoCloseableSupplier<OmSnapshot>
             rcOmNextSnapshot = omSnapshotManager.getSnapshot(nextSnapshot.getSnapshotId())) {
 
           OmSnapshot nextOmSnapshot = rcOmNextSnapshot.get();
@@ -155,8 +152,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
                                   OMMetadataManager metadataManager)
       throws IOException {
     for (SnapshotMoveKeyInfos dBKey : reclaimKeysList) {
-      RepeatedOmKeyInfo omKeyInfos =
-          createRepeatedOmKeyInfo(dBKey.getKeyInfosList());
+      RepeatedOmKeyInfo omKeyInfos = createRepeatedOmKeyInfo(dBKey.getKeyInfosList(), bucketId);
       // omKeyInfos can be null, because everything from RepeatedOmKeyInfo
       // is moved to next snapshot which means this key can be deleted in
       // the current snapshot processed by SDS. The reclaim key here indicates
@@ -198,7 +194,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     for (SnapshotMoveKeyInfos dBKey : nextDBKeysList) {
-      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(dBKey, metadataManager);
+      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(dBKey, bucketId,
+          metadataManager);
       if (omKeyInfos == null) {
         continue;
       }
@@ -208,18 +205,77 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   }
 
   public static RepeatedOmKeyInfo createRepeatedOmKeyInfo(
-      List<KeyInfo> keyInfoList) throws IOException {
+      List<KeyInfo> keyInfoList, long bucketId) throws IOException {
     RepeatedOmKeyInfo result = null;
 
     for (KeyInfo keyInfo: keyInfoList) {
       if (result == null) {
-        result = new RepeatedOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo));
+        result = new RepeatedOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo), bucketId);
       } else {
         result.addOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo));
       }
     }
 
     return result;
+  }
+
+  /**
+   * Builder for OMSnapshotMoveDeletedKeysResponse.
+   */
+  public static class Builder {
+    private OMResponse omResponse;
+    private SnapshotInfo fromSnapshot;
+    private SnapshotInfo nextSnapshot;
+    private List<SnapshotMoveKeyInfos> nextDBKeysList;
+    private List<SnapshotMoveKeyInfos> reclaimKeysList;
+    private List<HddsProtos.KeyValue> renamedKeysList;
+    private List<String> movedDirs;
+    private long bucketId;
+
+    public Builder setOmResponse(OMResponse omResponse) {
+      this.omResponse = omResponse;
+      return this;
+    }
+
+    public Builder setFromSnapshot(SnapshotInfo fromSnapshot) {
+      this.fromSnapshot = fromSnapshot;
+      return this;
+    }
+
+    public Builder setNextSnapshot(SnapshotInfo nextSnapshot) {
+      this.nextSnapshot = nextSnapshot;
+      return this;
+    }
+
+    public Builder setNextDBKeysList(List<SnapshotMoveKeyInfos> nextDBKeysList) {
+      this.nextDBKeysList = nextDBKeysList;
+      return this;
+    }
+
+    public Builder setReclaimKeysList(List<SnapshotMoveKeyInfos> reclaimKeysList) {
+      this.reclaimKeysList = reclaimKeysList;
+      return this;
+    }
+
+    public Builder setRenamedKeysList(List<HddsProtos.KeyValue> renamedKeysList) {
+      this.renamedKeysList = renamedKeysList;
+      return this;
+    }
+
+    public Builder setMovedDirs(List<String> movedDirs) {
+      this.movedDirs = movedDirs;
+      return this;
+    }
+
+    public Builder setBucketId(long bucketId) {
+      this.bucketId = bucketId;
+      return this;
+    }
+
+    public OMSnapshotMoveDeletedKeysResponse build() {
+      Objects.requireNonNull(fromSnapshot, "fromSnapshot must not be null");
+      return new OMSnapshotMoveDeletedKeysResponse(this);
+    }
   }
 }
 

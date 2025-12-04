@@ -117,7 +117,7 @@ public class OzoneTokenIdentifier extends
     return this;
   }
 
-  public OMTokenProto toProtoBuf() throws IOException {
+  public OMTokenProto toProtoBuf() {
     OMTokenProto.Builder builder = OMTokenProto.newBuilder()
         .setMaxDate(getMaxDate())
         .setType(getTokenType())
@@ -225,7 +225,9 @@ public class OzoneTokenIdentifier extends
     if (token.hasSecretKeyId()) {
       identifier.setSecretKeyId(token.getSecretKeyId());
     }
-    identifier.setOmServiceId(token.getOmServiceId());
+    if (token.hasOmServiceId()) {
+      identifier.setOmServiceId(token.getOmServiceId());
+    }
     return identifier;
   }
 

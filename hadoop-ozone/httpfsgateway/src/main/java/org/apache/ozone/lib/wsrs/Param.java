@@ -18,6 +18,7 @@
 package org.apache.ozone.lib.wsrs;
 
 import java.text.MessageFormat;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
@@ -42,7 +43,7 @@ public abstract class Param<T> {
 
   public T parseParam(String str) {
     try {
-      value = (str != null && !str.trim().isEmpty()) ? parse(str) : value;
+      value = StringUtils.isNotBlank(str) ? parse(str) : value;
     } catch (Exception ex) {
       throw new IllegalArgumentException(
         MessageFormat.format("Parameter [{0}], invalid value [{1}], " +

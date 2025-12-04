@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key.acl;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
@@ -96,13 +97,19 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
+      // Reverting back the full path to key name
+      // Eg: a/b/c/d/e/file1 -> file1
+      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(key));
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = apply(omKeyInfo, trxnLogIndex);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
+
 
       // Update the modification time when updating ACLs of Key.
       long modificationTime = omKeyInfo.getModificationTime();

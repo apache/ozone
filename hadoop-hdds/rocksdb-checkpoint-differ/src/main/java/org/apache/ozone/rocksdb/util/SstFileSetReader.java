@@ -19,17 +19,17 @@ package org.apache.ozone.rocksdb.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import jakarta.annotation.Nonnull;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.Comparator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.PriorityQueue;
 import java.util.function.Function;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -48,18 +48,12 @@ import org.rocksdb.RocksDBException;
  */
 public class SstFileSetReader {
 
-  private final Collection<String> sstFiles;
+  private final Collection<Path> sstFiles;
 
   private volatile long estimatedTotalKeys = -1;
 
-  public SstFileSetReader(final Collection<String> sstFiles) {
+  public SstFileSetReader(final Collection<Path> sstFiles) {
     this.sstFiles = sstFiles;
-  }
-
-  public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
-    final Spliterator<T> spliterator =
-        Spliterators.spliteratorUnknownSize(itr, 0);
-    return StreamSupport.stream(spliterator, false).onClose(itr::close);
   }
 
   public long getEstimatedTotalKeys() throws RocksDBException {
@@ -74,9 +68,9 @@ public class SstFileSetReader {
       }
 
       try (ManagedOptions options = new ManagedOptions()) {
-        for (String sstFile : sstFiles) {
+        for (Path sstFile : sstFiles) {
           try (ManagedSstFileReader fileReader = new ManagedSstFileReader(options)) {
-            fileReader.open(sstFile);
+            fileReader.open(sstFile.toAbsolutePath().toString());
             estimatedSize += fileReader.getTableProperties().getNumEntries();
           }
         }
@@ -87,7 +81,7 @@ public class SstFileSetReader {
     return estimatedTotalKeys;
   }
 
-  public Stream<String> getKeyStream(String lowerBound,
+  public ClosableIterator<String> getKeyStream(String lowerBound,
                                      String upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
@@ -133,10 +127,11 @@ public class SstFileSetReader {
         IOUtils.closeQuietly(lowerBoundSLice, upperBoundSlice);
       }
     };
-    return getStreamFromIterator(itr);
+    return itr;
   }
 
-  public Stream<String> getKeyStreamWithTombstone(String lowerBound, String upperBound) throws RocksDBException {
+  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
+      throws RocksDBException {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
@@ -169,7 +164,7 @@ public class SstFileSetReader {
         IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice);
       }
     };
-    return getStreamFromIterator(itr);
+    return itr;
   }
 
   private abstract static class ManagedSstFileIterator implements ClosableIterator<String> {
@@ -233,69 +228,136 @@ public class SstFileSetReader {
     }
   }
 
-  private abstract static class MultipleSstFileIterator<T> implements ClosableIterator<T> {
+  /**
+   * A wrapper class that holds an iterator and its current value for heap operations.
+   */
+  private static class HeapEntry<T extends Comparable<T>>
+      implements Comparable<HeapEntry<T>>, Closeable {
+    private final ClosableIterator<T> iterator;
+    private T currentKey;
 
-    private final Iterator<String> fileNameIterator;
+    HeapEntry(ClosableIterator<T> iterator) {
+      this.iterator = iterator;
+      advance();
+    }
 
-    private String currentFile;
-    private ClosableIterator<T> currentFileIterator;
+    @Override
+    public void close() {
+      iterator.close();
+    }
 
-    private MultipleSstFileIterator(Collection<String> files) {
-      this.fileNameIterator = files.iterator();
+    boolean advance() {
+      if (iterator.hasNext()) {
+        currentKey = iterator.next();
+        return true;
+      } else {
+        currentKey = null;
+        return false;
+      }
+    }
+
+    T getCurrentKey() {
+      return currentKey;
+    }
+
+    @Override
+    public int compareTo(@Nonnull HeapEntry<T> other) {
+      return Comparator.comparing(HeapEntry<T>::getCurrentKey).compare(this, other);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null || getClass() != obj.getClass()) {
+        return false;
+      }
+
+      HeapEntry<T> other = (HeapEntry<T>) obj;
+      return this.compareTo(other) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+      return currentKey.hashCode();
+    }
+  }
+
+  /**
+   * The MultipleSstFileIterator class is an abstract base for iterating over multiple SST files.
+   * It uses a PriorityQueue to merge keys from all files in sorted order.
+   * Each file's iterator is wrapped in a HeapEntryWithFileIdx object,
+   * which ensures stable ordering for identical keys by considering the file index.
+   * @param <T>
+   */
+  private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
+    private final PriorityQueue<HeapEntry<T>> minHeap;
+
+    private MultipleSstFileIterator(Collection<Path> sstFiles) {
+      this.minHeap = new PriorityQueue<>();
       init();
+      initMinHeap(sstFiles);
     }
 
     protected abstract void init();
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
 
+    private void initMinHeap(Collection<Path> files) {
+      try {
+        for (Path file : files) {
+          ClosableIterator<T> iterator = getKeyIteratorForFile(file.toAbsolutePath().toString());
+          HeapEntry<T> entry = new HeapEntry<>(iterator);
+
+          if (entry.getCurrentKey() != null) {
+            minHeap.offer(entry);
+          } else {
+            // No valid entries, close the iterator
+            entry.close();
+          }
+        }
+      } catch (IOException | RocksDBException e) {
+        // Clean up any opened iterators
+        close();
+        throw new RuntimeException("Failed to initialize SST file iterators", e);
+      }
+    }
+
     @Override
     public boolean hasNext() {
-      try {
-        do {
-          if (Objects.nonNull(currentFileIterator) && currentFileIterator.hasNext()) {
-            return true;
-          }
-        } while (moveToNextFile());
-      } catch (IOException | RocksDBException e) {
-        // TODO: [Snapshot] This exception has to be handled by the caller.
-        //  We have to do better exception handling.
-        throw new RuntimeException(e);
-      }
-      return false;
+      return !minHeap.isEmpty();
     }
 
     @Override
     public T next() {
-      if (hasNext()) {
-        return currentFileIterator.next();
+      if (!hasNext()) {
+        throw new NoSuchElementException("No more elements found.");
       }
-      throw new NoSuchElementException("No more elements found.");
+
+      assert minHeap.peek() != null;
+      // Get current key from heap
+      T currentKey = minHeap.peek().getCurrentKey();
+
+      // Advance all entries with the same key (from different files)
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
+        HeapEntry<T> entry = minHeap.poll();
+        if (entry.advance()) {
+          minHeap.offer(entry);
+        } else {
+          // Iterator is exhausted, close it to prevent resource leak
+          entry.close();
+        }
+      }
+
+      return currentKey;
     }
 
     @Override
-    public void close() throws UncheckedIOException {
-      try {
-        closeCurrentFile();
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
-    }
-
-    private boolean moveToNextFile() throws IOException, RocksDBException {
-      if (fileNameIterator.hasNext()) {
-        closeCurrentFile();
-        currentFile = fileNameIterator.next();
-        this.currentFileIterator = getKeyIteratorForFile(currentFile);
-        return true;
-      }
-      return false;
-    }
-
-    private void closeCurrentFile() throws IOException {
-      if (currentFile != null) {
-        currentFileIterator.close();
-        currentFile = null;
+    public void close() {
+      while (!minHeap.isEmpty()) {
+        minHeap.poll().close();
       }
     }
   }

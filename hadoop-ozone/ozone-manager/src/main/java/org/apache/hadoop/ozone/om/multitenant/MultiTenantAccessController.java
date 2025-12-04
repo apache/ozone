@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +30,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.ratis.util.ReflectionUtils;
 
 /**
  * Defines the operations needed for multi-tenant access control.
@@ -132,6 +136,14 @@ public interface MultiTenantAccessController {
       Acl otherAcl = (Acl) other;
       return isAllowed() == otherAcl.isAllowed() && acl == otherAcl.acl;
     }
+
+    @Override
+    public String toString() {
+      return "Acl{" +
+          "isAllowed=" + isAllowed +
+          ", acl=" + acl +
+          '}';
+    }
   }
 
   /**
@@ -199,6 +211,18 @@ public interface MultiTenantAccessController {
           Objects.equals(getUsersMap(), role.getUsersMap()) &&
           Objects.equals(getDescription(), role.getDescription()) &&
           roleIdsMatch;
+    }
+
+    @Override
+    public String toString() {
+      return "Role{" +
+          "id=" + id +
+          ", name='" + name + '\'' +
+          ", usersMap=" + usersMap +
+          ", rolesMap=" + rolesMap +
+          ", description='" + description + '\'' +
+          ", createdByUser='" + createdByUser + '\'' +
+          '}';
     }
 
     public String getCreatedByUser() {
@@ -398,6 +422,22 @@ public interface MultiTenantAccessController {
           Objects.equals(getLabels(), policy.getLabels());
     }
 
+    @Override
+    public String toString() {
+      return "Policy{" +
+          "id=" + id +
+          ", name='" + name + '\'' +
+          ", volumes=" + volumes +
+          ", buckets=" + buckets +
+          ", keys=" + keys +
+          ", description='" + description + '\'' +
+          ", userAcls=" + userAcls +
+          ", roleAcls=" + roleAcls +
+          ", labels=" + labels +
+          ", isEnabled=" + isEnabled +
+          '}';
+    }
+
     public boolean isEnabled() {
       return isEnabled;
     }
@@ -503,5 +543,19 @@ public interface MultiTenantAccessController {
         return new Policy(this);
       }
     }
+  }
+
+  /** Create {@code MultiTenantAccessController} implementation. */
+  static MultiTenantAccessController create(ConfigurationSource conf) {
+    if (conf.getBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, false)) {
+      return new InMemoryMultiTenantAccessController();
+    }
+
+    final String className = "org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController";
+    return ReflectionUtils.newInstance(
+        ReflectionUtils.getClass(className, MultiTenantAccessController.class),
+        new Class<?>[] {ConfigurationSource.class},
+        conf
+    );
   }
 }

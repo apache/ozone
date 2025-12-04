@@ -61,7 +61,6 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
     when(mockScmFacade.getDataSource()).thenReturn(dataSource);
 
     // Set the DataSource and DSLContext directly
-    upgradeAction.setDataSource(dataSource);
     upgradeAction.setDslContext(dslContext);
 
     // Check if the table already exists
@@ -85,7 +84,7 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
   @Test
   public void testUpgradeAppliesConstraintModificationForAllStates() throws SQLException {
     // Run the upgrade action
-    upgradeAction.execute(mockScmFacade);
+    upgradeAction.execute(mockScmFacade.getDataSource());
 
     // Iterate over all valid states and insert records
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :

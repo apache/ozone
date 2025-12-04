@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,9 +32,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
@@ -45,20 +45,20 @@ public class TestOzoneAclUtil {
   private static final List<OzoneAcl> DEFAULT_ACLS =
       getDefaultAcls();
 
-  private static final OzoneAcl USER1 = new OzoneAcl(USER, "user1",
+  private static final OzoneAcl USER1 = OzoneAcl.of(USER, "user1",
       ACCESS, ACLType.READ_ACL);
 
-  private static final OzoneAcl GROUP1 = new OzoneAcl(GROUP, "group1",
+  private static final OzoneAcl GROUP1 = OzoneAcl.of(GROUP, "group1",
       ACCESS, ACLType.ALL);
 
   @Test
   public void testAddAcl() throws IOException {
     List<OzoneAcl> currentAcls = getDefaultAcls();
-    assertTrue(!currentAcls.isEmpty());
+    assertFalse(currentAcls.isEmpty());
 
     // Add new permission to existing acl entry.
     OzoneAcl oldAcl = currentAcls.get(0);
-    OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
+    OzoneAcl newAcl = OzoneAcl.of(oldAcl.getType(), oldAcl.getName(),
         ACCESS, ACLType.READ_ACL);
 
     addAndVerifyAcl(currentAcls, newAcl, true, DEFAULT_ACLS.size());
@@ -86,11 +86,11 @@ public class TestOzoneAclUtil {
     removeAndVerifyAcl(currentAcls, USER1, false, 0);
 
     currentAcls = getDefaultAcls();
-    assertTrue(!currentAcls.isEmpty());
+    assertFalse(currentAcls.isEmpty());
 
     // Add new permission to existing acl entru.
     OzoneAcl oldAcl = currentAcls.get(0);
-    OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
+    OzoneAcl newAcl = OzoneAcl.of(oldAcl.getType(), oldAcl.getName(),
         ACCESS, ACLType.READ_ACL);
 
     // Remove non existing acl entry
@@ -180,16 +180,14 @@ public class TestOzoneAclUtil {
       ugi = UserGroupInformation.createRemoteUser("user0");
     }
 
-    OzoneAclConfig aclConfig = newInstanceOf(OzoneAclConfig.class);
-    IAccessAuthorizer.ACLType[] userRights = aclConfig.getUserDefaultRights();
-    IAccessAuthorizer.ACLType[] groupRights = aclConfig.getGroupDefaultRights();
+    OmConfig omConfig = newInstanceOf(OmConfig.class);
 
-    OzoneAclUtil.addAcl(ozoneAcls, new OzoneAcl(USER,
-        ugi.getUserName(), ACCESS, userRights));
+    OzoneAclUtil.addAcl(ozoneAcls, OzoneAcl.of(USER,
+        ugi.getUserName(), ACCESS, omConfig.getUserDefaultRights()));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(ugi.getGroupNames());
     userGroups.stream().forEach((group) -> OzoneAclUtil.addAcl(ozoneAcls,
-        new OzoneAcl(GROUP, group, ACCESS, groupRights)));
+        OzoneAcl.of(GROUP, group, ACCESS, omConfig.getGroupDefaultRights())));
     return ozoneAcls;
   }
 

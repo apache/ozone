@@ -31,27 +31,31 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Parser;
 /**
  * Codecs to serialize/deserialize Protobuf v3 messages.
  */
-public final class Proto3Codec<M extends MessageLite>
-    implements Codec<M> {
-  private static final ConcurrentMap<Class<? extends MessageLite>,
-                                     Codec<? extends MessageLite>> CODECS
-      = new ConcurrentHashMap<>();
+public final class Proto3Codec<M extends MessageLite> implements Codec<M> {
+  private static final ConcurrentMap<Class<? extends MessageLite>, Codec<? extends MessageLite>> CODECS =
+      new ConcurrentHashMap<>();
+
+  private final Class<M> clazz;
+  private final Parser<M> parser;
+  private final boolean allowInvalidProtocolBufferException;
 
   /**
    * @return the {@link Codec} for the given class.
    */
   public static <T extends MessageLite> Codec<T> get(T t) {
+    return get(t, false);
+  }
+
+  public static <T extends MessageLite> Codec<T> get(T t, boolean allowInvalidProtocolBufferException) {
     final Codec<?> codec = CODECS.computeIfAbsent(t.getClass(),
-        key -> new Proto3Codec<>(t));
+        key -> new Proto3Codec<>(t, allowInvalidProtocolBufferException));
     return (Codec<T>) codec;
   }
 
-  private final Class<M> clazz;
-  private final Parser<M> parser;
-
-  private Proto3Codec(M m) {
+  private Proto3Codec(M m, boolean allowInvalidProtocolBufferException) {
     this.clazz = (Class<M>) m.getClass();
     this.parser = (Parser<M>) m.getParserForType();
+    this.allowInvalidProtocolBufferException = allowInvalidProtocolBufferException;
   }
 
   @Override
@@ -64,29 +68,34 @@ public final class Proto3Codec<M extends MessageLite>
     return true;
   }
 
-  private ToIntFunction<ByteBuffer> writeTo(M message, int size) {
-    return buffer -> {
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull M message, CodecBuffer.Allocator allocator) {
+    final int size = message.getSerializedSize();
+    final CodecBuffer codecBuffer = allocator.apply(size);
+    final ToIntFunction<ByteBuffer> writeTo = buffer -> {
       try {
         message.writeTo(CodedOutputStream.newInstance(buffer));
       } catch (IOException e) {
+        // The buffer was allocated with the message size, it should never throw an IOException
         throw new IllegalStateException(
             "Failed to writeTo: message=" + message, e);
       }
       return size;
     };
+    codecBuffer.put(writeTo);
+    return codecBuffer;
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull M message,
-      CodecBuffer.Allocator allocator) {
-    final int size = message.getSerializedSize();
-    return allocator.apply(size).put(writeTo(message, size));
-  }
-
-  @Override
-  public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws InvalidProtocolBufferException {
-    return parser.parseFrom(buffer.asReadOnlyByteBuffer());
+  public M fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+    try {
+      return parser.parseFrom(buffer.asReadOnlyByteBuffer());
+    } catch (InvalidProtocolBufferException e) {
+      if (allowInvalidProtocolBufferException) {
+        return null;
+      }
+      throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
+    }
   }
 
   @Override
@@ -95,9 +104,16 @@ public final class Proto3Codec<M extends MessageLite>
   }
 
   @Override
-  public M fromPersistedFormat(byte[] bytes)
+  public M fromPersistedFormatImpl(byte[] bytes)
       throws InvalidProtocolBufferException {
-    return parser.parseFrom(bytes);
+    try {
+      return parser.parseFrom(bytes);
+    } catch (InvalidProtocolBufferException e) {
+      if (allowInvalidProtocolBufferException) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   @Override

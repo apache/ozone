@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.cli;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.MemoizedSupplier;
 import picocli.CommandLine;
 
@@ -66,6 +68,7 @@ public abstract class AbstractSubcommand {
   private static class NoParentCommand implements GenericParentCommand {
 
     private final OzoneConfiguration conf = new OzoneConfiguration();
+    private UserGroupInformation user;
 
     @Override
     public boolean isVerbose() {
@@ -75,6 +78,19 @@ public abstract class AbstractSubcommand {
     @Override
     public OzoneConfiguration getOzoneConf() {
       return conf;
+    }
+
+    @Override
+    public UserGroupInformation getUser() throws IOException {
+      if (user == null) {
+        user = UserGroupInformation.getCurrentUser();
+      }
+      return user;
+    }
+
+    @Override
+    public void printError(Throwable t) {
+      t.printStackTrace();
     }
   }
 

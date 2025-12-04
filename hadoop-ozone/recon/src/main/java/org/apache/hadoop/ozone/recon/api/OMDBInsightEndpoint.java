@@ -19,10 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
@@ -53,7 +50,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -69,17 +65,17 @@ import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
-import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ParamInfo;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,21 +97,22 @@ public class OMDBInsightEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
-  private final GlobalStatsDao globalStatsDao;
+  private final ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
-
+  private final ReconGlobalMetricsService reconGlobalMetricsService;
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
                              ReconOMMetadataManager omMetadataManager,
-                             GlobalStatsDao globalStatsDao,
-                             ReconNamespaceSummaryManagerImpl
-                                 reconNamespaceSummaryManager) {
+                             ReconGlobalStatsManager reconGlobalStatsManager,
+                             ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager,
+                             ReconGlobalMetricsService reconGlobalMetricsService) {
     this.omMetadataManager = omMetadataManager;
-    this.globalStatsDao = globalStatsDao;
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
+    this.reconGlobalMetricsService = reconGlobalMetricsService;
   }
 
   /**
@@ -325,49 +322,36 @@ public class OMDBInsightEndpoint {
   @GET
   @Path("/open/summary")
   public Response getOpenKeySummary() {
-    // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
-    // Create a keys summary for open keys
-    createKeysSummaryForOpenKey(keysSummary);
+    Map<String, Long> keysSummary = reconGlobalMetricsService.getOpenKeySummary();
     return Response.ok(keysSummary).build();
   }
 
-  /**
-   * Creates a keys summary for open keys and updates the provided
-   * keysSummary map. Calculates the total number of open keys, replicated
-   * data size, and unreplicated data size.
-   *
-   * @param keysSummary A map to store the keys summary information.
-   */
-  private void createKeysSummaryForOpenKey(
-      Map<String, Long> keysSummary) {
-    Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
-    Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
-    Long unreplicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
-    Long unreplicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
-    Long openKeyCountForKeyTable = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(OPEN_KEY_TABLE)));
-    Long openKeyCountForFileTable = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(OPEN_FILE_TABLE)));
-
-    // Calculate the total number of open keys
-    keysSummary.put("totalOpenKeys",
-        openKeyCountForKeyTable + openKeyCountForFileTable);
-    // Calculate the total replicated and unreplicated sizes
-    keysSummary.put("totalReplicatedDataSize",
-        replicatedSizeOpenKey + replicatedSizeOpenFile);
-    keysSummary.put("totalUnreplicatedDataSize",
-        unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
-
-  }
-
-  private Long getValueFromId(GlobalStats record) {
+  private Long getValueFromId(GlobalStatsValue record) {
     // If the record is null, return 0
     return record != null ? record.getValue() : 0L;
+  }
+
+  /**
+   * Retrieves the summary of open MPU keys.
+   *
+   * @return The HTTP response body includes a map with the following entries:
+   * - "totalOpenMPUKeys": the total number of open MPU keys
+   * - "totalReplicatedDataSize": the total replicated size for open MPU keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open MPU keys
+   *
+   * Example response:
+   *   {
+   *    "totalOpenMPUKeys": 2,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/open/mpu/summary")
+  public Response getOpenMPUKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = reconGlobalMetricsService.getMPUKeySummary();
+    return Response.ok(keysSummary).build();
   }
 
   /** Retrieves the summary of deleted keys.
@@ -391,9 +375,7 @@ public class OMDBInsightEndpoint {
   @Path("/deletePending/summary")
   public Response getDeletedKeySummary() {
     // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
-    // Create a keys summary for deleted keys
-    createKeysSummaryForDeletedKey(keysSummary);
+    Map<String, Long> keysSummary = reconGlobalMetricsService.getDeletedKeySummary();
     return Response.ok(keysSummary).build();
   }
 
@@ -517,7 +499,6 @@ public class OMDBInsightEndpoint {
 
       // We know each RepeatedOmKeyInfo has just one OmKeyInfo object
       OmKeyInfo keyInfo = repeatedOmKeyInfo.getOmKeyInfoList().get(0);
-      KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
 
       // Add the key directly to the list without classification
       deletedKeyInsightInfo.getRepeatedOmKeyInfoList().add(repeatedOmKeyInfo);
@@ -534,120 +515,6 @@ public class OMDBInsightEndpoint {
     deletedKeyInsightInfo.setLastKey(lastKey);
 
     return keysFound;
-  }
-
-  /**
-   * Creates a keys summary for deleted keys and updates the provided
-   * keysSummary map. Calculates the total number of deleted keys, replicated
-   * data size, and unreplicated data size.
-   *
-   * @param keysSummary A map to store the keys summary information.
-   */
-  private void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
-    // Fetch the necessary metrics for deleted keys
-    Long replicatedSizeDeleted = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getReplicatedSizeKeyFromTable(DELETED_TABLE)));
-    Long unreplicatedSizeDeleted = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(DELETED_TABLE)));
-    Long deletedKeyCount = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(DELETED_TABLE)));
-
-    // Calculate the total number of deleted keys
-    keysSummary.put("totalDeletedKeys", deletedKeyCount);
-    // Calculate the total replicated and unreplicated sizes
-    keysSummary.put("totalReplicatedDataSize", replicatedSizeDeleted);
-    keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeDeleted);
-  }
-
-
-  private void getPendingForDeletionDirInfo(
-      int limit, String prevKey,
-      KeyInsightInfoResponse pendingForDeletionKeyInfo) {
-
-    List<KeyEntityInfo> deletedDirInfoList =
-        pendingForDeletionKeyInfo.getDeletedDirInfoList();
-
-    Table<String, OmKeyInfo> deletedDirTable =
-        omMetadataManager.getDeletedDirTable();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            keyIter = deletedDirTable.iterator()) {
-      boolean skipPrevKey = false;
-      String seekKey = prevKey;
-      String lastKey = "";
-      if (isNotBlank(prevKey)) {
-        skipPrevKey = true;
-        Table.KeyValue<String, OmKeyInfo> seekKeyValue =
-            keyIter.seek(seekKey);
-        // check if RocksDB was able to seek correctly to the given key prefix
-        // if not, then return empty result
-        // In case of an empty prevKeyPrefix, all the keys are returned
-        if (seekKeyValue == null ||
-            (isNotBlank(prevKey) &&
-                !seekKeyValue.getKey().equals(prevKey))) {
-          return;
-        }
-      }
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        String key = kv.getKey();
-        lastKey = key;
-        OmKeyInfo omKeyInfo = kv.getValue();
-        // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKey)) {
-          continue;
-        }
-        KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-        keyEntityInfo.setIsKey(omKeyInfo.isFile());
-        keyEntityInfo.setKey(omKeyInfo.getFileName());
-        keyEntityInfo.setPath(createPath(omKeyInfo));
-        keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(
-            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
-        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
-        keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-        pendingForDeletionKeyInfo.setUnreplicatedDataSize(
-            pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
-                keyEntityInfo.getSize());
-        pendingForDeletionKeyInfo.setReplicatedDataSize(
-            pendingForDeletionKeyInfo.getReplicatedDataSize() +
-                keyEntityInfo.getReplicatedSize());
-        deletedDirInfoList.add(keyEntityInfo);
-        if (deletedDirInfoList.size() == limit) {
-          break;
-        }
-      }
-      pendingForDeletionKeyInfo.setLastKey(lastKey);
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    } catch (IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
-    } catch (Exception ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  /**
-   * Given an object ID, return total data size (no replication)
-   * under this object. Note:- This method is RECURSIVE.
-   *
-   * @param objectId the object's ID
-   * @return total used data size in bytes
-   * @throws IOException ioEx
-   */
-  protected long fetchSizeForDeletedDirectory(long objectId)
-      throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return 0L;
-    }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId : nsSummary.getChildDir()) {
-      totalSize += fetchSizeForDeletedDirectory(childId);
-    }
-    return totalSize;
   }
 
   /** This method retrieves set of directories pending for deletion.
@@ -708,9 +575,7 @@ public class OMDBInsightEndpoint {
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
       String prevKey) {
     KeyInsightInfoResponse
-        deletedDirInsightInfo = new KeyInsightInfoResponse();
-    getPendingForDeletionDirInfo(limit, prevKey,
-        deletedDirInsightInfo);
+        deletedDirInsightInfo = reconGlobalMetricsService.getPendingForDeletionDirInfo(limit, prevKey);
     return Response.ok(deletedDirInsightInfo).build();
   }
 
@@ -1016,7 +881,7 @@ public class OMDBInsightEndpoint {
       listKeysResponse = (ListKeysResponse) response.getEntity();
     }
 
-    List<KeyEntityInfoProtoWrapper> keyInfoList = listKeysResponse.getKeys();
+    List<ReconBasicOmKeyInfo> keyInfoList = listKeysResponse.getKeys();
     if (!keyInfoList.isEmpty()) {
       listKeysResponse.setLastKey(keyInfoList.get(keyInfoList.size() - 1).getKey());
     }
@@ -1031,9 +896,9 @@ public class OMDBInsightEndpoint {
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
 
-      // Search keys from non-FSO layout.
-      Table<String, KeyEntityInfoProtoWrapper> keyTable =
-          omMetadataManager.getKeyTableLite(BucketLayout.LEGACY);
+      Table<String, ReconBasicOmKeyInfo> keyTable =
+          omMetadataManager.getKeyTableBasic(BucketLayout.LEGACY);
+
       retrieveKeysFromTable(keyTable, paramInfo, listKeysResponse.getKeys());
 
       // Search keys from FSO layout.
@@ -1044,7 +909,7 @@ public class OMDBInsightEndpoint {
         return ReconResponseUtils.noMatchedKeysResponse(paramInfo.getStartPrefix());
       }
 
-      for (KeyEntityInfoProtoWrapper keyEntityInfo : listKeysResponse.getKeys()) {
+      for (ReconBasicOmKeyInfo keyEntityInfo : listKeysResponse.getKeys()) {
         replicatedTotal += keyEntityInfo.getReplicatedSize();
         unreplicatedTotal += keyEntityInfo.getSize();
       }
@@ -1069,13 +934,14 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  public void searchKeysInFSO(ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+  public void searchKeysInFSO(ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertStartPrefixPathToObjectIdPath(paramInfo.getStartPrefix());
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, KeyEntityInfoProtoWrapper> fileTable =
-        omMetadataManager.getKeyTableLite(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    Table<String, ReconBasicOmKeyInfo> fileTable =
+        omMetadataManager.getKeyTableBasic(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the level above bucket level hence
     // no need to find parent or extract id's or find subpaths as the fileTable is
@@ -1112,7 +978,6 @@ public class OMDBInsightEndpoint {
     // Iterate over for bucket and volume level search
     retrieveKeysFromTable(fileTable, paramInfo, results);
   }
-
 
   /**
    * Converts a startPrefix path into an objectId path for FSO buckets, using IDs.
@@ -1184,16 +1049,16 @@ public class OMDBInsightEndpoint {
    * @throws IOException If there are problems accessing the table.
    */
   private void retrieveKeysFromTable(
-      Table<String, KeyEntityInfoProtoWrapper> table, ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+      Table<String, ReconBasicOmKeyInfo> table, ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
     try (
-        TableIterator<String, ? extends Table.KeyValue<String, KeyEntityInfoProtoWrapper>> keyIter = table.iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> seekKeyValue =
+        Table.KeyValue<String, ReconBasicOmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
 
         // check if RocksDB was able to seek correctly to the given key prefix
@@ -1210,7 +1075,7 @@ public class OMDBInsightEndpoint {
       StringBuilder keyPrefix = null;
       int keyPrefixLength = 0;
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry = keyIter.next();
+        Table.KeyValue<String, ReconBasicOmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey();
         if (!dbKey.startsWith(paramInfo.getStartPrefix())) {
           break; // Exit the loop if the key no longer matches the prefix
@@ -1220,7 +1085,7 @@ public class OMDBInsightEndpoint {
           continue;
         }
         if (applyFilters(entry, paramInfo)) {
-          KeyEntityInfoProtoWrapper keyEntityInfo = entry.getValue();
+          ReconBasicOmKeyInfo keyEntityInfo = entry.getValue();
           keyEntityInfo.setKey(dbKey);
           if (keyEntityInfo.getParentId() == 0) {
             // Legacy bucket keys have a parentID of zero. OBS bucket keys have a parentID of the bucketID.
@@ -1228,9 +1093,14 @@ public class OMDBInsightEndpoint {
             // Legacy buckets are obsolete, so this code path is not optimized. We don't expect to see many Legacy
             // buckets in practice.
             prevParentID = -1;
-            keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
-                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
-                omMetadataManager));
+            String fullPath = ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
+                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
+            if (fullPath.isEmpty()) {
+              LOG.warn("Full path is empty for volume: {}, bucket: {}, key: {}",
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), keyEntityInfo.getKeyName());
+              continue;
+            }
+            keyEntityInfo.setPath(fullPath);
           } else {
             // As we iterate keys in sorted order, its highly likely that keys have the same prefix for many keys in a
             // row. Especially for FSO buckets, its expensive to construct the path for each key. So, we construct the
@@ -1239,13 +1109,18 @@ public class OMDBInsightEndpoint {
             if (prevParentID != keyEntityInfo.getParentId()) {
               prevParentID = keyEntityInfo.getParentId();
               keyPrefix = ReconUtils.constructFullPathPrefix(keyEntityInfo.getParentId(),
-                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
-                  omMetadataManager);
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
               keyPrefixLength = keyPrefix.length();
             }
             keyPrefix.setLength(keyPrefixLength);
             keyPrefix.append(keyEntityInfo.getKeyName());
-            keyEntityInfo.setPath(keyPrefix.toString());
+            String keyPrefixFullPath = keyPrefix.toString();
+            if (keyPrefixFullPath.isEmpty()) {
+              LOG.warn("Full path is empty for volume: {}, bucket: {}, key: {}",
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), keyEntityInfo.getKeyName());
+              continue;
+            }
+            keyEntityInfo.setPath(keyPrefixFullPath);
           }
 
           results.add(keyEntityInfo);
@@ -1261,7 +1136,7 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  private boolean applyFilters(Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry, ParamInfo paramInfo)
+  private boolean applyFilters(Table.KeyValue<String, ReconBasicOmKeyInfo> entry, ParamInfo paramInfo)
       throws IOException {
 
     LOG.debug("Applying filters on : {}", entry.getKey());
@@ -1292,7 +1167,8 @@ public class OMDBInsightEndpoint {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
     keyEntityInfo.setIsKey(keyInfo.isFile());
-    keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager, omMetadataManager));
+    String fullKeyPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
+    keyEntityInfo.setPath(fullKeyPath.isEmpty() ? keyInfo.getKeyName() : fullKeyPath);
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());
@@ -1303,11 +1179,17 @@ public class OMDBInsightEndpoint {
 
   private void createSummaryForDeletedDirectories(
       Map<String, Long> dirSummary) {
-    // Fetch the necessary metrics for deleted directories.
-    Long deletedDirCount = getValueFromId(globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE)));
-    // Calculate the total number of deleted directories
-    dirSummary.put("totalDeletedDirectories", deletedDirCount);
+    try {
+      // Fetch the necessary metrics for deleted directories.
+      Long deletedDirCount = getValueFromId(reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE)));
+      // Calculate the total number of deleted directories
+      dirSummary.put("totalDeletedDirectories", deletedDirCount);
+    } catch (IOException e) {
+      LOG.error("Error retrieving deleted directory summary from RocksDB", e);
+      // Return zero in case of error
+      dirSummary.put("totalDeletedDirectories", 0L);
+    }
   }
 
   private boolean validateStartPrefix(String startPrefix) {
@@ -1324,15 +1206,9 @@ public class OMDBInsightEndpoint {
     return true;
   }
 
-  private String createPath(OmKeyInfo omKeyInfo) {
-    return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
-        omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
-  }
-
-
   @VisibleForTesting
-  public GlobalStatsDao getDao() {
-    return this.globalStatsDao;
+  public ReconGlobalStatsManager getReconGlobalStatsManager() {
+    return this.reconGlobalStatsManager;
   }
 
   @VisibleForTesting

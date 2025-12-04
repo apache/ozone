@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
@@ -59,7 +59,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test OM Ratis server.
@@ -70,7 +69,6 @@ public class TestOzoneManagerRatisServer {
 
   private OzoneConfiguration conf;
   private OzoneManagerRatisServer omRatisServer;
-  private String omID;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
   private OMMetadataManager omMetadataManager;
@@ -87,7 +85,7 @@ public class TestOzoneManagerRatisServer {
   @BeforeEach
   public void init(@TempDir Path metaDirPath) throws Exception {
     conf = new OzoneConfiguration();
-    omID = UUID.randomUUID().toString();
+    String omID = UUID.randomUUID().toString();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -179,8 +177,7 @@ public class TestOzoneManagerRatisServer {
    */
   @Test
   public void testIsReadOnlyCapturesAllCmdTypeEnums() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(LoggerFactory.getLogger(OmUtils.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmUtils.class);
     OzoneManagerProtocolProtos.Type[] cmdTypes =
         OzoneManagerProtocolProtos.Type.values();
 
@@ -238,6 +235,4 @@ public class TestOzoneManagerRatisServer {
     assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
   }
-
-
 }

@@ -58,7 +58,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -67,7 +66,6 @@ import org.junit.jupiter.params.provider.CsvSource;
  * Test Multipart Upload Cleanup Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 class TestMultipartUploadCleanupService {
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
@@ -161,16 +159,16 @@ class TestMultipartUploadCleanupService {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < mpuKeyCount; x++) {
-      if (RandomUtils.nextBoolean()) {
+      if (RandomUtils.secure().randomBoolean()) {
         bucket = UUID.randomUUID().toString();
-        if (RandomUtils.nextBoolean()) {
+        if (RandomUtils.secure().randomBoolean()) {
           volume = UUID.randomUUID().toString();
         }
       }
       String key = UUID.randomUUID().toString();
       createVolumeAndBucket(volume, bucket, bucketLayout);
 
-      final int numParts = RandomUtils.nextInt(0, 5);
+      final int numParts = RandomUtils.secure().randomInt(0, 5);
       // Create the MPU key
       createIncompleteMPUKey(volume, bucket, key, numParts);
     }

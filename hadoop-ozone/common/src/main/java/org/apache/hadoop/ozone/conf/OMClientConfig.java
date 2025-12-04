@@ -57,7 +57,6 @@ public class OMClientConfig {
       description = "Total number of threads in pool for the Trash Emptier")
   private int trashEmptierPoolSize = 5;
 
-
   public int getTrashEmptierPoolSize() {
     return trashEmptierPoolSize;
   }

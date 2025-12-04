@@ -83,6 +83,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
@@ -103,6 +105,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -147,7 +151,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,6 +182,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   private final StorageContainerLocationProtocol impl;
   private final StorageContainerManager scm;
+  private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
       ScmContainerLocationResponse, ProtocolMessageEnum>
@@ -210,7 +215,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getClientRpcPort(), scm.getScmId());
+          scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
     }
     // After the request interceptor (now validator) framework is extended to
     // this server interface, this should be removed and solved via new
@@ -709,6 +714,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
               .build();
+      case GetDeletedBlocksTransactionSummary:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetDeletedBlocksTxnSummaryResponse(
+                getDeletedBlocksTxnSummary(
+                    request.getGetDeletedBlocksTxnSummaryRequest()))
+            .build();
       case TransferLeadership:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -730,13 +743,19 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case ReconcileContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
       }
     } catch (IOException e) {
       RatisUtil
-          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
+          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
       throw new ServiceException(e);
     }
   }
@@ -752,9 +771,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ContainerWithPipeline cp = impl
-        .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
+        request.getReplicationFactor(),
+        request.getEcReplicationConfig()
+    );
+    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
@@ -1000,8 +1021,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
-        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
+        .addAllPeerRoles(scmInfo.getPeerRoles())
         .build();
   }
 
@@ -1314,6 +1334,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
       GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
     long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
@@ -1323,6 +1344,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public ResetDeletedBlockRetryCountResponseProto
       getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {
@@ -1330,6 +1352,18 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
+  }
+
+  public GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummary(
+      GetDeletedBlocksTxnSummaryRequestProto request) throws IOException {
+    HddsProtos.DeletedBlocksTransactionSummary summary = impl.getDeletedBlockSummary();
+    if (summary == null) {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder().build();
+    } else {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder()
+          .setSummary(summary)
+          .build();
+    }
   }
 
   public TransferLeadershipResponseProto transferScmLeadership(
@@ -1347,5 +1381,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
+  }
+
+  public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
+    impl.reconcileContainer(request.getContainerID());
+    return ReconcileContainerResponseProto.getDefaultInstance();
   }
 }

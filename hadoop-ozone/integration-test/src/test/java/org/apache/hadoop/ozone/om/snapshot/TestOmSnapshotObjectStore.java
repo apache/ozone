@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
-import org.junit.jupiter.api.Timeout;
+import org.apache.ozone.test.tag.Unhealthy;
 
 /**
  * Test OmSnapshot for Object Store bucket type.
  */
-@Timeout(300)
+@Unhealthy("HDDS-13466")
 public class TestOmSnapshotObjectStore extends TestOmSnapshot {
 
   public TestOmSnapshotObjectStore() throws Exception {

@@ -33,8 +33,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
  * version 2, where the block data, metadata, and transactions which are to be
  * deleted are put in their own separate column families.
  */
-public class DatanodeSchemaTwoDBDefinition
-    extends AbstractDatanodeDBDefinition
+public class DatanodeSchemaTwoDBDefinition extends AbstractDatanodeDBDefinition
     implements DBDefinition.WithMapInterface {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
@@ -72,11 +71,6 @@ public class DatanodeSchemaTwoDBDefinition
           FixedLengthStringCodec.get(),
           BlockData.getCodec());
 
-  public DatanodeSchemaTwoDBDefinition(String dbPath,
-      ConfigurationSource config) {
-    super(dbPath, config);
-  }
-
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           BLOCK_DATA,
@@ -84,6 +78,10 @@ public class DatanodeSchemaTwoDBDefinition
           DELETE_TRANSACTION,
           FINALIZE_BLOCKS,
           LAST_CHUNK_INFO);
+
+  public DatanodeSchemaTwoDBDefinition(String dbPath, ConfigurationSource config) {
+    super(dbPath, config);
+  }
 
   @Override
   public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {

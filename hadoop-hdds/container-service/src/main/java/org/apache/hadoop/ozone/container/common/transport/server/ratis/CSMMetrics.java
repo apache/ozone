@@ -51,7 +51,10 @@ public class CSMMetrics {
   private @Metric MutableRate transactionLatencyMs;
   private final EnumMap<Type, MutableRate> opsLatencyMs;
   private final EnumMap<Type, MutableRate> opsQueueingDelay;
-  private MetricsRegistry registry = null;
+
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
+  @SuppressWarnings("PMD.SingularField")
+  private MetricsRegistry registry;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
@@ -223,7 +226,6 @@ public class CSMMetrics {
     writeStateMachineDataNs.add(latencyNanos);
   }
 
-
   public void recordWriteStateMachineQueueingLatencyNs(long latencyNanos) {
     writeStateMachineQueueingLatencyNs.add(latencyNanos);
   }
@@ -243,6 +245,7 @@ public class CSMMetrics {
   public void incNumDataCacheHit() {
     numDataCacheHit.incr();
   }
+
   public void incNumEvictedCacheCount() {
     numEvictedCacheCount.incr();
   }

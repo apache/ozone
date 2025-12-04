@@ -38,19 +38,18 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test OM Ratis request handling.
  */
-@Timeout(300)
 public class TestOzoneManagerRatisRequest {
   @TempDir
   private Path folder;
@@ -58,14 +57,13 @@ public class TestOzoneManagerRatisRequest {
   private OzoneManager ozoneManager;
   private final OzoneConfiguration ozoneConfiguration =
       new OzoneConfiguration();
-  private OMMetadataManager omMetadataManager;
 
   @Test
   public void testRequestWithNonExistentBucket() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.resolve("om").toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
@@ -106,9 +104,11 @@ public class TestOzoneManagerRatisRequest {
     ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.resolve("om").toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    OMExecutionFlow omExecutionFlow = new OMExecutionFlow(ozoneManager);
+    when(ozoneManager.getOmExecutionFlow()).thenReturn(omExecutionFlow);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     final OmConfig omConfig = ozoneConfiguration.getObject(OmConfig.class);
     when(ozoneManager.getConfig()).thenReturn(omConfig);

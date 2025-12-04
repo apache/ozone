@@ -65,7 +65,6 @@ import org.junit.jupiter.api.Test;
 public class TestDatanodeAdminMonitor {
 
   private SimpleMockNodeManager nodeManager;
-  private OzoneConfiguration conf;
   private DatanodeAdminMonitorImpl monitor;
   private DatanodeAdminMonitorTestUtil
           .DatanodeAdminHandler startAdminHandler;
@@ -74,7 +73,7 @@ public class TestDatanodeAdminMonitor {
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     eventQueue = new EventQueue();
     startAdminHandler = new DatanodeAdminMonitorTestUtil
@@ -115,7 +114,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     // Ensure the node has some pipelines
     nodeManager.setPipelines(dn1, 2);
@@ -154,7 +153,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     // Add the node to the monitor. By default we have zero pipelines and
@@ -173,7 +172,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
@@ -236,7 +235,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     // create 3 QUASI_CLOSED replicas with containerID 1 and same origin ID
@@ -257,7 +256,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
@@ -307,7 +306,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING, HddsProtos.NodeState.HEALTHY));
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING, HddsProtos.NodeState.HEALTHY));
 
     // create a container and 3 QUASI_CLOSED replicas with containerID 1 and same origin ID
     ContainerID containerID = ContainerID.valueOf(1);
@@ -321,7 +320,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
@@ -364,7 +363,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
@@ -393,7 +392,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(1));
@@ -451,7 +450,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
@@ -475,7 +474,7 @@ public class TestDatanodeAdminMonitor {
     // Set the node to dead, and then the workflow should get aborted, setting
     // the node state back to IN_SERVICE on the next run.
     nodeManager.setNodeStatus(dn1,
-        new NodeStatus(IN_SERVICE,
+        NodeStatus.valueOf(IN_SERVICE,
             HddsProtos.NodeState.HEALTHY));
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
@@ -488,7 +487,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
@@ -512,7 +511,7 @@ public class TestDatanodeAdminMonitor {
     // Set the node to dead, and then the workflow should get aborted, setting
     // the node state back to IN_SERVICE.
     nodeManager.setNodeStatus(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.DEAD));
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
@@ -525,7 +524,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
     nodeManager.setContainers(dn1, generateContainers(3));
     DatanodeAdminMonitorTestUtil
@@ -554,7 +553,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
 
     // Add the node to the monitor, it should transiting to
@@ -585,7 +584,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
     // Ensure the node has some pipelines
     nodeManager.setPipelines(dn1, 2);
@@ -611,7 +610,7 @@ public class TestDatanodeAdminMonitor {
       throws ContainerNotFoundException, NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
@@ -646,7 +645,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
 
     // Add the node to the monitor, it should transiting to
@@ -658,7 +657,7 @@ public class TestDatanodeAdminMonitor {
 
     // Set the node dead and ensure the workflow does not end
     NodeStatus status = nodeManager.getNodeStatus(dn1);
-    nodeManager.setNodeStatus(dn1, new NodeStatus(
+    nodeManager.setNodeStatus(dn1, NodeStatus.valueOf(
         status.getOperationalState(), HddsProtos.NodeState.DEAD));
 
     // Running the monitor again causes the node to remain in maintenance
@@ -672,7 +671,7 @@ public class TestDatanodeAdminMonitor {
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(ENTERING_MAINTENANCE,
+        NodeStatus.valueOf(ENTERING_MAINTENANCE,
             HddsProtos.NodeState.HEALTHY));
 
     // Add the node to the monitor, it should transiting to
@@ -696,7 +695,7 @@ public class TestDatanodeAdminMonitor {
 
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,
-        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        NodeStatus.valueOf(HddsProtos.NodeOperationalState.DECOMMISSIONING,
             HddsProtos.NodeState.HEALTHY));
 
     Set<ContainerID> containers = new HashSet<>();

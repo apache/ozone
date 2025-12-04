@@ -123,7 +123,6 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
   }
 
-
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound()
       throws Exception {
@@ -163,7 +162,6 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         () -> omVolumeSetOwnerRequest.preExecute(ozoneManager));
     assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
   }
-
 
   @Test
   public void testOwnSameVolumeTwice() throws Exception {

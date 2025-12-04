@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,6 +54,14 @@ class TestOmConfig {
   }
 
   @Test
+  void throwsOnInvalidMaxUserVolume() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    conf.setInt(OmConfig.Keys.USER_MAX_VOLUME, 0);
+
+    assertThrows(IllegalArgumentException.class, () -> conf.getObject(OmConfig.class));
+  }
+
+  @Test
   void testCopy() {
     MutableConfigurationSource conf = new OzoneConfiguration();
     OmConfig original = conf.getObject(OmConfig.class);
@@ -68,7 +77,9 @@ class TestOmConfig {
     OmConfig subject = conf.getObject(OmConfig.class);
     OmConfig updated = conf.getObject(OmConfig.class);
     updated.setFileSystemPathEnabled(!updated.isFileSystemPathEnabled());
+    updated.setKeyNameCharacterCheckEnabled(!updated.isKeyNameCharacterCheckEnabled());
     updated.setMaxListSize(updated.getMaxListSize() + 1);
+    updated.setMaxUserVolumeCount(updated.getMaxUserVolumeCount() + 1);
 
     subject.setFrom(updated);
 
@@ -78,6 +89,8 @@ class TestOmConfig {
   private static void assertConfigEquals(OmConfig expected, OmConfig actual) {
     assertEquals(expected.getMaxListSize(), actual.getMaxListSize());
     assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
+    assertEquals(expected.isKeyNameCharacterCheckEnabled(), actual.isKeyNameCharacterCheckEnabled());
+    assertEquals(expected.getMaxUserVolumeCount(), actual.getMaxUserVolumeCount());
   }
 
 }

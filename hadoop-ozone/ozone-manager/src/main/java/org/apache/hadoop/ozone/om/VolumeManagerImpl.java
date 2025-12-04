@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -49,7 +49,7 @@ public class VolumeManagerImpl implements VolumeManager {
 
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume, "volume == null");
     metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volume);
     try {
       String dbVolumeKey = metadataManager.getVolumeKey(volume);

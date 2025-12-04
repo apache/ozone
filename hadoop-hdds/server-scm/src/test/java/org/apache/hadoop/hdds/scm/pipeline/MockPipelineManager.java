@@ -236,15 +236,10 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
+  public void closePipeline(final PipelineID pipelineId)
       throws IOException {
-    stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
+    stateManager.updatePipelineState(pipelineId.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
-  }
-
-  @Override
-  public void closePipeline(PipelineID pipelineID) throws IOException {
-
   }
 
   @Override
@@ -352,6 +347,11 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean isPipelineCreationFrozen() {
+    return false;
+  }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
   }
 }

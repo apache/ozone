@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useState, useCallback } from "react";
 import moment from "moment";
-import { AxiosError } from "axios";
 import { Card, Row, Tabs } from "antd";
 import { ValueType } from "react-select/src/types";
 
@@ -27,9 +26,9 @@ import MultiSelect, { Option } from "@/v2/components/select/multiSelect";
 import ContainerTable, { COLUMNS } from "@/v2/components/tables/containersTable";
 import AutoReloadPanel from "@/components/autoReloadPanel/autoReloadPanel";
 import { showDataFetchError } from "@/utils/common";
-import { AutoReloadHelper } from "@/utils/autoReloadHelper";
-import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
-import { useDebounce } from "@/v2/hooks/debounce.hook";
+import { useDebounce } from "@/v2/hooks/useDebounce";
+import { useApiData } from "@/v2/hooks/useAPIData.hook";
+import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
 
 import {
   Container,
@@ -38,7 +37,6 @@ import {
 } from "@/v2/types/container.types";
 
 import './containers.less';
-
 
 const SearchableColumnOpts = [{
   label: 'Container ID',
@@ -53,10 +51,11 @@ const defaultColumns = COLUMNS.map(column => ({
   value: column.key as string
 }));
 
+const DEFAULT_CONTAINERS_RESPONSE = {
+  containers: []
+};
+
 const Containers: React.FC<{}> = () => {
-
-  const cancelSignal = useRef<AbortController>();
-
   const [state, setState] = useState<ContainerState>({
     lastUpdated: 0,
     columnOptions: defaultColumns,
@@ -64,10 +63,9 @@ const Containers: React.FC<{}> = () => {
     underReplicatedContainerData: [],
     overReplicatedContainerData: [],
     misReplicatedContainerData: [],
+    mismatchedReplicaContainerData: []
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
-
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTab, setSelectedTab] = useState<string>('1');
@@ -75,18 +73,21 @@ const Containers: React.FC<{}> = () => {
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  function loadData() {
-    setLoading(true);
+  // Use the modern hooks pattern
+  const containersData = useApiData<{ containers: Container[] }>(
+    '/api/v1/containers/unhealthy',
+    DEFAULT_CONTAINERS_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/containers/unhealthy',
-      cancelSignal.current
-    );
-
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const containers: Container[] = response.data.containers;
+  // Process containers data when it changes
+  React.useEffect(() => {
+    if (containersData.data && containersData.data.containers) {
+      const containers: Container[] = containersData.data.containers;
 
       const missingContainerData: Container[] = containers?.filter(
         container => container.containerState === 'MISSING'
@@ -100,42 +101,51 @@ const Containers: React.FC<{}> = () => {
       const misReplicatedContainerData: Container[] = containers?.filter(
         container => container.containerState === 'MIS_REPLICATED'
       ) ?? [];
+      const mismatchedReplicaContainerData: Container[] = containers?.filter(
+        container => container.containerState === 'MISMATCHED_REPLICA'
+      ) ?? [];
 
       setState({
         ...state,
-        missingContainerData: missingContainerData,
-        underReplicatedContainerData: underReplicatedContainerData,
-        overReplicatedContainerData: overReplicatedContainerData,
-        misReplicatedContainerData: misReplicatedContainerData,
+        missingContainerData,
+        underReplicatedContainerData,
+        overReplicatedContainerData,
+        misReplicatedContainerData,
+        mismatchedReplicaContainerData,
         lastUpdated: Number(moment())
       });
-      setLoading(false)
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
+    }
+  }, [containersData.data]);
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
 
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
+  function handleTagClose(label: string) {
+    setSelectedColumns(
+      selectedColumns.filter((column) => column.label !== label)
+    );
+  }
 
-  React.useEffect(() => {
-    autoReloadHelper.startPolling();
-    loadData();
+  function handleTabChange(key: string) {
+    setSelectedTab(key);
+  }
 
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!])
-    })
-  }, []);
+  // Create refresh function for auto-reload
+  const loadContainersData = () => {
+    containersData.refetch();
+  };
+
+  const autoReload = useAutoReload(loadContainersData);
 
   const {
-    lastUpdated, columnOptions,
-    missingContainerData, underReplicatedContainerData,
-    overReplicatedContainerData, misReplicatedContainerData
+    lastUpdated,
+    columnOptions,
+    missingContainerData,
+    underReplicatedContainerData,
+    overReplicatedContainerData,
+    misReplicatedContainerData,
+    mismatchedReplicaContainerData
   } = state;
 
   // Mapping the data to the Tab keys for enabling/disabling search
@@ -143,7 +153,8 @@ const Containers: React.FC<{}> = () => {
     1: missingContainerData,
     2: underReplicatedContainerData,
     3: overReplicatedContainerData,
-    4: misReplicatedContainerData
+    4: misReplicatedContainerData,
+    5: mismatchedReplicaContainerData
   }
 
   const highlightData = (
@@ -168,25 +179,46 @@ const Containers: React.FC<{}> = () => {
         Mis-Replicated <br/>
         <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
       </div>
+      <div className='highlight-content'>
+        Mismatched Replicas <br/>
+        <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
+      </div>
     </div>
   )
+
+  const getCurrentTabData = () => {
+    switch (selectedTab) {
+      case '1':
+        return missingContainerData;
+      case '2':
+        return underReplicatedContainerData;
+      case '3':
+        return overReplicatedContainerData;
+      case '4':
+        return misReplicatedContainerData;
+      case '5':
+        return mismatchedReplicaContainerData;
+      default:
+        return missingContainerData;
+    }
+  };
 
   return (
     <>
       <div className='page-header-v2'>
         Containers
         <AutoReloadPanel
-          isLoading={loading}
+          isLoading={containersData.loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData}
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadContainersData}
         />
       </div>
       <div style={{ padding: '24px' }}>
         <div style={{ marginBottom: '12px' }}>
           <Card
             title='Highlights'
-            loading={loading}>
+            loading={containersData.loading}>
               <Row
                 align='middle'>
                   {highlightData}
@@ -226,7 +258,7 @@ const Containers: React.FC<{}> = () => {
               tab='Missing'>
               <ContainerTable
                 data={missingContainerData}
-                loading={loading}
+                loading={containersData.loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
                 selectedColumns={selectedColumns}
@@ -239,7 +271,7 @@ const Containers: React.FC<{}> = () => {
               tab='Under-Replicated'>
               <ContainerTable
                 data={underReplicatedContainerData}
-                loading={loading}
+                loading={containersData.loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
                 selectedColumns={selectedColumns}
@@ -252,7 +284,7 @@ const Containers: React.FC<{}> = () => {
               tab='Over-Replicated'>
               <ContainerTable
                 data={overReplicatedContainerData}
-                loading={loading}
+                loading={containersData.loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
                 selectedColumns={selectedColumns}
@@ -265,7 +297,20 @@ const Containers: React.FC<{}> = () => {
               tab='Mis-Replicated'>
               <ContainerTable
                 data={misReplicatedContainerData}
-                loading={loading}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='5'
+              tab='Mismatched Replicas'>
+              <ContainerTable
+                data={mismatchedReplicaContainerData}
+                loading={containersData.loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}
                 selectedColumns={selectedColumns}

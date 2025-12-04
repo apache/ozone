@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSecretManager
     extends OzoneSecretManager<OzoneTokenIdentifier> {
 
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
@@ -414,6 +414,10 @@ public class OzoneDelegationTokenSecretManager
     if (StringUtils.isNotEmpty(secretKeyId)) {
       try {
         ManagedSecretKey verifyKey = secretKeyClient.getSecretKey(UUID.fromString(secretKeyId));
+        if (verifyKey == null) {
+          throw new SCMSecurityException("Secret verify key " + UUID.fromString(secretKeyId) +
+              " not found for token " + formatTokenId(identifier));
+        }
         return verifyKey.isValidSignature(identifier.getBytes(), password);
       } catch (SCMSecurityException e) {
         LOG.error("verifySignature for identifier {} failed", identifier, e);
@@ -480,7 +484,7 @@ public class OzoneDelegationTokenSecretManager
       awsSecret = s3SecretManager.getSecretString(identifier
           .getAwsAccessId());
     } catch (IOException e) {
-      LOG.error("Error while validating S3 identifier:{}",
+      LOG.warn("S3 identifier validation failed:{}",
           identifier, e);
       throw new InvalidToken("No S3 secret found for S3 identifier:"
           + identifier);
@@ -513,7 +517,11 @@ public class OzoneDelegationTokenSecretManager
     LOG.info("Loading token state into token manager.");
     for (Map.Entry<OzoneTokenIdentifier, Long> entry :
         state.getTokenState().entrySet()) {
-      addPersistedDelegationToken(entry.getKey(), entry.getValue());
+      try {
+        addPersistedDelegationToken(entry.getKey(), entry.getValue());
+      } catch (Exception e) {
+        LOG.error("exception while loading delegation token from DB... ignored to continue startup", e);
+      }
     }
   }
 
@@ -528,6 +536,16 @@ public class OzoneDelegationTokenSecretManager
     byte[] password;
     if (StringUtils.isNotEmpty(identifier.getSecretKeyId())) {
       ManagedSecretKey signKey = secretKeyClient.getSecretKey(UUID.fromString(identifier.getSecretKeyId()));
+      if (signKey == null) {
+        // if delegation token expired, remove it from the store.
+        if (renewDate < Time.now()) {
+          LOG.info("Removing expired persisted delegation token {} from DB", identifier);
+          this.store.removeToken(identifier);
+        }
+
+        throw new IOException("Secret key " + UUID.fromString(identifier.getSecretKeyId()) +
+            " not found for token " + formatTokenId(identifier));
+      }
       password = signKey.sign(identifier.getBytes());
     } else {
       if (LOG.isDebugEnabled()) {
@@ -589,9 +607,6 @@ public class OzoneDelegationTokenSecretManager
   public void stop() throws IOException {
     super.stop();
     stopThreads();
-    if (this.store != null) {
-      this.store.close();
-    }
   }
 
   @VisibleForTesting

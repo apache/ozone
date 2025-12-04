@@ -162,17 +162,16 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = Collections.singletonList(
-            ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 0));
+            new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+                    MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
-    pendingOp = Collections.singletonList(ContainerReplicaOp
-            .create(ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 0));
+    pendingOp = Collections.singletonList(new ContainerReplicaOp(
+            ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
+                    .stream().findAny().get().getDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }
-
 
   @Test
   public void testAllSourcesOverloaded() throws IOException {

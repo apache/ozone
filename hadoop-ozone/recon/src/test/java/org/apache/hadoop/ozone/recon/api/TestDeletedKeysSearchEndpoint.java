@@ -79,14 +79,12 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   private Path temporaryFolder;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
-  private OMMetadataManager omMetadataManager;
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 100);
-    omMetadataManager = initializeNewOmMetadataManager(
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
@@ -107,7 +105,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     populateOMDB();
   }
-
 
   private static OMMetadataManager initializeNewOmMetadataManager(File omDbDir) throws IOException {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
@@ -442,7 +439,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals("fileb3", result.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList().get(0).getKeyName());
   }
 
-
   /**
    * Populates the OMDB with a set of deleted keys for testing purposes.
    * This diagram is for reference:
@@ -523,7 +519,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     omKeyInfos.add(omKeyInfo);
 
     // Create a RepeatedOmKeyInfo object with the list of OmKeyInfo
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfos);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfos, 1);
 
     // Write the deleted key information to the OM metadata manager
     writeDeletedKeysToOm(reconOMMetadataManager, deletedKey, repeatedOmKeyInfo);

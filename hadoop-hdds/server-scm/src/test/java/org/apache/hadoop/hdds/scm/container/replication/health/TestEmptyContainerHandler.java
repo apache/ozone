@@ -53,6 +53,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestEmptyContainerHandler {
   private ReplicationManager replicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private EmptyContainerHandler emptyContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
@@ -66,6 +67,7 @@ public class TestEmptyContainerHandler {
     replicationManager = mock(ReplicationManager.class);
     emptyContainerHandler =
         new EmptyContainerHandler(replicationManager);
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
   }
 
   /**
@@ -86,14 +88,14 @@ public class TestEmptyContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -117,14 +119,14 @@ public class TestEmptyContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -154,7 +156,7 @@ public class TestEmptyContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -182,7 +184,7 @@ public class TestEmptyContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -204,7 +206,7 @@ public class TestEmptyContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(Collections.emptySet())
         .build();
@@ -231,11 +233,11 @@ public class TestEmptyContainerHandler {
         ReplicationTestUtil.createContainerReplica(containerInfo.containerID(),
             5, HddsProtos.NodeOperationalState.IN_SERVICE,
             ContainerReplicaProto.State.CLOSED, 1L, 100L, mockDn,
-            mockDn.getUuid()));
+            mockDn.getID()));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();

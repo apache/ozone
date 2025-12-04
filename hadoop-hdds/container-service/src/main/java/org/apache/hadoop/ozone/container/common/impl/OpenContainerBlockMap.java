@@ -41,6 +41,16 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
  */
 public class OpenContainerBlockMap {
   /**
+   * TODO : We may construct the openBlockMap by reading the Block Layout
+   * for each block inside a container listing all chunk files and reading the
+   * sizes. This will help to recreate the openKeys Map once the DataNode
+   * restarts.
+   *
+   * For now, we will track all open blocks of a container in the blockMap.
+   */
+  private final ConcurrentMap<Long, BlockDataMap> containers = new ConcurrentHashMap<>();
+
+  /**
    * Map: localId {@literal ->} BlockData.
    *
    * In order to support {@link #getAll()}, the update operations are
@@ -68,17 +78,6 @@ public class OpenContainerBlockMap {
       return new ArrayList<>(blocks.values());
     }
   }
-
-  /**
-   * TODO : We may construct the openBlockMap by reading the Block Layout
-   * for each block inside a container listing all chunk files and reading the
-   * sizes. This will help to recreate the openKeys Map once the DataNode
-   * restarts.
-   *
-   * For now, we will track all open blocks of a container in the blockMap.
-   */
-  private final ConcurrentMap<Long, BlockDataMap> containers =
-      new ConcurrentHashMap<>();
 
   /**
    * Removes the Container matching with specified containerId.

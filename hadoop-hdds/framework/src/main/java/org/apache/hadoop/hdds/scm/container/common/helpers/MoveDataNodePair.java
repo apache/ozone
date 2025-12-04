@@ -39,10 +39,6 @@ public class MoveDataNodePair {
       MoveDataNodePair.class,
       DelegatedCodec.CopyType.SHALLOW);
 
-  public static Codec<MoveDataNodePair> getCodec() {
-    return CODEC;
-  }
-
   /**
    * source datanode of current move option.
    */
@@ -56,6 +52,10 @@ public class MoveDataNodePair {
   public MoveDataNodePair(DatanodeDetails src, DatanodeDetails tgt) {
     this.src = src;
     this.tgt = tgt;
+  }
+
+  public static Codec<MoveDataNodePair> getCodec() {
+    return CODEC;
   }
 
   public DatanodeDetails getTgt() {

@@ -16,11 +16,12 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>ozone</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <artifactId>hdds-hadoop-dependency-client</artifactId>
+    <version>2.2.0-SNAPSHOT</version>
+    <relativePath>../../hadoop-hdds/hadoop-dependency-client</relativePath>
   </parent>
   <artifactId>ozone-common</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Common</name>
   <description>Apache Ozone Common</description>
@@ -61,14 +62,6 @@
       <artifactId>grpc-netty</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-stub</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-http2</artifactId>
-    </dependency>
-    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-common</artifactId>
     </dependency>
@@ -77,16 +70,24 @@
       <artifactId>netty-handler</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-handler-proxy</artifactId>
-    </dependency>
-    <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-pool2</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
@@ -107,10 +108,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -137,6 +134,22 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <!-- required by OzoneManagerServiceBlockingStub in GrpcOmTransport -->
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-stub</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec-http2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler-proxy</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-tcnative-boringssl-static</artifactId>
       <scope>runtime</scope>
@@ -155,6 +168,7 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>

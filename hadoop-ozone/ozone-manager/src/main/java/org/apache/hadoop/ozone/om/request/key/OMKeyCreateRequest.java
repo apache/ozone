@@ -20,23 +20,26 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -50,7 +53,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -85,18 +88,21 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
         .getCreateKeyRequest();
-    Preconditions.checkNotNull(createKeyRequest);
+    Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+
+    final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     if (keyArgs.hasExpectedDataGeneration()) {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setSnapshotReservedWord(keyArgs.getKeyName())
-        .setKeyName(keyArgs.getKeyName()).build();
-    validateKey(ozoneManager, validateArgs);
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
+
 
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
@@ -140,15 +146,16 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  till leader is identified.
       UserInfo userInfo = getUserInfo();
       List<OmKeyLocationInfo> omKeyLocationInfoList =
-          allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
-              new ExcludeList(), requestedSize, scmBlockSize,
-              ozoneManager.getPreallocateBlocksMax(),
-              ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMServiceId(),
-              ozoneManager.getMetrics(),
-              keyArgs.getSortDatanodes(),
-              userInfo);
+          captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
+              () -> allocateBlock(ozoneManager.getScmClient(),
+                ozoneManager.getBlockTokenSecretManager(), repConfig,
+                new ExcludeList(), requestedSize, scmBlockSize,
+                ozoneManager.getPreallocateBlocksMax(),
+                ozoneManager.isGrpcBlockTokenEnabled(),
+                ozoneManager.getOMServiceId(),
+                ozoneManager.getMetrics(),
+                keyArgs.getSortDatanodes(),
+                userInfo));
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
@@ -170,9 +177,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     }
 
+    KeyArgs.Builder finalNewKeyArgs = newKeyArgs;
     KeyArgs resolvedKeyArgs =
-        resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
-            IAccessAuthorizer.ACLType.CREATE);
+        captureLatencyNs(perfMetrics.getCreateKeyResolveBucketAndAclCheckLatencyNs(), 
+            () -> resolveBucketAndCheckKeyAcls(finalNewKeyArgs.build(), ozoneManager,
+            IAccessAuthorizer.ACLType.CREATE));
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(resolvedKeyArgs)
             .setClientID(UniqueId.next());
@@ -211,6 +220,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
     int numMissingParents = 0;
+    final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
+    long createKeyStartTime = Time.monotonicNowNanos();
     try {
 
       mergeOmLockDetails(
@@ -275,7 +286,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          replicationConfig, ozoneManager.getConfiguration());
+          replicationConfig, ozoneManager.getConfig());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
@@ -301,9 +312,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
+      long quotaCheckStartTime = Time.monotonicNowNanos();
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
       if (numMissingParents > 0) {
@@ -339,6 +352,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
+      long createKeyLatency = Time.monotonicNowNanos() - createKeyStartTime;
+
+      if (Result.SUCCESS.equals(result)) {
+        perfMetrics.addCreateKeySuccessLatencyNs(createKeyLatency);
+      } else {
+        perfMetrics.addCreateKeyFailureLatencyNs(createKeyLatency);
+      }
+      
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
             .releaseWriteLock(omMetadataManager, volumeName,

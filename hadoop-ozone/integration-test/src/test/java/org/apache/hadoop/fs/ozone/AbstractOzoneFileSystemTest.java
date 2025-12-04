@@ -111,7 +111,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -149,11 +148,6 @@ abstract class AbstractOzoneFileSystemTest {
       p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
   private String fsRoot;
 
-  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
-    enabledFileSystemPaths = setDefaultFs;
-    bucketLayout = layout;
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOzoneFileSystemTest.class);
 
@@ -175,6 +169,11 @@ abstract class AbstractOzoneFileSystemTest {
   private static final UserGroupInformation UGI_USER1 = UserGroupInformation
       .createUserForTesting(USER1,  new String[] {"usergroup"});
   private OzoneFileSystem userO3fs;
+
+  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
+    enabledFileSystemPaths = setDefaultFs;
+    bucketLayout = layout;
+  }
 
   @BeforeAll
   void init() throws Exception {
@@ -374,7 +373,7 @@ abstract class AbstractOzoneFileSystemTest {
     String fakeGrandpaKey = "dir1";
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String fullKeyName = fakeParentKey + "/key1";
-    TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, fullKeyName, new byte[0]);
 
     // /dir1/dir2 should not exist
     assertFalse(fs.exists(new Path(fakeParentKey)));
@@ -744,7 +743,7 @@ abstract class AbstractOzoneFileSystemTest {
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setLocationInfoList(new ArrayList<>())
-        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
+        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
         .build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);
@@ -888,7 +887,7 @@ abstract class AbstractOzoneFileSystemTest {
     * the "/dir1", "/dir1/dir2/" are fake directory
     * */
     String keyName = "dir1/dir2/key1";
-    TestDataUtil.createKey(ozoneBucket, keyName, "");
+    TestDataUtil.createKey(ozoneBucket, keyName, new byte[0]);
     FileStatus[] fileStatuses;
 
     fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
@@ -1396,7 +1395,7 @@ abstract class AbstractOzoneFileSystemTest {
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String sourceKeyName = fakeParentKey + "/key1";
     String targetKeyName = fakeParentKey +  "/key2";
-    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, sourceKeyName, new byte[0]);
 
     Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
     Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
@@ -1685,7 +1684,7 @@ abstract class AbstractOzoneFileSystemTest {
     ContractTestUtils.touch(fs, path);
     assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
-        isAssignableFrom(TrashPolicyOzone.class));
+        isAssignableFrom(OzoneTrashPolicy.class));
     assertEquals(TRASH_INTERVAL, trash.getConf().
         getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
 
@@ -1889,13 +1888,12 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
-        "org.apache.hadoop.ipc.ProcessingDetails");
+        "org.apache.hadoop.ipc_.ProcessingDetails");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
     int keySize = 1024;
-    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize],
-        UTF_8));
+    TestDataUtil.createKey(ozoneBucket, "key1", new byte[keySize]);
     logCapturer.stopCapturing();
     String logContent = logCapturer.getOutput();
 
@@ -1929,8 +1927,8 @@ abstract class AbstractOzoneFileSystemTest {
     String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
         o3fs.pathToKey(lev2path));
 
-    String data = RandomStringUtils.randomAlphanumeric(stringLen);
-    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    String data = RandomStringUtils.secure().nextAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
 
     Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
     String fileKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
@@ -1999,8 +1997,8 @@ abstract class AbstractOzoneFileSystemTest {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
     int stringLen = 20;
-    String data = RandomStringUtils.randomAlphanumeric(stringLen);
-    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    String data = RandomStringUtils.secure().nextAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
 
     Path pathIllegal = createPath("/" + filePath + "illegal");
     try (FSDataOutputStream streamIllegal = fs.create(pathIllegal, (short)2)) {
@@ -2021,12 +2019,11 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(owner, fileStatus.getGroup());
   }
 
-
   @Test
   public void testDirectory() throws IOException {
     assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
-    String leafName = RandomStringUtils.randomAlphanumeric(5);
+    String leafName = RandomStringUtils.secure().nextAlphanumeric(5);
     OMMetadataManager metadataManager = cluster.getOzoneManager()
         .getMetadataManager();
 
@@ -2081,7 +2078,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   void testListStatus2() throws IOException {
     List<Path> paths = new ArrayList<>();
-    String dirPath = RandomStringUtils.randomAlphanumeric(5);
+    String dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
     Path path = createPath("/" + dirPath);
     paths.add(path);
 
@@ -2096,7 +2093,7 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
-    dirPath = RandomStringUtils.randomAlphanumeric(5);
+    dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
     path = createPath("/" + dirPath);
     paths.add(path);
     assertTrue(fs.mkdirs(path));
@@ -2113,9 +2110,9 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testOzoneManagerListLocatedStatusAndListStatus() throws IOException {
-    String data = RandomStringUtils.randomAlphanumeric(20);
-    String directory = RandomStringUtils.randomAlphanumeric(5);
-    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    String data = RandomStringUtils.secure().nextAlphanumeric(20);
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
     Path path = createPath("/" + directory + "/" + filePath);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
@@ -2148,7 +2145,7 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   void testOzoneManagerFileSystemInterface() throws IOException {
-    String dirPath = RandomStringUtils.randomAlphanumeric(5);
+    String dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
 
     Path path = createPath("/" + dirPath);
     assertTrue(fs.mkdirs(path));
@@ -2187,8 +2184,8 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testOzoneManagerLocatedFileStatus() throws IOException {
-    String data = RandomStringUtils.randomAlphanumeric(20);
-    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    String data = RandomStringUtils.secure().nextAlphanumeric(20);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
     Path path = createPath("/" + filePath);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
@@ -2212,8 +2209,8 @@ abstract class AbstractOzoneFileSystemTest {
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
         StorageUnit.BYTES
     );
-    String data = RandomStringUtils.randomAlphanumeric(2 * blockSize + 837);
-    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    String data = RandomStringUtils.secure().nextAlphanumeric(2 * blockSize + 837);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
     Path path = createPath("/" + filePath);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);

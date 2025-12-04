@@ -60,15 +60,12 @@ public class StorageVolumeChecker {
 
   public static final int MAX_VOLUME_FAILURE_TOLERATED_LIMIT = -1;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolumeChecker.class);
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
-  private final AtomicLong numVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeSetsChecks = new AtomicLong(0);
-  private final AtomicLong numSkippedChecks = new AtomicLong(0);
+  private final BackgroundVolumeScannerMetrics metrics;
 
   /**
    * Max allowed time for a disk check in milliseconds. If the check
@@ -107,6 +104,8 @@ public class StorageVolumeChecker {
    */
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
+
+    metrics = BackgroundVolumeScannerMetrics.create();
 
     this.timer = timer;
 
@@ -165,7 +164,7 @@ public class StorageVolumeChecker {
   public synchronized void checkAllVolumeSets() {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
-      numSkippedChecks.incrementAndGet();
+      metrics.incNumIterationsSkipped();
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -176,12 +175,29 @@ public class StorageVolumeChecker {
     }
 
     try {
+      long totalVolumesScanned = 0;
       for (VolumeSet volSet : registeredVolumeSets) {
+        long volumeCount = volSet.getVolumesList().size();
+        if (volSet instanceof MutableVolumeSet) {
+          StorageVolume.VolumeType type = ((MutableVolumeSet) volSet).getVolumeType();
+          switch (type) {
+          case DATA_VOLUME:
+            metrics.incNumDataVolumeScans(volumeCount);
+            break;
+          case META_VOLUME:
+            metrics.incNumMetadataVolumeScans(volumeCount);
+            break;
+          default:
+            LOG.warn("Unknown volume type: {}", type);
+            break;
+          }
+        }
         volSet.checkAllVolumes(this);
+        totalVolumesScanned += volSet.getVolumesList().size();
       }
-
+      metrics.setNumVolumesScannedInLastIteration(totalVolumesScanned);
+      metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
-      numAllVolumeSetsChecks.incrementAndGet();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
@@ -219,6 +235,9 @@ public class StorageVolumeChecker {
                 numVolumes, (ignored1, ignored2) -> latch.countDown()),
             MoreExecutors.directExecutor());
       } else {
+        if (v instanceof HddsVolume) {
+          ((HddsVolume) v).getVolumeInfoStats().incNumScansSkipped();
+        }
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
         }
@@ -232,7 +251,6 @@ public class StorageVolumeChecker {
           maxAllowedTimeForCheckMs);
     }
 
-    numAllVolumeChecks.incrementAndGet();
     synchronized (this) {
       // All volumes that have not been detected as healthy should be
       // considered failed. This is a superset of 'failedVolumes'.
@@ -277,7 +295,6 @@ public class StorageVolumeChecker {
     Optional<ListenableFuture<VolumeCheckResult>> olf =
         delegateChecker.schedule(volume, null);
     if (olf.isPresent()) {
-      numVolumeChecks.incrementAndGet();
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
@@ -401,6 +418,7 @@ public class StorageVolumeChecker {
       periodicDiskChecker.cancel(true);
       diskCheckerservice.shutdownNow();
       checkVolumeResultHandlerExecutorService.shutdownNow();
+      metrics.unregister();
       try {
         delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
       } catch (InterruptedException e) {
@@ -422,32 +440,8 @@ public class StorageVolumeChecker {
     delegateChecker = testDelegate;
   }
 
-  /**
-   * Return the number of {@link #checkVolume} invocations.
-   */
-  public long getNumVolumeChecks() {
-    return numVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumes(Collection)} ()} invocations.
-   */
-  public long getNumAllVolumeChecks() {
-    return numAllVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumeSets()} invocations.
-   */
-  public long getNumAllVolumeSetsChecks() {
-    return numAllVolumeSetsChecks.get();
-  }
-
-  /**
-   * Return the number of checks skipped because the minimum gap since the
-   * last check had not elapsed.
-   */
-  public long getNumSkippedChecks() {
-    return numSkippedChecks.get();
+  @VisibleForTesting
+  public BackgroundVolumeScannerMetrics getMetrics() {
+    return metrics;
   }
 }

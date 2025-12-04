@@ -43,13 +43,11 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for Ozone Bucket Owner.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(120)
 public abstract class TestBucketOwner implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
@@ -103,7 +101,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       //Get Acls
       ozoneBucket.getAcls();
       //Add Acls
-      OzoneAcl acl = new OzoneAcl(USER, "testuser",
+      OzoneAcl acl = OzoneAcl.of(USER, "testuser",
           DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
     }
@@ -159,7 +157,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       assertThrows(Exception.class, () -> {
         OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-        OzoneAcl acl = new OzoneAcl(USER, "testuser1",
+        OzoneAcl acl = OzoneAcl.of(USER, "testuser1",
             DEFAULT, IAccessAuthorizer.ACLType.ALL);
         ozoneBucket.addAcl(acl);
       }, "Add Acls as non-volume and non-bucket owner should fail");
@@ -181,7 +179,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       //Get Acls
       ozoneBucket.getAcls();
       //Add Acls
-      OzoneAcl acl = new OzoneAcl(USER, "testuser2",
+      OzoneAcl acl = OzoneAcl.of(USER, "testuser2",
           DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
       //Bucket Delete

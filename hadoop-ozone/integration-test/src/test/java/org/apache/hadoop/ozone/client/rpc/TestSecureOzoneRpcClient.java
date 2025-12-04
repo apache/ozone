@@ -35,10 +35,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -53,14 +55,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -83,8 +87,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -159,10 +165,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       String keyName = UUID.randomUUID().toString();
 
       long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, replication, new HashMap<>())) {
-        out.write(value.getBytes(UTF_8));
-      }
+      TestDataUtil.createKey(bucket, keyName, replication, value.getBytes(UTF_8));
 
       assertEquals(committedBytes + value.getBytes(UTF_8).length,
           ozoneManager.getMetrics().getDataCommittedBytes());
@@ -172,7 +175,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       byte[] fileContent;
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
-        is.read(fileContent);
+        IOUtils.readFully(is, fileContent);
       }
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -180,11 +183,10 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
           omMetadataManager.getBucketTable().get(bucketKey).getObjectID());
       String keyPrefix =
           bucketLayout.isFileSystemOptimized() ? bucketId : bucketKey;
-      Table table = omMetadataManager.getKeyTable(bucketLayout);
+      Table<String, OmKeyInfo> table = omMetadataManager.getKeyTable(bucketLayout);
 
       // Check table entry.
-      try (
-          TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+      try (Table.KeyValueIterator<String, OmKeyInfo>
               keyIterator = table.iterator()) {
         Table.KeyValue<String, OmKeyInfo> kv =
             keyIterator.seek(keyPrefix + "/" + keyName);
@@ -309,14 +311,16 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         assertEquals(committedBytes + dataSize,
             getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
         // check used quota
-        bucket = volume.getBucket(bucketName);
-        assertEquals(1, bucket.getUsedNamespace());
-        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
-
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> 1 == volume.getBucket(bucketName).getUsedNamespace(),
+            1000, 30000);
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> dataSize * ReplicationFactor.THREE.getValue()
+                == volume.getBucket(bucketName).getUsedBytes(), 1000, 30000);
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
-        try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        try (Table.KeyValueIterator<String, RepeatedOmKeyInfo>
                  keyIter = deletedTable.iterator()) {
           while (keyIter.hasNext()) {
             Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
@@ -426,6 +430,21 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     omResponse = getCluster().getOzoneManager().getOmServerProtocol()
         .submitRequest(null, readRequest);
     assertEquals(Status.INVALID_TOKEN, omResponse.getStatus());
+  }
+
+  @Test
+  public void testRemoteException() {
+    UserGroupInformation realUser = UserGroupInformation.createRemoteUser("realUser");
+    UserGroupInformation proxyUser = UserGroupInformation.createProxyUser("user", realUser);
+
+    assertThrows(AccessControlException.class, () -> {
+      proxyUser.doAs((PrivilegedExceptionAction<Void>) () -> {
+        try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getCluster().getConf())) {
+          ozoneClient.getObjectStore().listVolumes("/");
+        }
+        return null;
+      });
+    });
   }
 
   @Test

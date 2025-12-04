@@ -38,7 +38,7 @@ public interface CommandHandler {
    * @param context - Current Context.
    * @param connectionManager - The SCMs that we are talking to.
    */
-  void handle(SCMCommand command, OzoneContainer container,
+  void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager);
 
   /**
@@ -68,7 +68,7 @@ public interface CommandHandler {
   /**
    * Default implementation for updating command status.
    */
-  default void updateCommandStatus(StateContext context, SCMCommand command,
+  default void updateCommandStatus(StateContext context, SCMCommand<?> command,
       Consumer<CommandStatus> cmdStatusUpdater, Logger log) {
     if (!context.updateCommandStatus(command.getId(), cmdStatusUpdater)) {
       log.warn("{} with Id:{} not found.", command.getType(),

@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,8 +157,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
-      DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuid());
+      final DatanodeDetails datanodeDetails = nodeManager.getNode(node.getID());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -309,9 +309,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
-              reportProto.getCommitted(), dataSizeRequired,
-              reportProto.getFreeSpaceToSpare())) {
+        if (VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
           enoughForData = true;
           break;
         }
@@ -448,7 +446,27 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .map(this::getPlacementGroup)
+        .map(dn -> {
+          Node rack = getPlacementGroup(dn);
+          if (rack == null) {
+            try {
+              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+              if (nodeStatus.isDead() && nodeStatus.isMaintenance()) {
+                LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.", dn.getNetworkLocation(), dn);
+                return dn.getNetworkLocation();
+              }
+              return null;
+            } catch (NodeNotFoundException e) {
+              LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
+              return null;
+            }
+          }
+          /*
+          data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
+          the network full path of rack1.
+          */
+          return rack.getNetworkFullPath();
+        })
         .filter(Objects::nonNull)
         .collect(Collectors.groupingBy(
             Function.identity(),
@@ -498,7 +516,7 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuid());
+        .getNode(datanodeDetails.getID());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);

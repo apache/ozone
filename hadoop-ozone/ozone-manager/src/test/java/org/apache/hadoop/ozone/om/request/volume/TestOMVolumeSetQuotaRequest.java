@@ -33,9 +33,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests set volume property request.
@@ -179,10 +178,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
-    GenericTestUtils.LogCapturer logs =
-            GenericTestUtils.LogCapturer.captureLogs(
-                    LoggerFactory.getLogger(OMVolumeSetQuotaRequest.class)
-            );
+    LogCapturer logs = LogCapturer.captureLogs(OMVolumeSetQuotaRequest.class);
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);

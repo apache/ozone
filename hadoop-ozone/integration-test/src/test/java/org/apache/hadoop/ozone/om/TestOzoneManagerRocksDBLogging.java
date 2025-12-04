@@ -29,12 +29,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test RocksDB logging for Ozone Manager.
  */
-@Timeout(100)
 public class TestOzoneManagerRocksDBLogging {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
@@ -53,9 +51,6 @@ public class TestOzoneManagerRocksDBLogging {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {

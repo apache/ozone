@@ -62,12 +62,10 @@ import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the containerStateMachine failure handling.
  */
-@Timeout(300)
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;
@@ -77,11 +75,6 @@ public class TestContainerStateMachine {
   private String volumeName;
   private String bucketName;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
 
@@ -124,9 +117,6 @@ public class TestContainerStateMachine {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -199,11 +189,11 @@ public class TestContainerStateMachine {
     RatisServerConfiguration ratisServerConfiguration =
         conf.getObject(RatisServerConfiguration.class);
 
-    stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
-    storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = getSnapshotPath(storage);
-    int numSnapshots = parentPath.getParent().toFile().listFiles().length;
+    Path parentPath = getSnapshotPath(storage).getParent();
+    assertThat(parentPath).isNotNull();
+    File[] files = parentPath.toFile().listFiles();
+    assertThat(files).isNotNull();
+    int numSnapshots = files.length;
     assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
         .isLessThanOrEqualTo(1);
 
@@ -220,11 +210,9 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes(UTF_8));
       key.close();
     }
-    stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
-    storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    parentPath = getSnapshotPath(storage);
-    numSnapshots = parentPath.getParent().toFile().listFiles().length;
+    files = parentPath.toFile().listFiles();
+    assertThat(files).isNotNull();
+    numSnapshots = files.length;
     assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
         .isLessThanOrEqualTo(1);
   }

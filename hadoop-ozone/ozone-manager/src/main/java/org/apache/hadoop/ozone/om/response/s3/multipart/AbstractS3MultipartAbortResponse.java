@@ -17,12 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Collections;
@@ -36,7 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -45,8 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
  * Base class for responses that need to move multipart info part keys to the
  * deleted table.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, OPEN_FILE_TABLE,
-    DELETED_TABLE, MULTIPARTINFO_TABLE, BUCKET_TABLE})
 public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
 
   public AbstractS3MultipartAbortResponse(
@@ -92,9 +83,8 @@ public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
         //  MPU part actually contains blocks, and only move the to
         //  deletedTable if it does.
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID()
-        );
+        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(),
+            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID());
 
         // multi-part key format is volumeName/bucketName/keyName/uploadId
         String deleteKey = omMetadataManager.getOzoneDeletePathKey(

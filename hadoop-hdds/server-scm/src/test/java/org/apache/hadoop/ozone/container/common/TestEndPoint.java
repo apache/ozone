@@ -41,6 +41,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -60,9 +61,11 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -73,6 +76,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -80,7 +84,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -96,7 +100,7 @@ public class TestEndPoint {
   @TempDir
   private static File testDir;
   private static OzoneConfiguration ozoneConf;
-  private static DatanodeLayoutStorage layoutStorage;
+  private static VolumeChoosingPolicy volumeChoosingPolicy;
   private static DatanodeDetails dnDetails;
 
   @TempDir
@@ -115,12 +119,13 @@ public class TestEndPoint {
     ozoneConf = SCMTestUtils.getConf(testDir);
     scmServerImpl = new ScmTestMock();
     dnDetails = randomDatanodeDetails();
-    layoutStorage = new DatanodeLayoutStorage(ozoneConf,
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(ozoneConf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
     layoutStorage.initialize();
     scmServer = SCMTestUtils.startScmRpcServer(ozoneConf,
         scmServerImpl, serverAddress, 10);
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(ozoneConf);
   }
 
   /**
@@ -155,7 +160,8 @@ public class TestEndPoint {
       ozoneConf.setBoolean(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails,
-          ozoneConf, ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
+          ozoneConf, ContainerTestUtils.getMockContext(dnDetails, ozoneConf),
+          volumeChoosingPolicy);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           ozoneConf, ozoneContainer);
@@ -227,10 +233,10 @@ public class TestEndPoint {
     ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-          .captureLogs(VersionEndpointTask.LOG);
+      LogCapturer logCapturer = LogCapturer.captureLogs(VersionEndpointTask.class);
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
-          ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
+          ContainerTestUtils.getMockContext(dnDetails, ozoneConf),
+          volumeChoosingPolicy);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           ozoneConf, ozoneContainer);
@@ -273,7 +279,8 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
-          ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
+          ContainerTestUtils.getMockContext(dnDetails, ozoneConf),
+          volumeChoosingPolicy);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           ozoneConf, ozoneContainer);
@@ -310,6 +317,13 @@ public class TestEndPoint {
 
       assertEquals("different_cluster_id", layout1.getClusterID());
       assertNotEquals(scmServerImpl.getClusterId(), layout1.getClusterID());
+
+      // another call() with OzoneContainer already started should not write the file
+      FileUtils.forceDelete(layout1.getVersionFile());
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      versionTask.call();
+      assertEquals(StorageState.NOT_INITIALIZED, new DatanodeLayoutStorage(ozoneConf, "any").getState());
+
       FileUtils.forceDelete(storageDir);
     }
   }
@@ -328,7 +342,8 @@ public class TestEndPoint {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails,
-          conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
+          conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf),
+          volumeChoosingPolicy);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
@@ -355,7 +370,8 @@ public class TestEndPoint {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails, conf,
-          ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
+          ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf),
+          volumeChoosingPolicy);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
 
@@ -378,9 +394,9 @@ public class TestEndPoint {
           .register(nodeToRegister.getExtendedProtoBufMessage(), HddsTestUtils
                   .createNodeReport(
                       Arrays.asList(getStorageReports(
-                          nodeToRegister.getUuid())),
+                          nodeToRegister.getID())),
                       Arrays.asList(getMetadataStorageReports(
-                          nodeToRegister.getUuid()))),
+                          nodeToRegister.getID()))),
               HddsTestUtils.getRandomContainerReports(10),
               HddsTestUtils.getRandomPipelineReports(),
               defaultLayoutVersionProto());
@@ -392,13 +408,13 @@ public class TestEndPoint {
     }
   }
 
-  private StorageReportProto getStorageReports(UUID id) {
+  private StorageReportProto getStorageReports(DatanodeID id) {
     String storagePath = testDir.getAbsolutePath() + "/data-" + id;
     return HddsTestUtils.createStorageReport(id, storagePath, 100, 10, 90,
         null);
   }
 
-  private MetadataStorageReportProto getMetadataStorageReports(UUID id) {
+  private MetadataStorageReportProto getMetadataStorageReports(DatanodeID id) {
     String storagePath = testDir.getAbsolutePath() + "/metadata-" + id;
     return HddsTestUtils.createMetadataStorageReport(storagePath, 100, 10, 90,
         null);
@@ -407,7 +423,7 @@ public class TestEndPoint {
   private RegisterEndpointTask getRegisterEndpointTask(boolean clearDatanodeDetails, OzoneConfiguration conf,
                                                        EndpointStateMachine rpcEndPoint) throws Exception {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    UUID datanodeID = UUID.randomUUID();
+    DatanodeID datanodeID = DatanodeID.randomID();
     when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
@@ -503,8 +519,8 @@ public class TestEndPoint {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
           .setNodeReport(HddsTestUtils.createNodeReport(
-              Arrays.asList(getStorageReports(dataNode.getUuid())),
-              Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
+              Arrays.asList(getStorageReports(dataNode.getID())),
+              Arrays.asList(getMetadataStorageReports(dataNode.getID()))))
           .build();
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
@@ -526,8 +542,8 @@ public class TestEndPoint {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
           .setNodeReport(HddsTestUtils.createNodeReport(
-              Arrays.asList(getStorageReports(dataNode.getUuid())),
-              Arrays.asList(getMetadataStorageReports(dataNode.getUuid()))))
+              Arrays.asList(getStorageReports(dataNode.getID())),
+              Arrays.asList(getMetadataStorageReports(dataNode.getID()))))
           .build();
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
@@ -648,7 +664,8 @@ public class TestEndPoint {
   private OzoneContainer createVolume(OzoneConfiguration conf)
       throws IOException {
     OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, conf,
-        ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
+        ContainerTestUtils.getMockContext(dnDetails, ozoneConf),
+        volumeChoosingPolicy);
 
     String clusterId = scmServerImpl.getClusterId();
 

@@ -53,6 +53,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Testing ContainerStatemanager.
@@ -60,8 +62,6 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestContainerStateManager {
 
   private ContainerStateManager containerStateManager;
-  private PipelineManager pipelineManager;
-  private SCMHAManager scmhaManager;
   @TempDir
   private File testDir;
   private DBStore dbStore;
@@ -70,10 +70,10 @@ public class TestContainerStateManager {
   @BeforeEach
   public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    pipelineManager = mock(PipelineManager.class);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
@@ -91,14 +91,13 @@ public class TestContainerStateManager {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
 
   }
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
@@ -147,11 +146,14 @@ public class TestContainerStateManager {
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedState() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+      throws IOException {
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.DELETING)
+        .setState(lifeCycleState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
@@ -161,16 +163,22 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    containerStateManager.transitionDeletingToClosedState(cid);
+    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainer() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSING", "QUASI_CLOSED", "CLOSED", "RECOVERING"})
+  public void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainer(
+      HddsProtos.LifeCycleState initialState) throws IOException {
+    // Negative test for non-OPEN Ratis container -> CLOSED transitions. OPEN -> CLOSED is tested in:
+    // TestContainerManagerImpl#testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers
+
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setState(initialState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
@@ -181,7 +189,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
     try {
-      containerStateManager.transitionDeletingToClosedState(cid);
+      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
       fail("Was expecting an Exception, but did not catch any.");
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
@@ -194,8 +202,7 @@ public class TestContainerStateManager {
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(node)
         .build();
-    containerStateManager
-        .updateContainerReplica(cont.containerID(), replica);
+    containerStateManager.updateContainerReplica(replica);
   }
 
   private ContainerInfo allocateContainer()

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -46,14 +46,6 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
  * Base class for OMVolumeAcl Request.
  */
 public abstract class OMVolumeAclRequest extends OMVolumeRequest {
-
-  /**
-   * Volume ACL operation.
-   */
-  public interface VolumeAclOp extends
-      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
-    // just a shortcut to avoid having to repeat long list of generic parameters
-  }
 
   private final VolumeAclOp omVolumeAclOp;
 
@@ -109,21 +101,19 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
       // Update only when
       if (applyAcl) {
+        OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
         // Update the modification time when updating ACLs of Volume.
-        long modificationTime = omVolumeArgs.getModificationTime();
         if (getOmRequest().getAddAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getAddAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getAddAclRequest().getModificationTime());
         } else if (getOmRequest().getSetAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getSetAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getSetAclRequest().getModificationTime());
         } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getRemoveAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getRemoveAclRequest().getModificationTime());
         }
-        omVolumeArgs.setModificationTime(modificationTime);
 
-        omVolumeArgs.setUpdateID(trxnLogIndex);
+        omVolumeArgs = builder
+            .setUpdateID(trxnLogIndex)
+            .build();
 
         // update cache.
         omMetadataManager.getVolumeTable().addCacheEntry(
@@ -207,4 +197,12 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    */
   abstract void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
+
+  /**
+   * Volume ACL operation.
+   */
+  public interface VolumeAclOp extends
+      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
+    // just a shortcut to avoid having to repeat long list of generic parameters
+  }
 }

@@ -19,8 +19,10 @@
     <Package name="org.apache.hadoop.hdds.protocol.proto"/>
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.hdds.cli.GenericCli"></Class>
-    <Bug pattern="DM_EXIT" />
+    <Package name="org.apache.hadoop.ipc_"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.security_"/>
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.OzoneConsts"/>

@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 @UpgradeActionOm(type = ON_FINALIZE, feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(QuotaRepairUpgradeAction.class);
+
   @Override
   public void execute(OzoneManager arg) throws Exception {
     boolean enabled = arg.getConfiguration().getBoolean(

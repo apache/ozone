@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 import com.google.common.base.Preconditions;
@@ -27,6 +27,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -94,7 +95,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignUserAccessIdRequest.class);
 
   public OMTenantAssignUserAccessIdRequest(OMRequest omRequest) {
@@ -329,7 +330,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredVolumeLock) {
-        Preconditions.checkNotNull(volumeName);
+        Objects.requireNonNull(volumeName, "volumeName == null");
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
                 volumeName));

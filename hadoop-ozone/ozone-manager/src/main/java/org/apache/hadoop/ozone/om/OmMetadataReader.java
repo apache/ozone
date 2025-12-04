@@ -33,8 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -275,9 +275,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+            bucket, args.getKeyName());
+      }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       audit.logReadFailure(

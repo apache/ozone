@@ -142,6 +142,7 @@ enum Status {
   CA_ROTATION_IN_POST_PROGRESS = 44;
   CONTAINER_ALREADY_CLOSED = 45;
   CONTAINER_ALREADY_CLOSING = 46;
+  UNSUPPORTED_OPERATION = 47;
 }
 
 /**
@@ -180,6 +181,8 @@ message DeleteScmKeyBlocksRequestProto {
 message KeyBlocks {
   required string key = 1;
   repeated BlockID blocks = 2;
+  repeated uint64 size = 3;
+  repeated uint64 replicatedSize = 4;
 }
 
 /**

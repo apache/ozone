@@ -21,14 +21,14 @@ if [[ ${SECURITY_ENABLED} == "true" ]]; then
 fi
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
-: ${HADOOP_IMAGE:="apache/hadoop"}
+: ${HADOOP_IMAGE:="${docker.hadoop.image}"}
 : ${HADOOP_TEST_IMAGES:=""}
 
 if [[ -z "${HADOOP_TEST_IMAGES}" ]]; then
-  # hadoop2 and flokkr images are only available from Docker Hub
+  # hadoop2 image is only available from Docker Hub
   HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} apache/hadoop:${hadoop2.version}"
-  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} flokkr/hadoop:3.1.2"
-  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:${hadoop.version}"
+  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:3.3.6"
+  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:${hadoop.version}${docker.hadoop.image.flavor}"
 fi
 
 export HADOOP_MAJOR_VERSION=3
@@ -54,7 +54,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 for HADOOP_TEST_IMAGE in $HADOOP_TEST_IMAGES; do
   export HADOOP_TEST_IMAGE
-  hadoop_version="${HADOOP_TEST_IMAGE##*:}"
+  hadoop_version=$(docker run --rm "${HADOOP_TEST_IMAGE}" bash -c "hadoop version | grep -m1 '^Hadoop' | cut -f2 -d' '")
   export HADOOP_MAJOR_VERSION=${hadoop_version%%.*}
 
   docker-compose --ansi never --profile hadoop up -d nm rm
@@ -62,7 +62,7 @@ for HADOOP_TEST_IMAGE in $HADOOP_TEST_IMAGES; do
   execute_command_in_container rm hadoop version
 
   if [[ ${SECURITY_ENABLED} == "true" ]]; then
-    execute_robot_test rm kinit-hadoop.robot
+    execute_robot_test rm -v SECURITY_ENABLED:"${SECURITY_ENABLED}" kinit-hadoop.robot
   fi
 
   for scheme in o3fs ofs; do

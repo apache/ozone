@@ -38,42 +38,34 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's snapshot provider service.
  */
-@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
+
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final int NUM_OF_OMS = 3;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private int numOfOMs = 3;
 
   private OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
         .build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -84,10 +76,10 @@ public class TestOzoneManagerSnapshotProvider {
 
   @Test
   public void testDownloadCheckpoint() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -125,6 +117,8 @@ public class TestOzoneManagerSnapshotProvider {
 
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
+
+    OmSnapshotUtils.createHardLinks(dbCheckpoint.getCheckpointLocation(), true);
 
     TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,

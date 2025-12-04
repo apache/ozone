@@ -31,6 +31,8 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -67,7 +69,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,6 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify that symmetric secret keys are correctly
  * synchronized from leader to follower during snapshot installation.
  */
-@Timeout(500)
 public final class TestSecretKeySnapshot {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeySnapshot.class);
@@ -92,7 +92,6 @@ public final class TestSecretKeySnapshot {
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
-  private String host;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -115,6 +114,8 @@ public final class TestSecretKeySnapshot {
         ROTATE_CHECK_DURATION_MS + "ms");
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_MS + "ms");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATE_CHECK_DURATION_MS + "ms");
 
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder
@@ -158,8 +159,8 @@ public final class TestSecretKeySnapshot {
 
   private void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 
 /**
  * Handles CreateKey request layout version1.
@@ -88,9 +90,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
     Exception exception = null;
-    Result result;
+    Result result = null;
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
+    final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
+    long createKeyStartTime = Time.monotonicNowNanos();
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -152,7 +156,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              repConfig, ozoneManager.getConfiguration());
+              repConfig, ozoneManager.getConfig());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
@@ -174,17 +178,18 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
+      long quotaCheckStartTime = Time.monotonicNowNanos();
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
-              trxnLogIndex);
+          dbOpenFileName, omFileInfo, keyName, trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
@@ -214,6 +219,14 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omClientResponse = new OMKeyCreateResponseWithFSO(
               createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
+      long createKeyLatency = Time.monotonicNowNanos() - createKeyStartTime;
+
+      if (Result.SUCCESS.equals(result)) {
+        perfMetrics.addCreateKeySuccessLatencyNs(createKeyLatency);
+      } else {
+        perfMetrics.addCreateKeyFailureLatencyNs(createKeyLatency);
+      }
+      
       if (acquireLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

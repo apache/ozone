@@ -69,16 +69,15 @@ public class TestNSSummaryDiskUsageOrdering {
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private static final String ROOT_PATH = "/";
   private static final String TEST_USER = "TestUser";
-  private OMMetadataManager omMetadataManager;
+
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         100);
-    omMetadataManager = initializeNewOmMetadataManager(
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir"))
             .toFile());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -55,7 +55,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -70,6 +69,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -230,7 +230,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setOmKeyLocationInfos(Collections.singletonList(
                   new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
               .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+                  ozoneManager.getPrefixManager(), ozoneManager.getConfig()))
               .setObjectID(pathInfoFSO.getLeafNodeObjectId())
               .setUpdateID(trxnLogIndex)
               .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
@@ -318,7 +318,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
-              keyToDelete, trxnLogIndex);
+              keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
@@ -398,7 +398,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo);
+        getBucketLayout(), omBucketInfo, bucketId);
   }
 
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
@@ -463,6 +463,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
+    OmKeyInfo.Builder builder = null;
     if (omKeyInfo == null) {
       // This is a newly added key, it does not have any versions.
       OmKeyLocationInfoGroup keyLocationInfoGroup = new
@@ -473,8 +474,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               keyName, omMetadataManager);
 
       // A newly created key, this is the first version.
-      OmKeyInfo.Builder builder =
-          new OmKeyInfo.Builder().setVolumeName(volumeName)
+      builder = new OmKeyInfo.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
           .setReplicationConfig(ReplicationConfig.fromProto(
               partKeyInfo.getType(), partKeyInfo.getFactor(),
@@ -498,7 +498,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setObjectID(dbOpenKeyInfo.getObjectID());
       }
       updatePrefixFSOInfo(dbOpenKeyInfo, builder);
-      omKeyInfo = builder.build();
     } else {
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
           keyName, omMetadataManager);
@@ -519,17 +518,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfo.setMetadata(dbOpenKeyInfo.getMetadata());
+        builder.setMetadata(dbOpenKeyInfo.getMetadata());
       }
-      omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
-          multipartUploadedKeyHash(partKeyInfoMap));
+      builder.addMetadata(OzoneConsts.ETAG, multipartHash);
       if (dbOpenKeyInfo.getTags() != null) {
-        omKeyInfo.setTags(dbOpenKeyInfo.getTags());
+        builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    omKeyInfo.setUpdateID(trxnLogIndex);
-    return omKeyInfo;
+    return builder.setUpdateID(trxnLogIndex).build();
   }
 
   protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
@@ -629,13 +628,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_PART);
       }
 
-      OmKeyInfo currentPartKeyInfo = null;
-      try {
-        currentPartKeyInfo =
-            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-      } catch (IOException ioe) {
-        throw new OMException(ioe, OMException.ResultCodes.INTERNAL_ERROR);
-      }
+      final OmKeyInfo currentPartKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
       // Except for last part all parts should have minimum size.
       if (currentPartCount != partsListSize) {

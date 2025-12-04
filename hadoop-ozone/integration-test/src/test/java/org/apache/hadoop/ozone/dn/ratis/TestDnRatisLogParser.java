@@ -29,17 +29,15 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.debug.segmentparser.DatanodeRatisLogParser;
+import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Datanode Ratis log parser.
  */
-@Timeout(300)
 public class TestDnRatisLogParser {
 
   private MiniOzoneCluster cluster = null;
@@ -80,11 +78,11 @@ public class TestDnRatisLogParser {
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     assertThat(logFile).isFile();
 
-    DatanodeRatisLogParser datanodeRatisLogParser =
-        new DatanodeRatisLogParser();
+    RatisLogParser datanodeRatisLogParser =
+        new RatisLogParser();
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
-        DatanodeRatisLogParser::smToContainerLogString);
+        RatisLogParser::smToContainerLogString);
     assertThat(out.toString(StandardCharsets.UTF_8.name()))
         .contains("Num Total Entries:");
   }

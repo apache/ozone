@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 public abstract class MisReplicationHandler implements
         UnhealthyReplicationHandler {
 
-  public static final Logger LOG =
+  protected static final Logger LOG =
           LoggerFactory.getLogger(MisReplicationHandler.class);
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;

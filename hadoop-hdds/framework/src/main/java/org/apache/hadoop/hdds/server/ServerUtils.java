@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -43,7 +43,6 @@ public final class ServerUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ServerUtils.class);
-
 
   private ServerUtils() {
   }
@@ -84,7 +83,6 @@ public final class ServerUtils {
     return valueTocheck;
   }
 
-
   /**
    * After starting an RPC server, updates configuration with the actual
    * listening address of that server. The listening address may be different
@@ -102,7 +100,6 @@ public final class ServerUtils {
     return updateListenAddress(conf, rpcAddressKey, addr,
         rpcServer.getListenerAddress());
   }
-
 
   /**
    * After starting an server, updates configuration with the actual
@@ -221,7 +218,6 @@ public final class ServerUtils {
     return permissionValue.matches(".*[rwx].*");
   }
 
-
   /**
    * Retrieves the permissions' configuration value for a given config key.
    *
@@ -254,7 +250,6 @@ public final class ServerUtils {
     throw new IllegalArgumentException(
         "Invalid configuration value for key: " + key);
   }
-
 
   /**
    * Checks and creates Ozone Metadir Path if it does not exist.
@@ -312,6 +307,4 @@ public final class ServerUtils {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
     return (new File(metaDirPath, "ratis")).getPath();
   }
-
-
 }

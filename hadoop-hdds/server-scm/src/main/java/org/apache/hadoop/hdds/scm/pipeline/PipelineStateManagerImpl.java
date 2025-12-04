@@ -75,11 +75,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.info("No pipeline exists in current db");
       return;
     }
-    try (TableIterator<PipelineID,
-        ? extends Table.KeyValue<PipelineID, Pipeline>> iterator =
-             pipelineStore.iterator()) {
+    try (TableIterator<PipelineID, Pipeline> iterator = pipelineStore.valueIterator()) {
       while (iterator.hasNext()) {
-        Pipeline pipeline = iterator.next().getValue();
+        final Pipeline pipeline = iterator.next();
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
       }
@@ -147,7 +145,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       lock.readLock().unlock();
     }
   }
-
 
   @Override
   public List<Pipeline> getPipelines(
@@ -305,15 +302,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     lock.writeLock().lock();
     try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } catch (Exception ex) {
-      LOG.error("Pipeline store close failed", ex);
+      pipelineStore = null;
     } finally {
       lock.writeLock().unlock();
     }
@@ -324,7 +316,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();

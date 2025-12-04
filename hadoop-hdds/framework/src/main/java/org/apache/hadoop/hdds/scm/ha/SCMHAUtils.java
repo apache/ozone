@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * Utility class used by SCM HA.
  */
 public final class SCMHAUtils {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMHAUtils.class);
 
   private static final ImmutableList<Class<? extends Exception>>

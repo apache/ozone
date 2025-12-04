@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * 3) Delete unused parts.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE, DIRECTORY_TABLE})
+    MULTIPART_INFO_TABLE, DIRECTORY_TABLE})
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
@@ -70,7 +70,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
       List<OmDirectoryInfo> missingParentInfos,
       OmMultipartKeyInfo multipartKeyInfo) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
-        allKeyInfoToRemove, bucketLayout, omBucketInfo);
+        allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.missingParentInfos = missingParentInfos;

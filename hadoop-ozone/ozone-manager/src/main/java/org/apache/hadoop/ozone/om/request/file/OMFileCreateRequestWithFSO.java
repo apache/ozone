@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -168,7 +168,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-          repConfig, ozoneManager.getConfiguration());
+          repConfig, ozoneManager.getConfig());
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
@@ -198,8 +198,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
-              trxnLogIndex);
+          dbOpenFileName, omFileInfo, keyName, trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.

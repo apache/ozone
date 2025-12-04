@@ -131,8 +131,7 @@ public class TestECUnderReplicationHandler {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
-        return new NodeStatus(
-            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+        return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     };
     replicationManager = mock(ReplicationManager.class);
@@ -142,12 +141,12 @@ public class TestECUnderReplicationHandler {
         .thenReturn(rmConf);
     metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(mock(ContainerReplicaPendingOps.class));
 
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
         });
 
     commandsSent = new HashSet<>();
@@ -392,11 +391,10 @@ public class TestECUnderReplicationHandler {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
         if (dd.equals(deadMaintenance.getDatanodeDetails())) {
-          return new NodeStatus(dd.getPersistedOpState(),
+          return NodeStatus.valueOf(dd.getPersistedOpState(),
               HddsProtos.NodeState.DEAD);
         }
-        return new NodeStatus(
-            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+        return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     };
 
@@ -1075,7 +1073,7 @@ public class TestECUnderReplicationHandler {
     Set<ContainerReplica> availableReplicas = createReplicas(3);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn, 4));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD, dn, 4, null, System.currentTimeMillis(), 0));
 
     /*
     Mock the placement policy. If the list of nodes to be excluded does not

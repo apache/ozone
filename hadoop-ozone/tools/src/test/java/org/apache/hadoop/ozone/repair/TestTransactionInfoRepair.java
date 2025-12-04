@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mockStatic;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -43,6 +44,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
@@ -110,8 +113,10 @@ public class TestTransactionInfoRepair {
   private void testCommand(String component, ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
     final String expectedColumnFamilyName = getColumnFamilyName(component);
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
-         MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
-      mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);
+         MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class);
+         MockedStatic<OptionsUtil> mockOptionsUtil = mockStatic(OptionsUtil.class)) {
+      mocked.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class), any(DBOptions.class),
+          anyString(), anyList(), anyList())).thenReturn(mdb);
       mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(eq(expectedColumnFamilyName), anyList()))
           .thenReturn(columnFamilyHandle);
 
@@ -142,7 +147,7 @@ public class TestTransactionInfoRepair {
 
   private String getColumnFamilyName(String component) {
     switch (component) {
-    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE.getName();
+    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE_DEF.getName();
     case "scm": return SCMDBDefinition.TRANSACTIONINFO.getName();
     default: return "";
     }

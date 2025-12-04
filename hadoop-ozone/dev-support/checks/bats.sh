@@ -21,12 +21,12 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/bats.sh"
-
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/bats"}
 mkdir -p "${REPORT_DIR}"
 REPORT_FILE="${REPORT_DIR}/summary.txt"
+
+source "${DIR}/_lib.sh"
+source "${DIR}/install/bats.sh"
 
 rm -f "${REPORT_DIR}/output.log"
 
@@ -34,6 +34,7 @@ find * \( \
     -path '*/src/test/shell/*' -name '*.bats' \
     -or -path dev-support/ci/selective_ci_checks.bats \
     -or -path dev-support/ci/pr_title_check.bats \
+    -or -path dev-support/ci/find_test_class_project.bats \
     \) -print0 \
   | xargs -0 -n1 bats --formatter tap \
   | tee -a "${REPORT_DIR}/output.log"

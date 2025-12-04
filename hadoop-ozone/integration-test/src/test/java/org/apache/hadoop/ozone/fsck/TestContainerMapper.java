@@ -29,13 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -45,32 +43,24 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test cases for ContainerMapper.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerMapper {
   @TempDir
   private static Path dbPath;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
-  private static OzoneManager ozoneManager;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
-      storageContainerLocationClient;
   private static String volName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
   private static OzoneConfiguration conf;
   private static List<String> keyList = new ArrayList<>();
-
 
   @BeforeAll
   public static void init() throws Exception {
@@ -87,10 +77,7 @@ public class TestContainerMapper {
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
-    store = ozClient.getObjectStore();
-    storageContainerLocationClient =
-        cluster.getStorageContainerLocationClient();
-    ozoneManager = cluster.getOzoneManager();
+    ObjectStore store = ozClient.getObjectStore();
     store.createVolume(volName);
     OzoneVolume volume = store.getVolume(volName);
     // TODO: HDDS-5463

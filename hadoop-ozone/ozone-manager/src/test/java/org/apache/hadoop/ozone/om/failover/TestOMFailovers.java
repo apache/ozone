@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
 
@@ -56,9 +57,8 @@ public class TestOMFailovers {
 
     testException = new AccessControlException();
 
-    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMFailoverProxyProviderBase.LOG);
+    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.class, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMFailoverProxyProviderBase.class);
 
     MockFailoverProxyProvider failoverProxyProvider =
         new MockFailoverProxyProvider(conf);
@@ -74,7 +74,7 @@ public class TestOMFailovers {
     // Request should try all OMs one be one and fail when the last OM also
     // throws AccessControlException.
     assertThat(serviceException).hasCauseInstanceOf(AccessControlException.class)
-        .hasMessage("ServiceException of type class org.apache.hadoop.security.AccessControlException for om3");
+        .hasMessageStartingWith("ServiceException of type class org.apache.hadoop.security.AccessControlException");
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om1"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om2"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om3"));

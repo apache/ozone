@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -114,7 +114,6 @@ public class HeatMapUtil {
                                 long keySize) {
     bucket.setSize(bucket.getSize() + keySize);
   }
-
 
   private void addPrefixPathInfoToBucket(
       EntityReadAccessHeatMapResponse rootEntity, String[] split,

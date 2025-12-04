@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -51,6 +51,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
+    // The parent class handles ACL checks in preExecute, so just call super
     return super.preExecute(ozoneManager);
   }
 
@@ -95,7 +96,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
 
       // update cache.
       if (isDirectory) {

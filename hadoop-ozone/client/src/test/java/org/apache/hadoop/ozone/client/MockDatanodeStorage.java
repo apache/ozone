@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.map.HashedMap;
+import org.apache.commons.collections4.map.HashedMap;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * State represents persisted data of one specific datanode.
  */
 public class MockDatanodeStorage {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MockDatanodeStorage.class);
   public static final String FULL_CHUNK = "full";
   public static final ContainerProtos.KeyValue FULL_CHUNK_KV =
@@ -133,7 +133,7 @@ public class MockDatanodeStorage {
     if (!blocks.containsKey(id)) {
       StringBuilder sb = new StringBuilder();
       for (BlockID bid : blocks.keySet()) {
-        sb.append(bid).append("\n");
+        sb.append(bid).append('\n');
       }
       throw new AssertionError("blockID " + id +
           " not found in blocks. Available block ID: \n" + sb);

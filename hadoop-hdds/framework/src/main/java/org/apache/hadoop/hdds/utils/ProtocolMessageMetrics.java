@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
@@ -68,12 +69,12 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   }
 
   public UncheckedAutoCloseable measure(KEY key) {
-    final long startTime = System.currentTimeMillis();
+    final long startTime = Time.monotonicNow();
     concurrency.incrementAndGet();
     return () -> {
       concurrency.decrementAndGet();
       counters.get(key).incrementAndGet();
-      elapsedTimes.get(key).addAndGet(System.currentTimeMillis() - startTime);
+      elapsedTimes.get(key).addAndGet(Time.monotonicNow() - startTime);
     };
   }
 

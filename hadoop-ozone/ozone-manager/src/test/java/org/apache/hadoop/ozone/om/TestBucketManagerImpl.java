@@ -143,7 +143,6 @@ class TestBucketManagerImpl extends OzoneTestBase {
         bucketInfo.getEncryptionKeyInfo().getKeyName());
   }
 
-
   @Test
   public void testCreateBucket() throws Exception {
     String volume = volumeName();
@@ -442,6 +441,12 @@ class TestBucketManagerImpl extends OzoneTestBase {
     assertEquals(
         bucketInfo.getUsedNamespace(),
         storedLinkBucket.getUsedNamespace());
+    assertEquals(
+        bucketInfo.getSnapshotUsedBytes(),
+        storedLinkBucket.getSnapshotUsedBytes());
+    assertEquals(
+        bucketInfo.getSnapshotUsedNamespace(),
+        storedLinkBucket.getSnapshotUsedNamespace());
     assertEquals(
         bucketInfo.getDefaultReplicationConfig(),
         storedLinkBucket.getDefaultReplicationConfig());

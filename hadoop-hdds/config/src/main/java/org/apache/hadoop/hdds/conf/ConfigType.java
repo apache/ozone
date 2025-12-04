@@ -168,6 +168,18 @@ public enum ConfigType {
         Config config) {
       target.setDouble(key, (double) value);
     }
+  },
+  FLOAT {
+    @Override
+    Float parse(String value, Config config, Class<?> type, String key) {
+      return Float.parseFloat(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setFloat(key, (float) value);
+    }
   };
 
   abstract Object parse(String value, Config config, Class<?> type, String key)

@@ -94,15 +94,14 @@ public class TestRatisOverReplicationHandler {
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
         });
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.class, Level.DEBUG);
   }
 
   /**
@@ -114,8 +113,8 @@ public class TestRatisOverReplicationHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
     // created
@@ -208,8 +207,7 @@ public class TestRatisOverReplicationHandler {
     when(replicationManager.getNodeStatus(eq(staleNode)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.STALE, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.STALE);
         });
 
     testProcessing(replicas, Collections.emptyList(),
@@ -222,8 +220,8 @@ public class TestRatisOverReplicationHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         State.UNHEALTHY, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
     // created
@@ -411,11 +409,12 @@ public class TestRatisOverReplicationHandler {
     replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 0));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }
+
   @Test
   public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
       throws IOException {

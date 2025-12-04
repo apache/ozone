@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -106,7 +106,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
 
       operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex);
 
       if (operationResult) {
         // Update the modification time when updating ACLs of Bucket.
@@ -122,7 +121,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
               .getModificationTime();
         }
         omBucketInfo = omBucketInfo.toBuilder()
-            .setModificationTime(modificationTime).build();
+            .setUpdateID(transactionLogIndex)
+            .setModificationTime(modificationTime)
+            .build();
 
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(
@@ -169,7 +170,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
-
 
   /**
    * Get the Bucket object Info from the request.

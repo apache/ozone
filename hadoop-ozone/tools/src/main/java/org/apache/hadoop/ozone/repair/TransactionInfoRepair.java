@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -42,7 +44,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in transaction info table.",
+    description = "CLI to update the highest index in transaction info table." +
+        " The corresponding OM or SCM role should be stopped for this tool.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -65,12 +68,14 @@ public class TransactionInfoRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    ManagedConfigOptions configOptions = new ManagedConfigOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
-        dbPath);
+    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
     String columnFamilyName = getColumnFamily(serviceToBeOffline()).getName();
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.openWithLatestOptions(
+        configOptions, dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (transactionInfoCfh == null) {
         throw new IllegalArgumentException(columnFamilyName +
@@ -99,6 +104,8 @@ public class TransactionInfoRepair extends RepairTool {
       error("Failed to update the RocksDB for the given path: %s", dbPath);
       throw new IOException("Failed to update RocksDB.", exception);
     } finally {
+      IOUtils.closeQuietly(configOptions);
+      IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
   }
@@ -120,7 +127,7 @@ public class TransactionInfoRepair extends RepairTool {
   public static DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily(Component component) {
     switch (component) {
     case OM:
-      return OMDBDefinition.TRANSACTION_INFO_TABLE;
+      return OMDBDefinition.TRANSACTION_INFO_TABLE_DEF;
     case SCM:
       return SCMDBDefinition.TRANSACTIONINFO;
     default:

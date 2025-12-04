@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,7 +193,7 @@ public class TestBlockInputStream {
 
     // Seek to random positions between 0 and the block size.
     for (int i = 0; i < 10; i++) {
-      pos = RandomUtils.nextInt(0, blockSize);
+      pos = RandomUtils.secure().randomInt(0, blockSize);
       seekAndVerify(pos);
     }
   }
@@ -266,9 +267,8 @@ public class TestBlockInputStream {
 
   @Test
   public void testRefreshPipelineFunction() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(BlockInputStream.LOG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BlockExtendedInputStream.class);
+    GenericTestUtils.setLogLevel(BlockExtendedInputStream.class, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);

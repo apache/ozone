@@ -164,7 +164,7 @@ public class TestDbVolume {
     for (int i = 0; i < volumeNum; i++) {
       hddsVolumeDirs[i] =
           Files.createDirectory(folder.resolve("volumeDir" + i)).toFile();
-      hddsDirs.append(hddsVolumeDirs[i]).append(",");
+      hddsDirs.append(hddsVolumeDirs[i]).append(',');
     }
     CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
     MutableVolumeSet hddsVolumeSet = new MutableVolumeSet(DATANODE_UUID,

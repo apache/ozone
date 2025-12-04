@@ -101,32 +101,32 @@ public class RatisPipelineProvider
     }
   }
 
-  private boolean exceedPipelineNumberLimit(
-      RatisReplicationConfig replicationConfig) {
+  private boolean exceedPipelineNumberLimit(RatisReplicationConfig replicationConfig) {
+    // Apply limits only for replication factor THREE
     if (replicationConfig.getReplicationFactor() != ReplicationFactor.THREE) {
-      // Only put limits for Factor THREE pipelines.
       return false;
     }
-    // Per datanode limit
+
+    PipelineStateManager pipelineStateManager = getPipelineStateManager();
+    int totalActivePipelines = pipelineStateManager.getPipelines(replicationConfig).size();
+    int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
+    int openPipelines = totalActivePipelines - closedPipelines;
+    // Check per-datanode pipeline limit
     if (maxPipelinePerDatanode > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(replicationConfig,
-              PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
-          getNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) /
-          replicationConfig.getRequiredNodes();
+      int healthyNodeCount = getNodeManager()
+          .getNodeCount(NodeStatus.inServiceHealthy());
+      int allowedOpenPipelines = (maxPipelinePerDatanode * healthyNodeCount)
+          / replicationConfig.getRequiredNodes();
+      return openPipelines >= allowedOpenPipelines;
     }
-
-    // Global limit
+    // Check global pipeline limit
     if (pipelineNumberLimit > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(
-              replicationConfig, PipelineState.CLOSED).size()) >
-          (pipelineNumberLimit - getPipelineStateManager()
-              .getPipelines(RatisReplicationConfig
-                  .getInstance(ReplicationFactor.ONE))
-              .size());
+      int factorOnePipelineCount = pipelineStateManager
+          .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE)).size();
+      int allowedOpenPipelines = pipelineNumberLimit - factorOnePipelineCount;
+      return openPipelines >= allowedOpenPipelines;
     }
-
+    // No limits are set
     return false;
   }
 
@@ -147,10 +147,15 @@ public class RatisPipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
-      throw new SCMException("Ratis pipeline number meets the limit: " +
-          pipelineNumberLimit + " replicationConfig : " +
-          replicationConfig,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      String limitInfo = (maxPipelinePerDatanode > 0)
+          ? String.format("per datanode: %d", maxPipelinePerDatanode)
+          : String.format(": %d", pipelineNumberLimit);
+
+      throw new SCMException(
+          String.format("Cannot create pipeline as it would exceed the limit %s replicationConfig: %s",
+              limitInfo, replicationConfig),
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE
+      );
     }
 
     List<DatanodeDetails> dns;
@@ -187,7 +192,7 @@ public class RatisPipelineProvider
         .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getUuid() : null)
+            suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -201,9 +206,9 @@ public class RatisPipelineProvider
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
-          pipeline.getId(), node.getUuidString());
+          pipeline.getId(), node);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(node.getUuid(), createCommand));
+          new CommandForDatanode<>(node, createCommand));
     });
 
     return pipeline;
@@ -264,7 +269,7 @@ public class RatisPipelineProvider
     closeCommand.setTerm(scmContext.getTermOfLeader());
     pipeline.getNodes().forEach(node -> {
       final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(node.getUuid(), closeCommand);
+          new CommandForDatanode<>(node, closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
           pipeline.getId(), datanodeCommand.getDatanodeId());
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);

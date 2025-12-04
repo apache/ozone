@@ -81,6 +81,24 @@ import org.junit.jupiter.api.io.TempDir;
  * Test for PipelinePlacementPolicy.
  */
 public class TestPipelinePlacementPolicy {
+  private static final Node[] NODES = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
+  };
+
+  // 3 racks with single node.
+  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
+  };
+
   private MockNodeManager nodeManager;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
@@ -185,7 +203,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -222,7 +240,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -359,24 +377,6 @@ public class TestPipelinePlacementPolicy {
     assertEquals(results.get(0).getNetworkLocation(), results.get(2).getNetworkLocation());
   }
 
-  private static final Node[] NODES = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h4", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h5", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h6", "/r3", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h7", "/r4", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
-  };
-
-  // 3 racks with single node.
-  private static final Node[] SINGLE_NODE_RACK = new NodeImpl[] {
-      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
-      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
-  };
-
   private NetworkTopology createNetworkTopologyOnDifRacks() {
     NetworkTopology topology =
         new NetworkTopologyImpl(new OzoneConfiguration());
@@ -459,7 +459,6 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicyOK() {
-    cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
@@ -512,8 +511,9 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
-    cluster = initTopology();
-    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
+    NetworkTopologyImpl localCluster = initTopology();
+
+    nodeManager = new MockNodeManager(localCluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
@@ -526,7 +526,7 @@ public class TestPipelinePlacementPolicy {
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host3", "/rack1"));
     for (DatanodeDetails dn : dns) {
-      cluster.add(dn);
+      localCluster.add(dn);
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
@@ -591,8 +591,6 @@ public class TestPipelinePlacementPolicy {
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
-    cluster = initTopology();
-
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host1", "/rack1"));

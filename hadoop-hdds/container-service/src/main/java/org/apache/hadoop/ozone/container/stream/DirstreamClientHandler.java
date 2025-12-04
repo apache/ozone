@@ -44,9 +44,13 @@ import java.nio.file.Path;
  */
 public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
 
+  private static final String INVALID_FORMAT_MESSAGE =
+      "Expected format: <size> <filename> where <size> is a number and <filename> "
+          + "is a string separated by a single space. Example: '1024 myfile.txt'";
+
   private final StreamingDestination destination;
   private boolean headerMode = true;
-  private StringBuilder currentFileName = new StringBuilder();
+  private String currentFileName = "";
   private RandomAccessFile destFile;
 
   private FileChannel destFileChannel;
@@ -76,12 +80,20 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
       if (eolPosition > 0) {
         headerMode = false;
         final ByteBuf name = buffer.readBytes(eolPosition);
-        currentFileName.append(name
-            .toString(StandardCharsets.UTF_8));
+        currentFileName += name.toString(StandardCharsets.UTF_8);
         name.release();
         buffer.skipBytes(1);
-        String[] parts = currentFileName.toString().split(" ", 2);
-        remaining = Long.parseLong(parts[0]);
+        String[] parts = currentFileName.split(" ", 2);
+        if (parts.length < 2 || parts[1].isEmpty()) {
+          throw new IllegalArgumentException("Invalid file name format: " + currentFileName + ". "
+              + INVALID_FORMAT_MESSAGE);
+        }
+        try {
+          remaining = Long.parseLong(parts[0]);
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException("Invalid file name format: " + currentFileName + ". "
+              + INVALID_FORMAT_MESSAGE, e);
+        }
         Path destFilePath = destination.mapToDestination(parts[1]);
         final Path destfileParent = destFilePath.getParent();
         if (destfileParent == null) {
@@ -94,8 +106,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         destFileChannel = this.destFile.getChannel();
 
       } else {
-        currentFileName
-            .append(buffer.toString(StandardCharsets.UTF_8));
+        currentFileName += buffer.toString(StandardCharsets.UTF_8);
       }
     }
     if (!headerMode) {
@@ -105,7 +116,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
             buffer.readBytes(destFileChannel, readableBytes);
       } else {
         remaining -= buffer.readBytes(destFileChannel, (int) remaining);
-        currentFileName = new StringBuilder();
+        currentFileName = "";
         headerMode = true;
         destFile.close();
         if (readableBytes > 0) {
@@ -118,6 +129,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   public boolean isAtTheEnd() {
     return getCurrentFileName().equals(END_MARKER);
   }
+
   @Override
   public void channelUnregistered(ChannelHandlerContext ctx) {
     try {
@@ -142,6 +154,6 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   }
 
   public String getCurrentFileName() {
-    return currentFileName.toString();
+    return currentFileName;
   }
 }

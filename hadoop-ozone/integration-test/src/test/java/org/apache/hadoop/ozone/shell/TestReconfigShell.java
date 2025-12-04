@@ -17,166 +17,166 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.conf.ReconfigurableBase;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.hdds.conf.ReconfigurableBase;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.HddsDatanodeClientProtocolServer;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInstance;
 
 /**
- * * Integration test for {@code ozone admin reconfig} command. HA enabled.
+ * Integration test for {@code ozone admin reconfig} command.
  */
-@Timeout(300)
-public class TestReconfigShell {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestReconfigShell implements NonHATests.TestCase {
 
-  private static final int DATANODE_COUNT = 3;
-  private static MiniOzoneCluster cluster;
-  private static List<HddsDatanodeService> datanodeServices;
-  private static OzoneAdmin ozoneAdmin;
-  private static OzoneManager ozoneManager;
-  private static StorageContainerManager storageContainerManager;
-  private static NodeManager nm;
+  private OzoneAdmin ozoneAdmin;
+  private ReconfigurationHandler reconfigurationHandler;
+  private GenericTestUtils.PrintStreamCapturer out;
+  private GenericTestUtils.PrintStreamCapturer err;
 
-
-  /**
-   * Create a Mini Cluster for testing.
-   */
-  @BeforeAll
-  public static void setup() throws Exception {
+  @BeforeEach
+  void capture() {
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
     ozoneAdmin = new OzoneAdmin();
-    OzoneConfiguration conf = ozoneAdmin.getOzoneConf();
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    String omServiceId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(1)
-        .setNumOfStorageContainerManagers(1)
-        .setNumDatanodes(DATANODE_COUNT)
-        .build();
-    cluster.waitForClusterToBeReady();
-    ozoneManager = cluster.getOzoneManager();
-    storageContainerManager = cluster.getStorageContainerManager();
-    datanodeServices = cluster.getHddsDatanodes();
-    nm = storageContainerManager.getScmNodeManager();
+    reconfigurationHandler = cluster().getOzoneManager().getReconfigurationHandler();
   }
 
-  @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
+  @AfterEach
+  void stopCapture() {
+    IOUtils.closeQuietly(out);
+  }
+
+  @Test
+  void testDataNodeGetReconfigurableProperties() {
+    for (HddsDatanodeService dn : cluster().getHddsDatanodes()) {
+      InetSocketAddress socket = dn.getClientProtocolServer().getClientRpcAddress();
+      executeAndAssertProperties(dn.getReconfigurationHandler(), "DATANODE", socket);
     }
   }
 
   @Test
-  public void testDataNodeGetReconfigurableProperties() throws Exception {
-    try (SystemOutCapturer capture = new SystemOutCapturer()) {
-      for (HddsDatanodeService datanodeService : datanodeServices) {
-        HddsDatanodeClientProtocolServer server =
-            datanodeService.getClientProtocolServer();
-        InetSocketAddress socket = server.getClientRpcAddress();
-        executeAndAssertProperties(datanodeService.getReconfigurationHandler(), "--service=DATANODE",
-            socket, capture);
-      }
-    }
+  void testOzoneManagerGetReconfigurationProperties() {
+    OzoneManager om = cluster().getOzoneManager();
+    InetSocketAddress socket = om.getOmRpcServerAddr();
+    executeAndAssertProperties(om.getReconfigurationHandler(), "OM", socket);
   }
 
   @Test
-  public void testOzoneManagerGetReconfigurationProperties() throws Exception {
-    try (SystemOutCapturer capture = new SystemOutCapturer()) {
-      InetSocketAddress socket = ozoneManager.getOmRpcServerAddr();
-      executeAndAssertProperties(ozoneManager.getReconfigurationHandler(), "--service=OM",
-          socket, capture);
-    }
+  void testDirectoryDeletingServiceIntervalReconfiguration() throws ReconfigurationException,
+      InterruptedException, TimeoutException {
+    OzoneManager om = cluster().getOzoneManager();
+    InetSocketAddress socket = om.getOmRpcServerAddr();
+    LogCapturer dirDeletingServiceLog = LogCapturer.captureLogs(DirectoryDeletingService.class);
+    LogCapturer reconfigHandlerLog = LogCapturer.captureLogs(ReconfigurationHandler.class);
+
+    String initialInterval = "1m";
+    String intervalFromXML = "2m"; //config value set in ozone-site.xml
+    long intervalFromXMLInSeconds = TimeUnit.MINUTES.toSeconds(2); //120 seconds
+
+    reconfigurationHandler.reconfigureProperty(OZONE_DIR_DELETING_SERVICE_INTERVAL, initialInterval);
+    assertThat(reconfigurationHandler.getConf().get(OZONE_DIR_DELETING_SERVICE_INTERVAL)).isEqualTo(initialInterval);
+
+    //Start the reconfiguration task
+    executeAndAssertStart("OM", socket);
+    GenericTestUtils.waitFor(() -> reconfigHandlerLog.getOutput().contains("Reconfiguration completed"),
+        1000, 20000);
+    assertThat(dirDeletingServiceLog.getOutput()).contains(
+        String.format("Updating and restarting DirectoryDeletingService with interval %d %s",
+            intervalFromXMLInSeconds, TimeUnit.SECONDS.name().toLowerCase()));
+    assertThat(reconfigurationHandler.getConf().get(OZONE_DIR_DELETING_SERVICE_INTERVAL)).isEqualTo(intervalFromXML);
+
+    String address = socket.getHostString() + ":" + socket.getPort();
+    GenericTestUtils.waitFor(() -> {
+      ozoneAdmin.getCmd().execute("reconfig", "--service", "OM", "--address", address, "status");
+      String output = out.get();
+      return output.contains("finished") &&
+          output.contains(String.format("SUCCESS: Changed property %s", OZONE_DIR_DELETING_SERVICE_INTERVAL));
+    }, 1000, 20000);
   }
 
   @Test
-  public void testStorageContainerManagerGetReconfigurationProperties()
-      throws Exception {
-    try (SystemOutCapturer capture = new SystemOutCapturer()) {
-      InetSocketAddress socket = storageContainerManager.getClientRpcAddress();
-      executeAndAssertProperties(
-          storageContainerManager.getReconfigurationHandler(), "--service=SCM", socket, capture);
+  void testStorageContainerManagerGetReconfigurationProperties() {
+    StorageContainerManager scm = cluster().getStorageContainerManager();
+    executeAndAssertProperties(scm.getReconfigurationHandler(), "SCM", scm.getClientRpcAddress());
+  }
+
+  @Test
+  void testDatanodeBulkCommand() {
+    executeForInServiceDatanodes(cluster().getHddsDatanodes().size());
+  }
+
+  @Test
+  void testDatanodeBulkCommandWithOutOfServiceNode() throws Exception {
+    DatanodeDetails dn = cluster().getHddsDatanodes().get(0).getDatanodeDetails();
+    NodeManager nodeManager = cluster().getStorageContainerManager().getScmNodeManager();
+    nodeManager.setNodeOperationalState(dn, HddsProtos.NodeOperationalState.DECOMMISSIONING);
+
+    try {
+      executeForInServiceDatanodes(cluster().getHddsDatanodes().size() - 1);
+    } finally {
+      nodeManager.setNodeOperationalState(dn, HddsProtos.NodeOperationalState.IN_SERVICE);
     }
   }
 
   private void executeAndAssertProperties(
       ReconfigurableBase reconfigurableBase, String service,
-      InetSocketAddress socket, SystemOutCapturer capture)
-      throws UnsupportedEncodingException {
+      InetSocketAddress socket) {
     String address = socket.getHostString() + ":" + socket.getPort();
-    ozoneAdmin.execute(
-        new String[] {"reconfig", service, "--address", address, "properties"});
-    assertReconfigurablePropertiesOutput(
-        reconfigurableBase.getReconfigurableProperties(), capture.getOutput());
+    ozoneAdmin.getCmd().execute("reconfig", "--service", service, "--address", address, "properties");
+    assertReconfigurablePropertiesOutput(reconfigurableBase.getReconfigurableProperties());
   }
 
-  private void assertReconfigurablePropertiesOutput(
-      Collection<String> except, String output) {
-    List<String> outs =
-        Arrays.asList(output.split(System.getProperty("line.separator")));
-    for (String property : except) {
-      assertThat(outs).contains(property);
-    }
+  private void assertReconfigurablePropertiesOutput(Collection<String> expectedProperties) {
+    assertThat(err.get()).isEmpty();
+
+    List<String> outs = Arrays.asList(out.get().split(System.lineSeparator()));
+    assertThat(outs).containsAll(expectedProperties);
   }
 
-  @Test
-  public void testDatanodeBulkReconfig() throws Exception {
-    // All Dn are normal, So All the Dn will be reconfig
-    List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-    assertEquals(DATANODE_COUNT, dns.size());
-    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
+  private void executeForInServiceDatanodes(int expectedCount) {
+    StorageContainerManager scm = cluster().getStorageContainerManager();
+    ozoneAdmin.getCmd().execute(
+        "-D", OZONE_SCM_CLIENT_ADDRESS_KEY + "=" + getAddress(scm.getClientRpcAddress()),
+        "reconfig", "--service", "DATANODE", "--in-service-datanodes", "properties");
 
-    // Shutdown a Dn, it will not be reconfig,
-    // so only (datanodeCount - 1) Dn will be configured successfully
-    cluster.shutdownHddsDatanode(0);
-    executeAndAssertBulkReconfigCount(DATANODE_COUNT - 1);
-    cluster.restartHddsDatanode(0, true);
-    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
-
-    // DECOMMISSIONED a Dn, it will not be reconfig,
-    // so only (datanodeCount - 1) Dn will be configured successfully
-    DatanodeDetails details = dns.get(1).getDatanodeDetails();
-    storageContainerManager.getScmDecommissionManager()
-        .startDecommission(details);
-    nm.setNodeOperationalState(details, DECOMMISSIONED);
-    executeAndAssertBulkReconfigCount(DATANODE_COUNT - 1);
-    storageContainerManager.getScmDecommissionManager()
-        .recommission(details);
-    nm.setNodeOperationalState(details, IN_SERVICE);
-    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
+    assertThat(err.get()).isEmpty();
+    assertThat(out.get())
+        .contains(String.format("successfully %d ", expectedCount));
   }
 
-  private void executeAndAssertBulkReconfigCount(int except)
-      throws Exception {
-    try (SystemOutCapturer capture = new SystemOutCapturer()) {
-      ozoneAdmin.execute(new String[] {
-          "reconfig", "--service=DATANODE", "--in-service-datanodes", "properties"});
-      String output = capture.getOutput();
-
-      assertThat(capture.getOutput()).contains(String.format("successfully %d", except));
-    }
+  private String getAddress(InetSocketAddress socket) {
+    return socket.getHostString() + ":" + socket.getPort();
   }
+
+  private void executeAndAssertStart(String service, InetSocketAddress socket) {
+    String address = socket.getHostString() + ":" + socket.getPort();
+    ozoneAdmin.getCmd().execute("reconfig", "--service", service, "--address", address, "start");
+    assertThat(out.get()).contains(service + ": Started reconfiguration task on node [" + address + "]");
+  }
+
 }

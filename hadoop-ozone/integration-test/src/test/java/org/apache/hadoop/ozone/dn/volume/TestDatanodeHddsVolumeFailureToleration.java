@@ -52,22 +52,18 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
  */
-@Timeout(300)
 public class TestDatanodeHddsVolumeFailureToleration {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration ozoneConfig;
   private List<HddsDatanodeService> datanodes;
 
   @BeforeEach
   public void init() throws Exception {
-    ozoneConfig = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     ozoneConfig.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
@@ -132,10 +128,8 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // datanode will not actually exit. Use log messages to determine that
     // the ExitUtil was invoked which would terminate the process in a normal
     // deployment.
-    LogCapturer dsmCapturer = LogCapturer.captureLogs(
-        LoggerFactory.getLogger(DatanodeStateMachine.class));
-    LogCapturer exitCapturer = LogCapturer.captureLogs(
-            LoggerFactory.getLogger(ExitUtil.class.getName()));
+    LogCapturer dsmCapturer = LogCapturer.captureLogs(DatanodeStateMachine.class);
+    LogCapturer exitCapturer = LogCapturer.captureLogs(ExitUtil.class);
     cluster.restartHddsDatanode(0, false);
     // Give the datanode time to restart. This may be slow in a mini ozone
     // cluster.

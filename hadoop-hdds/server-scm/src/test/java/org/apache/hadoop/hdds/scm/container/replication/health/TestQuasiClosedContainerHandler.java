@@ -55,6 +55,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestQuasiClosedContainerHandler {
   private ReplicationManager replicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private QuasiClosedContainerHandler quasiClosedContainerHandler;
   private RatisReplicationConfig ratisReplicationConfig;
 
@@ -63,6 +64,7 @@ public class TestQuasiClosedContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = mock(ReplicationManager.class);
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
     quasiClosedContainerHandler =
         new QuasiClosedContainerHandler(replicationManager);
   }
@@ -76,7 +78,7 @@ public class TestQuasiClosedContainerHandler {
             State.QUASI_CLOSED, 1, 2, 3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -95,7 +97,7 @@ public class TestQuasiClosedContainerHandler {
             State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -123,13 +125,13 @@ public class TestQuasiClosedContainerHandler {
     containerReplicas.add(openReplica);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -157,13 +159,13 @@ public class TestQuasiClosedContainerHandler {
             State.QUASI_CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -192,13 +194,13 @@ public class TestQuasiClosedContainerHandler {
             State.UNHEALTHY, 0));
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -228,11 +230,11 @@ public class TestQuasiClosedContainerHandler {
 
     // 1001 is the highest sequence id
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+        id, State.QUASI_CLOSED, 1000L, dnOne.getID(), dnOne);
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnTwo.getUuid(), dnTwo);
+        id, State.QUASI_CLOSED, 1000L, dnTwo.getID(), dnTwo);
     final ContainerReplica replicaThree = getReplicas(
-        id, State.UNHEALTHY, 1001L, dnThree.getUuid(), dnThree);
+        id, State.UNHEALTHY, 1001L, dnThree.getID(), dnThree);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     containerReplicas.add(replicaOne);
     containerReplicas.add(replicaTwo);
@@ -240,13 +242,13 @@ public class TestQuasiClosedContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
@@ -273,7 +275,7 @@ public class TestQuasiClosedContainerHandler {
             State.QUASI_CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -302,7 +304,7 @@ public class TestQuasiClosedContainerHandler {
     containerReplicas.add(quasiClosed);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -332,11 +334,11 @@ public class TestQuasiClosedContainerHandler {
 
     // 1001 is the highest sequence id
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+        id, State.QUASI_CLOSED, 1000L, dnOne.getID(), dnOne);
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1001L, dnTwo.getUuid(), dnTwo);
+        id, State.QUASI_CLOSED, 1001L, dnTwo.getID(), dnTwo);
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1001L, dnThree.getUuid(), dnThree);
+        id, State.QUASI_CLOSED, 1001L, dnThree.getID(), dnThree);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     containerReplicas.add(replicaOne);
     containerReplicas.add(replicaTwo);
@@ -344,13 +346,13 @@ public class TestQuasiClosedContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
     ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)

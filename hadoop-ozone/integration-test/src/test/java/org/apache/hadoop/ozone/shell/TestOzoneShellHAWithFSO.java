@@ -28,10 +28,6 @@ import org.junit.jupiter.api.BeforeAll;
  */
 public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   */
   @BeforeAll
   @Override
   public void init() throws Exception {
@@ -41,7 +37,7 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    // startKMS();
+    startKMS();
     startCluster(conf);
   }
 }

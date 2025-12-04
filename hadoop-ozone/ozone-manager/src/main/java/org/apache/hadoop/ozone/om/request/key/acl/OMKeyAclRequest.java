@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -107,7 +107,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
 
       operationResult = apply(omKeyInfo, trxnLogIndex);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Update the modification time when updating ACLs of Key.
       long modificationTime = omKeyInfo.getModificationTime();

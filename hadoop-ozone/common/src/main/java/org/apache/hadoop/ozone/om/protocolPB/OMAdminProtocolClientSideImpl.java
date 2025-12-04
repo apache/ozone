@@ -28,9 +28,9 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -40,11 +40,15 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,9 +216,53 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
     }
   }
 
+  @Override
+  public void compactOMDB(String columnFamily) throws IOException {
+    CompactRequest compactRequest = CompactRequest.newBuilder()
+        .setColumnFamily(columnFamily)
+        .build();
+    CompactResponse response;
+    try {
+      response = rpcProxy.compactDB(NULL_RPC_CONTROLLER, compactRequest);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    if (!response.getSuccess()) {
+      throwException("Request to compact \'" + columnFamily +
+          "\', sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
+    }
+  }
+
+  @Override
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+    TriggerSnapshotDefragRequest request = TriggerSnapshotDefragRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+    TriggerSnapshotDefragResponse response;
+    try {
+      response = rpcProxy.triggerSnapshotDefrag(NULL_RPC_CONTROLLER, request);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    if (!response.getSuccess()) {
+      throwException("Request to trigger snapshot defragmentation" +
+          ", sent to " + omPrintInfo + " failed with error: " +
+          response.getErrorMsg());
+    }
+    if (response.hasResult()) {
+      return response.getResult();
+    } else {
+      throwException("Missing result in TriggerSnapshotDefragResponse from " + omPrintInfo +
+          ". This likely indicates a server error.");
+      // Unreachable, required for compilation
+      return false;
+    }
+  }
+
   private void throwException(String errorMsg)
       throws IOException {
-    throw new IOException("Failed to Decommission OM. Error: " + errorMsg);
+    throw new IOException("Request Failed. Error: " + errorMsg);
   }
 
   @Override

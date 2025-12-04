@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.ozone.test.ConfigAssumptions.assumeConfig;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +50,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -60,7 +57,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneManager list volume operation under combinations of configs.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(120)
 public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
@@ -93,7 +89,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   @AfterEach
   void logout() {
     UserGroupInformation.setLoginUser(null);
-    setListAllVolumesAllowed(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
+    setListAllVolumesAllowed(OmConfig.Defaults.LIST_ALL_VOLUMES_ALLOWED);
   }
 
   @BeforeAll
@@ -127,9 +123,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   }
 
   private void setListAllVolumesAllowed(boolean newValue) {
-    OzoneManager om = cluster().getOzoneManager();
-    om.getConfiguration().setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
-    om.setAllowListAllVolumesFromConfig();
+    cluster().getOzoneManager().getConfig().setListAllVolumesAllowed(newValue);
   }
 
   private static void createVolumeWithOwnerAndAcl(ObjectStore objectStore,

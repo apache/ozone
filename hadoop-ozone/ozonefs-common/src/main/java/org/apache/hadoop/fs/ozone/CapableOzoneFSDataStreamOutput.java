@@ -35,6 +35,7 @@ import org.apache.hadoop.util.StringUtils;
 public class CapableOzoneFSDataStreamOutput extends OzoneFSDataStreamOutput
     implements StreamCapabilities {
   private final boolean isHsyncEnabled;
+
   public CapableOzoneFSDataStreamOutput(OzoneFSDataStreamOutput outputStream,
                                           boolean enabled) {
     super(outputStream.getByteBufferStreamOutput());

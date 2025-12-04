@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -37,6 +38,8 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
  * A Client for the storageContainer protocol.
  */
 public abstract class XceiverClientSpi implements Closeable {
+  private final AtomicInteger referenceCount;
+  private boolean isEvicted;
 
   /**
    * Validator for container command request/response.
@@ -46,9 +49,6 @@ public abstract class XceiverClientSpi implements Closeable {
           ContainerCommandResponseProto, IOException> {
     // just a shortcut to avoid having to repeat long list of generic parameters
   }
-
-  private final AtomicInteger referenceCount;
-  private boolean isEvicted;
 
   public XceiverClientSpi() {
     this.referenceCount = new AtomicInteger(0);
@@ -145,11 +145,24 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
+  public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
+    throw new UnsupportedOperationException("Stream read is not supported");
+  }
+
+  public void streamRead(ContainerCommandRequestProto request, StreamingReadResponse streamObserver) {
+    throw new UnsupportedOperationException("Stream read is not supported");
+  }
+
+  public void completeStreamRead() {
+    throw new UnsupportedOperationException("Stream read is not supported");
+  }
+
   public static IOException getIOExceptionForSendCommand(
       ContainerCommandRequestProto request, Exception e) {
     return new IOException("Failed to execute command "
         + HddsUtils.processForDebug(request), e);
   }
+
   /**
    * Sends a given command to server gets a waitable future back.
    *

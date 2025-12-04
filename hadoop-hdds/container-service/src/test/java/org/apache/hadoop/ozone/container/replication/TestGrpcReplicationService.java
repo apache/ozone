@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,7 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContai
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -57,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.junit.jupiter.api.AfterEach;
@@ -93,7 +93,7 @@ class TestGrpcReplicationService {
 
     SecurityConfig secConf = new SecurityConfig(conf);
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
 
     DatanodeDetails.Builder dn =
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
@@ -124,11 +124,8 @@ class TestGrpcReplicationService {
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(
         new HddsVolume.Builder(testDir).conf(conf).build()));
 
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
     Handler containerHandler =
-        new KeyValueHandler(conf, datanode.getUuidString(), containerSet,
-            volumeSet, metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanode.getUuidString(), containerSet, volumeSet);
 
     containerController = new ContainerController(containerSet,
         Collections.singletonMap(
@@ -153,7 +150,7 @@ class TestGrpcReplicationService {
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
-    when(importer.chooseNextVolume()).thenReturn(new HddsVolume.Builder(
+    when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
 
@@ -196,7 +193,7 @@ class TestGrpcReplicationService {
     ContainerReplicationSource source =
         new OnDemandContainerReplicationSource(containerController);
 
-    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null);
+    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null, containerController);
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
