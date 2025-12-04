@@ -532,11 +532,18 @@ public final class IamSessionPolicyResolver {
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
 
-      // If condition prefixes are present, these would constrain the object permissions if the action is s3:ListBucket
-      if (prefixes != null && !prefixes.isEmpty() && action == S3Action.LIST_BUCKET) {
-        for (String prefix : prefixes) {
+      if (action == S3Action.LIST_BUCKET) {
+        // If condition prefixes are present, these would constrain the object permissions if the action
+        // is s3:ListBucket
+        if (prefixes != null && !prefixes.isEmpty()) {
+          for (String prefix : prefixes) {
+            createObjectResourcesFromConditionPrefix(
+                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, action.objectPerms);
+          }
+        } else {
+          // No condition prefixes, but we need READ access to all objects, so use "*" as the prefix
           createObjectResourcesFromConditionPrefix(
-              volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, singleton(READ));
+              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, action.objectPerms);
         }
       }
     }
@@ -606,8 +613,9 @@ public final class IamSessionPolicyResolver {
     if (authorizerType == AuthorizerType.NATIVE) {
       // For native authorizer, use PREFIX resource type with normalized prefix.
       // Map "x" in condition list prefix to "x". Map "x/*" in condition list prefix to "x/".
+      // Map "*" in condition list prefix to "".
       final String normalizedPrefix;
-      if (conditionPrefix != null && conditionPrefix.endsWith("/*")) {
+      if (conditionPrefix != null && conditionPrefix.endsWith("*")) {
         normalizedPrefix = conditionPrefix.substring(0, conditionPrefix.length() - 1);
       } else {
         normalizedPrefix = conditionPrefix;
@@ -617,6 +625,7 @@ public final class IamSessionPolicyResolver {
     } else {
       // For Ranger authorizer, use KEY resource type with original prefix
       // Map "x" in condition list prefix to "x".  Map "x/*" in condition list prefix to "x/*".
+      // Map "* in condition list prefix to "*".
       final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, conditionPrefix);
       addAclsForObj(objToAclsMap, keyObj, acls);
     }
@@ -770,8 +779,7 @@ public final class IamSessionPolicyResolver {
     GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
         EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
-    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST),
-        EnumSet.noneOf(ACLType.class)),
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(READ)),
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),

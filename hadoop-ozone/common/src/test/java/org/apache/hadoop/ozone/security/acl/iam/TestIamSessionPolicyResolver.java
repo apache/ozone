@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.security.acl.iam;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
@@ -709,24 +710,46 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
-  public void testCreatePathsAndPermissionsWithBucketResource() {
+  public void testCreatePathsAndPermissionsWithBucketResourceThatIsListBucket() {
     final Set<S3Action> actions = Collections.singleton(IamSessionPolicyResolver.S3Action.LIST_BUCKET);
     final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
         new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
     final Set<IOzoneObj> readAndListObject = objSet(bucket("bucket1"));
-    final Set<IOzoneObj> readVolume = objSet(volume());
 
+    final Set<IOzoneObj> nativeReadObjects = objSet(volume(), prefix("bucket1", ""));
     final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
         VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
     assertThat(resultNative).containsExactlyInAnyOrder(
         new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)),
-        new AssumeRoleRequest.OzoneGrant(readVolume, acls(READ)));
+        new AssumeRoleRequest.OzoneGrant(nativeReadObjects, acls(READ)));
 
+    final Set<IOzoneObj> rangerReadObjects = objSet(volume(), key("bucket1", "*"));
     final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
     assertThat(resultRanger).containsExactlyInAnyOrder(
         new AssumeRoleRequest.OzoneGrant(readAndListObject, acls(READ, LIST)),
-        new AssumeRoleRequest.OzoneGrant(readVolume, acls(READ)));
+        new AssumeRoleRequest.OzoneGrant(rangerReadObjects, acls(READ)));
+  }
+
+  @Test
+  public void testCreatePathsAndPermissionsWithBucketResourceThatIsNotListBucket() {
+    final Set<S3Action> actions = Collections.singleton(S3Action.CREATE_BUCKET);
+    final Set<IamSessionPolicyResolver.ResourceSpec> resourceSpecs = Collections.singleton(
+        new IamSessionPolicyResolver.ResourceSpec(S3ResourceType.BUCKET, "bucket1", null, null));
+    final Set<IOzoneObj> createObject = objSet(bucket("bucket1"));
+    final Set<IOzoneObj> readObject = objSet(volume());
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultNative = createPathsAndPermissions(
+        VOLUME, NATIVE, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultNative).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(createObject, acls(CREATE)),
+        new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
+
+    final Set<AssumeRoleRequest.OzoneGrant> resultRanger = createPathsAndPermissions(
+        VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
+    assertThat(resultRanger).containsExactlyInAnyOrder(
+        new AssumeRoleRequest.OzoneGrant(createObject, acls(CREATE)),
+        new AssumeRoleRequest.OzoneGrant(readObject, acls(READ)));
   }
 
   @Test
@@ -767,9 +790,12 @@ public class TestIamSessionPolicyResolver {
         VOLUME, RANGER, actions, resourceSpecs, Collections.emptySet());
 
     // Both the volume and the wildcard bucket should end up with READ + LIST permissions.
+    // We also need READ access on the keys
     final Set<IOzoneObj> readAndListObjects = objSet(volume(), bucket("*"));
+    final Set<IOzoneObj> readObjects = objSet(key("*", "*"));
     assertThat(resultRanger).containsExactlyInAnyOrder(
-        new AssumeRoleRequest.OzoneGrant(readAndListObjects, acls(READ, LIST)));
+        new AssumeRoleRequest.OzoneGrant(readAndListObjects, acls(READ, LIST)),
+        new AssumeRoleRequest.OzoneGrant(readObjects, acls(READ)));
   }
 
   @Test
