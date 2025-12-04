@@ -135,8 +135,10 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
    * @param allocate function to allocate ByteBuffer for each range
    * @throws IOException if there is an error performing the reads
    */
-  public void readVectored(List<? extends FileRange> ranges,
-                           IntFunction<ByteBuffer> allocate) throws IOException {
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate
+  ) throws IOException {
     if (inputStream instanceof MultipartInputStream) {
       ((MultipartInputStream) inputStream).readVectored(ranges, allocate);
     } else {

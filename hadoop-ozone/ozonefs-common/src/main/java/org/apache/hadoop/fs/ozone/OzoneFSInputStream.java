@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
 import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -35,6 +34,7 @@ import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.VectoredReadUtils;
 
 /**
  * The input stream for Ozone file system.
@@ -215,42 +215,29 @@ public class OzoneFSInputStream extends FSInputStream
    * @throws IOException if there is an error performing the reads
    */
   @Override
-  public void readVectored(List<? extends FileRange> ranges,
-                           IntFunction<ByteBuffer> allocate) throws IOException {
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate
+  ) throws IOException {
     TracingUtil.executeInNewSpan("OzoneFSInputStream.readVectored", () -> {
-      // Perform vectored read using positioned read operations
-      for (FileRange range : ranges) {
-        CompletableFuture<ByteBuffer> result = range.getData();
-        if (result == null) {
-          result = new CompletableFuture<>();
-          range.setData(result);
-        }
+      // Save the initial position
+      final long initialPosition = getPos();
 
-        final CompletableFuture<ByteBuffer> finalResult = result;
-        final long offset = range.getOffset();
-        final int length = range.getLength();
+      try {
+        VectoredReadUtils.performVectoredRead(ranges, allocate, (offset, buffer) -> {
+          int length = buffer.remaining();
+          readFully(offset, buffer);
 
-        // Submit async read task for this range
-        CompletableFuture.runAsync(() -> {
-          try {
-            ByteBuffer buffer = allocate.apply(length);
-            int bytesRead = read(offset, buffer);
-
-            if (bytesRead < length) {
-              finalResult.completeExceptionally(
-                  new EOFException("Requested " + length +
-                      " bytes but only read " + bytesRead));
-            } else {
-              buffer.flip();
-              if (statistics != null) {
-                statistics.incrementBytesRead(bytesRead);
-              }
-              finalResult.complete(buffer);
-            }
-          } catch (Exception e) {
-            finalResult.completeExceptionally(e);
+          // Update statistics
+          if (statistics != null) {
+            statistics.incrementBytesRead(length);
           }
         });
+      } finally {
+        // Restore position
+        synchronized (this) {
+          seek(initialPosition);
+        }
       }
       return null;
     });

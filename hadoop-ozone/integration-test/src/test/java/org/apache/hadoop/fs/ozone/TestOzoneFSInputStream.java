@@ -375,14 +375,10 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
       ranges.add(FileRange.createFileRange(300L, 400));  // Overlaps with first range
       ranges.add(FileRange.createFileRange(600L, 200));
 
-      inputStream.readVectored(ranges, ByteBuffer::allocate);
-
-      // Validate all reads complete successfully
-      for (FileRange range : ranges) {
-        CompletableFuture<ByteBuffer> result = range.getData();
-        ByteBuffer buffer = result.get(30, TimeUnit.SECONDS);
-        assertEquals(range.getLength(), buffer.remaining());
-      }
+      // Overlapping ranges should throw IllegalArgumentException
+      assertThrows(IllegalArgumentException.class, () -> {
+        inputStream.readVectored(ranges, ByteBuffer::allocate);
+      });
     }
   }
 
