@@ -80,7 +80,7 @@ public class TestSTSTokenSecretManager {
 
   @Test
   public void testCreateSTSTokenStringContainsCorrectFields() throws IOException {
-       final String tokenString = secretManager.createSTSTokenString(
+    final String tokenString = secretManager.createSTSTokenString(
         TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Decode the token
