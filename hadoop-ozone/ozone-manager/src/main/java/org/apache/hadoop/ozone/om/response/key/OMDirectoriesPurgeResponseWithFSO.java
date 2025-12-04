@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
@@ -157,8 +157,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       }
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
-        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-        keyInfo.setCommittedKeyDeletedFlag(true);
+        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key)
+            .withCommittedKeyDeletedFlag(true);
         String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())

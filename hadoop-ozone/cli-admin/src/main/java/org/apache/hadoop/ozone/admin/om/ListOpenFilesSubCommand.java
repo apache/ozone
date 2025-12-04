@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,20 +48,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(
-      names = {"--service-id", "--om-service-id"},
-      description = "Ozone Manager Service ID",
-      required = false
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use --service-id instead. "
-          + "If you must use --service-host with OM HA, this must point directly to the leader OM. "
-          + "This option is required when --service-id is not provided or when HA is not enabled."
-  )
-  private String omHost;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -106,20 +93,20 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-
-    if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify --service-id or --service-host");
-      return null;
+    try (OzoneManagerProtocol omClient = omAddressOptions.newClient()) {
+      execute(omClient);
     }
 
-    OzoneManagerProtocol ozoneManagerClient =
-        parent.createOmClient(omServiceId, omHost, false);
+    return null;
+  }
+
+  private void execute(OzoneManagerProtocol ozoneManagerClient) throws IOException {
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     final OzoneManagerVersion omVersion = RpcClient.getOmVersion(serviceInfoEx);
     if (omVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
       System.err.println("Error: This command requires OzoneManager version "
           + OzoneManagerVersion.HBASE_SUPPORT.name() + " or later.");
-      return null;
+      return;
     }
 
     ListOpenFilesResult res =
@@ -138,8 +125,6 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       // Human friendly output
       printOpenKeysList(res);
     }
-
-    return null;
   }
 
   private void printOpenKeysListAsJson(ListOpenFilesResult res)
@@ -237,13 +222,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
    * @return the command to get the next batch of open keys
    */
   private String getCmdForNextBatch(String lastElementFullPath) {
-    String nextBatchCmd = "ozone admin om lof";
-    if (omServiceId != null && !omServiceId.isEmpty()) {
-      nextBatchCmd += " -id=" + omServiceId;
-    }
-    if (omHost != null && !omHost.isEmpty()) {
-      nextBatchCmd += " -host=" + omHost;
-    }
+    String nextBatchCmd = "ozone admin om lof " + omAddressOptions;
     if (json) {
       nextBatchCmd += " --json";
     }

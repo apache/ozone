@@ -174,7 +174,7 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
@@ -184,6 +184,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
@@ -679,6 +680,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getLayoutVersion());
+    VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         finalizationExecutor;
@@ -1530,10 +1532,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // If HA is enabled, start datanode protocol server once leader is ready.
-    if (!scmStorageConfig.isSCMHAEnabled()) {
-      getDatanodeProtocolServer().start();
-    }
+    // start datanode protocol server
+    getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -1805,6 +1805,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SCMHAManager.
    */
+  @Override
   public SCMHAManager getScmHAManager() {
     return scmHAManager;
   }
@@ -1957,6 +1958,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Returns SequenceIdGen.
    */
+  @Override
   public SequenceIdGenerator getSequenceIdGen() {
     return sequenceIdGen;
   }
@@ -1995,6 +1997,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Returns the SCM metadata Store.
    * @return SCMMetadataStore
    */
+  @Override
   public SCMMetadataStore getScmMetadataStore() {
     return scmMetadataStore;
   }
@@ -2181,9 +2184,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
-        getConfiguration(), scmStarterUser);
+    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfigValue(
+        newVal, scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
@@ -2191,9 +2193,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneReadOnlyAdmins(String newVal) {
-    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
-        getConfiguration());
+    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfigValue(
+        newVal);
     scmReadOnlyAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now read only admins are: {}",
         OZONE_READONLY_ADMINISTRATORS,

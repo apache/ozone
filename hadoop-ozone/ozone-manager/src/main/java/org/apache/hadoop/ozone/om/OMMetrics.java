@@ -107,6 +107,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numPutObjectTagging;
   private @Metric MutableCounterLong numDeleteObjectTagging;
 
+  private @Metric MutableCounterLong numLinearizableRead;
+  private @Metric MutableCounterLong numLeaderSkipLinearizableRead;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -957,6 +960,22 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumDeleteObjectTaggingFails() {
     numDeleteObjectTaggingFails.incr();
+  }
+
+  public void incNumLinearizableRead() {
+    numLinearizableRead.incr();
+  }
+
+  public long getNumLinearizableRead() {
+    return numLinearizableRead.value();
+  }
+
+  public void incNumLeaderSkipLinearizableRead() {
+    numLeaderSkipLinearizableRead.incr();
+  }
+
+  public long getNumLeaderSkipLinearizableRead() {
+    return numLeaderSkipLinearizableRead.value();
   }
 
   @VisibleForTesting

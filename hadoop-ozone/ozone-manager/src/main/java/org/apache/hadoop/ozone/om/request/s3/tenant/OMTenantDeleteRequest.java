@@ -22,11 +22,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENA
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -80,7 +80,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // First get tenant name
     final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
-    Preconditions.checkNotNull(tenantId);
+    Objects.requireNonNull(tenantId, "tenantId == null");
 
     // Check if there are any accessIds in the tenant.
     // This must be done before we attempt to delete policies from Ranger.
@@ -149,7 +149,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
       volumeName = dbTenantState.getBucketNamespaceName();
-      Preconditions.checkNotNull(volumeName);
+      Objects.requireNonNull(volumeName, "volumeName == null");
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string
@@ -174,9 +174,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
               volumeName, null, null);
         }
 
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-        // Decrement volume ref count
-        omVolumeArgs.decRefCount();
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .decRefCount()
+            .build();
 
         // Update omVolumeArgs
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

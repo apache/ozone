@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -71,7 +71,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
     super(omRequest, VOLUME_REMOVE_ACL_OP);
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
-    Preconditions.checkNotNull(removeAclRequest);
+    Objects.requireNonNull(removeAclRequest, "removeAclRequest == null");
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
     obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
