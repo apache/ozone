@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -42,6 +43,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.IOzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 /**
  * Resolves a limited subset of AWS IAM session policies into Ozone ACL grants,
@@ -73,7 +77,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
  * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_effect.html">AWS spec</a>.
  * <p>
  * If a (currently) unsupported S3 action is requested, such as s3:GetAccelerateConfiguration,
- * it will be silently ignored.
+ * it will be silently ignored.  Similarly, if an invalid S3 action is requested, it will be silently ignored.
  * <p>
  * Supported wildcard expansions in Actions are: s3:*, s3:Get*, s3:Put*, s3:List*,
  * s3:Create*, and s3:Delete*.
@@ -81,6 +85,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 public final class IamSessionPolicyResolver {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static final String AWS_S3_ARN_PREFIX = "arn:aws:s3:::";
 
   // JSON length is limited per AWS policy.  See https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
   // under Policy section.
@@ -344,6 +350,17 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * Validates that wildcard bucket patterns are not used with native authorizer.
+   */
+  private static void validateNativeAuthorizerBucketPattern(AuthorizerType authorizerType, String bucket)
+      throws OMException {
+    if (authorizerType == AuthorizerType.NATIVE && bucket.contains("*")) {
+      throw new OMException(
+          "Wildcard bucket patterns are not supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  /**
    * Iterates over resources in IAM policy and determines whether it is a bucket resource,
    * an object resource, a prefix or a wildcard.  The categorization can be different
    * depending on whether the AuthorizerType is Ranger (for RangerOzoneAuthorizer) or
@@ -352,21 +369,276 @@ public final class IamSessionPolicyResolver {
    * <p>
    * It also validates that the Resource Arn(s) are valid and supported.
    */
-  private static Set<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
+  @VisibleForTesting
+  static Set<ResourceSpec> validateAndCategorizeResources(AuthorizerType authorizerType,
       Set<String> resources) throws OMException {
-    // TODO implement in future PR
-    return Collections.emptySet();
+    final Set<ResourceSpec> resourceSpecs = new HashSet<>();
+    if (resources.isEmpty()) {
+      throw new OMException("No Resource(s) found in policy", INVALID_REQUEST);
+    }
+    for (String resource : resources) {
+      if ("*".equals(resource)) {
+        validateNativeAuthorizerBucketPattern(authorizerType, "*");
+        resourceSpecs.add(ResourceSpec.any());
+        continue;
+      }
+
+      if (!resource.startsWith(AWS_S3_ARN_PREFIX)) {
+        throw new OMException("Unsupported Resource Arn - " + resource, NOT_SUPPORTED_OPERATION);
+      }
+
+      final String suffix = resource.substring(AWS_S3_ARN_PREFIX.length());
+      if (suffix.isEmpty()) {
+        throw new OMException("Invalid Resource Arn - " + resource, INVALID_REQUEST);
+      }
+
+      ResourceSpec spec = parseResourceSpec(suffix);
+
+      // This scenario can happen in the case of arn:aws:s3:::*/* or arn:aws:s3:::*/test.txt for
+      // examples
+      validateNativeAuthorizerBucketPattern(authorizerType, spec.bucket);
+
+      if (authorizerType == AuthorizerType.NATIVE && spec.type == S3ResourceType.OBJECT_PREFIX_WILDCARD) {
+        final String specPrefixExceptLastChar = spec.prefix.substring(0, spec.prefix.length() - 1);
+        if (spec.prefix.endsWith("*") && !specPrefixExceptLastChar.contains("*")) {
+          spec = ResourceSpec.objectPrefix(spec.bucket, specPrefixExceptLastChar);
+        } else {
+          throw new OMException(
+              "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not at the end",
+              NOT_SUPPORTED_OPERATION);
+        }
+      }
+      resourceSpecs.add(spec);
+    }
+    return resourceSpecs;
   }
 
   /**
    * Iterates over all resources, finds applicable actions (if any) and constructs
    * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
    */
-  private static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName,
-      AuthorizerType authorizerType, Set<S3Action> mappedS3Actions, Set<ResourceSpec> resourceSpecs,
-      Set<String> prefixes) {
-    // TODO implement in future PR
-    return Collections.emptySet();
+  @VisibleForTesting
+  static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, Set<ResourceSpec> resourceSpecs, Set<String> prefixes) {
+    // Create map to collect IOzoneObj to ACLType mappings
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
+
+    // Process each resource spec with the given actions
+    for (ResourceSpec resourceSpec : resourceSpecs) {
+      processResourceSpecWithActions(volumeName, authorizerType, mappedS3Actions, resourceSpec, prefixes, objToAclsMap);
+    }
+
+    // Group objects by their ACL sets to create proper entries
+    return groupObjectsByAcls(objToAclsMap);
+  }
+
+  /**
+   * Groups objects by their ACL sets.
+   */
+  private static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAcls(Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    final Map<Set<ACLType>, Set<IOzoneObj>> groupMap = new LinkedHashMap<>();
+
+    // Group objects by their ACL sets only (across resource types)
+    objToAclsMap.forEach((obj, acls) ->
+        groupMap.computeIfAbsent(acls, k -> new LinkedHashSet<>()).add(obj));
+
+    // Convert to result format, filtering out entries with empty ACLs
+    final Set<AssumeRoleRequest.OzoneGrant> result = new LinkedHashSet<>();
+    groupMap.forEach((key, objs) -> {
+      if (!key.isEmpty()) {
+        result.add(new AssumeRoleRequest.OzoneGrant(objs, key));
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Processes a single ResourceSpec with given actions and adds resulting
+   * IOzoneObj to ACLType mappings to the provided map.
+   */
+  private static void processResourceSpecWithActions(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Set<String> prefixes,
+      Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+
+    // Process based on ResourceSpec type
+    switch (resourceSpec.type) {
+    case ANY:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
+      processResourceTypeAny(volumeName, mappedS3Actions, objToAclsMap);
+      break;
+    case BUCKET:
+      processBucketResource(volumeName, mappedS3Actions, resourceSpec, prefixes, authorizerType, objToAclsMap);
+      break;
+    case BUCKET_WILDCARD:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type BUCKET_WILDCARD not supported for OzoneNativeAuthorizer");
+      processBucketResource(volumeName, mappedS3Actions, resourceSpec, prefixes, authorizerType, objToAclsMap);
+      break;
+    case OBJECT_EXACT:
+      processObjectExactResource(volumeName, mappedS3Actions, resourceSpec, objToAclsMap);
+      break;
+    case OBJECT_PREFIX:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.RANGER,
+          "ResourceSpec type OBJECT_PREFIX not supported for RangerOzoneAuthorizer");
+      processObjectPrefixResource(volumeName, authorizerType, mappedS3Actions, resourceSpec, objToAclsMap);
+      break;
+    case OBJECT_PREFIX_WILDCARD:
+      Preconditions.checkArgument(
+          authorizerType != AuthorizerType.NATIVE,
+          "ResourceSpec type OBJECT_PREFIX_WILDCARD not supported for OzoneNativeAuthorizer");
+      processObjectPrefixResource(volumeName, authorizerType, mappedS3Actions, resourceSpec, objToAclsMap);
+      break;
+    default:
+      throw new IllegalStateException("Unexpected resourceSpec type found: " + resourceSpec.type);
+    }
+  }
+
+  /**
+   * Handles ResourceType.ANY (*).
+   * Example: "Resource": "*"
+   */
+  private static void processResourceTypeAny(String volumeName, Set<S3Action> mappedS3Actions,
+      Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    for (S3Action action : mappedS3Actions) {
+      addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+      addAclsForObj(objToAclsMap, bucketObj(volumeName, "*"), action.bucketPerms);
+      addAclsForObj(objToAclsMap, keyObj(volumeName, "*", "*"), action.objectPerms);
+    }
+  }
+
+  /**
+   * Handles BUCKET and BUCKET_WILDCARD resource types.
+   * Example: "Resource": "arn:aws:s3:::my-bucket" or "Resource": "arn:aws:s3:::my-bucket*" or
+   *          "Resource": "arn:aws:s3:::*"
+   */
+  private static void processBucketResource(String volumeName, Set<S3Action> mappedS3Actions,
+      ResourceSpec resourceSpec, Set<String> prefixes, AuthorizerType authorizerType,
+      Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    for (S3Action action : mappedS3Actions) {
+      // The s3:ListAllMyBuckets action can use either "*" or
+      // "arn:aws:s3:::*" as its Resource.  The former is already handled via the
+      // ResourceSpec.ANY path.  The latter is parsed as a BUCKET_WILDCARD with a
+      // bucket name of "*".  To align with AWS, make sure that in this
+      // specific case we also grant the volume-level permissions for volume-scoped
+      // actions (currently s3:ListAllMyBuckets).
+      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3 ||
+          action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket)) { // this handles s3:ListAllMyBuckets
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      }
+
+      if (action == S3Action.LIST_BUCKET) {
+        // If condition prefixes are present, these would constrain the object permissions if the action
+        // is s3:ListBucket
+        if (prefixes != null && !prefixes.isEmpty()) {
+          for (String prefix : prefixes) {
+            createObjectResourcesFromConditionPrefix(
+                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, action.objectPerms);
+          }
+        } else {
+          // No condition prefixes, but we need READ access to all objects, so use "*" as the prefix
+          createObjectResourcesFromConditionPrefix(
+              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, action.objectPerms);
+        }
+      }
+    }
+  }
+
+  /**
+   * Handles OBJECT_EXACT resource type.
+   * Example: "Resource": "arn:aws:s3:::my-bucket/file.txt"
+   */
+  private static void processObjectExactResource(String volumeName, Set<S3Action> mappedS3Actions,
+      ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    for (S3Action action : mappedS3Actions) {
+      addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+      if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+        addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the object level; grant READ at bucket level for navigation
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
+        addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
+      }
+    }
+  }
+
+  /**
+   * Handles OBJECT_PREFIX and OBJECT_PREFIX_WILDCARD resource types.
+   * Prefixes can be specified in the Resource itself as in the example below, or via an s3:prefix Condition.
+   * Example: "Resource": "arn:aws:s3:::my-bucket/path/folder"
+   */
+  private static void processObjectPrefixResource(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+    for (S3Action action : mappedS3Actions) {
+      // Object actions apply to prefix/key resources
+      addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+      if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the object/prefix level; grant READ at bucket level for navigation
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
+      }
+
+      // Handle the resource prefix itself (e.g., my-bucket/*)
+      createObjectResourcesFromResourcePrefix(
+          volumeName, authorizerType, resourceSpec, objToAclsMap, action.objectPerms);
+    }
+  }
+
+  /**
+   * Creates object resources from resource prefix (e.g., my-bucket/*).
+   */
+  private static void createObjectResourcesFromResourcePrefix(String volumeName, AuthorizerType authorizerType,
+      ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap, Set<ACLType> acls) {
+    if (authorizerType == AuthorizerType.NATIVE) {
+      final IOzoneObj prefixObj = prefixObj(volumeName, resourceSpec.bucket, resourceSpec.prefix);
+      addAclsForObj(objToAclsMap, prefixObj, acls);
+    } else {
+      final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, resourceSpec.prefix);
+      addAclsForObj(objToAclsMap, keyObj, acls);
+    }
+  }
+
+  /**
+   * Creates object resources from condition prefixes (i.e. the s3:prefix conditions).
+   */
+  private static void createObjectResourcesFromConditionPrefix(String volumeName, AuthorizerType authorizerType,
+      ResourceSpec resourceSpec, String conditionPrefix, Map<IOzoneObj, Set<ACLType>> objToAclsMap, Set<ACLType> acls) {
+    if (authorizerType == AuthorizerType.NATIVE) {
+      // For native authorizer, use PREFIX resource type with normalized prefix.
+      // Map "x" in condition list prefix to "x". Map "x/*" in condition list prefix to "x/".
+      // Map "*" in condition list prefix to "".
+      final String normalizedPrefix;
+      if (conditionPrefix != null && conditionPrefix.endsWith("*")) {
+        normalizedPrefix = conditionPrefix.substring(0, conditionPrefix.length() - 1);
+      } else {
+        normalizedPrefix = conditionPrefix;
+      }
+      final IOzoneObj prefixObj = prefixObj(volumeName, resourceSpec.bucket, normalizedPrefix);
+      addAclsForObj(objToAclsMap, prefixObj, acls);
+    } else {
+      // For Ranger authorizer, use KEY resource type with original prefix
+      // Map "x" in condition list prefix to "x".  Map "x/*" in condition list prefix to "x/*".
+      // Map "* in condition list prefix to "*".
+      final IOzoneObj keyObj = keyObj(volumeName, resourceSpec.bucket, conditionPrefix);
+      addAclsForObj(objToAclsMap, keyObj, acls);
+    }
+  }
+
+  /**
+   * Helper method to add ACLs for an IOzoneObj, merging with existing ACLs if present.
+   */
+  private static void addAclsForObj(Map<IOzoneObj, Set<ACLType>> objToAclsMap, IOzoneObj obj, Set<ACLType> acls) {
+    if (acls != null && !acls.isEmpty()) {
+      final OzoneObj ozoneObj = (OzoneObj) obj;
+      objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class)).addAll(acls);
+    }
   }
 
   /**
@@ -390,10 +662,104 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * The categorization possibilities of Resources in the IAM policy.
+   */
+  @VisibleForTesting
+  enum S3ResourceType {
+    ANY,                    // Ranger authorizer solely uses this
+    BUCKET,
+    BUCKET_WILDCARD,        // Ranger authorizer solely uses this
+    OBJECT_PREFIX,          // Native authorizer solely uses this
+    OBJECT_PREFIX_WILDCARD, // Ranger authorizer solely uses this. We initially categorize all resources with
+                            // wildcard (*) as OBJECT_PREFIX_WILDCARD, but if the wildcard is not at the end, and
+                            // Native authorizer is being used, an error is thrown.  If the wildcard is at the end,
+                            // then the categorization will use OBJECT_PREFIX for native authorizer instead and remove
+                            // the wildcard.
+    OBJECT_EXACT
+  }
+
+  /**
    * Utility to help categorize IAM policy resources, whether for bucket, key, wildcards, etc.
    */
-  private static final class ResourceSpec {
-    // TODO implement in future PR
+  @VisibleForTesting
+  static final class ResourceSpec {
+    private final S3ResourceType type;
+    private final String bucket;
+    private final String prefix; // for OBJECT_PREFIX or OBJECT_PREFIX_WILDCARD only, otherwise null
+    private final String key; // for OBJECT_EXACT only, otherwise null
+
+    @VisibleForTesting
+    ResourceSpec(S3ResourceType type, String bucket, String prefix, String key) {
+      this.type = type;
+      this.bucket = bucket;
+      this.prefix = prefix;
+      this.key = key;
+    }
+
+    static ResourceSpec any() {
+      return new ResourceSpec(S3ResourceType.ANY, "*", null, null);
+    }
+
+    static ResourceSpec bucket(String bucket) {
+      return new ResourceSpec(
+          bucket.contains("*") ? S3ResourceType.BUCKET_WILDCARD : S3ResourceType.BUCKET, bucket, null, null);
+    }
+
+    static ResourceSpec objectExact(String bucket, String key) {
+      return new ResourceSpec(S3ResourceType.OBJECT_EXACT, bucket, null, key);
+    }
+
+    static ResourceSpec objectPrefix(String bucket, String prefix) {
+      return new ResourceSpec(
+          prefix.contains("*") ? S3ResourceType.OBJECT_PREFIX_WILDCARD : S3ResourceType.OBJECT_PREFIX, bucket,
+          prefix, null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      final ResourceSpec that = (ResourceSpec) o;
+      return type == that.type && Objects.equals(bucket, that.bucket) && Objects.equals(prefix, that.prefix) &&
+          Objects.equals(key, that.key);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(type, bucket, prefix, key);
+    }
+
+    @Override
+    public String toString() {
+      return "ResourceSpec{" + "type=" + type + ", bucket='" + bucket + '\'' + ", prefix='" + prefix + '\'' +
+          ", key='" + key + '\'' + '}';
+    }
+  }
+
+  /**
+   * Parses and categorizes the ResourceArn.
+   * <p>
+   * Suffix parameter can be:
+   * -> bucket
+   * -> bucket/* (prefix in OzoneNativeAuthorizer or wildcard key in RangerOzoneAuthorizer)
+   * -> bucket/deep/path/* (prefix in OzoneNativeAuthorizer or wildcard key in RangerOzoneAuthorizer)
+   * -> bucket/key or bucket/prefix/key (exact key)
+   */
+  private static ResourceSpec parseResourceSpec(String suffix) {
+
+    final int slashIndex = suffix.indexOf('/');
+    if (slashIndex < 0) {
+      return ResourceSpec.bucket(suffix);
+    }
+
+    final String bucket = suffix.substring(0, slashIndex);
+    final String rest = suffix.substring(slashIndex + 1);
+    if (rest.contains("*")) {
+      return ResourceSpec.objectPrefix(bucket, rest);
+    }
+
+    return ResourceSpec.objectExact(bucket, rest);
   }
 
   @VisibleForTesting
@@ -413,8 +779,7 @@ public final class IamSessionPolicyResolver {
     GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
         EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
-    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST),
-        EnumSet.noneOf(ACLType.class)),
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(READ)),
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
@@ -443,7 +808,7 @@ public final class IamSessionPolicyResolver {
         EnumSet.of(ACLType.WRITE)),
 
     // Wildcard all
-    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
+    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(READ), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
 
     private final String name;
     private final ActionKind kind;
@@ -459,5 +824,52 @@ public final class IamSessionPolicyResolver {
       this.bucketPerms = bucketPerms;
       this.objectPerms = objectPerms;
     }
+  }
+
+  /**
+   * Creates an OzoneObjInfo.Builder based on supplied parameters.
+   */
+  private static OzoneObjInfo.Builder obj(OzoneObj.ResourceType type, String volumeName, String bucketName) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(type)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName);
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType BUCKET.
+   */
+  private static IOzoneObj bucketObj(String volumeName, String bucketName) {
+    return obj(OzoneObj.ResourceType.BUCKET, volumeName, bucketName).build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType KEY.
+   */
+  private static IOzoneObj keyObj(String volumeName, String bucketName, String keyName) {
+    return obj(OzoneObj.ResourceType.KEY, volumeName, bucketName)
+        .setKeyName(keyName)
+        .build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType PREFIX.
+   */
+  private static IOzoneObj prefixObj(String volumeName, String bucketName, String prefixName) {
+    return obj(OzoneObj.ResourceType.PREFIX, volumeName, bucketName)
+        .setPrefixName(prefixName)
+        .build();
+  }
+
+  /**
+   * Creates IOzoneObj with ResourceType VOLUME.
+   */
+  private static IOzoneObj volumeObj(String volumeName) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .build();
   }
 }
