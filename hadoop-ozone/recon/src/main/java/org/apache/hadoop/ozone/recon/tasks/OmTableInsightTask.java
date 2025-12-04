@@ -124,22 +124,18 @@ public class OmTableInsightTask implements ReconOmTask {
 
     init();
     for (String tableName : tables) {
-      Table<?, ?> table = omMetadataManager.getTable(tableName);
-
       try {
         if (tableHandlers.containsKey(tableName)) {
-          Table<String, ?> stringTable = (Table<String, ?>) table;
-          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = stringTable.iterator()) {
-            Triple<Long, Long, Long> details = tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-            objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
-            unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-            replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
-          }
+          Triple<Long, Long, Long> details = 
+              tableHandlers.get(tableName).getTableSizeAndCount(tableName, omMetadataManager);
+          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
+          unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
         } else {
           if (usesNonStringKeys(tableName)) {
-            processTableSequentially(tableName, table);
+            processTableSequentially(tableName, omMetadataManager);
           } else {
-            processTableInParallel(tableName, table, omMetadataManager);
+            processTableInParallel(tableName, omMetadataManager);
           }
         }
       } catch (Exception ioEx) {
@@ -173,15 +169,16 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   /**
-   * Process table sequentially using raw iterator (no type assumptions).
+   * Process table sequentially using key-only iterator.
    * Used for tables with non-String keys or as fallback.
    */
-  private void processTableSequentially(String tableName, Table<?, ?> table) throws IOException {
+  private void processTableSequentially(String tableName, OMMetadataManager omMetadataManager) throws IOException {
     LOG.info("{}: Processing table {} sequentially (non-String keys)", getTaskName(), tableName);
-    
-    Table<String, ?> stringTable = (Table<String, ?>) table;
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator = stringTable.iterator()) {
-      long count = Iterators.size(iterator);
+
+    Table<byte[], byte[]> table = omMetadataManager.getStore()
+        .getTable(tableName, ByteArrayCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    try (TableIterator<byte[], byte[]> keyIterator = table.keyIterator()) {
+      long count = Iterators.size(keyIterator);
       objectCountMap.put(getTableCountKeyFromTable(tableName), count);
     }
   }
@@ -190,16 +187,24 @@ public class OmTableInsightTask implements ReconOmTask {
    * Process table in parallel using multiple iterators and workers.
    * Only for tables with String keys.
    */
-  private void processTableInParallel(String tableName, Table<?, ?> table, 
-                                      OMMetadataManager omMetadataManager) throws Exception {
+  private void processTableInParallel(String tableName, OMMetadataManager omMetadataManager) throws Exception {
     int workerCount = 2;  // Only 2 workers needed for simple counting
-    long loggingThreshold = calculateLoggingThreshold(table);
+    
+    Table<String, byte[]> table = omMetadataManager.getStore()
+        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    
+    long estimatedCount = 100000;  // Default
+    try {
+      estimatedCount = table.getEstimatedKeyCount();
+    } catch (IOException e) {
+      LOG.info("Could not estimate key count for table {}, using default", tableName);
+    }
+    long loggingThreshold = calculateLoggingThreshold(estimatedCount);
     
     AtomicLong count = new AtomicLong(0);
 
     try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
-        omMetadataManager, omMetadataManager.getStore()
-        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE), StringCodec.get(),
+        omMetadataManager, table, StringCodec.get(),
         maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
@@ -214,17 +219,11 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   /**
-   * Calculate logging threshold based on table size.
+   * Calculate logging threshold based on estimated key count.
    * Logs progress every 1% of total keys, minimum 1.
    */
-  private long calculateLoggingThreshold(Table<?, ?> table) {
-    try {
-      long estimatedKeys = table.getEstimatedKeyCount();
-      return Math.max(estimatedKeys / 100, 1);
-    } catch (IOException e) {
-      LOG.debug("Could not estimate key count, using default logging threshold");
-      return 100000;  // Default: log every 100K keys
-    }
+  private long calculateLoggingThreshold(long estimatedCount) {
+    return Math.max(estimatedCount / 100, 1);
   }
 
   @Override

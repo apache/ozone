@@ -162,17 +162,17 @@ public abstract class FileSizeCountTaskHelper {
     // Lambda executed by workers for each key
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         // Get or create this worker's private map using thread ID
-        Map<FileSizeCountKey, Long> myMap = allMap.computeIfAbsent(
+        Map<FileSizeCountKey, Long> workerFileSizeCountMap = allMap.computeIfAbsent(
             Thread.currentThread().getId(), k -> new HashMap<>());
         
         // Update worker's private map without locks
-        handlePutKeyEvent(kv.getValue(), myMap);
+        handlePutKeyEvent(kv.getValue(), workerFileSizeCountMap);
         
         // Flush this worker's map when it reaches threshold
-        if (myMap.size() >= PER_WORKER_THRESHOLD) {
+        if (workerFileSizeCountMap.size() >= PER_WORKER_THRESHOLD) {
             synchronized (flushLock) {
-                writeCountsToDB(myMap, reconFileMetadataManager);
-                myMap.clear();
+                writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
+                workerFileSizeCountMap.clear();
             }
         }
         return null;
@@ -188,10 +188,10 @@ public abstract class FileSizeCountTaskHelper {
     }
     
     // Final flush: Write remaining entries from all worker maps to DB
-    for (Map<FileSizeCountKey, Long> workerMap : allMap.values()) {
-        if (!workerMap.isEmpty()) {
-            writeCountsToDB(workerMap, reconFileMetadataManager);
-            workerMap.clear();
+    for (Map<FileSizeCountKey, Long> workerFileSizeCountMap : allMap.values()) {
+        if (!workerFileSizeCountMap.isEmpty()) {
+            writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
+            workerFileSizeCountMap.clear();
         }
     }
     

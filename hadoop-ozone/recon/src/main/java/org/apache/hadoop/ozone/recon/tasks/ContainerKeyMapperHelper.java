@@ -105,8 +105,8 @@ public abstract class ContainerKeyMapperHelper {
           // Step 2: Clear shared map
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
           
-          // Step 3: Initialize reference counter (2 tasks: FSO + OBS)
-          ACTIVE_TASK_COUNT.set(2);
+          // Step 3: Increment the refrence counter for active tasks
+          ACTIVE_TASK_COUNT.incrementAndGet();
 
         } catch (Exception e) {
           // CRITICAL: Reset flag so another task can retry
@@ -144,24 +144,20 @@ public abstract class ContainerKeyMapperHelper {
       // Map thread IDs to worker-specific local maps for lockless updates
       Map<Long, Map<ContainerKeyPrefix, Integer>> allLocalMaps = new ConcurrentHashMap<>();
       
-      Object flushLock = new Object();
-      
       Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
         try {
           // Get or create this worker's private local map using thread ID
-          Map<ContainerKeyPrefix, Integer> myLocalMap = allLocalMaps.computeIfAbsent(
+          Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap = allLocalMaps.computeIfAbsent(
               Thread.currentThread().getId(), k -> new ConcurrentHashMap<>());
           
-          handleKeyReprocess(kv.getKey(), kv.getValue(), myLocalMap, SHARED_CONTAINER_KEY_COUNT_MAP,
+          handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyPrefixMap, SHARED_CONTAINER_KEY_COUNT_MAP,
               reconContainerMetadataManager);
 
           // Flush this worker's map when it reaches threshold
-          if (myLocalMap.size() >= PER_WORKER_THRESHOLD) {
-            synchronized (flushLock) {
-              if (!flushAndCommitContainerKeyInfoToDB(myLocalMap, Collections.emptyMap(),
-                  reconContainerMetadataManager)) {
-                throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
-              }
+          if (containerKeyPrefixMap.size() >= PER_WORKER_THRESHOLD) {
+            if (!flushAndCommitContainerKeyInfoToDB(containerKeyPrefixMap, Collections.emptyMap(),
+                reconContainerMetadataManager)) {
+              throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
             }
           }
           return null;
@@ -177,9 +173,9 @@ public abstract class ContainerKeyMapperHelper {
       }
 
       // Final flush: Write remaining entries from all worker local maps to DB
-      for (Map<ContainerKeyPrefix, Integer> workerLocalMap : allLocalMaps.values()) {
-        if (!workerLocalMap.isEmpty()) {
-          if (!flushAndCommitContainerKeyInfoToDB(workerLocalMap, Collections.emptyMap(),
+      for (Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap : allLocalMaps.values()) {
+        if (!containerKeyPrefixMap.isEmpty()) {
+          if (!flushAndCommitContainerKeyInfoToDB(containerKeyPrefixMap, Collections.emptyMap(),
               reconContainerMetadataManager)) {
             LOG.error("Failed to flush worker local map for {}", taskName);
             return false;
@@ -187,27 +183,29 @@ public abstract class ContainerKeyMapperHelper {
         }
       }
 
-      // Capture total container count from shared map
-      long totalContainers = SHARED_CONTAINER_KEY_COUNT_MAP.size();
-
-      // Final flush: Shared container count map
-      if (!flushAndCommitContainerKeyInfoToDB(Collections.emptyMap(), SHARED_CONTAINER_KEY_COUNT_MAP, reconContainerMetadataManager)) {
-        LOG.error("Failed to flush shared container count map for {}", taskName);
-        return false;
-      }
-
-      // Write total container count once at the end (after all processing)
-      if (totalContainers > 0) {
-        reconContainerMetadataManager.incrementContainerCountBy(totalContainers);
-      }
-
-      // Decrement active task counter and cleanup if this is the last task
+      // Decrement active task counter
       int remainingTasks = ACTIVE_TASK_COUNT.decrementAndGet();
       LOG.info("{}: Task completed. Remaining active tasks: {}", taskName, remainingTasks);
 
+      // Only last task flushes shared map and writes container count
       if (remainingTasks == 0) {
-        // Last task finished - clean up shared resources
         synchronized (INITIALIZATION_LOCK) {
+          // Capture total container count from shared map
+          long totalContainers = SHARED_CONTAINER_KEY_COUNT_MAP.size();
+
+          // Flush shared container count map
+          if (!flushAndCommitContainerKeyInfoToDB(Collections.emptyMap(), SHARED_CONTAINER_KEY_COUNT_MAP, 
+              reconContainerMetadataManager)) {
+            LOG.error("Failed to flush shared container count map for {}", taskName);
+            return false;
+          }
+
+          // Write total container count once at the end
+          if (totalContainers > 0) {
+            reconContainerMetadataManager.incrementContainerCountBy(totalContainers);
+          }
+
+          // Clean up shared resources
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
           ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
           LOG.debug("{}: Last task completed. Cleared shared map and reset initialization flag.", taskName);
