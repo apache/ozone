@@ -27,12 +27,13 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 public class DeleteKeysResult {
 
   private List<OmKeyInfo> keysToDelete;
-
   private boolean processedKeys;
+  private List<ExclusiveRange> keyRanges;
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, boolean processedKeys) {
+  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
     this.keysToDelete = keysToDelete;
     this.processedKeys = processedKeys;
+    this.keyRanges = keyRanges;
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
@@ -41,6 +42,32 @@ public class DeleteKeysResult {
 
   public boolean isProcessedKeys() {
     return processedKeys;
+  }
+
+  public List<ExclusiveRange> getKeyRanges() {
+    return keyRanges;
+  }
+
+  /**
+   * Represents a half-open key range {@code [startKey, exclusiveEndKey)} used
+   * for RocksDB deleteRange operations.
+   */
+  public static class ExclusiveRange {
+    private final String startKey;
+    private final String exclusiveEndKey;
+
+    public ExclusiveRange(String startKey, String exclusiveEndKey) {
+      this.startKey = startKey;
+      this.exclusiveEndKey = exclusiveEndKey;
+    }
+
+    public String getExclusiveEndKey() {
+      return exclusiveEndKey;
+    }
+
+    public String getStartKey() {
+      return startKey;
+    }
   }
 
 }
