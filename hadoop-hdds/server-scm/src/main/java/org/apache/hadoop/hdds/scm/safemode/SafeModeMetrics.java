@@ -52,6 +52,11 @@ public class SafeModeMetrics {
   private @Metric MutableCounterLong
       currentPipelinesWithAtleastOneReplicaReportedCount;
 
+  @Metric private MutableGaugeLong scmInSafeMode;
+  
+  @Metric private MutableGaugeLong numRequiredDatanodesThreshold;
+  @Metric private MutableCounterLong currentRegisteredDatanodesCount;
+
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "SCM Safemode Metrics", new SafeModeMetrics());
@@ -86,12 +91,24 @@ public class SafeModeMetrics {
     }
   }
 
+  public void setScmInSafeMode(boolean inSafeMode) {
+    this.scmInSafeMode.set(inSafeMode ? 1 : 0);
+  }
+
+  public void setNumRequiredDatanodesThreshold(long val) {
+    this.numRequiredDatanodesThreshold.set(val);
+  }
+
   public void incCurrentContainersWithOneReplicaReportedCount() {
     this.currentContainersWithOneReplicaReportedCount.incr();
   }
 
   public void incCurrentContainersWithECDataReplicaReportedCount() {
     this.currentContainersWithECDataReplicaReportedCount.incr();
+  }
+
+  public void incCurrentRegisteredDatanodesCount() {
+    this.currentRegisteredDatanodesCount.incr();
   }
 
   MutableGaugeLong getNumHealthyPipelinesThreshold() {
@@ -121,6 +138,10 @@ public class SafeModeMetrics {
 
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
+  }
+  
+  MutableCounterLong getCurrentRegisteredDatanodesCount() {
+    return currentRegisteredDatanodesCount;
   }
 
   public void unRegister() {

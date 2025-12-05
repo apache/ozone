@@ -65,6 +65,8 @@ public class TestDataNodeSafeModeRule {
     eventQueue = new EventQueue();
 
     mockSafeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics metrics = mock(SafeModeMetrics.class);
+    when(mockSafeModeManager.getSafeModeMetrics()).thenReturn(metrics);
 
     rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockSafeModeManager);
     assertNotNull(rule);
