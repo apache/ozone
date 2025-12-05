@@ -572,6 +572,8 @@ enum Status {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
     TOO_MANY_SNAPSHOTS = 98;
+
+    REVOKED_TOKEN = 99;
 }
 
 /**
