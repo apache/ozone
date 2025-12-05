@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,13 +97,11 @@ import org.slf4j.LoggerFactory;
  * task.reprocess()              [Only ONE execution at a time]
  * </pre>
  */
-@SuppressWarnings("PMD.SingularField") // nsSummaryTask used via taskController across all tests
 public class TestNSSummaryUnifiedControl {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestNSSummaryUnifiedControl.class);
 
   private ReconTaskControllerImpl taskController;
-  private NSSummaryTask nsSummaryTask;
   private ReconNamespaceSummaryManager mockNamespaceSummaryManager;
   private ReconOMMetadataManager mockReconOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
@@ -118,9 +118,6 @@ public class TestNSSummaryUnifiedControl {
 
     // Configure small buffer for easier testing
     ozoneConfiguration.setInt(ReconServerConfigKeys.OZONE_RECON_OM_EVENT_BUFFER_CAPACITY, 100);
-
-    // Create testable NSSummaryTask instance
-    nsSummaryTask = createTestableNSSummaryTask();
 
     // Setup task controller
     ReconTaskStatusUpdaterManager mockTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
@@ -139,7 +136,8 @@ public class TestNSSummaryUnifiedControl {
         mockTaskStatusUpdaterManager, reconDbProvider, reconContainerMgr, mockNamespaceSummaryManager,
         reconGlobalStatsManager, reconFileMetadataManager);
 
-    taskController.registerTask(nsSummaryTask);
+    // Register testable NSSummaryTask instance
+    taskController.registerTask(createTestableNSSummaryTask());
 
     // Setup mock OM metadata manager with checkpoint support
     setupMockOMMetadataManager();
@@ -193,8 +191,8 @@ public class TestNSSummaryUnifiedControl {
       }
 
       @Override
-      public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager,
-                                         DBStore stagedReconDbStore) throws IOException {
+      public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+          throws IOException {
         return this;
       }
 
@@ -290,8 +288,9 @@ public class TestNSSummaryUnifiedControl {
         "Rebuild should execute");
     assertTrue(rebuildExecuted.get(), "Rebuild should have executed");
 
-    // Allow time for state to return to IDLE
-    Thread.sleep(500);
+    // wait for 5 secs for state to return to IDLE
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.IDLE,
+        100, 5000);
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should return to IDLE after successful rebuild");
   }
@@ -318,8 +317,9 @@ public class TestNSSummaryUnifiedControl {
     assertTrue(failureLatch.await(10, TimeUnit.SECONDS),
         "Rebuild should be attempted");
 
-    // Allow time for state update
-    Thread.sleep(500);
+    // Wait for 5 secs time for state update
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.FAILED,
+        100, 5000);
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after rebuild failure");
   }
@@ -354,12 +354,17 @@ public class TestNSSummaryUnifiedControl {
         "First event should be queued successfully");
 
     assertTrue(firstAttempt.await(10, TimeUnit.SECONDS), "First rebuild should be attempted");
-    Thread.sleep(1000);
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.FAILED,
+        100, 5000);
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after first rebuild");
 
-    // Second rebuild succeeds - wait for retry delay (2 seconds)
-    Thread.sleep(2100); // Wait for RETRY_DELAY_MS (2000ms) + buffer
+    // Second rebuild succeeds - must wait for time-based retry delay to expire
+    // This is a deliberate time-based test of the retry mechanism
+    int retryDelayMs = 2100; // RETRY_DELAY_MS (2000ms) + buffer
+    long deadline = System.currentTimeMillis() + retryDelayMs;
+    GenericTestUtils.waitFor(() -> System.currentTimeMillis() >= deadline,
+        100, retryDelayMs + 1000);
 
     ReconTaskController.ReInitializationResult result2 =
         taskController.queueReInitializationEvent(
@@ -368,14 +373,15 @@ public class TestNSSummaryUnifiedControl {
         "Second event should be queued successfully after retry delay");
 
     assertTrue(secondAttempt.await(10, TimeUnit.SECONDS), "Second rebuild should be attempted");
-    Thread.sleep(1000);
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.IDLE,
+        100, 5000);
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should be IDLE after successful rebuild");
   }
 
   /**
    * Test multiple concurrent queueReInitializationEvent() calls.
-   *
+   * <p>
    * This is the KEY test for production behavior - multiple threads
    * simultaneously calling queueReInitializationEvent(), which is what
    * actually happens in production (not direct reprocess() calls).
@@ -386,178 +392,262 @@ public class TestNSSummaryUnifiedControl {
    * prevents concurrent execution within a single reprocess() call.
    */
   @Test
-  @SuppressWarnings("methodLength")
   void testMultipleConcurrentAttempts() throws Exception {
-    int threadCount = 5;
-    CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
-    CountDownLatch firstRebuildStarted = new CountDownLatch(1);
-    CountDownLatch firstRebuildCanComplete = new CountDownLatch(1);
-    AtomicInteger clearTableCallCount = new AtomicInteger(0);
-    AtomicInteger concurrentExecutions = new AtomicInteger(0);
-    AtomicInteger maxConcurrentExecutions = new AtomicInteger(0);
-    AtomicInteger successfulQueueCount = new AtomicInteger(0);
-    AtomicInteger totalQueueAttempts = new AtomicInteger(0);
+    ConcurrentTestContext ctx = new ConcurrentTestContext(5);
 
-    // Ensure clean initial state
     NSSummaryTask.resetRebuildState();
-    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
-        "Initial state must be IDLE");
+    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(), "Initial state must be IDLE");
 
-    // Setup rebuild to track concurrent executions
+    setupConcurrentExecutionTracking(ctx);
+
+    ExecutorService executor = Executors.newFixedThreadPool(ctx.getThreadCount());
+    List<CompletableFuture<ReconTaskController.ReInitializationResult>> futures =
+        launchConcurrentQueueRequests(ctx, executor);
+
+    try {
+      coordinateConcurrentExecution(ctx, futures);
+      verifyConcurrentExecutionResults(ctx, futures);
+    } finally {
+      ctx.getFirstRebuildCanComplete().countDown();
+      executor.shutdown();
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+    }
+  }
+
+  private void setupConcurrentExecutionTracking(ConcurrentTestContext ctx) throws IOException {
     doAnswer(invocation -> {
-      int callNum = clearTableCallCount.incrementAndGet();
-      int currentConcurrent = concurrentExecutions.incrementAndGet();
+      int callNum = ctx.getClearTableCallCount().incrementAndGet();
+      int currentConcurrent = ctx.getConcurrentExecutions().incrementAndGet();
 
-      // Track max concurrent executions
-      maxConcurrentExecutions.updateAndGet(max -> Math.max(max, currentConcurrent));
-
+      ctx.getMaxConcurrentExecutions().updateAndGet(max -> Math.max(max, currentConcurrent));
       LOG.info("clearNSSummaryTable call #{}, concurrent executions: {}, state: {}",
           callNum, currentConcurrent, NSSummaryTask.getRebuildState());
 
       try {
         if (callNum == 1) {
-          // First call - block to allow other threads to queue
-          firstRebuildStarted.countDown();
-          boolean awaitSuccess = firstRebuildCanComplete.await(15, TimeUnit.SECONDS);
+          ctx.getFirstRebuildStarted().countDown();
+          boolean awaitSuccess = ctx.getFirstRebuildCanComplete().await(15, TimeUnit.SECONDS);
           if (!awaitSuccess) {
             LOG.error("firstRebuildCanComplete.await() timed out");
           }
         } else {
-          // Subsequent calls - execute quickly
-          Thread.sleep(100);
+          Thread.sleep(100); // Simulate operation time (acceptable use in mock)
         }
       } finally {
-        concurrentExecutions.decrementAndGet();
+        ctx.getConcurrentExecutions().decrementAndGet();
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
+  }
 
-    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+  private List<CompletableFuture<ReconTaskController.ReInitializationResult>>
+      launchConcurrentQueueRequests(ConcurrentTestContext ctx, ExecutorService executor) {
     List<CompletableFuture<ReconTaskController.ReInitializationResult>> futures = new ArrayList<>();
 
+    for (int i = 0; i < ctx.threadCount; i++) {
+      final int threadId = i;
+      futures.add(CompletableFuture.supplyAsync(() ->
+          executeQueueRequest(ctx, threadId), executor));
+    }
+    return futures;
+  }
+
+  private ReconTaskController.ReInitializationResult executeQueueRequest(
+      ConcurrentTestContext ctx, int threadId) {
     try {
-      // Launch multiple concurrent queue requests
-      for (int i = 0; i < threadCount; i++) {
-        final int threadId = i;
-        CompletableFuture<ReconTaskController.ReInitializationResult> future =
-            CompletableFuture.supplyAsync(() -> {
-              try {
-                // Signal thread is ready
-                allThreadsReady.countDown();
-                LOG.info("Thread {} ready, waiting for all threads", threadId);
+      ctx.getAllThreadsReady().countDown();
+      LOG.info("Thread {} ready, waiting for all threads", threadId);
 
-                // Wait for all threads to be ready
-                if (!allThreadsReady.await(10, TimeUnit.SECONDS)) {
-                  throw new RuntimeException("Not all threads ready in time");
-                }
-
-                // Small staggered delay to create realistic race conditions
-                Thread.sleep(threadId * 10L);
-
-                LOG.info("Thread {} calling queueReInitializationEvent()", threadId);
-                totalQueueAttempts.incrementAndGet();
-
-                ReconTaskController.ReInitializationResult result =
-                    taskController.queueReInitializationEvent(
-                        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
-
-                if (result == ReconTaskController.ReInitializationResult.SUCCESS) {
-                  successfulQueueCount.incrementAndGet();
-                }
-
-                LOG.info("Thread {} completed with result={}", threadId, result);
-                return result;
-
-              } catch (InterruptedException e) {
-                LOG.error("Thread {} interrupted", threadId, e);
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-              }
-            }, executor);
-        futures.add(future);
+      if (!ctx.getAllThreadsReady().await(10, TimeUnit.SECONDS)) {
+        throw new RuntimeException("Not all threads ready in time");
       }
 
-      // Wait for first rebuild to start
-      assertTrue(firstRebuildStarted.await(15, TimeUnit.SECONDS),
-          "First rebuild should start");
-      LOG.info("First rebuild started, state: {}", NSSummaryTask.getRebuildState());
+      Thread.sleep(threadId * 10L); // Staggered delay for race conditions
 
-      // Give time for other threads to attempt queueing while first rebuild is running
-      Thread.sleep(1000);
+      LOG.info("Thread {} calling queueReInitializationEvent()", threadId);
+      ctx.getTotalQueueAttempts().incrementAndGet();
 
-      // Signal first rebuild can complete
-      firstRebuildCanComplete.countDown();
+      ReconTaskController.ReInitializationResult result =
+          taskController.queueReInitializationEvent(
+              ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
 
-      // Wait for all threads to complete queueing
-      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-          .get(20, TimeUnit.SECONDS);
-
-      // Allow time for all queued events to be processed
-      Thread.sleep(3000);
-
-      // Collect and analyze results
-      long successResultCount = 0;
-      long retryLaterCount = 0;
-      long maxRetriesCount = 0;
-
-      for (CompletableFuture<ReconTaskController.ReInitializationResult> future : futures) {
-        ReconTaskController.ReInitializationResult result = future.get();
-        switch (result) {
-        case SUCCESS:
-          successResultCount++;
-          break;
-        case RETRY_LATER:
-          retryLaterCount++;
-          break;
-        case MAX_RETRIES_EXCEEDED:
-          maxRetriesCount++;
-          break;
-        default:
-          LOG.warn("Unexpected result: {}", result);
-        }
+      if (result == ReconTaskController.ReInitializationResult.SUCCESS) {
+        ctx.getSuccessfulQueueCount().incrementAndGet();
       }
 
-      // Debug output
-      LOG.info("Test completed - Total queue attempts: {}, Successful queues: {}, " +
-              "Result breakdown: SUCCESS={}, RETRY_LATER={}, MAX_RETRIES={}, " +
-              "ClearTable calls: {}, Max concurrent: {}, Final state: {}",
-          totalQueueAttempts.get(), successfulQueueCount.get(),
-          successResultCount, retryLaterCount, maxRetriesCount,
-          clearTableCallCount.get(), maxConcurrentExecutions.get(),
-          NSSummaryTask.getRebuildState());
+      LOG.info("Thread {} completed with result={}", threadId, result);
+      return result;
+    } catch (InterruptedException e) {
+      LOG.error("Thread {} interrupted", threadId, e);
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
+  }
 
-      // CRITICAL INVARIANT: No concurrent executions
-      // The queue + async processing ensures sequential (not concurrent) execution
-      assertEquals(1, maxConcurrentExecutions.get(),
-          "Should never have concurrent executions - queue provides serialization");
+  private void coordinateConcurrentExecution(ConcurrentTestContext ctx,
+                                             List<CompletableFuture<ReconTaskController.ReInitializationResult>>
+                                                 futures)
+      throws Exception {
+    assertTrue(ctx.getFirstRebuildStarted().await(15, TimeUnit.SECONDS), "First rebuild should start");
+    LOG.info("First rebuild started, state: {}", NSSummaryTask.getRebuildState());
 
-      // All threads should have attempted to queue
-      assertEquals(threadCount, totalQueueAttempts.get(),
-          "All threads should have attempted to queue events");
+    GenericTestUtils.waitFor(() -> ctx.getTotalQueueAttempts().get() >= ctx.getThreadCount() / 2,
+        100, 5000);
 
-      // At least one thread should have successfully queued
-      assertTrue(successfulQueueCount.get() >= 1,
-          "At least one thread should have successfully queued rebuild");
+    ctx.getFirstRebuildCanComplete().countDown();
 
-      // Multiple events may be queued and executed sequentially
-      assertTrue(clearTableCallCount.get() >= 1,
-          "At least one rebuild should execute");
-      assertTrue(clearTableCallCount.get() <= successfulQueueCount.get(),
-          "Number of executions should not exceed successfully queued events");
+    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(20, TimeUnit.SECONDS);
 
-      // Final state should be IDLE after all events processed
-      assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
-          "Final state should be IDLE after all rebuilds complete");
+    // Wait for all queued events to be processed and state to return to IDLE
+    // Use longer timeout and smaller check interval for more robust waiting
+    GenericTestUtils.waitFor(() -> {
+      RebuildState state = NSSummaryTask.getRebuildState();
+      LOG.info("Current state: {}, clearTableCallCount: {}", state, ctx.getClearTableCallCount().get());
+      return state == RebuildState.IDLE;
+    }, 100, 20000);
+  }
 
-      LOG.info("VERIFIED: Queue architecture prevents concurrent executions. " +
-          "Multiple events can be queued but execute sequentially.");
+  private void verifyConcurrentExecutionResults(ConcurrentTestContext ctx,
+                                                List<CompletableFuture<ReconTaskController.ReInitializationResult>>
+                                                    futures)
+      throws Exception {
+    ResultCounts counts = collectResultCounts(futures);
 
-    } finally {
-      firstRebuildCanComplete.countDown();
-      executor.shutdown();
-      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-        executor.shutdownNow();
+    LOG.info("Test completed - Total queue attempts: {}, Successful queues: {}, " +
+            "Result breakdown: SUCCESS={}, RETRY_LATER={}, MAX_RETRIES={}, " +
+            "ClearTable calls: {}, Max concurrent: {}, Final state: {}",
+        ctx.getTotalQueueAttempts().get(), ctx.getSuccessfulQueueCount().get(),
+        counts.getSuccessCount(), counts.getRetryLaterCount(), counts.getMaxRetriesCount(),
+        ctx.getClearTableCallCount().get(), ctx.getMaxConcurrentExecutions().get(),
+        NSSummaryTask.getRebuildState());
+
+    assertEquals(1, ctx.getMaxConcurrentExecutions().get(),
+        "Should never have concurrent executions - queue provides serialization");
+    assertEquals(ctx.getThreadCount(), ctx.getTotalQueueAttempts().get(),
+        "All threads should have attempted to queue events");
+    assertTrue(ctx.getSuccessfulQueueCount().get() >= 1,
+        "At least one thread should have successfully queued rebuild");
+    assertThat(ctx.getClearTableCallCount().get())
+        .as("At least one rebuild should execute and not exceed successfully queued events")
+        .isPositive()
+        .isLessThanOrEqualTo(ctx.getSuccessfulQueueCount().get());
+
+    // Final verification that state is IDLE - wait one more time to ensure stability
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.IDLE,
+        100, 5000);
+    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
+        "Final state should be IDLE after all rebuilds complete");
+
+    LOG.info("VERIFIED: Queue architecture prevents concurrent executions. " +
+        "Multiple events can be queued but execute sequentially.");
+  }
+
+  private ResultCounts collectResultCounts(
+      List<CompletableFuture<ReconTaskController.ReInitializationResult>> futures)
+      throws Exception {
+    ResultCounts counts = new ResultCounts();
+    for (CompletableFuture<ReconTaskController.ReInitializationResult> future : futures) {
+      ReconTaskController.ReInitializationResult result = future.get();
+      switch (result) {
+      case SUCCESS:
+        counts.successCount++;
+        break;
+      case RETRY_LATER:
+        counts.retryLaterCount++;
+        break;
+      case MAX_RETRIES_EXCEEDED:
+        counts.maxRetriesCount++;
+        break;
+      default:
+        LOG.warn("Unexpected result: {}", result);
       }
+    }
+    return counts;
+  }
+
+  /**
+   * Context for concurrent test execution tracking.
+   */
+  private static class ConcurrentTestContext {
+    private final int threadCount;
+    private final CountDownLatch allThreadsReady;
+    private final CountDownLatch firstRebuildStarted;
+    private final CountDownLatch firstRebuildCanComplete;
+    private final AtomicInteger clearTableCallCount;
+    private final AtomicInteger concurrentExecutions;
+    private final AtomicInteger maxConcurrentExecutions;
+    private final AtomicInteger successfulQueueCount;
+    private final AtomicInteger totalQueueAttempts;
+
+    ConcurrentTestContext(int threadCount) {
+      this.threadCount = threadCount;
+      this.allThreadsReady = new CountDownLatch(threadCount);
+      this.firstRebuildStarted = new CountDownLatch(1);
+      this.firstRebuildCanComplete = new CountDownLatch(1);
+      this.clearTableCallCount = new AtomicInteger(0);
+      this.concurrentExecutions = new AtomicInteger(0);
+      this.maxConcurrentExecutions = new AtomicInteger(0);
+      this.successfulQueueCount = new AtomicInteger(0);
+      this.totalQueueAttempts = new AtomicInteger(0);
+    }
+
+    public int getThreadCount() {
+      return threadCount;
+    }
+
+    public CountDownLatch getAllThreadsReady() {
+      return allThreadsReady;
+    }
+
+    public CountDownLatch getFirstRebuildStarted() {
+      return firstRebuildStarted;
+    }
+
+    public CountDownLatch getFirstRebuildCanComplete() {
+      return firstRebuildCanComplete;
+    }
+
+    public AtomicInteger getClearTableCallCount() {
+      return clearTableCallCount;
+    }
+
+    public AtomicInteger getConcurrentExecutions() {
+      return concurrentExecutions;
+    }
+
+    public AtomicInteger getMaxConcurrentExecutions() {
+      return maxConcurrentExecutions;
+    }
+
+    public AtomicInteger getSuccessfulQueueCount() {
+      return successfulQueueCount;
+    }
+
+    public AtomicInteger getTotalQueueAttempts() {
+      return totalQueueAttempts;
+    }
+  }
+
+  /**
+   * Result counts from concurrent execution.
+   */
+  private static class ResultCounts {
+    private long successCount = 0;
+    private long retryLaterCount = 0;
+    private long maxRetriesCount = 0;
+
+    public long getSuccessCount() {
+      return successCount;
+    }
+
+    public long getRetryLaterCount() {
+      return retryLaterCount;
+    }
+
+    public long getMaxRetriesCount() {
+      return maxRetriesCount;
     }
   }
 
@@ -590,7 +680,8 @@ public class TestNSSummaryUnifiedControl {
         "State should be RUNNING during rebuild");
 
     rebuildCanFinish.countDown();
-    Thread.sleep(1000);
+    GenericTestUtils.waitFor(() -> ReconUtils.getNSSummaryRebuildState() == RebuildState.IDLE,
+        100, 5000);
     assertEquals(RebuildState.IDLE, ReconUtils.getNSSummaryRebuildState(),
         "State should return to IDLE after completion");
   }
@@ -626,12 +717,17 @@ public class TestNSSummaryUnifiedControl {
 
     assertTrue(exceptionLatch.await(10, TimeUnit.SECONDS),
         "Exception should occur");
-    Thread.sleep(1000);
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.FAILED,
+        100, 5000);
     assertEquals(RebuildState.FAILED, NSSummaryTask.getRebuildState(),
         "State should be FAILED after exception");
 
-    // Second rebuild succeeds (recovery) - wait for retry delay (2 seconds)
-    Thread.sleep(2100); // Wait for RETRY_DELAY_MS (2000ms) + buffer
+    // Second rebuild succeeds (recovery) - must wait for time-based retry delay to expire
+    // This is a deliberate time-based test of the retry mechanism
+    int retryDelayMs = 2100; // RETRY_DELAY_MS (2000ms) + buffer
+    long deadline = System.currentTimeMillis() + retryDelayMs;
+    GenericTestUtils.waitFor(() -> System.currentTimeMillis() >= deadline,
+        100, retryDelayMs + 1000);
 
     ReconTaskController.ReInitializationResult result2 =
         taskController.queueReInitializationEvent(
@@ -640,7 +736,8 @@ public class TestNSSummaryUnifiedControl {
         "Second event should be queued successfully after retry delay");
 
     assertTrue(recoveryLatch.await(10, TimeUnit.SECONDS), "Recovery should execute");
-    Thread.sleep(1000);
+    GenericTestUtils.waitFor(() -> NSSummaryTask.getRebuildState() == RebuildState.IDLE,
+        100, 5000);
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
         "State should be IDLE after recovery");
   }
@@ -661,8 +758,11 @@ public class TestNSSummaryUnifiedControl {
     assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result1,
         "First attempt should return RETRY_LATER due to checkpoint failure");
 
-    // After delay, try again
-    Thread.sleep(2100);
+    // After delay, try again - must wait for time-based retry delay to expire
+    int retryDelayMs = 2100; // RETRY_DELAY_MS (2000ms) + buffer
+    long deadline = System.currentTimeMillis() + retryDelayMs;
+    GenericTestUtils.waitFor(() -> System.currentTimeMillis() >= deadline,
+        100, retryDelayMs + 1000);
     ReconTaskController.ReInitializationResult result2 =
         controllerSpy.queueReInitializationEvent(
             ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
