@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.security;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Instant;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ShortLivedTokenSecretManager;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 
 /**
@@ -50,6 +52,25 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   }
 
   /**
+   * Override token generation so that we first compute the identifier bytes, then sign exactly those bytes, and
+   * return a Token that contains those same identifier bytes. This avoids non-determinism from multiple serializations
+   * which would break unit tests.  If we used the inherited generateToken() in ShortLivedTokenSecretManager, it
+   * would have made two serialization calls:
+   *   1) in the call to secretKey.sign() in the createPassword() method
+   *   2) in the call to tokenIdentifier.getBytes() for the Token constructor
+   * These two calls would produce different secretAccessKey encrypted values because of the random initialization
+   * vector and random salt and hence give non-deterministic return value, so here we are only serializing once.
+   */
+  @Override
+  public Token<STSTokenIdentifier> generateToken(STSTokenIdentifier tokenIdentifier) {
+    final ManagedSecretKey secretKey = secretKeyClient.getCurrentSecretKey();
+    tokenIdentifier.setSecretKeyId(secretKey.getId());
+    final byte[] identifierBytes = tokenIdentifier.getBytes();
+    final byte[] password = secretKey.sign(identifierBytes);
+    return new Token<>(identifierBytes, password, tokenIdentifier.getKind(), new Text(tokenIdentifier.getService()));
+  }
+
+  /**
    * Create an STS token and return it as an encoded string.
    *
    * @param tempAccessKeyId     the temporary access key ID
@@ -59,11 +80,12 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
    * @param secretAccessKey     the secret access key associated with the temporary access key ID
    * @param sessionPolicy       an optional opaque identifier that further limits the scope of
    *                            the permissions granted by the role
+   * @param clock               the system clock
    * @return base64 encoded token string
    */
   public String createSTSTokenString(String tempAccessKeyId, String originalAccessKeyId, String roleArn,
-      int durationSeconds, String secretAccessKey, String sessionPolicy) throws IOException {
-    final Instant expiration = Instant.now().plusSeconds(durationSeconds);
+      int durationSeconds, String secretAccessKey, String sessionPolicy, Clock clock) throws IOException {
+    final Instant expiration = clock.instant().plusSeconds(durationSeconds);
 
     // Get the current secret key for encryption
     final ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();

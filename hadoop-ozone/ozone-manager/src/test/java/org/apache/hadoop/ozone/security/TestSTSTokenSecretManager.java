@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,8 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSTSTokenSecretManager {
   private STSTokenSecretManager secretManager;
+  private TestClock clock;
+
   private static final String TEMP_ACCESS_KEY = "temp-access-key";
   private static final String ORIGINAL_ACCESS_KEY = "original-access-key";
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
@@ -71,14 +75,13 @@ public class TestSTSTokenSecretManager {
     when(mockSecretKeyClient.getCurrentSecretKey()).thenReturn(mockSecretKey);
 
     secretManager = new STSTokenSecretManager(mockSecretKeyClient);
+    clock = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
   }
 
   @Test
   public void testCreateSTSTokenStringContainsCorrectFields() throws IOException {
-    final Instant beforeCreation = Instant.now();
-
     final String tokenString = secretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
@@ -88,7 +91,6 @@ public class TestSTSTokenSecretManager {
     final STSTokenIdentifier identifier = new STSTokenIdentifier();
     identifier.setEncryptionKey(sharedSecretKey.getEncoded());
     identifier.readFromByteArray(token.getIdentifier());
-    final Instant afterCreation = Instant.now();
     final Instant expiration = identifier.getExpiry();
 
     assertEquals(TEMP_ACCESS_KEY, identifier.getTempAccessKeyId());
@@ -99,15 +101,13 @@ public class TestSTSTokenSecretManager {
     assertNotNull(identifier.getSecretKeyId());
     assertEquals(new Text("STSToken"), identifier.getKind());
     assertEquals("STS", identifier.getService());
-    // Verify expiration is approximately durationSeconds in the future
-    assertTrue(expiration.isAfter(beforeCreation.plusSeconds(DURATION_SECONDS - 1)));
-    assertTrue(expiration.isBefore(afterCreation.plusSeconds(DURATION_SECONDS + 1)));
+    assertEquals(clock.millis() + (DURATION_SECONDS * 1000), expiration.toEpochMilli());
   }
 
   @Test
   public void testCreateSTSTokenStringWithNullSessionPolicy() throws IOException {
     final String tokenString = secretManager.createSTSTokenString(
-        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null);
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, null, clock);
 
     // Decode the token
     final Token<STSTokenIdentifier> token = new Token<>();
