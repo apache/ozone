@@ -197,7 +197,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
         Cluster Capacity
       </div>
       <Link
-        to={{ pathname: '/DiskUsage' }}
+        to={{ pathname: '/NamespaceUsage' }}
         style={{
           fontWeight: 400
         }}> View Usage </Link>
