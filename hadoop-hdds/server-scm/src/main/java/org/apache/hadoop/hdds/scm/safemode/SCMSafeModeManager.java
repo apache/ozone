@@ -164,16 +164,20 @@ public class SCMSafeModeManager implements SafeModeManager {
     // and notify listeners.
     if (validatedPreCheckRules.size() == preCheckRules.size()
         && status.compareAndSet(SafeModeStatus.INITIAL, SafeModeStatus.PRE_CHECKS_PASSED)) {
+      logSafeModeStatus();
       LOG.info("All SCM safe mode pre check rules have passed");
       emitSafeModeStatus();
     }
 
-    if (validatedRules.size() == exitRules.size()
-        && status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
-      // All rules are satisfied, we can exit safe mode.
-      LOG.info("ScmSafeModeManager, all rules are successfully validated");
-      LOG.info("SCM exiting safe mode.");
-      emitSafeModeStatus();
+    if (validatedRules.size() == exitRules.size()) {
+      logSafeModeStatus();
+      
+      if (status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
+        // All rules are satisfied, we can exit safe mode.
+        LOG.info("ScmSafeModeManager, all rules are successfully validated");
+        LOG.info("SCM exiting safe mode.");
+        emitSafeModeStatus();
+      }
     }
   }
 
@@ -265,21 +269,28 @@ public class SCMSafeModeManager implements SafeModeManager {
       stopSafeModePeriodicLogger();
       return;
     }
-    SafeModeStatus s = status.get();
+    SafeModeStatus safeModeStatus = status.get();
     int validatedCount;
     int preCheckValidatedCount;
     synchronized (this) {
       validatedCount = validatedRules.size();
       preCheckValidatedCount = validatedPreCheckRules.size();
     }
-    String rules = getRuleStatus().entrySet().stream()
-        .map(e -> e.getKey() + "(valid=" + e.getValue().getLeft()
-            + ", " + e.getValue().getRight() + ")")
+    String rules = exitRules.values().stream()
+        .map(rule -> {
+          String name = rule.getRuleName();
+          boolean isValidated;
+          synchronized (this) {
+            isValidated = validatedRules.contains(name);
+          }
+          return name + "(status=" + (isValidated ? "validated" : "waiting")
+              + ", " + rule.getStatusText() + ")";
+        })
         .collect(Collectors.joining(", "));
     LOG.info(
         "SCM SafeMode periodic status: state={}, preCheckComplete={}, validatedRules={}/{}," +
             " preCheckValidated={}/{}, rules=[{}]",
-        s, s.isPreCheckComplete(), validatedCount, exitRules.size(),
+        safeModeStatus, safeModeStatus.isPreCheckComplete(), validatedCount, exitRules.size(),
         preCheckValidatedCount, preCheckRules.size(), rules);
   }
 
