@@ -1191,4 +1191,14 @@ public interface OzoneManagerProtocol
       String awsIamSessionPolicy) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
   }
+
+  /**
+   * Revokes an STS token.
+   * @param accessKeyId             The STS accessKeyId (starting with ASIA...)
+   * @param sessionToken            The STS session token
+   * @throws IOException            if an error occurs while revoking the STS token
+   */
+  default void revokeSTSToken(String accessKeyId, String sessionToken) throws IOException  {
+    throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
+  }
 }

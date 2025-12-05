@@ -157,6 +157,7 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   AssumeRole = 143;
+  RevokeSTSToken = 144;
 }
 
 enum SafeMode {
@@ -306,6 +307,7 @@ message OMRequest {
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
   optional AssumeRoleRequest                assumeRoleRequest              = 144;
+  optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 145;
 }
 
 message OMResponse {
@@ -440,6 +442,7 @@ message OMResponse {
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
   optional AssumeRoleResponse                assumeRoleResponse            = 143;
+  optional RevokeSTSTokenResponse            revokeSTSTokenResponse        = 144;
 }
 
 enum Status {
@@ -2379,6 +2382,14 @@ message AssumeRoleResponse {
   required string sessionToken            = 3;
   required uint64 expirationEpochSeconds  = 4;
   required string assumedRoleId           = 5;
+}
+
+message RevokeSTSTokenRequest {
+    required string accessKeyId = 1;
+    required string sessionToken = 2;
+}
+
+message RevokeSTSTokenResponse {
 }
 
 /**

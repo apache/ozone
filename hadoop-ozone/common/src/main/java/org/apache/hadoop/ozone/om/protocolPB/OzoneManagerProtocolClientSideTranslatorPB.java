@@ -2675,6 +2675,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getAssumeRoleResponse());
   }
 
+  @Override
+  public void revokeSTSToken(String accessKeyId, String sessionToken) throws IOException {
+    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest request =
+        OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+            .setAccessKeyId(accessKeyId)
+            .setSessionToken(sessionToken)
+            .build();
+
+    final OMRequest omRequest = createOMRequest(Type.RevokeSTSToken)
+        .setRevokeSTSTokenRequest(request)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
   private SafeMode toProtoBuf(SafeModeAction action) {
     switch (action) {
     case ENTER:
