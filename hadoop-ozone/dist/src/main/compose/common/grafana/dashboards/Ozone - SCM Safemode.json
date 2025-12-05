@@ -31,6 +31,9 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "max": 1,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
@@ -120,6 +123,8 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
@@ -220,6 +225,8 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
@@ -320,6 +327,8 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
@@ -420,6 +429,8 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
@@ -520,6 +531,8 @@
           },
           "fieldConfig": {
             "defaults": {
+              "min": 0,
+              "decimals": 0,
               "color": {
                 "mode": "palette-classic"
               },
