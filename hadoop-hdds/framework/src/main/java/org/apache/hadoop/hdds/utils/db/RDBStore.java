@@ -363,14 +363,7 @@ public class RDBStore implements DBStore {
    */
   @Override
   public void dropTable(String tableName) throws RocksDatabaseException {
-    ColumnFamily columnFamily = db.getColumnFamily(tableName);
-    if (columnFamily != null) {
-      try {
-        db.getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
-      } catch (RocksDBException e) {
-        throw new RocksDatabaseException("Failed to drop " + tableName, e);
-      }
-    }
+    db.dropColumnFamily(tableName);
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
