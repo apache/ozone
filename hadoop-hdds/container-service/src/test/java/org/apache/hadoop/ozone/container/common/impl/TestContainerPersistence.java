@@ -1138,9 +1138,10 @@ public class TestContainerPersistence {
     }
 
     // Count must be >0
-    Exception exception = assertThrows(IllegalArgumentException.class,
-        () -> blockManager.listBlock(container, 0, -1));
+    final int count = -1234;
+    final Exception exception = assertThrows(IllegalStateException.class,
+        () -> blockManager.listBlock(container, 0, count));
     assertThat(exception.getMessage())
-        .contains("Count must be a positive number.");
+        .contains(count + " <= 0");
   }
 }

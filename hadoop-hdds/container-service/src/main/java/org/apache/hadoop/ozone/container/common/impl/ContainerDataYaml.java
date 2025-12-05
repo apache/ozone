@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.impl;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.KEYVALUE_YAML_TAG;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +28,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -87,7 +87,7 @@ public final class ContainerDataYaml {
    */
   public static ContainerData readContainerFile(File containerFile)
       throws IOException {
-    Preconditions.checkNotNull(containerFile, "containerFile cannot be null");
+    Objects.requireNonNull(containerFile, "containerFile == null");
     try (InputStream inputFileStream = Files.newInputStream(containerFile.toPath())) {
       return readContainer(inputFileStream);
     }
