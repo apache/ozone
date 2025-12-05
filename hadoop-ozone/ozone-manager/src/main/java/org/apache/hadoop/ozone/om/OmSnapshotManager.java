@@ -858,7 +858,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       return new SnapshotDiffResponse(diffReport, DONE, 0L);
     }
 
-    int index = getIndexFromToken(token);
+    String index = validateToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }
@@ -982,24 +982,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     return inFlightSnapshotCount.get();
   }
 
-  private int getIndexFromToken(final String token) throws IOException {
+  private String validateToken(final String token) throws IOException {
     if (isBlank(token)) {
-      return 0;
+      return "";
     }
 
     // Validate that token passed in the request is valid integer as of now.
     // Later we can change it if we migrate to encrypted or cursor token.
-    try {
-      int index = Integer.parseInt(token);
-      if (index < 0) {
-        throw new IOException("Passed token is invalid. Resend the request " +
-            "with valid token returned in previous request.");
-      }
-      return index;
-    } catch (NumberFormatException exception) {
+    if (!token.matches("[0-9]+")) {
       throw new IOException("Passed token is invalid. " +
           "Resend the request with valid token returned in previous request.");
     }
+    return token;
   }
 
   private ManagedRocksDB createRocksDbForSnapshotDiff(
