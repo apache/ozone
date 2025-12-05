@@ -181,6 +181,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private TypedTable<String, String> snapshotRenamedTable;
   private TypedTable<String, CompactionLogEntry> compactionLogTable;
 
+  private TypedTable<String, String> s3RevokedStsTokenTable;
+
   private OzoneManager ozoneManager;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
@@ -486,6 +488,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    // temporaryAccessKeyId -> sessionToken
+    s3RevokedStsTokenTable = initializer.get(OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF);
   }
 
   /**
@@ -1681,6 +1686,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, String> getS3RevokedStsTokenTable() {
+    return s3RevokedStsTokenTable;
   }
 
   /**
