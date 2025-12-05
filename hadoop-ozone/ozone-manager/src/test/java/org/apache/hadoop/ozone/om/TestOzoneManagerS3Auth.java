@@ -88,8 +88,8 @@ public class TestOzoneManagerS3Auth {
 
     final S3Authentication s3Auth = S3Authentication.newBuilder()
         .setAccessId(accessId)
-        .setSignature("sig")
-        .setStringToSign("str")
+        .setSignature("signature")
+        .setStringToSign("stringToSign")
         .setSessionToken(emptySessionToken)
         .build();
     OzoneManager.setS3Auth(s3Auth);
