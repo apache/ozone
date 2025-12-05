@@ -318,7 +318,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
 
     if (!enoughForData) {
-      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+      LOG.info("Datanode {} has no volumes with enough space to allocate {} " +
               "bytes for data.", datanodeDetails, dataSizeRequired);
       return false;
     }
@@ -335,7 +335,7 @@ public abstract class SCMCommonPlacementPolicy implements
       enoughForMeta = true;
     }
     if (!enoughForMeta) {
-      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+      LOG.info("Datanode {} has no volumes with enough space to allocate {} " +
               "bytes for metadata.", datanodeDetails, metadataSizeRequired);
     }
     return enoughForMeta;
