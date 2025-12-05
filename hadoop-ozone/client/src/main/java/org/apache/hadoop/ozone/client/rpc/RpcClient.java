@@ -2797,6 +2797,11 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy);
   }
 
+  @Override
+  public void revokeSTSToken(String accessKeyId, String sessionToken) throws IOException {
+    ozoneManagerClient.revokeSTSToken(accessKeyId, sessionToken);
+  }
+
   private static ExecutorService createThreadPoolExecutor(
        int corePoolSize, int maximumPoolSize, String threadNameFormat) {
     return new ThreadPoolExecutor(corePoolSize, maximumPoolSize,
