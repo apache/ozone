@@ -94,6 +94,7 @@ public class TestStringToSignProducer {
             //NOOP
           }
         }.parseSignature();
+    signatureInfo.setPayloadHash("Content-SHA");
     signatureInfo.setUnfilteredURI("/buckets");
 
     headers.fixContentType();
