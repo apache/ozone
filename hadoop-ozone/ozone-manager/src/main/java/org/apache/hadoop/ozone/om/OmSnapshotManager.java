@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.commons.io.file.PathUtils.deleteDirectory;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
@@ -57,7 +58,6 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.Nonnull;
 import java.io.File;
@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -272,30 +273,6 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
-
-    // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
-    //  pluggable.
-    RemovalListener<String, OmSnapshot> removalListener = notification -> {
-      try {
-        final String snapshotTableKey = notification.getKey();
-        final OmSnapshot omSnapshot = notification.getValue();
-        if (omSnapshot != null) {
-          // close snapshot's rocksdb on eviction
-          LOG.debug("Closing OmSnapshot '{}' due to {}",
-              snapshotTableKey, notification.getCause());
-          omSnapshot.close();
-        } else {
-          // Cache value would never be null in RemovalListener.
-
-          // When a soft reference is GC'ed by the JVM, this RemovalListener
-          // would be called. But the cache value should still exist at that
-          // point. Thus in-theory this condition won't be triggered by JVM GC
-          throw new IllegalStateException("Unexpected: OmSnapshot is null");
-        }
-      } catch (IOException e) {
-        LOG.error("Failed to close OmSnapshot: {}", notification.getKey(), e);
-      }
-    };
 
     // Init snapshot cache
     long cacheCleanupServiceInterval = ozoneManager.getConfiguration()
@@ -509,6 +486,64 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCacheEntry(UUID key) {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
+    }
+  }
+
+  /**
+   * Deletes the snapshot checkpoint directories for a given snapshot ID up to
+   * the specified maximum version. This method ensures that all directories
+   * containing checkpoint data for the specified snapshot ID up to the max
+   * version are removed in a controlled manner.
+   *
+   * @param snapshotId The unique identifier of the snapshot whose checkpoint
+   *                   directories are to be deleted.
+   * @param maxVersion The maximum version of checkpoint directories to delete.
+   *                   If a value less than 0 is provided, it defaults to the
+   *                   current maximum version of the snapshot.
+   * @throws IOException If there is a failure acquiring the snapshot database
+   *                     lock or while deleting directories.
+   * @throws IllegalArgumentException If the specified maxVersion is greater
+   *                                  than the current maximum version of the
+   *                                  snapshot.
+   */
+  public void deleteSnapshotCheckpointDirectories(UUID snapshotId, int maxVersion) throws IOException {
+    // Acquire Snapshot DBHandle lock before removing the older version to ensure all readers are done with the
+    // snapshot db use.
+    try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = getSnapshotCache().lock(snapshotId)) {
+      if (!lock.get().isLockAcquired()) {
+        throw new IOException("Failed to acquire dbHandlelock on snapshot: " + snapshotId);
+      }
+      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
+               snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotId)) {
+        if (maxVersion < 0) {
+          maxVersion = snapMetaProvider.getMeta().getVersion();
+        }
+        if (maxVersion > snapMetaProvider.getMeta().getVersion()) {
+          throw new IllegalArgumentException(
+              String.format("Max Version to be deleted can never be greater than the existing " +
+                  "version of the snapshot. Argument passed : %d and snapshotMaxVersion : %d", maxVersion,
+                  snapMetaProvider.getMeta().getVersion()));
+        }
+        // Binary search the smallest existing version and delete the older versions starting from the smallest version.
+        // This is to ensure efficient crash recovery.
+        int smallestExistingVersion = 0;
+        int largestExistingVersion = maxVersion;
+        while (smallestExistingVersion <= largestExistingVersion) {
+          int midVersion = smallestExistingVersion + (largestExistingVersion - smallestExistingVersion) / 2;
+          Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, midVersion);
+          if (path.toFile().exists()) {
+            largestExistingVersion = midVersion - 1;
+          } else {
+            smallestExistingVersion = midVersion + 1;
+          }
+        }
+        // Delete the older version directories. Always starting deletes from smallest version to largest version to
+        // ensure binary search works correctly on a later basis.
+        for (int version = smallestExistingVersion; version <= maxVersion; version++) {
+          Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, version);
+          deleteDirectory(path);
+        }
+      }
     }
   }
 

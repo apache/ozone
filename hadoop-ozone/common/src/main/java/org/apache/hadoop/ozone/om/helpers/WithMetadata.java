@@ -59,7 +59,7 @@ public abstract class WithMetadata {
       metadata = new ConcurrentHashMap<>();
     }
 
-    protected Builder(WithObjectID obj) {
+    protected Builder(WithMetadata obj) {
       metadata = new ConcurrentHashMap<>(obj.getMetadata());
     }
 
@@ -81,7 +81,7 @@ public abstract class WithMetadata {
       return this;
     }
 
-    protected Map<String, String> getMetadata() {
+    public Map<String, String> getMetadata() {
       return metadata;
     }
   }

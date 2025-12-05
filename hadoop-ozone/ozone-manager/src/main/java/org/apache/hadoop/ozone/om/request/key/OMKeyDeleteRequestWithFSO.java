@@ -125,7 +125,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omKeyInfo.setKeyName(fileName);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName,
@@ -156,7 +158,6 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      // TODO: HDDS-4565: consider all the sub-paths if the path is a dir.
       long quotaReleased = sumBlockLengths(omKeyInfo);
       // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);

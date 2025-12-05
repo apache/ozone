@@ -36,6 +36,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class contains ozone admin user information, username and group,
@@ -161,6 +162,21 @@ public class OzoneAdmins {
   }
 
   /**
+   * Return list of administrators from config value.
+   * The starterUser user will default to an admin.
+   * @param valueString the configuration value.
+   * @param starterUser initial user to consider in admin list.
+   */
+  public static Collection<String> getOzoneAdminsFromConfigValue(
+      String valueString, String starterUser) {
+    Collection<String> ozAdmins = StringUtils.getTrimmedStringCollection(valueString);
+    if (!ozAdmins.contains(starterUser)) {
+      ozAdmins.add(starterUser);
+    }
+    return ozAdmins;
+  }
+
+  /**
    * Return list of administrators Groups from config.
    * The service startup user will default to an admin.
    * @param configuration the configuration settings to apply.
@@ -178,6 +194,15 @@ public class OzoneAdmins {
   public static Collection<String> getOzoneReadOnlyAdminsFromConfig(
       OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
+  }
+
+  /**
+   * Return list of Ozone Read only admin Usernames from config value.
+   * @param valueString the configuration value.
+   */
+  public static Collection<String> getOzoneReadOnlyAdminsFromConfigValue(
+      String valueString) {
+    return StringUtils.getTrimmedStringCollection(valueString);
   }
 
   /**

@@ -159,7 +159,8 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public void setKeyName(String keyName) {
-    this.keyName = keyName;
+    this.keyName = Objects.requireNonNull(keyName, "keyName == null");
+    this.fileName = OzoneFSUtils.getFileName(keyName);
   }
 
   public long getDataSize() {
@@ -172,10 +173,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public void setDataSize(long size) {
     this.dataSize = size;
-  }
-
-  public void setFileName(String fileName) {
-    this.fileName = fileName;
   }
 
   public String getFileName() {
@@ -500,7 +497,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmKeyInfo> {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -560,8 +557,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setKeyName(String key) {
-      this.keyName = key;
+    public Builder setKeyName(String newValue) {
+      if (!Objects.equals(newValue, keyName)) {
+        this.keyName = newValue;
+        this.fileName = null;
+      }
       return this;
     }
 
@@ -655,11 +655,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setFileName(String keyFileName) {
-      this.fileName = keyFileName;
-      return this;
-    }
-
     @Override
     public Builder setParentObjectID(long parentID) {
       super.setParentObjectID(parentID);
@@ -673,6 +668,12 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder setFile(boolean isAFile) {
       this.isFile = isAFile;
+      return this;
+    }
+
+    public Builder setTags(Map<String, String> tags) {
+      this.tags.clear();
+      addAllTags(tags);
       return this;
     }
 
@@ -691,7 +692,18 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public OmKeyInfo build() {
+    @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(keyName, "keyName == null");
+    }
+
+    @Override
+    protected OmKeyInfo buildObject() {
+      // not persisted to DB
+      if (fileName == null) {
+        fileName = OzoneFSUtils.getFileName(keyName);
+      }
       return new OmKeyInfo(this);
     }
   }
@@ -856,8 +868,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
     }
-    // not persisted to DB. FileName will be filtered out from keyName
-    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder;
   }
 
@@ -939,13 +949,13 @@ public final class OmKeyInfo extends WithParentObjectId
     return Objects.hash(volumeName, bucketName, keyName, getParentObjectID());
   }
 
-  /**
-   * Return a new copy of the object.
-   */
   public Builder toBuilder() {
     return new Builder(this);
   }
 
+  /**
+   * Return a new copy of the object.
+   */
   @Override
   public OmKeyInfo copyObject() {
     return new Builder(this).build();
