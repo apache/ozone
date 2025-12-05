@@ -33,6 +33,7 @@ public class ContainerEntry {
   private final ContainerInfo info;
   private Map<ContainerReplica, ContainerReplica> replicaMap = Collections.emptyMap();
   private Set<ContainerReplica> replicas = Collections.emptySet();
+
   ContainerEntry(ContainerInfo info) {
     this.info = info;
   }
