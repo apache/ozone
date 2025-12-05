@@ -690,6 +690,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs.permissions</name>
     <value>750</value>
     <description>
