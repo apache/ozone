@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.function.Function.identity;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
@@ -32,7 +33,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.google.common.graph.MutableGraph;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.BufferedWriter;
@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -84,7 +86,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
@@ -153,7 +155,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Used to trim the file extension when writing compaction entries to the log
    * to save space.
    */
-  static final String SST_FILE_EXTENSION = ".sst";
+  public static final String SST_FILE_EXTENSION = ".sst";
   public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
   static final String PRUNED_SST_FILE_TEMP = "pruned.sst.tmp";
@@ -170,8 +172,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final Scheduler scheduler;
   private volatile boolean closed;
   private final long maxAllowedTimeInDag;
-  private final BootstrapStateHandler.Lock lock
-      = new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
   private static final int SST_READ_AHEAD_SIZE = 2 * 1024 * 1024;
   private int pruneSSTFileBatchSize;
   private SSTFilePruningMetrics sstFilePruningMetrics;
@@ -215,12 +216,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                           String sstBackupDirName,
                           String compactionLogDirName,
                           String activeDBLocationName,
-                          ConfigurationSource configuration) {
+                          ConfigurationSource configuration,
+                          Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
     Preconditions.checkNotNull(compactionLogDirName);
     Preconditions.checkNotNull(activeDBLocationName);
-
+    Preconditions.checkNotNull(lockSupplier);
+    this.lock = new BootstrapStateHandler.Lock(lockSupplier);
     this.metadataDir = metadataDirName;
     this.compactionLogDir =
         createCompactionLogDir(metadataDirName, compactionLogDirName);
@@ -598,57 +601,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   /**
-   * Helper method to trim the filename retrieved from LiveFileMetaData.
-   */
-  private String trimSSTFilename(String filename) {
-    if (!filename.startsWith("/")) {
-      final String errorMsg = String.format(
-          "Invalid start of filename: '%s'. Expected '/'", filename);
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      final String errorMsg = String.format(
-          "Invalid extension of file: '%s'. Expected '%s'",
-          filename, SST_FILE_EXTENSION_LENGTH);
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-    return filename.substring("/".length(),
-        filename.length() - SST_FILE_EXTENSION_LENGTH);
-  }
-
-  /**
-   * Read the current Live manifest for a given RocksDB instance (Active or
-   * Checkpoint).
-   * @param rocksDB open rocksDB instance.
-   * @param tableFilter set of column-family/table names to include when collecting live SSTs.
-   * @return a list of SST files (without extension) in the DB.
-   */
-  public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB, Set<String> tableFilter) {
-    HashSet<String> liveFiles = new HashSet<>();
-
-    final Set<String> cfs = Sets.newHashSet(
-        org.apache.hadoop.hdds.StringUtils.bytes2String(
-            RocksDB.DEFAULT_COLUMN_FAMILY), "keyTable", "directoryTable",
-        "fileTable");
-    // Note it retrieves only the selected column families by the descriptor
-    // i.e. keyTable, directoryTable, fileTable
-    List<LiveFileMetaData> liveFileMetaDataList =
-        RdbUtil.getLiveSSTFilesForCFs(rocksDB, cfs);
-    LOG.debug("SST File Metadata for DB: " + rocksDB.get().getName());
-    for (LiveFileMetaData m : liveFileMetaDataList) {
-      if (!tableFilter.contains(StringUtils.bytes2String(m.columnFamilyName()))) {
-        continue;
-      }
-      LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
-      final String trimmedFilename = trimSSTFilename(m.fileName());
-      liveFiles.add(trimmedFilename);
-    }
-    return liveFiles;
-  }
-
-  /**
    * Process log line of compaction log text file input and populate the DAG.
    * It also adds the compaction log entry to compaction log table.
    */
@@ -791,30 +743,25 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * exist in backup directory before being involved in compactions),
    * and appends the extension '.sst'.
    */
-  private String getSSTFullPath(String sstFilenameWithoutExtension,
-      String... dbPaths) {
+  private Path getSSTFullPath(SstFileInfo sstFileInfo, Path... dbPaths) throws IOException {
 
     // Try to locate the SST in the backup dir first
-    final Path sstPathInBackupDir = Paths.get(sstBackupDir,
-        sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+    final Path sstPathInBackupDir = sstFileInfo.getFilePath(Paths.get(sstBackupDir).toAbsolutePath());
     if (Files.exists(sstPathInBackupDir)) {
-      return sstPathInBackupDir.toString();
+      return sstPathInBackupDir.toAbsolutePath();
     }
 
     // SST file does not exist in the SST backup dir, this means the SST file
     // has not gone through any compactions yet and is only available in the
     // src DB directory or destDB directory
-    for (String dbPath : dbPaths) {
-      final Path sstPathInDBDir = Paths.get(dbPath,
-          sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+    for (Path dbPath : dbPaths) {
+      final Path sstPathInDBDir = sstFileInfo.getFilePath(dbPath);
       if (Files.exists(sstPathInDBDir)) {
-        return sstPathInDBDir.toString();
+        return sstPathInDBDir.toAbsolutePath();
       }
     }
 
-    // TODO: More graceful error handling?
-    throw new RuntimeException("Unable to locate SST file: " +
-        sstFilenameWithoutExtension);
+    throw new IOException("Unable to locate SST file: " + sstFileInfo);
   }
 
   /**
@@ -824,30 +771,35 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param versionMap version map containing the connection between source snapshot version and dest snapshot version.
    * @param tablesToLookup tablesToLookup set of table (column family) names used to restrict which SST files to return.
-   * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
-   *                                 for snapDiff job.
-   * @return A list of SST files without extension.
-   *         e.g. ["/path/to/sstBackupDir/000050.sst",
-   *               "/path/to/sstBackupDir/000060.sst"]
+   * @return map of SST file absolute paths with extension to SstFileInfo.
    */
-  public synchronized Optional<List<String>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest, Set<String> tablesToLookup,
-      String sstFilesDirForSnapDiffJob) {
+  public synchronized Optional<Map<Path, SstFileInfo>> getSSTDiffListWithFullPath(DifferSnapshotInfo src,
+      DifferSnapshotInfo dest, Map<Integer, Integer> versionMap, TablePrefixInfo prefixInfo,
+      Set<String> tablesToLookup) throws IOException {
+    int srcVersion = src.getMaxVersion();
+    if (!versionMap.containsKey(srcVersion)) {
+      throw new IOException("No corresponding dest version corresponding srcVersion : " + srcVersion + " in " +
+          "versionMap : " + versionMap);
+    }
+    int destVersion = versionMap.get(srcVersion);
+    DifferSnapshotVersion srcSnapshotVersion = new DifferSnapshotVersion(src, src.getMaxVersion(), tablesToLookup);
+    DifferSnapshotVersion destSnapshotVersion = new DifferSnapshotVersion(dest, destVersion, tablesToLookup);
 
-    Optional<List<String>> sstDiffList = getSSTDiffList(src, dest, tablesToLookup);
-
-    return sstDiffList.map(diffList -> diffList.stream()
-        .map(
-            sst -> {
-              String sstFullPath = getSSTFullPath(sst, src.getDbPath(), dest.getDbPath());
-              Path link = Paths.get(sstFilesDirForSnapDiffJob,
-                  sst + SST_FILE_EXTENSION);
-              Path srcFile = Paths.get(sstFullPath);
-              createLink(link, srcFile);
-              return link.toString();
-            })
-        .collect(Collectors.toList()));
+    // If the source snapshot version is 0, use the compaction DAG path otherwise performs a full diff on the basis
+    // of the sst file names.
+    Optional<List<SstFileInfo>> sstDiffList = getSSTDiffList(srcSnapshotVersion, destSnapshotVersion, prefixInfo,
+        tablesToLookup, srcVersion == 0);
+    if (sstDiffList.isPresent()) {
+      Map<Path, SstFileInfo> sstFileInfoMap = new HashMap<>();
+      for (SstFileInfo sstFileInfo : sstDiffList.get()) {
+        Path sstPath = getSSTFullPath(sstFileInfo, srcSnapshotVersion.getDbPath());
+        sstFileInfoMap.put(sstPath, sstFileInfo);
+      }
+      return Optional.of(sstFileInfoMap);
+    }
+    return Optional.empty();
   }
 
   /**
@@ -859,57 +811,116 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param prefixInfo TablePrefixInfo to filter irrelevant SST files; can be null.
    * @param tablesToLookup tablesToLookup Set of column-family (table) names to include when reading SST files;
    *                       must be non-null.
+   * @param useCompactionDag If true, the method uses the compaction history to produce the incremental diff,
+   *                         otherwise a full diff would be performed on the basis of the sst file names.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
-  public synchronized Optional<List<String>> getSSTDiffList(DifferSnapshotInfo src,
-      DifferSnapshotInfo dest, Set<String> tablesToLookup) {
+  public synchronized Optional<List<SstFileInfo>> getSSTDiffList(DifferSnapshotVersion src,
+      DifferSnapshotVersion dest, TablePrefixInfo prefixInfo, Set<String> tablesToLookup, boolean useCompactionDag) {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB(), tablesToLookup);
-    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB(), tablesToLookup);
+    Map<String, SstFileInfo>  fwdDAGSameFiles = new HashMap<>();
+    Map<String, SstFileInfo>  fwdDAGDifferentFiles = new HashMap<>();
 
-    Set<String> fwdDAGSameFiles = new HashSet<>();
-    Set<String> fwdDAGDifferentFiles = new HashSet<>();
-
-    LOG.debug("Doing forward diff from src '{}' to dest '{}'",
-        src.getDbPath(), dest.getDbPath());
-    internalGetSSTDiffList(src, dest, srcSnapFiles, destSnapFiles,
-        fwdDAGSameFiles, fwdDAGDifferentFiles);
-
+    if (useCompactionDag) {
+      LOG.debug("Doing forward diff from src '{}' to dest '{}'", src.getDbPath(), dest.getDbPath());
+      internalGetSSTDiffList(src, dest, fwdDAGSameFiles, fwdDAGDifferentFiles);
+    } else {
+      Set<SstFileInfo> srcSstFileInfos = new HashSet<>(src.getSstFileMap().values());
+      Set<SstFileInfo> destSstFileInfos = new HashSet<>(dest.getSstFileMap().values());
+      for (SstFileInfo srcSstFileInfo : srcSstFileInfos) {
+        if (destSstFileInfos.contains(srcSstFileInfo)) {
+          fwdDAGSameFiles.put(srcSstFileInfo.getFileName(), srcSstFileInfo);
+        } else {
+          fwdDAGDifferentFiles.put(srcSstFileInfo.getFileName(), srcSstFileInfo);
+        }
+      }
+      for (SstFileInfo destSstFileInfo : destSstFileInfos) {
+        if (srcSstFileInfos.contains(destSstFileInfo)) {
+          fwdDAGSameFiles.put(destSstFileInfo.getFileName(), destSstFileInfo);
+        } else {
+          fwdDAGDifferentFiles.put(destSstFileInfo.getFileName(), destSstFileInfo);
+        }
+      }
+    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result of diff from src '" + src.getDbPath() + "' to dest '" +
           dest.getDbPath() + "':");
       StringBuilder logSB = new StringBuilder();
 
       logSB.append("Fwd DAG same SST files:      ");
-      for (String file : fwdDAGSameFiles) {
+      for (String file : fwdDAGSameFiles.keySet()) {
         logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug(logSB.toString());
 
       logSB.setLength(0);
       logSB.append("Fwd DAG different SST files: ");
-      for (String file : fwdDAGDifferentFiles) {
+      for (String file : fwdDAGDifferentFiles.keySet()) {
         logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug("{}", logSB);
     }
 
     // Check if the DAG traversal was able to reach all the destination SST files.
-    for (String destSnapFile : destSnapFiles) {
-      if (!fwdDAGSameFiles.contains(destSnapFile) && !fwdDAGDifferentFiles.contains(destSnapFile)) {
+    for (String destSnapFile : dest.getSstFiles()) {
+      if (!fwdDAGSameFiles.containsKey(destSnapFile) && !fwdDAGDifferentFiles.containsKey(destSnapFile)) {
         return Optional.empty();
       }
     }
 
-    if (src.getTablePrefixes() != null && src.getTablePrefixes().size() != 0) {
-      RocksDiffUtils.filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes(),
-          compactionDag.getCompactionMap(), tablesToLookup, src.getRocksDB(), dest.getRocksDB());
+    if (prefixInfo != null && prefixInfo.size() != 0) {
+      RocksDiffUtils.filterRelevantSstFiles(fwdDAGDifferentFiles, tablesToLookup, prefixInfo);
     }
-    return Optional.of(new ArrayList<>(fwdDAGDifferentFiles));
+    return Optional.of(new ArrayList<>(fwdDAGDifferentFiles.values()));
+  }
+
+  /**
+   * This class represents a version of a snapshot in a database differ operation.
+   * It contains metadata associated with a specific snapshot version, including
+   * SST file information, generation id, and the database path for the given version.
+   *
+   * Designed to work with `DifferSnapshotInfo`, this class allows the retrieval of
+   * snapshot-related metadata and facilitates mapping of SST files for version comparison
+   * and other operations.
+   *
+   * The core functionality is to store and provide read-only access to:
+   * - SST file information for a specified snapshot version.
+   * - Snapshot generation identifier.
+   * - Path to the database directory corresponding to the snapshot version.
+   */
+  public static class DifferSnapshotVersion {
+    private Map<String, SstFileInfo> sstFiles;
+    private long generation;
+    private Path dbPath;
+
+    public DifferSnapshotVersion(DifferSnapshotInfo differSnapshotInfo, int version,
+        Set<String> tablesToLookup) {
+      this.sstFiles = differSnapshotInfo.getSstFiles(version, tablesToLookup)
+          .stream().collect(Collectors.toMap(SstFileInfo::getFileName, identity()));
+      this.generation = differSnapshotInfo.getGeneration();
+      this.dbPath = differSnapshotInfo.getDbPath(version);
+    }
+
+    private Path getDbPath() {
+      return dbPath;
+    }
+
+    private long getGeneration() {
+      return generation;
+    }
+
+    private Set<String> getSstFiles() {
+      return sstFiles.keySet();
+    }
+
+    private Map<String, SstFileInfo> getSstFileMap() {
+      return Collections.unmodifiableMap(sstFiles);
+    }
   }
 
   /**
@@ -921,30 +932,26 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * diffing).  Otherwise, add it to the differentFiles map, as it will
    * need further diffing.
    */
-  synchronized void internalGetSSTDiffList(
-      DifferSnapshotInfo src,
-      DifferSnapshotInfo dest,
-      Set<String> srcSnapFiles,
-      Set<String> destSnapFiles,
-      Set<String> sameFiles,
-      Set<String> differentFiles) {
+  synchronized void internalGetSSTDiffList(DifferSnapshotVersion src, DifferSnapshotVersion dest,
+      Map<String, SstFileInfo> sameFiles, Map<String, SstFileInfo> differentFiles) {
 
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
     Preconditions.checkArgument(differentFiles.isEmpty(), "Set must be empty");
-
-    for (String fileName : srcSnapFiles) {
-      if (destSnapFiles.contains(fileName)) {
+    Map<String, SstFileInfo> destSnapFiles = dest.getSstFileMap();
+    for (Map.Entry<String, SstFileInfo> sstFileEntry : src.getSstFileMap().entrySet()) {
+      String fileName =  sstFileEntry.getKey();
+      SstFileInfo sstFileInfo = sstFileEntry.getValue();
+      if (destSnapFiles.containsKey(fileName)) {
         LOG.debug("Source '{}' and destination '{}' share the same SST '{}'",
             src.getDbPath(), dest.getDbPath(), fileName);
-        sameFiles.add(fileName);
+        sameFiles.put(fileName, sstFileInfo);
         continue;
       }
 
       CompactionNode infileNode = compactionDag.getCompactionNode(fileName);
       if (infileNode == null) {
-        LOG.debug("Source '{}' SST file '{}' is never compacted",
-            src.getDbPath(), fileName);
-        differentFiles.add(fileName);
+        LOG.debug("Source '{}' SST file '{}' is never compacted", src.getDbPath(), fileName);
+        differentFiles.put(fileName, sstFileInfo);
         continue;
       }
 
@@ -954,15 +961,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       // Traversal level/depth indicator for debug print
       int level = 1;
       while (!currentLevel.isEmpty()) {
-        LOG.debug("Traversal level: {}. Current level has {} nodes.",
-            level++, currentLevel.size());
+        LOG.debug("Traversal level: {}. Current level has {} nodes.", level++, currentLevel.size());
 
         if (level >= 1000000) {
-          final String errorMsg = String.format(
-                  "Graph traversal level exceeded allowed maximum (%d). "
-                  + "This could be due to invalid input generating a "
-                  + "loop in the traversal path. Same SSTs found so far: %s, "
-                  + "different SSTs: %s", level, sameFiles, differentFiles);
+          final String errorMsg = String.format("Graph traversal level exceeded allowed maximum (%d). " +
+              "This could be due to invalid input generating a loop in the traversal path. Same SSTs found so " +
+              "far: %s, different SSTs: %s", level, sameFiles, differentFiles);
           LOG.error(errorMsg);
           // Clear output in case of error. Expect fall back to full diff
           sameFiles.clear();
@@ -974,43 +978,42 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         final Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
           LOG.debug("Processing node: '{}'", current.getFileName());
-          if (current.getSnapshotGeneration() < dest.getSnapshotGeneration()) {
+          if (current.getSnapshotGeneration() < dest.getGeneration()) {
             LOG.debug("Current node's snapshot generation '{}' "
                     + "reached destination snapshot's '{}'. "
                     + "Src '{}' and dest '{}' have different SST file: '{}'",
-                current.getSnapshotGeneration(), dest.getSnapshotGeneration(),
+                current.getSnapshotGeneration(), dest.getGeneration(),
                 src.getDbPath(), dest.getDbPath(), current.getFileName());
-            differentFiles.add(current.getFileName());
+            differentFiles.put(current.getFileName(), current);
             continue;
           }
 
           Set<CompactionNode> successors = compactionDag.getForwardCompactionDAG().successors(current);
           if (successors.isEmpty()) {
-            LOG.debug("No further compaction happened to the current file. " +
-                "Src '{}' and dest '{}' have different file: {}",
-                src.getDbPath(), dest.getDbPath(), current.getFileName());
-            differentFiles.add(current.getFileName());
+            LOG.debug("No further compaction happened to the current file. Src '{}' and dest '{}' " +
+                    "have different file: {}", src.getDbPath(), dest.getDbPath(), current.getFileName());
+            differentFiles.put(current.getFileName(), current);
             continue;
           }
 
           for (CompactionNode nextNode : successors) {
-            if (sameFiles.contains(nextNode.getFileName()) ||
-                differentFiles.contains(nextNode.getFileName())) {
+            if (sameFiles.containsKey(nextNode.getFileName()) ||
+                differentFiles.containsKey(nextNode.getFileName())) {
               LOG.debug("Skipping known processed SST: {}",
                   nextNode.getFileName());
               continue;
             }
 
-            if (destSnapFiles.contains(nextNode.getFileName())) {
-              LOG.debug("Src '{}' and dest '{}' have the same SST: {}",
-                  src.getDbPath(), dest.getDbPath(), nextNode.getFileName());
-              sameFiles.add(nextNode.getFileName());
+            if (destSnapFiles.containsKey(nextNode.getFileName())) {
+              LOG.debug("Src '{}' and dest '{}' have the same SST: {}", src.getDbPath(), dest.getDbPath(),
+                  nextNode.getFileName());
+              sameFiles.put(nextNode.getFileName(), destSnapFiles.get(nextNode.getFileName()));
               continue;
             }
 
             // Queue different SST to the next level
-            LOG.debug("Src '{}' and dest '{}' have a different SST: {}",
-                src.getDbPath(), dest.getDbPath(), nextNode.getFileName());
+            LOG.debug("Src '{}' and dest '{}' have a different SST: {}", src.getDbPath(), dest.getDbPath(),
+                nextNode.getFileName());
             nextLevel.add(nextNode);
           }
         }
@@ -1420,14 +1423,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         String sstBackupDirName,
         String compactionLogDirName,
         String activeDBLocationName,
-        ConfigurationSource configuration
+        ConfigurationSource configuration,
+        Function<Boolean, UncheckedAutoCloseable> lockSupplier
     ) {
       return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
           new RocksDBCheckpointDiffer(metadataDirName,
               sstBackupDirName,
               compactionLogDirName,
               activeDBLocationName,
-              configuration));
+              configuration,
+              lockSupplier));
     }
 
     /**

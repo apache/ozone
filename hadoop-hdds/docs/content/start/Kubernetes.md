@@ -25,6 +25,8 @@ weight: 22
  * kubectl
 {{< /requirements >}}
 
+**Note:** The Kubernetes examples and scripts in this project have been tested with Kubernetes 1.34.2 (k3s v1.34.2+k3s1).
+
 As the _apache/ozone_ docker images are available from the dockerhub the deployment process is very similar to Minikube deployment. The only big difference is that we have dedicated set of k8s files for hosted clusters (for example we can use one datanode per host)
 Deploy to kubernetes
 

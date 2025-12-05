@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,9 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -122,20 +132,32 @@ class TestOzoneManagerLock {
 
   @ParameterizedTest
   @EnumSource
-  public void testFlatLockWithParallelResource(FlatResource flatResource) {
+  public void testDAGLockWithParallelResource(DAGLeveledResource dagLeveledResource) {
+    Map<DAGLeveledResource, Set<Resource>> forbiddenLockOrdering =
+        ImmutableMap.of(SNAPSHOT_DB_CONTENT_LOCK, ImmutableSet.of(SNAPSHOT_DB_LOCK, SNAPSHOT_LOCAL_DATA_LOCK),
+            BOOTSTRAP_LOCK, ImmutableSet.of(SNAPSHOT_GC_LOCK, SNAPSHOT_DB_LOCK, SNAPSHOT_DB_CONTENT_LOCK,
+                SNAPSHOT_LOCAL_DATA_LOCK));
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     List<Resource> resources = new ArrayList<>();
     resources.addAll(Arrays.stream(LeveledResource.values()).collect(Collectors.toList()));
-    resources.addAll(Arrays.stream(FlatResource.values()).collect(Collectors.toList()));
+    resources.addAll(Arrays.stream(dagLeveledResource.values()).collect(Collectors.toList()));
     for (Resource otherResource : resources) {
       String[] otherResourceName = generateResourceName(otherResource);
-      String[] flatResourceName = generateResourceName(flatResource);
+      String[] dagResourceName = generateResourceName(dagLeveledResource);
       lock.acquireWriteLock(otherResource, otherResourceName);
+      boolean secondLockAcquired = false;
       try {
-        lock.acquireWriteLock(flatResource, flatResourceName);
+        if (forbiddenLockOrdering.getOrDefault(dagLeveledResource, Collections.emptySet()).contains(otherResource)) {
+          assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(dagLeveledResource, dagResourceName));
+        } else {
+          lock.acquireWriteLock(dagLeveledResource, dagResourceName);
+          secondLockAcquired = true;
+        }
       } finally {
         lock.releaseWriteLock(otherResource, otherResourceName);
-        lock.releaseWriteLock(flatResource, flatResourceName);
+        if (secondLockAcquired) {
+          lock.releaseWriteLock(dagLeveledResource, dagResourceName);
+        }
       }
     }
   }
@@ -285,7 +307,7 @@ class TestOzoneManagerLock {
   void testLockResourceParallel(boolean fullResourceLock) throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    for (Resource resource : Stream.of(LeveledResource.values(), FlatResource.values())
+    for (Resource resource : Stream.of(LeveledResource.values(), DAGLeveledResource.values())
         .flatMap(Arrays::stream).collect(Collectors.toList())) {
       final String[] resourceName = generateResourceName(resource);
       if (fullResourceLock) {
@@ -338,7 +360,7 @@ class TestOzoneManagerLock {
       throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    for (Resource resource : Stream.of(LeveledResource.values(), FlatResource.values())
+    for (Resource resource : Stream.of(LeveledResource.values(), DAGLeveledResource.values())
         .flatMap(Arrays::stream).collect(Collectors.toList())) {
       final String[] resourceName = generateResourceName(resource);
       if (mainThreadAcquireResourceLock) {

@@ -570,7 +570,7 @@ public class TestRDBTableStore {
     final List<String> prefixes = generatePrefixes(prefixCount);
     final List<Map<String, String>> data = generateKVs(prefixes, keyCount);
 
-    TypedTable<String, String> table = rdbStore.getTable("PrefixFirst", StringCodec.get(), StringCodec.get());
+    Table<String, String> table = rdbStore.getTable("PrefixFirst", StringCodec.get(), StringCodec.get());
     populateTable(table, data);
     for (String prefix : prefixes) {
       assertIterator(keyCount, prefix, table);
@@ -582,7 +582,7 @@ public class TestRDBTableStore {
   }
 
   static void assertIterator(int expectedCount, String prefix,
-      TypedTable<String, String> table) throws Exception {
+      Table<String, String> table) throws Exception {
     try (Table.KeyValueIterator<String, String> i = table.iterator(prefix)) {
       int keyCount = 0;
       for (; i.hasNext(); keyCount++) {

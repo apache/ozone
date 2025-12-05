@@ -20,12 +20,13 @@ package org.apache.hadoop.ozone.admin.om;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
+import java.io.IOException;
 import java.util.Collection;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.admin.om.lease.LeaseSubCommand;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -88,29 +90,32 @@ public class OMAdmin implements AdminSubcommand {
   }
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      String omServiceID
-  ) throws Exception {
-    return createOmClient(omServiceID, null, true);
-  }
-
-  public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
       String omHost,
       boolean forceHA
   ) throws Exception {
-    OzoneConfiguration conf = parent.getOzoneConf();
+    return createOmClient(parent.getOzoneConf(), parent.getUser(), omServiceID, omHost, forceHA);
+  }
+
+  public static OzoneManagerProtocolClientSideTranslatorPB createOmClient(
+      OzoneConfiguration conf,
+      UserGroupInformation ugi,
+      String omServiceID,
+      String omHost,
+      boolean forceHA
+  ) throws IOException {
     if (omHost != null && !omHost.isEmpty()) {
       omServiceID = null;
       conf.set(OZONE_OM_ADDRESS_KEY, omHost);
     } else if (omServiceID == null || omServiceID.isEmpty()) {
-      omServiceID = getTheOnlyConfiguredOmServiceIdOrThrow();
+      omServiceID = getTheOnlyConfiguredOmServiceIdOrThrow(conf);
     }
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
     if (!forceHA || (forceHA && OmUtils.isOmHAServiceId(conf, omServiceID))) {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
-          .createOmTransport(conf, parent.getUser(), omServiceID);
+          .createOmTransport(conf, ugi, omServiceID);
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
           clientId);
     } else {
@@ -122,19 +127,17 @@ public class OMAdmin implements AdminSubcommand {
     }
   }
 
-  private String getTheOnlyConfiguredOmServiceIdOrThrow() {
-    if (getConfiguredServiceIds().size() != 1) {
+  private static String getTheOnlyConfiguredOmServiceIdOrThrow(OzoneConfiguration conf) {
+    Collection<String> configuredServiceIds = getConfiguredServiceIds(conf);
+    if (configuredServiceIds.size() != 1) {
       throw new IllegalArgumentException("There is no Ozone Manager service ID "
           + "specified, but there are either zero, or more than one service ID"
           + "configured.");
     }
-    return getConfiguredServiceIds().iterator().next();
+    return configuredServiceIds.iterator().next();
   }
 
-  private Collection<String> getConfiguredServiceIds() {
-    OzoneConfiguration conf = parent.getOzoneConf();
-    Collection<String> omServiceIds =
-        conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
-    return omServiceIds;
+  private static Collection<String> getConfiguredServiceIds(OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
   }
 }
