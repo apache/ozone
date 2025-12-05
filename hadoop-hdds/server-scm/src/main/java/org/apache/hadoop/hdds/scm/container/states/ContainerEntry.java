@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.states;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -31,7 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private Map<ContainerReplica, ContainerReplica> replicaMap = Collections.emptyMap();
+  private Map<DatanodeID, ContainerReplica> replicaMap = Collections.emptyMap();
   private Set<ContainerReplica> replicas = Collections.emptySet();
 
   ContainerEntry(ContainerInfo info) {
@@ -47,27 +48,18 @@ public class ContainerEntry {
   }
 
   public ContainerReplica put(ContainerReplica r) {
-    return copyAndUpdate(map -> map.put(r, r));
+    return copyAndUpdate(map -> map.put(r.getDatanodeDetails().getID(), r));
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    return copyAndUpdate(map -> {
-      ContainerReplica replicaToRemove = null;
-      for (ContainerReplica replica : map.keySet()) {
-        if (replica.getDatanodeDetails().getID().equals(datanodeID)) {
-          replicaToRemove = replica;
-          break;
-        }
-      }
-      return replicaToRemove != null ? map.remove(replicaToRemove) : null;
-    });
+    return copyAndUpdate(map -> map.remove(datanodeID));
   }
 
-  private <T> T copyAndUpdate(java.util.function.Function<Map<ContainerReplica, ContainerReplica>, T> update) {
-    Map<ContainerReplica, ContainerReplica> map = new HashMap<>(this.replicaMap);
+  private <T> T copyAndUpdate(java.util.function.Function<Map<DatanodeID, ContainerReplica>, T> update) {
+    Map<DatanodeID, ContainerReplica> map = new HashMap<>(this.replicaMap);
     T result = update.apply(map);
     this.replicaMap = map;
-    this.replicas = Collections.unmodifiableSet(map.keySet());
+    this.replicas = Collections.unmodifiableSet(new HashSet<>(map.values()));
     return result;
   }
 }
