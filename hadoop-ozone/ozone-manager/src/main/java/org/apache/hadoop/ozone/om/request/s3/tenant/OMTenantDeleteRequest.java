@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENA
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
