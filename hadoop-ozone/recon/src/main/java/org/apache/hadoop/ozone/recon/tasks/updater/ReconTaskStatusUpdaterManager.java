@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks.updater;
 
+import static org.jooq.impl.DSL.name;
+
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
@@ -29,7 +31,6 @@ import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.jooq.impl.DSL.name;
 
 /**
  * This class provides caching for ReconTaskStatusUpdater instances.
