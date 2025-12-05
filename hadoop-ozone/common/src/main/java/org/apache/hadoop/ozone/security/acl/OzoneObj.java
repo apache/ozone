@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
@@ -146,4 +147,20 @@ public abstract class OzoneObj implements IOzoneObj {
     return auditMap;
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    } else if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    final OzoneObj that = (OzoneObj) o;
+    return resType == that.resType && storeType == that.storeType;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(resType, storeType);
+  }
 }
