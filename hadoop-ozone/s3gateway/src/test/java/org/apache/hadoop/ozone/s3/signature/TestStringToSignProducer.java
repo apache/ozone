@@ -51,7 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestStringToSignProducer {
 
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
-      format(LocalDateTime.now());
+          format(LocalDateTime.now());
 
   @Test
   public void test() throws Exception {
