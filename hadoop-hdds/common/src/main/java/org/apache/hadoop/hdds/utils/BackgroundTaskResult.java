@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.utils;
  * Result of a {@link BackgroundTask}.
  */
 public interface BackgroundTaskResult {
-
   /**
    * Returns the size of entries included in this result.
    */
