@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -203,7 +204,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @SuppressWarnings("methodlength")
   private ContainerCommandResponseProto dispatchRequest(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
-    Preconditions.checkNotNull(msg);
+    Objects.requireNonNull(msg, "msg == null");
     if (LOG.isTraceEnabled()) {
       LOG.trace("Command {}, trace ID: {} ", msg.getCmdType(),
           msg.getTraceID());
@@ -267,7 +268,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // snapshot.
       // just add it to the list, and remove it from missing container set
       // as it might have been added in the list during "init".
-      Preconditions.checkNotNull(container2BCSIDMap);
+      Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
       if (container != null && container2BCSIDMap.get(containerID) == null) {
         container2BCSIDMap.put(
             containerID, container.getBlockCommitSequenceId());
@@ -428,8 +429,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
-        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
-        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+        Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
+        container2BCSIDMap.putIfAbsent(containerID, 0L);
       }
       if (result == Result.SUCCESS) {
         updateBCSID(container, dispatcherContext, cmdType);
@@ -467,12 +468,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       DispatcherContext dispatcherContext, Type cmdType) {
     if (dispatcherContext != null && (cmdType == Type.PutBlock
         || cmdType == Type.PutSmallFile)) {
-      Preconditions.checkNotNull(container);
+      Objects.requireNonNull(container, "container == null");
       long bcsID = container.getBlockCommitSequenceId();
       long containerId = container.getContainerData().getContainerID();
       Map<Long, Long> container2BCSIDMap;
       container2BCSIDMap = dispatcherContext.getContainer2BCSIDMap();
-      Preconditions.checkNotNull(container2BCSIDMap);
+      Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
       Preconditions.checkArgument(container2BCSIDMap.containsKey(containerId));
       // updates the latest BCSID on every putBlock or putSmallFile
       // transaction over Ratis.
@@ -655,7 +656,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void setClusterId(String clusterId) {
-    Preconditions.checkNotNull(clusterId, "clusterId cannot be null");
+    Objects.requireNonNull(clusterId, "clusterId == null");
     if (this.clusterId == null) {
       this.clusterId = clusterId;
       for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
@@ -821,6 +822,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
       RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
+    Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
@@ -828,7 +830,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     EventType eventType = getEventType(msg);
 
     try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
-      Preconditions.checkNotNull(msg);
       if (LOG.isTraceEnabled()) {
         LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
       }
