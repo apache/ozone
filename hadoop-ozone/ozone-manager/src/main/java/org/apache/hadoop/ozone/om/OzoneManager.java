@@ -4268,7 +4268,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (File item : currentContents) {
         // Skip backup directories and marker files
         if (item.getName().startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
-            item.getName().equals(DB_TRANSIENT_MARKER)) {
+            item.getName().equals(DB_TRANSIENT_MARKER) ||
+            item.getName().equals(OZONE_RATIS_SNAPSHOT_DIR)) {
           continue;
         }
 

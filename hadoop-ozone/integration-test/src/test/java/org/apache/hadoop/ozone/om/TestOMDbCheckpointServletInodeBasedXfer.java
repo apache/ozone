@@ -396,13 +396,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
     InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
         new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
     assertNotNull(obtainedCheckpoint);
-    for (Path old : allPathsInTarball) {
-      assertTrue(old.toFile().delete());
-    }
     Path snapshotDbDir = Paths.get(newDbDir.getPath(),
         OM_SNAPSHOT_CHECKPOINT_DIR, OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
     assertTrue(Files.exists(snapshotDbDir));
