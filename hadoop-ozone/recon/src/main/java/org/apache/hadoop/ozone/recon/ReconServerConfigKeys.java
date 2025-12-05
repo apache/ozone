@@ -191,6 +191,22 @@ public final class  ReconServerConfigKeys {
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT =
+      "ozone.recon.dn.metrics.collection.thread.count";
+  public static final int OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT = 10;
+
+  public static final String OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT =
+      "ozone.recon.dn.http.request.timeout";
+  public static final int OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT = 60;
+
+  public static final String OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT =
+      "ozone.recon.dn.http.connection.timeout";
+  public static final int OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT = 10;
+
+  public static final String OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT =
+      "ozone.recon.dn.http.socket.timeout";
+  public static final int OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT = 30;
+
   /**
    * Private constructor for utility class.
    */
