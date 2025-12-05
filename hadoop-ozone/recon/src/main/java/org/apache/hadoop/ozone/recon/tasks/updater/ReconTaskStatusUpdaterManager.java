@@ -24,6 +24,7 @@ import com.google.inject.Singleton;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.jooq.DSLContext;
@@ -50,7 +51,7 @@ public class ReconTaskStatusUpdaterManager {
   private final ReconTaskStatusDao reconTaskStatusDao;
   // Act as a cache for the task updater instances
   private final Map<String, ReconTaskStatusUpdater> updaterCache;
-  private volatile boolean initialized = false;
+  private AtomicBoolean initialized = new AtomicBoolean(false);
 
   @Inject
   public ReconTaskStatusUpdaterManager(
@@ -65,7 +66,7 @@ public class ReconTaskStatusUpdaterManager {
    * This ensures the DB schema is ready (after upgrades have run).
    */
   private synchronized void ensureInitialized() {
-    if (!initialized) {
+    if (!initialized.get()) {
       try {
         LOG.info("Initializing ReconTaskStatusUpdaterManager - loading existing tasks from DB");
 
@@ -100,7 +101,7 @@ public class ReconTaskStatusUpdaterManager {
         }
 
         LOG.info("Loaded {} existing tasks from DB", tasks.size());
-        initialized = true;
+        initialized.set(true);
       } catch (Exception e) {
         LOG.debug("Could not load tasks from DB yet, will retry: {}", e.getMessage());
       }
