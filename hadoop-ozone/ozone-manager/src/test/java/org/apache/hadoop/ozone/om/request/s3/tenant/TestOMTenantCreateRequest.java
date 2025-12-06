@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,16 +36,24 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -266,4 +274,32 @@ public class TestOMTenantCreateRequest {
     omTenantCreateRequest.preExecute(ozoneManager);
   }
 
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    final String tenantId = UUID.randomUUID().toString();
+    OMRequest originalRequest =
+        OMRequestTestUtils.createTenantRequest(tenantId, false);
+
+    OMTenantCreateRequest omTenantCreateRequest =
+        spy(new OMTenantCreateRequest(originalRequest) {
+          @Override
+          public void checkAcls(OzoneManager om,
+              OzoneObj.ResourceType resType, OzoneObj.StoreType storeType,
+              IAccessAuthorizer.ACLType aclType, String volume, String bucket,
+              String key) throws IOException {
+            throw new OMException("denied",
+                OMException.ResultCodes.PERMISSION_DENIED);
+          }
+        });
+    doReturn("username").when(omTenantCreateRequest).getUserName();
+
+    OMException exception = assertThrows(OMException.class,
+        () -> omTenantCreateRequest.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+        exception.getResult());
+  }
+
 }
+
