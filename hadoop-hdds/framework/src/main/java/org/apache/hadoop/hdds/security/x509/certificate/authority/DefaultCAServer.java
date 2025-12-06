@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
@@ -487,7 +488,7 @@ public class DefaultCAServer implements CertificateServer {
   private void generateRootCertificate(
       SecurityConfig securityConfig, KeyPair key)
       throws IOException, SCMSecurityException {
-    Preconditions.checkNotNull(this.config);
+    Objects.requireNonNull(this.config, "this.config == null");
     ZonedDateTime beginDate = ZonedDateTime.now();
     ZonedDateTime endDate = beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()

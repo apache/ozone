@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -123,7 +122,7 @@ public final class CodecRegistry {
    * @return byte array to store it ini the kv store.
    */
   public <T> byte[] asRawData(T object) throws IOException {
-    Preconditions.checkNotNull(object,
+    Objects.requireNonNull(object,
         "Null value shouldn't be persisted in the database");
     Codec<T> codec = getCodec(object);
     return codec.toPersistedFormat(object);
