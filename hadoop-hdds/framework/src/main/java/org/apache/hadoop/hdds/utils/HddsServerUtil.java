@@ -432,6 +432,13 @@ public final class HddsServerUtil {
     return 2 * defaultContainerSize;
   }
 
+  public static long requiredReplicationSpace(long defaultContainerSize, ConfigurationSource conf) {
+    double multiplier = conf.getDouble(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SPACE_REQUIREMENT_MULTIPLIER_DEFAULT);
+    return (long) (multiplier * defaultContainerSize);
+  }
+
   public static Collection<String> getDatanodeStorageDirs(ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {

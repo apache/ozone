@@ -163,7 +163,7 @@ public class RatisPipelineProvider
 
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
-    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes);
+    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes, conf);
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,

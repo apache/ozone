@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -79,7 +80,7 @@ public class TestECPipelineProvider {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    this.containerSpaceRequirement = 2 * containerSizeBytes;
+    this.containerSpaceRequirement = HddsServerUtil.requiredReplicationSpace(containerSizeBytes, conf);
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),

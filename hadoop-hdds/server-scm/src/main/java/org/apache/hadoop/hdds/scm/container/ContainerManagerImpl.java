@@ -72,6 +72,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private final SCMHAManager haManager;
   private final SequenceIdGenerator sequenceIdGen;
+  private final Configuration conf;
 
   // TODO: Revisit this.
   // Metrics related to operations should be moved to ProtocolServer
@@ -100,6 +101,7 @@ public class ContainerManagerImpl implements ContainerManager {
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
     this.sequenceIdGen = sequenceIdGen;
+    this.conf = conf;
     this.containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
@@ -353,7 +355,7 @@ public class ContainerManagerImpl implements ContainerManager {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize);
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize, conf);
           if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
@@ -366,7 +368,7 @@ public class ContainerManagerImpl implements ContainerManager {
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize);
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize, conf);
           if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             containerInfo = allocateContainer(pipeline, owner);
           } else {

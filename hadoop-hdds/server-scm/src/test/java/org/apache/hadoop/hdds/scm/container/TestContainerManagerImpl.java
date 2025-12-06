@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -186,11 +187,11 @@ public class TestContainerManagerImpl {
   public void testContainerSpaceRequirement() throws IOException {
     long sizeRequired = 256 * 1024 * 1024;
     long containerSize = 5L * 1024 * 1024 * 1024;
-    long expectedSpaceRequirement = 2 * containerSize;
 
     PipelineManager spyPipelineManager = spy(pipelineManager);
     File tempDir = new File(testDir, "tempDir");
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    long expectedSpaceRequirement = HddsServerUtil.requiredReplicationSpace(containerSize, conf);
 
     ContainerManager manager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, spyPipelineManager,

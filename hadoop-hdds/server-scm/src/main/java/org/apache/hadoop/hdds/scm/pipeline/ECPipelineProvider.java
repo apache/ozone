@@ -87,7 +87,7 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   protected Pipeline create(ECReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
-    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes);
+    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes, conf);
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
             replicationConfig.getRequiredNodes(), 0, requiredSpace);

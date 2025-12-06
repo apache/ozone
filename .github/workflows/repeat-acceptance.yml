@@ -150,11 +150,8 @@ jobs:
           KEEP_IMAGE: false
         continue-on-error: true
       - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
-        run: |
-          if [[ -f "hadoop-ozone/dev-support/checks/_summary.sh" ]]; then
-            hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-          fi
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
