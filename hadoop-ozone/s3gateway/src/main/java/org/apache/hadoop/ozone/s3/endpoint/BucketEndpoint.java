@@ -130,6 +130,7 @@ public class BucketEndpoint extends EndpointBase {
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
+      // Actual bucket processing starts here
       // Validate and prepare parameters
       BucketListingContext context = validateAndPrepareParameters(
           bucketName, delimiter, encodingType, marker, maxKeys, prefix, 
