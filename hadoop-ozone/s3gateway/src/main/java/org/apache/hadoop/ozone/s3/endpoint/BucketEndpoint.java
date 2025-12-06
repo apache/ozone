@@ -126,6 +126,7 @@ public class BucketEndpoint extends EndpointBase {
       // Handle ACL requests
       final String aclMarker = queryParams().get(QueryParams.ACL);
       if (aclMarker != null) {
+        s3GAction = S3GAction.GET_ACL;
         return handleGetBucketAcl(bucketName, startNanos);
       }
 
@@ -138,6 +139,7 @@ public class BucketEndpoint extends EndpointBase {
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
+      // Actual bucket processing starts here
       // Validate and prepare parameters
       BucketListingContext context = validateAndPrepareParameters(
           bucketName, delimiter, encodingType, marker, maxKeys, prefix, 
