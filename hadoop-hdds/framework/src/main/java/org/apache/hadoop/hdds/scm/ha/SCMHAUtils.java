@@ -42,15 +42,11 @@ import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
 import org.apache.ratis.protocol.exceptions.ReconfigurationTimeoutException;
 import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utility class used by SCM HA.
  */
 public final class SCMHAUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SCMHAUtils.class);
 
   private static final ImmutableList<Class<? extends Exception>>
       RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST =
