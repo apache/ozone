@@ -117,9 +117,6 @@ public class BucketEndpoint extends EndpointBase {
     String prefix = queryParams().get(QueryParams.PREFIX);
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
-    // Actual bucket processing starts here
-    S3GAction s3GAction = S3GAction.GET_BUCKET;
-
     try {
       final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
@@ -129,6 +126,7 @@ public class BucketEndpoint extends EndpointBase {
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
+      // Actual bucket processing starts here
       // Validate and prepare parameters
       BucketListingContext context = validateAndPrepareParameters(
           bucketName, delimiter, encodingType, marker, maxKeys, prefix, 
