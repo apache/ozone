@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -46,7 +47,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
-import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
@@ -623,7 +623,8 @@ public class FSORepairTool extends RepairTool {
     // Load RocksDB and tables needed.
     // Use the actual directory name from the provided path (e.g., "om.db", "om-db-backup")
     String dbName = omDBFile.getName();
-    return DBStoreBuilder.newBuilder(new OzoneConfiguration(), OMDBDefinition.get(), dbName, omDBFile.getParentFile().toPath())
+    return DBStoreBuilder.newBuilder(new OzoneConfiguration(), OMDBDefinition.get(), dbName,
+        omDBFile.getParentFile().toPath())
         .setOpenReadOnly(false)
         .setEnableCompactionDag(true)
         .setCreateCheckpointDirs(true)

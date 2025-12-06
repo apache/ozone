@@ -401,7 +401,6 @@ public class TestFSORepairTool {
         .execute(() -> cmd.execute(argList.toArray(new String[0])));
   }
 
-
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
     int count = 0;
     try (Table.KeyValueIterator<K, V> iterator = table.iterator()) {
