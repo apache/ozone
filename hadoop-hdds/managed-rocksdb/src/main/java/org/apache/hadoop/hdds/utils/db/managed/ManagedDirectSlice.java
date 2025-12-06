@@ -15,25 +15,37 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha.io;
+package org.apache.hadoop.hdds.utils.db.managed;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
+import java.nio.ByteBuffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.DirectSlice;
 
 /**
- * {@link Codec} for {@code String} objects.
+ * Managed Direct Slice.
  */
-public class StringCodec implements Codec {
-  @Override
-  public ByteString serialize(Object object) {
-    // getBytes returns a new array
-    return ProtoUtils.unsafeByteString(((String) object).getBytes(UTF_8));
+public class ManagedDirectSlice extends DirectSlice {
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
+  public ManagedDirectSlice(ByteBuffer data) {
+    super(data);
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value) {
-    return new String(value.toByteArray(), UTF_8);
+  public synchronized long getNativeHandle() {
+    return super.getNativeHandle();
+  }
+
+  @Override
+  protected void disposeInternal() {
+    // RocksMutableObject.close is final thus can't be decorated.
+    // So, we decorate disposeInternal instead to track closure.
+    try {
+      super.disposeInternal();
+    } finally {
+      leakTracker.close();
+    }
   }
 }
