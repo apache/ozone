@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.common;
 import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
 
 import java.io.File;
-import java.util.Objects;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;

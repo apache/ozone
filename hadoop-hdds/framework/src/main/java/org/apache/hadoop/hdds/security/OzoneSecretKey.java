@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.security;
 
 import java.security.KeyPair;
-import java.util.Objects;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;

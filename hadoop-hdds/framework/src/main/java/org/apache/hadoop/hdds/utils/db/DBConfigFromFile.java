@@ -19,13 +19,13 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
-import java.util.Objects;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;

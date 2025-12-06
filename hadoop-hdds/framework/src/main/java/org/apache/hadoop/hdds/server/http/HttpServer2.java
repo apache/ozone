@@ -24,7 +24,6 @@ import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilt
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.Objects;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -45,6 +44,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

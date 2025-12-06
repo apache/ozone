@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.Objects;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;

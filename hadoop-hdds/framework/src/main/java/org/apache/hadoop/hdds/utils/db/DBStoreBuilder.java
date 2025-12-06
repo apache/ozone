@@ -28,7 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
-import java.util.Objects;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
