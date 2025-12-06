@@ -230,6 +230,15 @@ public final class OzoneAclUtil {
     return true;
   }
 
+  public static boolean addAllAcl(List<OzoneAcl> existingAcls, List<OzoneAcl> acls) {
+    // TOOD optimize
+    boolean changed = false;
+    for (OzoneAcl acl : acls) {
+      changed |= addAcl(existingAcls, acl);
+    }
+    return changed;
+  }
+
   /**
    * remove OzoneAcl from existing list of OzoneAcls.
    * @return true if current OzoneAcls are changed, false otherwise.

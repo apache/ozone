@@ -4801,7 +4801,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Add ACLs
     for (OzoneAcl ozoneAcl : listOfAcls) {
-      omVolumeArgs.addOzoneAcls(ozoneAcl);
+      omVolumeArgs.addAcl(ozoneAcl);
     }
 
     return omVolumeArgs.build();
