@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -81,7 +81,7 @@ public final class DBConfigFromFile {
    * @return Name of the DB File options
    */
   public static String getOptionsFileNameFromDB(String dbFileName) {
-    Preconditions.checkNotNull(dbFileName);
+    Objects.requireNonNull(dbFileName, "dbFileName == null");
     return dbFileName.isEmpty() ? "" : dbFileName + ".ini";
   }
 

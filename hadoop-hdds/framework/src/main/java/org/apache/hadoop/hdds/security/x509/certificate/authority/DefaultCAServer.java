@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.Objects;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -487,7 +488,7 @@ public class DefaultCAServer implements CertificateServer {
   private void generateRootCertificate(
       SecurityConfig securityConfig, KeyPair key)
       throws IOException, SCMSecurityException {
-    Preconditions.checkNotNull(this.config);
+    Objects.requireNonNull(this.config, "this.config == null");
     ZonedDateTime beginDate = ZonedDateTime.now();
     ZonedDateTime endDate = beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()

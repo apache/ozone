@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.Objects;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -89,8 +90,8 @@ public class RDBStore implements DBStore {
                   ConfigurationSource configuration,
                   boolean enableRocksDBMetrics)
       throws RocksDatabaseException {
-    Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
-    Preconditions.checkNotNull(families);
+    Objects.requireNonNull(dbFile, "DB file location cannot be null");
+    Objects.requireNonNull(families, "families == null");
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
     dbLocation = dbFile;
@@ -99,7 +100,7 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionDag) {
-        Preconditions.checkNotNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
+        Objects.requireNonNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
             "compaction dag is enabled");
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
@@ -154,7 +155,7 @@ public class RDBStore implements DBStore {
 
       if (enableCompactionDag) {
         ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
-        Preconditions.checkNotNull(ssInfoTableCF,
+        Objects.requireNonNull(ssInfoTableCF,
             "SnapshotInfoTable column family handle should not be null");
         // Set CF handle in differ to be used in DB listener
         rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
@@ -162,7 +163,7 @@ public class RDBStore implements DBStore {
         // Set CF handle in differ to be store compaction log entry.
         ColumnFamily compactionLogTableCF =
             db.getColumnFamily(COMPACTION_LOG_TABLE);
-        Preconditions.checkNotNull(compactionLogTableCF,
+        Objects.requireNonNull(compactionLogTableCF,
             "CompactionLogTable column family handle should not be null.");
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
             compactionLogTableCF.getHandle());

@@ -24,6 +24,7 @@ import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilt
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.Objects;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -455,7 +456,7 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     public HttpServer2 build() throws IOException {
-      Preconditions.checkNotNull(name, "name is not set");
+      Objects.requireNonNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
 
       if (hostName == null) {
@@ -604,7 +605,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initializeWebServer(Builder builder) throws IOException {
-    Preconditions.checkNotNull(webAppContext);
+    Objects.requireNonNull(webAppContext, "webAppContext == null");
 
     int maxThreads = builder.conf.getInt(HTTP_MAX_THREADS_KEY, -1);
     // If HTTP_MAX_THREADS is not configured, QueueThreadPool() will use the

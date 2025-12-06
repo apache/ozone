@@ -33,6 +33,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
+import java.util.Objects;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -1354,7 +1355,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   public synchronized void startCertificateRenewerService() {
-    Preconditions.checkNotNull(getCertificate(),
+    Objects.requireNonNull(getCertificate(),
         "Component certificate should not be empty");
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();

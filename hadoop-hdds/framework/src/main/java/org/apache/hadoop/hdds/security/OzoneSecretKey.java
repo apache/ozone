@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.security;
 
-import com.google.common.base.Preconditions;
 import java.security.KeyPair;
+import java.util.Objects;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -42,7 +42,7 @@ public class OzoneSecretKey {
 
   public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
       String certificateSerialId) {
-    Preconditions.checkNotNull(keyId);
+    Objects.requireNonNull(keyPair, "keyPair == null");
     this.keyId = keyId;
     this.expiryDate = expiryDate;
     this.privateKey = keyPair.getPrivate();

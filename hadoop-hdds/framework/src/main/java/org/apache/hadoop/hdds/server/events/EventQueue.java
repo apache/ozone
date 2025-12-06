@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+import java.util.Objects;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -182,7 +183,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    */
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
       EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
-    Preconditions.checkNotNull(handler, "Handler should not be null.");
+    Objects.requireNonNull(handler, "Handler should not be null.");
     validateEvent(event);
     String executorName = getExecutorName(event, handler);
     SingleThreadExecutor<PAYLOAD> executor =
