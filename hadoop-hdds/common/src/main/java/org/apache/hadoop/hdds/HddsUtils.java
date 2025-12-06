@@ -635,10 +635,8 @@ public final class HddsUtils {
    *     ancestor of {@code path}
    */
   public static void validatePath(Path path, Path ancestor) {
-    Preconditions.checkNotNull(path,
-        "Path should not be null");
-    Preconditions.checkNotNull(ancestor,
-        "Ancestor should not be null");
+    Objects.requireNonNull(path, "Path should not be null");
+    Objects.requireNonNull(ancestor, "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path %s should be a descendant of %s", path, ancestor);
