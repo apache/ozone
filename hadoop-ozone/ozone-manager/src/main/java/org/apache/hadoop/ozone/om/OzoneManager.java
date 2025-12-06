@@ -4309,16 +4309,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
         for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
           Path targetPath = dbDir.toPath().resolve(sourcePath.getFileName());
-          // Delete target if it exists (file or directory)
           if (Files.exists(targetPath)) {
-            if (Files.isDirectory(targetPath)) {
-              FileUtil.fullyDelete(targetPath.toFile());
-            } else {
-              Files.delete(targetPath);
-            }
+            throw new IllegalStateException("Cannnot move checkpoint data into target." +
+                "Checkpoint data already exists: " + targetPath);
           }
           // Move source to target
-          Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+          Files.move(sourcePath, targetPath);
         }
       }
       // Success - delete marker file

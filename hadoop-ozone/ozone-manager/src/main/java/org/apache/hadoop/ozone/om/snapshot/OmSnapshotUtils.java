@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.HARDLINK_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
 import java.io.File;
@@ -101,7 +102,7 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append('\t')
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append(HARDLINK_SEPARATOR)
           .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));

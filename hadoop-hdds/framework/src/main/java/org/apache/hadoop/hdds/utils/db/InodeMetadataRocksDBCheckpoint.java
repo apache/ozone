@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,7 +103,7 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
 
       // Create hardlinks directly in checkpointLocation
       for (String l : lines) {
-        String[] parts = l.split("\t");
+        String[] parts = l.split(OzoneConsts.HARDLINK_SEPARATOR);
         if (parts.length != 2) {
           LOG.warn("Skipping malformed line in hardlink file: {}", l);
           continue;
@@ -110,8 +111,8 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
         String to = parts[0];      // Destination path (relative)
         String from = parts[1];    // Source path (relative to checkpointLocation)
 
-        Path sourcePath = Paths.get(checkpointLocation.toString(), from);
-        Path targetPath = Paths.get(checkpointLocation.toString(), to);
+        Path sourcePath = checkpointLocation.resolve(from).toAbsolutePath();
+        Path targetPath = checkpointLocation.resolve(to).toAbsolutePath();
 
         // Track source file for later deletion
         if (Files.exists(sourcePath)) {
@@ -120,7 +121,7 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
 
         // Make parent directory if it doesn't exist
         Path parent = targetPath.getParent();
-        if (parent != null && !Files.exists(parent)) {
+        if (!Files.exists(parent)) {
           Files.createDirectories(parent);
         }
 

@@ -830,21 +830,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
-  private static Set<Path> getAllPathsInTarball(File newDbDir) throws IOException {
-    Set<Path> allPathsInTarball = new HashSet<>();
-    try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
-      List<Path> files = filesInTarball.collect(Collectors.toList());
-      for (Path p : files) {
-        File file = p.toFile();
-        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
-          continue;
-        }
-        allPathsInTarball.add(p);
-      }
-    }
-    return allPathsInTarball;
-  }
-
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
       String volumeName, String keyName)
       throws IOException {

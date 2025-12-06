@@ -125,7 +125,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       Path unTarredDb = untarContentsOfTarball(targetFile,
           candidateDir, true);
       LOG.info("Successfully untar the downloaded snapshot {} at {}.",
-          targetFile, unTarredDb.toFile().getAbsolutePath());
+          targetFile, unTarredDb.toAbsolutePath());
       if (ratisSnapshotComplete(unTarredDb)) {
         LOG.info("Ratis snapshot transfer is complete.");
         return new InodeMetadataRocksDBCheckpoint(unTarredDb);
