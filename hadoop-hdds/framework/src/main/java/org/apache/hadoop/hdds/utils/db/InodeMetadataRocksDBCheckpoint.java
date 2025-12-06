@@ -45,8 +45,6 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
 
   private final Path checkpointLocation;
   private final long checkpointTimestamp = System.currentTimeMillis();
-  private final long latestSequenceNumber = -1;
-  private final long checkpointCreationTimeTaken = 0L;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(InodeMetadataRocksDBCheckpoint.class);
@@ -70,12 +68,12 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
 
   @Override
   public long getLatestSequenceNumber() {
-    return this.latestSequenceNumber;
+    return -1;
   }
 
   @Override
   public long checkpointCreationTimeTaken() {
-    return this.checkpointCreationTimeTaken;
+    return 0L;
   }
 
   @Override

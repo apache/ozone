@@ -4052,6 +4052,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
+    } finally {
+      try {
+        omDBCheckpoint.cleanupCheckpoint();
+      } catch (IOException e) {
+        LOG.error("Failed to cleanup checkpoint at {}", omDBCheckpoint.getCheckpointLocation(), e);
+      }
     }
     return termIndex;
   }
