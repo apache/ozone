@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -134,8 +133,8 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
     private DBStore tempDB;
-    private TypedTable<String, byte[]> reachableTable;
-    private TypedTable<String, byte[]> pendingToDeleteTable;
+    private Table<String, byte[]> reachableTable;
+    private Table<String, byte[]> pendingToDeleteTable;
     private final ReportStatistics reachableStats;
     private final ReportStatistics pendingToDeleteStats;
     private final ReportStatistics orphanedStats;
@@ -626,7 +625,6 @@ public class FSORepairTool extends RepairTool {
     return DBStoreBuilder.newBuilder(new OzoneConfiguration(), OMDBDefinition.get(), dbName,
         omDBFile.getParentFile().toPath())
         .setOpenReadOnly(false)
-        .setEnableCompactionDag(true)
         .setCreateCheckpointDirs(true)
         .setEnableRocksDbMetrics(true)
         .setMaxNumberOfOpenFiles(-1)
