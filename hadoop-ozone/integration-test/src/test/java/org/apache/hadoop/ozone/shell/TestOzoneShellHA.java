@@ -230,7 +230,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(GenericCli shell, String[] args) {
+  protected void execute(GenericCli shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -347,7 +347,7 @@ public class TestOzoneShellHA {
   /**
    * Helper function to generate keys for testing shell command of keys.
    */
-  private void generateKeys(String volumeName, String bucketName,
+  protected void generateKeys(String volumeName, String bucketName,
                             String bucketLayout) {
     String[] args = new String[] {
         "volume", "create", "o3://" + omServiceId + volumeName};
@@ -372,7 +372,7 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of keys from info of listing command.
    */
-  private int getNumOfKeys() throws UnsupportedEncodingException {
+  protected int getNumOfKeys() throws UnsupportedEncodingException {
     return out.toString(DEFAULT_ENCODING).split("key").length - 1;
   }
 
@@ -2488,5 +2488,9 @@ public class TestOzoneShellHA {
 
   protected MiniOzoneHAClusterImpl getCluster() {
     return cluster;
+  }
+
+  protected OzoneShell getOzoneShell() {
+    return ozoneShell;
   }
 }

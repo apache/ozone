@@ -150,6 +150,38 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean allowLeaderSkipLinearizableRead;
 
+  @Config(key = "ozone.om.follower.read.local.lease.enabled",
+      defaultValue = "false",
+      reconfigurable = true,
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
+      description = "If we enabled the local lease for Follower Read. " +
+          "If enabled, follower OM will decide if return local data directly\n" +
+          "based on lag log and time."
+  )
+  private boolean followerReadLocalLeaseEnabled;
+
+  @Config(key = "ozone.om.follower.read.local.lease.lag.limit",
+      defaultValue = "10000",
+      reconfigurable = true,
+      type = ConfigType.LONG,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
+      description = "If the lag between leader OM and follower OM is larger " +
+          "than this number, the follower OM is not up-to-date."
+  )
+  private long followerReadLocalLeaseLagLimit;
+
+  @Config(key = "ozone.om.follower.read.local.lease.time.ms",
+      defaultValue = "5000",
+      reconfigurable = true,
+      type = ConfigType.LONG,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
+      description = " If the lag time Ms between leader OM and follower OM is larger " +
+          "than this number, the follower OM is not up-to-date. " +
+          "By default, it's set to Ratis RPC timeout value."
+  )
+  private long followerReadLocalLeaseTimeMs;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -188,6 +220,30 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setAllowLeaderSkipLinearizableRead(boolean newValue) {
     allowLeaderSkipLinearizableRead = newValue;
+  }
+
+  public boolean isFollowerReadLocalLeaseEnabled() {
+    return followerReadLocalLeaseEnabled;
+  }
+
+  public void setFollowerReadLocalLeaseEnabled(boolean newValue) {
+    this.followerReadLocalLeaseEnabled = newValue;
+  }
+
+  public long getFollowerReadLocalLeaseLagLimit() {
+    return followerReadLocalLeaseLagLimit;
+  }
+
+  public void setFollowerReadLocalLeaseLagLimit(long newValue) {
+    this.followerReadLocalLeaseLagLimit = newValue;
+  }
+
+  public long getFollowerReadLocalLeaseTimeMs() {
+    return followerReadLocalLeaseTimeMs;
+  }
+
+  public void setFollowerReadLocalLeaseTimeMs(long newValue) {
+    this.followerReadLocalLeaseTimeMs = newValue;
   }
 
   public void setMaxListSize(long newValue) {

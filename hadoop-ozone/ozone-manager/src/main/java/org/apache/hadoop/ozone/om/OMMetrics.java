@@ -110,6 +110,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numLinearizableRead;
   private @Metric MutableCounterLong numLeaderSkipLinearizableRead;
 
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseSuccess;
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseFailLog;
+  private @Metric MutableCounterLong numFollowerReadLocalLeaseFailTime;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -976,6 +980,30 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumLeaderSkipLinearizableRead() {
     return numLeaderSkipLinearizableRead.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseSuccess() {
+    numFollowerReadLocalLeaseSuccess.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseSuccess() {
+    return numFollowerReadLocalLeaseSuccess.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseFailLog() {
+    numFollowerReadLocalLeaseFailLog.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseFailLog() {
+    return numFollowerReadLocalLeaseFailLog.value();
+  }
+
+  public void incNumFollowerReadLocalLeaseFailTime() {
+    numFollowerReadLocalLeaseFailTime.incr();
+  }
+
+  public long getNumFollowerReadLocalLeaseFailTime() {
+    return numFollowerReadLocalLeaseFailTime.value();
   }
 
   @VisibleForTesting
