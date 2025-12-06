@@ -27,8 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -57,6 +60,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -177,6 +181,40 @@ public class TestContainerManagerImpl {
     pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
     container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNotNull(container);
+  }
+
+  @Test
+  public void testContainerSpaceRequirement() throws IOException {
+    long sizeRequired = 256 * 1024 * 1024;
+    long containerSize = 5L * 1024 * 1024 * 1024;
+
+    PipelineManager spyPipelineManager = spy(pipelineManager);
+    File tempDir = new File(testDir, "tempDir");
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    long expectedSpaceRequirement = HddsServerUtil.requiredReplicationSpace(containerSize, conf);
+
+    ContainerManager manager = new ContainerManagerImpl(conf,
+        scmhaManager, sequenceIdGen, spyPipelineManager,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+
+    Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
+
+    doReturn(false).when(spyPipelineManager)
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
+    ContainerInfo container = manager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNull(container);
+    verify(spyPipelineManager, atLeast(1))
+        .hasEnoughSpace(eq(pipeline), eq(expectedSpaceRequirement));
+
+    reset(spyPipelineManager);
+    doReturn(true).when(spyPipelineManager)
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
+    container = manager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNotNull(container);
+    verify(spyPipelineManager, atLeast(1))
+        .hasEnoughSpace(eq(pipeline), eq(expectedSpaceRequirement));
   }
 
   @Test

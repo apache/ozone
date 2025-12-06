@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -68,17 +69,18 @@ public class TestECPipelineProvider {
   private PipelineStateManager stateManager =
       mock(PipelineStateManager.class);
   private PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
-  private long containerSizeBytes;
+  private long containerSpaceRequirement;
 
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
     OzoneConfiguration conf = new OzoneConfiguration();
     provider = new ECPipelineProvider(
         nodeManager, stateManager, conf, placementPolicy);
-    this.containerSizeBytes = (long) conf.getStorageSize(
+    long containerSizeBytes = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    this.containerSpaceRequirement = HddsServerUtil.requiredReplicationSpace(containerSizeBytes, conf);
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),
@@ -200,7 +202,7 @@ public class TestECPipelineProvider {
     assertEquals(ecConf.getData() + ecConf.getParity(), pipeline.getNodes().size());
 
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
-        ecConf.getRequiredNodes(), 0, containerSizeBytes);
+        ecConf.getRequiredNodes(), 0, containerSpaceRequirement);
   }
 
   private Set<ContainerReplica> createContainerReplicas(int number) {

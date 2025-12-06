@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy.DnWithPipelin
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -162,10 +163,11 @@ public class RatisPipelineProvider
 
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
+    long requiredSpace = HddsServerUtil.requiredReplicationSpace(containerSizeBytes, conf);
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSizeBytes, conf);
+          requiredSpace, conf);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
@@ -178,7 +180,7 @@ public class RatisPipelineProvider
       }
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
-          containerSizeBytes);
+          requiredSpace);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());
