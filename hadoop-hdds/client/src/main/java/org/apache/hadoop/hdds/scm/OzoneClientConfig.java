@@ -281,6 +281,27 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int maxConcurrentWritePerKey = 1;
 
+  @Config(key = "ozone.client.stream.read.pre-read-size",
+      defaultValue = "33554432",
+      type = ConfigType.LONG,
+      tags = {ConfigTag.CLIENT},
+      description = "Extra bytes to prefetch during streaming reads.")
+  private long streamReadPreReadSize = 32L << 20;
+
+  @Config(key = "ozone.client.stream.read.response-data-size",
+      defaultValue = "1048576",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Chunk size of streaming read responses from datanodes.")
+  private int streamReadResponseDataSize = 1 << 20;
+
+  @Config(key = "ozone.client.stream.read.timeout",
+      defaultValue = "1000",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Timeout in ms for receiving streaming read responses.")
+  private int streamReadTimeoutMs = 1000;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -551,6 +572,18 @@ public class OzoneClientConfig {
 
   public void setStreamReadBlock(boolean streamReadBlock) {
     this.streamReadBlock = streamReadBlock;
+  }
+
+  public long getStreamReadPreReadSize() {
+    return streamReadPreReadSize;
+  }
+
+  public int getStreamReadResponseDataSize() {
+    return streamReadResponseDataSize;
+  }
+
+  public int getStreamReadTimeoutMs() {
+    return streamReadTimeoutMs;
   }
 
   /**

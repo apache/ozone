@@ -4852,4 +4852,25 @@
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
+  <property>
+    <name>ozone.scm.client.stream.read.pre-read-size</name>
+    <value>33554432</value> <!-- 32 MB -->
+    <description>
+      Extra bytes to prefetch during streaming block reads.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.client.stream.read.response-data-size</name>
+    <value>1048576</value> <!-- 1 MB -->
+    <description>
+      Maximum chunk size returned by datanode in a single streaming read response.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.client.stream.read.timeout</name>
+    <value>10000</value>
+    <description>
+      Timeout (in milliseconds) when waiting for streaming read responses.
+    </description>
+  </property>
 </configuration>

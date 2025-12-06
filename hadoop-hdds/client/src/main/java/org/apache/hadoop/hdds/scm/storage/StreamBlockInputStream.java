@@ -70,8 +70,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
   private final long blockLength;
-  private final int responseDataSize = 1 << 20; // 1 MB
-  private final long preReadSize = 32 << 20; // 32 MB
+  private final int responseDataSize; // Default size is 1 MB
+  private final long preReadSize; // Default size is 32 MB
+  private final int readTimeoutMs; // // Default timeout is 10 second
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -101,6 +102,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.verifyChecksum = config.isChecksumVerify();
     this.retryPolicy = getReadRetryPolicy(config);
     this.refreshFunction = refreshFunction;
+    this.preReadSize = config.getStreamReadPreReadSize();
+    this.responseDataSize = config.getStreamReadResponseDataSize();
+    this.readTimeoutMs = config.getStreamReadTimeoutMs();
   }
 
   @Override
@@ -399,7 +403,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ByteBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll(10, TimeUnit.SECONDS);
+      final ReadBlockResponseProto readBlock = poll(readTimeoutMs, TimeUnit.SECONDS);
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind
