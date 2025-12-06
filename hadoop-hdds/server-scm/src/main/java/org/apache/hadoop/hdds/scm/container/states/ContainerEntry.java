@@ -18,9 +18,11 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -31,7 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private Map<DatanodeID, ContainerReplica> replicaMap = Collections.emptyMap();
+  private final Map<DatanodeID, ContainerReplica> replicasMap = new HashMap<>();
   private Set<ContainerReplica> replicas = Collections.emptySet();
 
   ContainerEntry(ContainerInfo info) {
@@ -54,9 +56,9 @@ public class ContainerEntry {
     return copyAndUpdate(map -> map.remove(datanodeID));
   }
 
-  private <T> T copyAndUpdate(java.util.function.Function<Map<DatanodeID, ContainerReplica>, T> update) {
-    T result = update.apply(this.replicaMap);
-    this.replicas = Collections.unmodifiableSet(new HashSet<>(this.replicaMap.values()));
+  private <T> T copyAndUpdate(Function<Map<DatanodeID, ContainerReplica>, T> update) {
+    T result = update.apply(replicasMap);
+    replicas = Collections.unmodifiableSet(new HashSet<>(replicasMap.values()));
     return result;
   }
 }
