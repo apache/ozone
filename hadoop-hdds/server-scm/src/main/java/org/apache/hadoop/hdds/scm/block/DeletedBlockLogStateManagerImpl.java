@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -212,7 +213,7 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
-    Preconditions.checkNotNull(deletingTxIDs);
+    Objects.requireNonNull(deletingTxIDs, "deletingTxIDs == null");
     deletingTxIDs.clear();
   }
 
@@ -271,7 +272,7 @@ public class DeletedBlockLogStateManagerImpl
     }
 
     public DeletedBlockLogStateManager build() throws IOException {
-      Preconditions.checkNotNull(deletedBlocksTransactionTable);
+      Objects.requireNonNull(deletedBlocksTransactionTable, "deletedBlocksTransactionTable == null");
 
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
           deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);

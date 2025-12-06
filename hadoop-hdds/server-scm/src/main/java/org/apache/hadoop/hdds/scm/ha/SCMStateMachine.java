@@ -401,7 +401,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    Preconditions.checkNotNull(installingDBCheckpoint);
+    requireNonNull(installingDBCheckpoint, "installingDBCheckpoint == null");
     DBCheckpoint checkpoint = installingDBCheckpoint;
     List<ManagedSecretKey> secretKeys = installingSecretKeys;
 

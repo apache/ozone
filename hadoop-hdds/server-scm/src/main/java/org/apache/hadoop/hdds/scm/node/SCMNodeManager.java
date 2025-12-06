@@ -537,7 +537,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
                                            CommandQueueReportProto queueReport) {
-    Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
+    Objects.requireNonNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
@@ -1592,7 +1592,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
     HashSet<DatanodeDetails> dns = new HashSet<>();
-    Preconditions.checkNotNull(dn);
+    Objects.requireNonNull(dn, "dn == null");
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();

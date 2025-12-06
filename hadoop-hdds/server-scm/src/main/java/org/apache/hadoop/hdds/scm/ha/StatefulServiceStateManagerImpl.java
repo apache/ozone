@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -127,8 +127,8 @@ public final class StatefulServiceStateManagerImpl
     }
 
     public StatefulServiceStateManager build() {
-      Preconditions.checkNotNull(statefulServiceConfig);
-      Preconditions.checkNotNull(transactionBuffer);
+      Objects.requireNonNull(statefulServiceConfig, "statefulServiceConfig == null");
+      Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
 
       final StatefulServiceStateManager stateManager =
           new StatefulServiceStateManagerImpl(statefulServiceConfig,

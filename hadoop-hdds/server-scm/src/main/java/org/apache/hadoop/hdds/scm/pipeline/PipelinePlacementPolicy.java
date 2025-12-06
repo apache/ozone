@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -292,8 +293,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       int nodesRequired, List<DatanodeDetails> healthyNodes,
       List<DatanodeDetails> usedNodes)
       throws SCMException {
-    Preconditions.checkNotNull(usedNodes);
-    Preconditions.checkNotNull(healthyNodes);
+    Objects.requireNonNull(usedNodes, "usedNodes == null");
+    Objects.requireNonNull(healthyNodes, "healthyNodes == null");
     Preconditions.checkState(nodesRequired >= 1);
 
     if (nodesRequired + usedNodes.size() !=

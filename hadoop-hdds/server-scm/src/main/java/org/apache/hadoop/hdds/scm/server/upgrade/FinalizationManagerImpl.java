@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -110,7 +110,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
   public UpgradeFinalization.StatusAndMessages finalizeUpgrade(
       String upgradeClientID)
       throws IOException {
-    Preconditions.checkNotNull(context, "Cannot finalize upgrade without " +
+    Objects.requireNonNull(context, "Cannot finalize upgrade without " +
         "first building the upgrade context.");
     return upgradeFinalizer.finalize(upgradeClientID, context);
   }
@@ -227,12 +227,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
     }
 
     public FinalizationManagerImpl build() throws IOException {
-      Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(versionManager);
-      Preconditions.checkNotNull(storage);
-      Preconditions.checkNotNull(scmHAManager);
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(executor);
+      Objects.requireNonNull(conf, "conf == null");
+      Objects.requireNonNull(versionManager, "versionManager == null");
+      Objects.requireNonNull(storage, "storage == null");
+      Objects.requireNonNull(scmHAManager, "scmHAManager == null");
+      Objects.requireNonNull(finalizationStore, "finalizationStore == null");
+      Objects.requireNonNull(executor, "executor == null");
 
       return new FinalizationManagerImpl(this);
     }
