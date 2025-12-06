@@ -118,7 +118,7 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
 
         // Make parent directory if it doesn't exist
         Path parent = targetPath.getParent();
-        if (!Files.exists(parent)) {
+        if (parent!=null && !Files.exists(parent)) {
           Files.createDirectories(parent);
         }
 
