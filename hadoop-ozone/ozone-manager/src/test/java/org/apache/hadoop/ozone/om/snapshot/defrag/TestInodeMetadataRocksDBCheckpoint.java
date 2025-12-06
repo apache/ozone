@@ -52,7 +52,7 @@ public class TestInodeMetadataRocksDBCheckpoint {
         "om.db/target1.sst\tsource.sst\n" +
             "target2.sst\tsource.sst\n";
     Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
-
+    Object sourceFileInode = getINode(sourceFile.toPath());
     // Execute createHardLinks
     InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
         new InodeMetadataRocksDBCheckpoint(testDir.toPath());
@@ -68,9 +68,9 @@ public class TestInodeMetadataRocksDBCheckpoint {
         "Hard link should be created");
 
     // Verify content is same using inode comparison
-    assertEquals(getINode(sourceFile.toPath()), getINode(target1.toPath()),
+    assertEquals(sourceFileInode, getINode(target1.toPath()),
         "Hard links should have same inode as source");
-    assertEquals(getINode(sourceFile.toPath()), getINode(target2.toPath()),
+    assertEquals(sourceFileInode, getINode(target2.toPath()),
         "Hard links should have same inode as source");
   }
 }

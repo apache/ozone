@@ -4316,7 +4316,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
           Path targetPath = dbDir.toPath().resolve(sourcePath.getFileName());
           if (Files.exists(targetPath)) {
-            throw new IllegalStateException("Cannnot move checkpoint data into target." +
+            throw new IOException("Cannnot move checkpoint data into target." +
                 "Checkpoint data already exists: " + targetPath);
           }
           // Move source to target

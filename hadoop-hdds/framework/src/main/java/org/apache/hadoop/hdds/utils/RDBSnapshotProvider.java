@@ -184,6 +184,21 @@ public abstract class RDBSnapshotProvider implements Closeable {
    * @return {@link RocksDBCheckpoint}
    * @throws IOException
    */
+  public RocksDBCheckpoint getCheckpointFromSnapshotFile(File snapshot,
+      File untarDir, boolean deleteSnapshot) throws IOException {
+    Path untarredDbDir = untarContentsOfTarball(snapshot, untarDir, deleteSnapshot);
+    return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  /**
+   *
+   * Untar the downloaded snapshot.
+   * @param snapshot the downloaded snapshot tar file
+   * @param untarDir the directory to place the untarred files
+   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
+   * @return  path of untarred dbDir.
+   * @throws IOException
+   */
   public Path untarContentsOfTarball(File snapshot,
       File untarDir, boolean deleteSnapshot) throws IOException {
     // Untar the checkpoint file.
