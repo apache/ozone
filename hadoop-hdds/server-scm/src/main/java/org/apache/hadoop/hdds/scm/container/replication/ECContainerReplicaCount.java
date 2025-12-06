@@ -573,7 +573,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
         .append(", ReplicationConfig: ").append(repConfig)
         .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);
-
     return sb.toString();
   }
 
