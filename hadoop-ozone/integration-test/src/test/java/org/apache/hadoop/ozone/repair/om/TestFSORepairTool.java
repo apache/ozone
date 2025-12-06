@@ -61,6 +61,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -190,7 +191,7 @@ public class TestFSORepairTool {
   void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
+    int exitCode = execute(null, dryRun, "-v", "/vol1", "-b", "bucket1");
     assertEquals(0, exitCode, err.getOutput());
 
     String cliOutput = out.getOutput();
@@ -312,6 +313,25 @@ public class TestFSORepairTool {
     assertEquals(expectedOutput, reportOutput);
   }
 
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testAlternateOmDbDirName(@TempDir java.nio.file.Path tempDir) throws Exception {
+    File original = new File(dbPath);
+    File backup = tempDir.resolve("om-db-backup").toFile();
+
+    FileUtils.copyDirectory(original, backup);
+
+    out.reset();
+    String expectedOutput = serializeReport(fullReport);
+    int exitCode = execute(backup.getPath(), true);
+
+    assertEquals(0, exitCode, err.getOutput());
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+  }
+
   /**
    * Test in repair mode. This test ensures that:
    * - The initial repair correctly resolves unreferenced objects.
@@ -361,15 +381,17 @@ public class TestFSORepairTool {
   }
 
   private int repair(String... args) {
-    return execute(false, args);
+    return execute(null, false, args);
   }
 
   private int dryRun(String... args) {
-    return execute(true, args);
+    return execute(null, true, args);
   }
 
-  private int executeWithDb(boolean dryRun, String omDbPath, String... args) {
-    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", omDbPath));
+  private int execute(String customDbPath, boolean dryRun, String... args) {
+    String effectiveDbPath = customDbPath != null ? customDbPath : dbPath;
+
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", effectiveDbPath));
     if (dryRun) {
       argList.add("--dry-run");
     }
@@ -379,49 +401,6 @@ public class TestFSORepairTool {
         .execute(() -> cmd.execute(argList.toArray(new String[0])));
   }
 
-  private int execute(boolean dryRun, String... args) {
-    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
-    if (dryRun) {
-      argList.add("--dry-run");
-    }
-    argList.addAll(Arrays.asList(args));
-
-    return withTextFromSystemIn("y")
-        .execute(() -> cmd.execute(argList.toArray(new String[0])));
-  }
-
-  @Order(ORDER_DRY_RUN)
-  @Test
-  public void testAlternateOmDbDirName() throws Exception {
-    File original = new File(OMStorage.getOmDbDir(cluster.getConf()), OM_DB_NAME);
-    // Place backup under a different parent directory to ensure we don't
-    // accidentally open the original om.db due to path handling bugs.
-    File backupParent = new File(OMStorage.getOmDbDir(cluster.getConf()), "copy");
-    File backup = new File(backupParent, "om-db-backup");
-
-    if (backup.exists()) {
-      FileUtils.deleteDirectory(backup);
-    }
-    if (backupParent.exists()) {
-      FileUtils.deleteDirectory(backupParent);
-    }
-    boolean created = backupParent.mkdirs();
-    if (!created && !backupParent.exists()) {
-      throw new IOException("Failed to create backup parent directory: " + backupParent);
-    }
-    FileUtils.copyDirectory(original, backup);
-
-    out.reset();
-    String expectedOutput = serializeReport(fullReport);
-    int exitCode = executeWithDb(true, backup.getPath());
-    assertEquals(0, exitCode, err.getOutput());
-
-    String cliOutput = out.getOutput();
-    String reportOutput = extractRelevantSection(cliOutput);
-    assertEquals(expectedOutput, reportOutput);
-
-    FileUtils.deleteDirectory(backupParent);
-  }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
     int count = 0;
