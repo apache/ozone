@@ -109,6 +109,12 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
+  private Runnable preCommit = () -> {
+  };
+
+  public void setPreCommit(Runnable preCommit) {
+    this.preCommit = preCommit;
+  }
 
   @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
@@ -654,6 +660,7 @@ public class KeyOutputStream extends OutputStream
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
+      preCommit.run();
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
