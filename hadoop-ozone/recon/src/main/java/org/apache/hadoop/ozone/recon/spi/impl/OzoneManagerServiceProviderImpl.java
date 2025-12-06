@@ -272,6 +272,7 @@ public class OzoneManagerServiceProviderImpl
         throw new RuntimeException(runtimeException);
       }
     }
+    reconTaskController.updateOMMetadataManager(omMetadataManager);
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
