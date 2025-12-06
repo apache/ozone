@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,13 +122,13 @@ public abstract class RDBSnapshotProvider implements Closeable {
       numDownloaded.incrementAndGet();
       injectPause();
 
-      RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
+      Path unTarredDb = untarContentsOfTarball(targetFile,
           candidateDir, true);
       LOG.info("Successfully untar the downloaded snapshot {} at {}.",
-          targetFile, checkpoint.getCheckpointLocation());
-      if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
+          targetFile, unTarredDb.toAbsolutePath());
+      if (ratisSnapshotComplete(unTarredDb)) {
         LOG.info("Ratis snapshot transfer is complete.");
-        return checkpoint;
+        return new InodeMetadataRocksDBCheckpoint(unTarredDb);
       }
     }
   }
@@ -185,6 +186,21 @@ public abstract class RDBSnapshotProvider implements Closeable {
    */
   public RocksDBCheckpoint getCheckpointFromSnapshotFile(File snapshot,
       File untarDir, boolean deleteSnapshot) throws IOException {
+    Path untarredDbDir = untarContentsOfTarball(snapshot, untarDir, deleteSnapshot);
+    return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  /**
+   *
+   * Untar the downloaded snapshot.
+   * @param snapshot the downloaded snapshot tar file
+   * @param untarDir the directory to place the untarred files
+   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
+   * @return  path of untarred dbDir.
+   * @throws IOException
+   */
+  private Path untarContentsOfTarball(File snapshot,
+      File untarDir, boolean deleteSnapshot) throws IOException {
     // Untar the checkpoint file.
     Path untarredDbDir = untarDir.toPath();
     FileUtil.unTar(snapshot, untarredDbDir.toFile());
@@ -192,7 +208,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
     if (deleteSnapshot) {
       FileUtil.fullyDelete(snapshot);
     }
-    return new RocksDBCheckpoint(untarredDbDir);
+    return untarredDbDir;
   }
 
   /**

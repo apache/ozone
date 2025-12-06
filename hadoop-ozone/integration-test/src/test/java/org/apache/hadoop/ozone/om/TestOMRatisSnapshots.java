@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -86,7 +87,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -101,6 +101,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -112,6 +113,9 @@ public class TestOMRatisSnapshots {
   private static final int SNAPSHOTS_TO_CREATE = 100;
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final int NUM_OF_OMS = 3;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -965,8 +969,10 @@ public class TestOMRatisSnapshots {
     // followerOM is already ahead of that transactionLogIndex and the OM
     // state should be reloaded.
     TermIndex followerTermIndex = followerRatisServer.getLastAppliedTermIndex();
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
     TermIndex newTermIndex = followerOM.installCheckpoint(
-        leaderOMNodeId, leaderDbCheckpoint);
+        leaderOMNodeId, leaderCheckpointLocation);
 
     String errorMsg = "Cannot proceed with InstallSnapshot as OM is at " +
         "TermIndex " + followerTermIndex + " and checkpoint has lower " +
@@ -1006,7 +1012,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
+    assertNotNull(leaderCheckpointLocation);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
@@ -1162,6 +1168,7 @@ public class TestOMRatisSnapshots {
       // tarballs.
       if (count == 1) {
         long sstSize = getSizeOfSstFiles(tarball);
+        LOG.info("Setting ozone.om.ratis.snapshot.max.total.sst.size to {}", sstSize);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
@@ -1177,15 +1184,22 @@ public class TestOMRatisSnapshots {
     // Get Size of sstfiles in tarball.
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      OmSnapshotUtils.createHardLinks(tempDir, true);
-      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
+      InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+          new InodeMetadataRocksDBCheckpoint(tempDir);
+      assertNotNull(obtainedCheckpoint);
+      Path omDbDir = Paths.get(obtainedCheckpoint.getCheckpointLocation().toString(), OM_DB_NAME);
+      assertNotNull(omDbDir);
+      List<Path> sstPaths = Files.list(omDbDir).collect(Collectors.toList());
       long totalFileSize = 0;
+      int numFiles = 0;
       for (Path sstPath : sstPaths) {
         File file = sstPath.toFile();
         if (file.isFile() && file.getName().endsWith(".sst")) {
           totalFileSize += Files.size(sstPath);
+          numFiles++;
         }
       }
+      LOG.info("Total num files {}",  numFiles);
       return totalFileSize;
     }
 
