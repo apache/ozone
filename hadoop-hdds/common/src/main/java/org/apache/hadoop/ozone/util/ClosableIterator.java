@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.ozone.util;
 
+import java.io.Closeable;
 import java.util.Iterator;
 
 /**
  * An {@link Iterator} that may hold resources until it is closed.
  */
-public interface ClosableIterator<E> extends Iterator<E>, AutoCloseable {
+public interface ClosableIterator<E> extends Iterator<E>, Closeable {
   @Override
   void close();
 }
