@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
@@ -424,7 +425,7 @@ public final class HddsServerUtil {
 
     if (rawLocations.isEmpty()) {
       rawLocations = new ArrayList<>(1);
-      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf, NodeType.DATANODE));
     }
     return rawLocations;
   }
