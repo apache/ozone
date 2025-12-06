@@ -335,10 +335,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketArgs.
-   * @return instance of OmBucketArgs
+   * Parses BucketInfo protobuf and creates OmBucketArgs Builder.
+   * @return Builder instance
    */
-  public static OmBucketArgs getFromProtobuf(BucketArgs bucketArgs) {
+  public static Builder builderFromProtobuf(BucketArgs bucketArgs) {
     final OmBucketArgs.Builder builder = newBuilder()
         .setVolumeName(bucketArgs.getVolumeName())
         .setBucketName(bucketArgs.getBucketName())
@@ -372,6 +372,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
           OMPBHelper.convert(bucketArgs.getBekInfo()));
     }
 
-    return builder.build();
+    return builder;
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketArgs.
+   * @return instance of OmBucketArgs
+   */
+  public static OmBucketArgs getFromProtobuf(BucketArgs bucketArgs) {
+    return builderFromProtobuf(bucketArgs).build();
   }
 }

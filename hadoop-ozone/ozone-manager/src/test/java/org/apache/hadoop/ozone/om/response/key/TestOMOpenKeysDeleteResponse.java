@@ -223,7 +223,6 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
         String file = OzoneFSUtils.getFileName(key);
         final long volumeId = omMetadataManager.getVolumeId(volume);
         final long bucketId = omMetadataManager.getBucketId(volume, bucket);
-        omKeyInfo.setFileName(file);
         omKeyInfo.setParentObjectID(parentID);
         OMRequestTestUtils.addFileToKeyTable(true, false, file, omKeyInfo,
             clientID, 0L, omMetadataManager);

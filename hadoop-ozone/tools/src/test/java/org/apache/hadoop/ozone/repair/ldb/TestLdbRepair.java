@@ -149,7 +149,7 @@ public class TestLdbRepair {
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath.toString());
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath.toString(), cfDescList, cfHandleList)) {
       List<LiveFileMetaData> liveFileMetaDataList = RdbUtil
-          .getLiveSSTFilesForCFs(db, Collections.singletonList(TEST_CF_NAME));
+          .getLiveSSTFilesForCFs(db, Collections.singleton(TEST_CF_NAME));
       for (LiveFileMetaData liveMetadata : liveFileMetaDataList) {
         assertEquals(0, liveMetadata.numDeletions(),
             "Tombstones found in file: " + liveMetadata.fileName());

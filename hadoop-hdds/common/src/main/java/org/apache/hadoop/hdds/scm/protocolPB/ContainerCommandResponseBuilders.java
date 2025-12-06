@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -331,6 +332,20 @@ public final class ContainerCommandResponseBuilders {
 
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getReadBlockResponse(
+      ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
+
+    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .setData(ByteString.copyFrom(data))
+        .setOffset(offset)
+        .build();
+
+    return getSuccessResponseBuilder(request)
+        .setReadBlock(response)
         .build();
   }
 

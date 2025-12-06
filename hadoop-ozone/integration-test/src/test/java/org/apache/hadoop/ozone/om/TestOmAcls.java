@@ -70,11 +70,6 @@ public class TestOmAcls {
     AuditLogTestUtils.enableAuditLog();
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

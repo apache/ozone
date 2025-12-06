@@ -92,7 +92,7 @@ public class TestContainerDeletionChoosingPolicy {
           layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
-      data.incrPendingDeletionBlocks(20);
+      data.incrPendingDeletionBlocks(20, 256);
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
@@ -189,7 +189,7 @@ public class TestContainerDeletionChoosingPolicy {
         containerId, layout, ContainerTestHelper.CONTAINER_MAX_SIZE,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
 
-    data.incrPendingDeletionBlocks(5);
+    data.incrPendingDeletionBlocks(5, 5 * 256);
     data.setState(state);
     containerSet.addContainer(new KeyValueContainer(data, conf));
 
@@ -227,7 +227,7 @@ public class TestContainerDeletionChoosingPolicy {
       if (i != numContainers) {
         int deletionBlocks = random.nextInt(numContainers) + 1;
         numberOfBlocks.add(deletionBlocks);
-        data.incrPendingDeletionBlocks(deletionBlocks);
+        data.incrPendingDeletionBlocks(deletionBlocks, 256);
         name2Count.put(containerId, deletionBlocks);
       }
       KeyValueContainer container = new KeyValueContainer(data, conf);

@@ -125,7 +125,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     List<String[]> bucketLockKeys = getBucketLockKeySet(purgeDirsRequest);
-    boolean lockAcquired = omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketLockKeys).isLockAcquired();
+    mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketLockKeys));
+    boolean lockAcquired = getOmLockDetails().isLockAcquired();
     if (!lockAcquired && !purgeDirsRequest.getBucketNameInfosList().isEmpty()) {
       OMException oe = new OMException("Unable to acquire write locks on buckets while performing DirectoryPurge",
           OMException.ResultCodes.KEY_DELETION_ERROR);
@@ -173,7 +174,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 parentId, processed.keyInfo.getFileName(), hsyncClientId);
             OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
             if (openKeyInfo != null) {
-              openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+              openKeyInfo = openKeyInfo.withMetadataMutations(
+                  metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
               openKeyInfoMap.put(dbOpenKey, openKeyInfo);
             }
           }
@@ -255,7 +257,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
-      omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys);
+      if (lockAcquired) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys));
+      }  
     }
 
     return new OMDirectoriesPurgeResponseWithFSO(

@@ -363,18 +363,20 @@ public class TestKeyManagerImpl {
     // Create directory where the parent directory does not exist
     StringBuffer keyNameBuf = new StringBuffer();
     keyNameBuf.append(RandomStringUtils.secure().nextAlphabetic(5));
-    OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(keyNameBuf.toString())
-        .build();
     for (int i = 0; i < 5; i++) {
       keyNameBuf.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     String keyName = keyNameBuf.toString();
+    OmKeyArgs keyArgs = createBuilder()
+        .setKeyName(keyName)
+        .build();
+
     writeClient.createDirectory(keyArgs);
+
     Path path = Paths.get(keyName);
     while (path != null) {
       // verify parent directories are created
-      assertTrue(keyManager.getFileStatus(keyArgs).isDirectory());
+      assertIsDirectory(BUCKET_NAME, path.toString());
       path = path.getParent();
     }
 
@@ -1905,7 +1907,8 @@ public class TestKeyManagerImpl {
       OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
       assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
       assertEquals(bucketName, keyInfo.getBucketName());
-      assertEquals(keyName, keyInfo.getFileName());
+      assertEquals(keyName + '/', keyInfo.getKeyName());
+      assertEquals(Paths.get(keyName).getFileName().toString(), keyInfo.getFileName());
       assertTrue(ozoneFileStatus.isDirectory());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1946,7 +1949,6 @@ public class TestKeyManagerImpl {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName() + "/")
-        .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
         .setOmKeyLocationInfos(null)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
