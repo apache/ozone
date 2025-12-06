@@ -17,17 +17,17 @@
 
 package org.apache.hadoop.ozone.om.snapshot.defrag;
 
-import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import java.io.File;
-import java.nio.file.Files;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.nio.file.Files;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test InodeMetadataRocksDBCheckpoint.
