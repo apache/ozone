@@ -1607,7 +1607,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     OmUtils.createOMDir(omRatisDirectory);
 
-    String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
+    String scmStorageDir = SCMHAUtils.getSCMRatisDirectory(conf);
     if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
         .isNullOrEmpty(scmStorageDir) && omRatisDirectory
         .equals(scmStorageDir)) {

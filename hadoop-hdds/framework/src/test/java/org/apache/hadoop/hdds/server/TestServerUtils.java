@@ -35,6 +35,7 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -280,9 +281,9 @@ public class TestServerUtils {
       assertFalse(metaDir.exists());
 
       // Test Ratis directories - each component should get its own with flat naming
-      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
-      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
-      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.SCM);
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.DATANODE);
 
       // Verify Ratis directories use flat naming pattern (component.ratis)
       assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
@@ -320,9 +321,9 @@ public class TestServerUtils {
       assertTrue(testFile.createNewFile());
 
       // Test that all components use the old shared location
-      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "scm");
-      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "om");
-      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, "dn");
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.SCM);
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.DATANODE);
 
       // All should use the old shared location
       assertEquals(oldSharedRatisDir.getPath(), scmRatisDir);

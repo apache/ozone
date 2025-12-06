@@ -135,7 +135,7 @@ class TestOzoneHARatisLogParser {
 
     // Now check for SCM.
     File scmMetadataDir =
-        new File(SCMHAUtils.getRatisStorageDir(leaderSCMConfig));
+        new File(SCMHAUtils.getSCMRatisDirectory(leaderSCMConfig));
     assertThat(scmMetadataDir).isDirectory();
 
     ratisDirs = scmMetadataDir.list();
