@@ -32,6 +32,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -72,7 +73,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private final SCMHAManager haManager;
   private final SequenceIdGenerator sequenceIdGen;
-  private final Configuration conf;
+  private final OzoneConfiguration conf;
 
   // TODO: Revisit this.
   // Metrics related to operations should be moved to ProtocolServer
@@ -101,7 +102,11 @@ public class ContainerManagerImpl implements ContainerManager {
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
     this.sequenceIdGen = sequenceIdGen;
-    this.conf = conf;
+    if (conf instanceof OzoneConfiguration) {
+      this.conf = (OzoneConfiguration) conf;
+    } else {
+      this.conf = new OzoneConfiguration(conf);
+    }
     this.containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
