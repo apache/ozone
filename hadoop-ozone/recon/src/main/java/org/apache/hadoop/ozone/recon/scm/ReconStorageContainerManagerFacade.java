@@ -115,8 +115,11 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTaskV2;
+import org.apache.hadoop.ozone.recon.fsck.ReconReplicationManager;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
@@ -154,8 +157,10 @@ public class ReconStorageContainerManagerFacade
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
-  private final ContainerHealthTask containerHealthTask;
+  private final ReconScmTask containerHealthTask;
+  private final ReconScmTask containerHealthTaskV2;
   private final DataSource dataSource;
+  private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
 
   private DBStore dbStore;
   private ReconNodeManager nodeManager;
@@ -167,6 +172,7 @@ public class ReconStorageContainerManagerFacade
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
+  private ReconReplicationManager reconReplicationManager;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
@@ -184,7 +190,8 @@ public class ReconStorageContainerManagerFacade
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
                                             DataSource dataSource,
-                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager)
+                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
+                                            ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2)
       throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
@@ -246,7 +253,8 @@ public class ReconStorageContainerManagerFacade
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
-        containerHealthSchemaManager, reconContainerMetadataManager,
+        containerHealthSchemaManager, containerHealthSchemaManagerV2,
+        reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
@@ -266,14 +274,58 @@ public class ReconStorageContainerManagerFacade
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
         scmServiceProvider, reconTaskConfig, taskStatusUpdaterManager);
 
-    containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
-        containerHealthSchemaManager, containerPlacementPolicy,
-        reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
+    // Create legacy ContainerHealthTask (always runs, writes to UNHEALTHY_CONTAINERS)
+    LOG.info("Creating ContainerHealthTask (legacy)");
+    containerHealthTask = new ContainerHealthTask(
+        containerManager,
+        scmServiceProvider,
+        containerHealthSchemaManager,
+        containerPlacementPolicy,
+        reconTaskConfig,
+        reconContainerMetadataManager,
+        conf,
+        taskStatusUpdaterManager
+    );
+
+    // Create ContainerHealthTaskV2 (always runs, writes to UNHEALTHY_CONTAINERS_V2)
+    LOG.info("Creating ContainerHealthTaskV2");
+    containerHealthTaskV2 = new ContainerHealthTaskV2(
+        containerManager,
+        containerHealthSchemaManagerV2,
+        containerPlacementPolicy,
+        reconContainerMetadataManager,
+        conf,
+        reconTaskConfig,
+        taskStatusUpdaterManager,
+        this  // ReconStorageContainerManagerFacade - provides access to ReconReplicationManager
+    );
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager,
         reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
 
+    this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.dataSource = dataSource;
+
+    // Initialize Recon's ReplicationManager for local health checks
+    try {
+      LOG.info("Creating ReconReplicationManager");
+      this.reconReplicationManager = new ReconReplicationManager(
+          conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
+          conf,
+          containerManager,
+          containerPlacementPolicy,  // Use for both Ratis and EC
+          containerPlacementPolicy,
+          eventQueue,
+          scmContext,
+          nodeManager,
+          Clock.system(ZoneId.systemDefault()),
+          containerHealthSchemaManagerV2
+      );
+      LOG.info("Successfully created ReconReplicationManager");
+    } catch (IOException e) {
+      LOG.error("Failed to create ReconReplicationManager", e);
+      throw e;
+    }
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager, pipelineSyncTask);
@@ -348,6 +400,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconScmTasks.add(containerHealthTaskV2);
     reconScmTasks.add(containerSizeCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
@@ -671,7 +724,7 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public ReplicationManager getReplicationManager() {
-    return null;
+    return reconReplicationManager;
   }
 
   @Override
@@ -727,7 +780,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   @VisibleForTesting
-  public ContainerHealthTask getContainerHealthTask() {
+  public ReconScmTask getContainerHealthTask() {
     return containerHealthTask;
   }
 
