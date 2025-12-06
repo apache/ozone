@@ -190,7 +190,7 @@ public class TestContainerCommandReconciliation {
     }
 
     if (cluster != null) {
-      cluster.stop();
+      cluster.shutdown();
     }
   }
 
