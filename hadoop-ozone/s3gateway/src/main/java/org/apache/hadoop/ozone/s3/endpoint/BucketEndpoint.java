@@ -125,22 +125,22 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("upload-id-marker") String uploadIdMarker,
       @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
-
-    // Handle ACL requests
-    if (aclMarker != null) {
-      return handleGetBucketAcl(bucketName, startNanos);
-    }
-
-    // Handle multipart uploads requests
-    if (uploads != null) {
-      return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
-    }
-
-    // Actual bucket processing starts here
     S3GAction s3GAction = S3GAction.GET_BUCKET;
 
     try {
+      // Handle ACL requests
+      if (aclMarker != null) {
+        s3GAction = S3GAction.GET_ACL;
+        return handleGetBucketAcl(bucketName, startNanos);
+      }
 
+      // Handle multipart uploads requests
+      if (uploads != null) {
+        s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
+        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+      }
+
+      // Actual bucket processing starts here
       // Validate and prepare parameters
       BucketListingContext context = validateAndPrepareParameters(
           bucketName, delimiter, encodingType, marker, maxKeys, prefix, 
