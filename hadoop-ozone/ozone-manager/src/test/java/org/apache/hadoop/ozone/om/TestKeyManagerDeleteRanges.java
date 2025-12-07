@@ -74,16 +74,11 @@ public class TestKeyManagerDeleteRanges {
           .setUpdateID(0L)
           .build();
 
-      // Insert dir1 into the directory table.
-      String dirDbKey = OMRequestTestUtils.addDirKeyToDirTable(
-          false, dir1, volume, bucket, 1L, metadataManager);
-
       OmKeyInfo parentInfo = getOmKeyInfo(
           volume, bucket, dir1, "dir1/");
 
       // Create 5 files under dir1 in FileTable.
       List<String> fileDbKeys = new ArrayList<>();
-      List<OmKeyInfo> fileInfos = new ArrayList<>();
       for (int i = 1; i <= 5; i++) {
         OmKeyInfo subFile = OMRequestTestUtils
             .createOmKeyInfo(volume, bucket, "file" + i,
@@ -96,7 +91,6 @@ public class TestKeyManagerDeleteRanges {
         String dbKey = OMRequestTestUtils.addFileToKeyTable(
             false, true, subFile.getKeyName(), subFile, 1234L, 10L + i, metadataManager);
         fileDbKeys.add(dbKey);
-        fileInfos.add(subFile);
       }
 
       // Check: All 5 file entries exist in the FileTable.
