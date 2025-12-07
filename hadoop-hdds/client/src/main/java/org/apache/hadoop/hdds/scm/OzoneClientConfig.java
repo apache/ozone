@@ -300,7 +300,7 @@ public class OzoneClientConfig {
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
       description = "Timeout in ms for receiving streaming read responses.")
-  private int streamReadTimeoutMs = 1000;
+  private int streamReadTimeoutMs = 10_000;
 
   @PostConstruct
   public void validate() {

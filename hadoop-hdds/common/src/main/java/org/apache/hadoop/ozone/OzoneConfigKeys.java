@@ -694,6 +694,27 @@ public final class OzoneConfigKeys {
       "ozone.client.elastic.byte.buffer.pool.max.size";
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
 
+  public static final String
+      OZONE_CLIENT_STREAM_READ_PRE_READ_SIZE =
+      "ozone.client.stream.read.pre-read-size";
+  public static final long
+      OZONE_CLIENT_STREAM_READ_PRE_READ_SIZE_DEFAULT =
+      32L << 20;
+
+  public static final String
+      OZONE_CLIENT_STREAM_READ_RESPONSE_DATA_SIZE =
+      "ozone.client.stream.read.response-data-size";
+  public static final int
+      OZONE_CLIENT_STREAM_READ_RESPONSE_DATA_SIZE_DEFAULT =
+      1 << 20;
+
+  public static final String
+      OZONE_CLIENT_STREAM_READ_TIMEOUT =
+      "ozone.client.stream.read.timeout";
+  public static final int
+      OZONE_CLIENT_STREAM_READ_TIMEOUT_DEFAULT =
+      10_000;
+
   /**
    * There is no need to instantiate this class.
    */
