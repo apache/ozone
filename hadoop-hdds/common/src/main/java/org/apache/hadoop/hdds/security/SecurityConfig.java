@@ -425,8 +425,7 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, keyDir);
   }
 
@@ -438,8 +437,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, certificateDir);
   }
 
@@ -450,8 +448,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getLocation(String component) {
-    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component);
   }
 

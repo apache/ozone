@@ -322,8 +322,7 @@ public final class CertificateSignRequest {
 
     public CertificateSignRequest.Builder addServiceName(
         String serviceName) {
-      Objects.requireNonNull(
-          serviceName, "Service Name cannot be null");
+      Objects.requireNonNull(serviceName, "Service Name cannot be null");
 
       this.addAltName(GeneralName.otherName, serviceName);
       return this;

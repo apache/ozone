@@ -850,8 +850,7 @@ public final class HddsUtils {
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "HddsProtos.UUID can't be null to transform to java UUID.");
+    Objects.requireNonNull(uuid, "HddsProtos.UUID can't be null to transform to java UUID.");
     return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
   }
 
@@ -859,8 +858,7 @@ public final class HddsUtils {
    * Transform a Java UUID to protobuf UUID.
    */
   public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "UUID can't be null to transform to protobuf UUID.");
+    Objects.requireNonNull(uuid, "UUID can't be null to transform to protobuf UUID.");
     return HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())

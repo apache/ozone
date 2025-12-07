@@ -216,13 +216,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
     if (isDatastreamPipelineMode) {
-      return Objects.requireNonNull(xceiverClient.getDataStreamApi(),
-          "xceiverClient.getDataStreamApi() == null")
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer(),
               RatisHelper.getRoutingTable(pipeline));
     } else {
-      return Objects.requireNonNull(xceiverClient.getDataStreamApi(),
-          "xceiverClient.getDataStreamApi() == null")
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer());
     }
   }

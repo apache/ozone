@@ -507,7 +507,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       reply.setResponse(CompletableFuture.completedFuture(responseProto));
       return reply;
     } else {
-      Objects.requireNonNull(ioException);
+      Objects.requireNonNull(ioException, "ioException == null");
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",

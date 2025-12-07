@@ -274,8 +274,7 @@ public class RetryCache {
       lock.unlock();
     }
     // Entry already exists in cache. Wait for completion and return its state
-    Objects.requireNonNull(mapEntry,
-        "Entry from the cache should not be null");
+    Objects.requireNonNull(mapEntry, "Entry from the cache should not be null");
     // Wait for in progress request to complete
     synchronized (mapEntry) {
       while (mapEntry.state == CacheEntry.INPROGRESS) {
