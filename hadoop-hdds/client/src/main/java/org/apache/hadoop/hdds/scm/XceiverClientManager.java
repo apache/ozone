@@ -246,7 +246,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @ConfigGroup(prefix = "scm.container.client")
   public static class ScmClientConfig {
 
-    @Config(key = "max.size",
+    @Config(key = "scm.container.client.max.size",
         defaultValue = "256",
         tags = {OZONE, PERFORMANCE},
         description =
@@ -257,7 +257,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     )
     private int maxSize;
 
-    @Config(key = "idle.threshold",
+    @Config(key = "scm.container.client.idle.threshold",
         type = ConfigType.TIME, timeUnit = MILLISECONDS,
         defaultValue = "10s",
         tags = {OZONE, PERFORMANCE},

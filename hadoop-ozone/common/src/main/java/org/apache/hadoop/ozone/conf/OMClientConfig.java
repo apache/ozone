@@ -32,9 +32,9 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.om.client")
 public class OMClientConfig {
 
-  public static final String OM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
+  public static final String OM_CLIENT_RPC_TIME_OUT = "ozone.om.client.rpc.timeout";
   public static final String OM_TRASH_EMPTIER_CORE_POOL_SIZE
-      = "trash.core.pool.size";
+      = "ozone.om.client.trash.core.pool.size";
 
   @Config(key = OM_CLIENT_RPC_TIME_OUT,
       defaultValue = "15m",

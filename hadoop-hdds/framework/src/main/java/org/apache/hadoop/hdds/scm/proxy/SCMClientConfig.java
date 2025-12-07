@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.conf.ConfigType;
  */
 @ConfigGroup(prefix = "hdds.scmclient")
 public class SCMClientConfig {
-  public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
+  public static final String SCM_CLIENT_RPC_TIME_OUT = "hdds.scmclient.rpc.timeout";
   public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
-      "failover.max.retry";
+      "hdds.scmclient.failover.max.retry";
   public static final String SCM_CLIENT_MAX_RETRY_TIMEOUT =
-      "max.retry.timeout";
+      "hdds.scmclient.max.retry.timeout";
   public static final String SCM_CLIENT_RETRY_INTERVAL =
-      "failover.retry.interval";
+      "hdds.scmclient.failover.retry.interval";
 
   @Config(key = SCM_CLIENT_RPC_TIME_OUT,
       defaultValue = "15m",

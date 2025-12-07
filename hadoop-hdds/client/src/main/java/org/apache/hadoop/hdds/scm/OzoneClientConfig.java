@@ -113,7 +113,7 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long streamBufferMaxSize = 32 * 1024 * 1024;
 
-  @Config(key = "stream.readblock.enable",
+  @Config(key = "ozone.client.stream.readblock.enable",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       description = "Allow ReadBlock to stream all the readChunk in one request.",
