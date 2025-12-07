@@ -52,6 +52,8 @@ public class CSMMetrics {
   private final EnumMap<Type, MutableRate> opsLatencyMs;
   private final EnumMap<Type, MutableRate> opsQueueingDelay;
 
+  // MetricsRegistry must be kept as instance field to prevent GC and ensure metrics work correctly
+  @SuppressWarnings("PMD.SingularField")
   private final MetricsRegistry registry;
 
   // Failure Metrics

@@ -65,6 +65,8 @@ public class ContainerMetrics implements Closeable {
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
 
+  // MetricsRegistry must be kept as instance field to prevent GC and ensure metrics work correctly
+  @SuppressWarnings("PMD.SingularField")
   private final MetricsRegistry registry;
 
   public ContainerMetrics(int[] intervals) {

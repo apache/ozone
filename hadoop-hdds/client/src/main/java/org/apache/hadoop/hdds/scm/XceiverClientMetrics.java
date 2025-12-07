@@ -52,6 +52,8 @@ public class XceiverClientMetrics implements MetricsSource {
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
 
+  // MetricsRegistry must be kept as instance field because reset() method reuses it
+  @SuppressWarnings("PMD.SingularField")
   private MetricsRegistry registry;
 
   public XceiverClientMetrics() {
