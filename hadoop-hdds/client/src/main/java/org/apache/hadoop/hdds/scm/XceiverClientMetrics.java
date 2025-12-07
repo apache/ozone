@@ -52,6 +52,8 @@ public class XceiverClientMetrics implements MetricsSource {
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
 
+  private MetricsRegistry registry;
+
   public XceiverClientMetrics() {
     init();
   }
@@ -60,7 +62,7 @@ public class XceiverClientMetrics implements MetricsSource {
     OzoneConfiguration conf = new OzoneConfiguration();
     int[] intervals = conf.getInts(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
-    MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
+    this.registry = new MetricsRegistry(SOURCE_NAME);
 
     this.pendingOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsArray = new EnumMap<>(ContainerProtos.Type.class);

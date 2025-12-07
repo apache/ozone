@@ -65,6 +65,8 @@ public class ContainerMetrics implements Closeable {
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
 
+  private final MetricsRegistry registry;
+
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;
     MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
@@ -73,7 +75,7 @@ public class ContainerMetrics implements Closeable {
     this.opsForClosedContainer = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatQuantiles = new EnumMap<>(ContainerProtos.Type.class);
-    MetricsRegistry registry = new MetricsRegistry("StorageContainerMetrics");
+    this.registry = new MetricsRegistry("StorageContainerMetrics");
 
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
       numOpsArray.put(type, registry.newCounter(
