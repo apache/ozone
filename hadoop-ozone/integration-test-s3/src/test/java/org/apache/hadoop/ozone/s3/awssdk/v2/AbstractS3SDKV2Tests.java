@@ -111,6 +111,7 @@ import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -381,6 +382,108 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
     CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", copyObjectResponse.copyObjectResult().eTag());
+  }
+
+  @Test
+  public void testPutObjectTagging() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("env").value("test").build(),
+        Tag.builder().key("project").value("ozone").build()
+    );
+
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+
+    assertEquals(tags.size(), response.tagSet().size());
+    Map<String, String> tagMap = response.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals("test", tagMap.get("env"));
+    assertEquals("ozone", tagMap.get("project"));
+  }
+
+  @Test
+  public void testGetObjectTagging() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("department").value("engineering").build(),
+        Tag.builder().key("status").value("active").build()
+    );
+
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+
+    assertEquals(tags.size(), response.tagSet().size());
+    Map<String, String> retrievedTags = response.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals("engineering", retrievedTags.get("department"));
+    assertEquals("active", retrievedTags.get("status"));
+  }
+
+  @Test
+  public void testDeleteObjectTagging() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("temp").value("data").build()
+    );
+
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    GetObjectTaggingResponse beforeDelete = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertEquals(1, beforeDelete.tagSet().size());
+
+    s3Client.deleteObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+
+    GetObjectTaggingResponse afterDelete = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertTrue(afterDelete.tagSet().isEmpty());
   }
 
   @Test
