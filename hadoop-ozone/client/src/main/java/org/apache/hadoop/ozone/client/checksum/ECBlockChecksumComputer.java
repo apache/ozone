@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import com.google.common.base.Preconditions;
-import java.util.Objects;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;

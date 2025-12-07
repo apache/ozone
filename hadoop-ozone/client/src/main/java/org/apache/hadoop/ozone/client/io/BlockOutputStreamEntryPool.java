@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Objects;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -27,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ContainerBlockID;

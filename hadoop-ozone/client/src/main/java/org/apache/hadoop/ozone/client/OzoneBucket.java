@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.Objects;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;

@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.security;
 
 import com.google.common.base.Preconditions;
-import java.util.Objects;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
