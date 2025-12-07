@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 
-import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -248,7 +248,7 @@ public final class ContainerCommandResponseBuilders {
       ContainerCommandRequestProto request, List<ByteString> dataBuffers,
       ChunkInfo info) {
 
-    Preconditions.checkNotNull(request);
+    Objects.requireNonNull(request, "request == null");
 
     boolean isReadChunkV0 = getReadChunkVersion(request.getGetSmallFile())
         .equals(ContainerProtos.ReadChunkVersion.V0);
@@ -294,7 +294,7 @@ public final class ContainerCommandResponseBuilders {
   public static ContainerCommandResponseProto getReadContainerResponse(
       ContainerCommandRequestProto request, ContainerDataProto containerData) {
 
-    Preconditions.checkNotNull(containerData);
+    Objects.requireNonNull(containerData, "containerData == null");
 
     ReadContainerResponseProto.Builder response =
         ReadContainerResponseProto.newBuilder()
