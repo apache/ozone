@@ -156,13 +156,7 @@ const NUPieChart: React.FC<PieChartProps> = ({
       }
     },
     legend: {
-      top: '10%',
-      orient: 'vertical',
-      left: '0%',
-      width: '80%'
-    },
-    grid: {
-
+      show: false
     },
     series: [
       {

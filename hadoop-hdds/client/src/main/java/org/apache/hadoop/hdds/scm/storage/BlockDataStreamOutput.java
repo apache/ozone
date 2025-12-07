@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -215,11 +216,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
     if (isDatastreamPipelineMode) {
-      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer(),
               RatisHelper.getRoutingTable(pipeline));
     } else {
-      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer());
     }
   }
@@ -398,10 +399,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     long flushPos = totalDataFlushedLength;
     final List<StreamBuffer> byteBufferList;
     if (!force) {
-      Preconditions.checkNotNull(bufferList);
+      Objects.requireNonNull(bufferList, "bufferList == null");
       byteBufferList = buffersForPutBlock;
       buffersForPutBlock = null;
-      Preconditions.checkNotNull(byteBufferList);
+      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       byteBufferList = null;
     }
