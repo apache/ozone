@@ -140,8 +140,8 @@ public class BasicOzoneFileSystem extends FileSystem {
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
-    Preconditions.checkNotNull(name.getScheme(),
-        "No scheme provided in %s", name);
+    Objects.requireNonNull(name.getScheme(),
+        () -> "No scheme provided in " + name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
         "Invalid scheme provided in %s", name);
 

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * Class that represents the API Response structure of ClusterState.
@@ -245,7 +245,7 @@ public final class ClusterStateResponse {
     }
 
     public ClusterStateResponse build() {
-      Preconditions.checkNotNull(this.storageReport);
+      Objects.requireNonNull(this.storageReport, "this.storageReport == null");
 
       return new ClusterStateResponse(this);
     }

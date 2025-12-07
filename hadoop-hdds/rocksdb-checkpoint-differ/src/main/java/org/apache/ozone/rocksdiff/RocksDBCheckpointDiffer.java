@@ -53,6 +53,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -218,11 +219,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                           String activeDBLocationName,
                           ConfigurationSource configuration,
                           Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
-    Preconditions.checkNotNull(metadataDirName);
-    Preconditions.checkNotNull(sstBackupDirName);
-    Preconditions.checkNotNull(compactionLogDirName);
-    Preconditions.checkNotNull(activeDBLocationName);
-    Preconditions.checkNotNull(lockSupplier);
+    Objects.requireNonNull(metadataDirName, "metadataDirName == null");
+    Objects.requireNonNull(sstBackupDirName, "sstBackupDirName == null");
+    Objects.requireNonNull(compactionLogDirName, "compactionLogDirName == null");
+    Objects.requireNonNull(activeDBLocationName, "activeDBLocationName == null");
+    Objects.requireNonNull(lockSupplier, "lockSupplier == null");
     this.lock = new BootstrapStateHandler.Lock(lockSupplier);
     this.metadataDir = metadataDirName;
     this.compactionLogDir =
@@ -366,7 +367,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   public void setSnapshotInfoTableCFHandle(
       ColumnFamilyHandle snapshotInfoTableCFHandle) {
-    Preconditions.checkNotNull(snapshotInfoTableCFHandle,
+    Objects.requireNonNull(snapshotInfoTableCFHandle,
         "Column family handle should not be null");
     this.snapshotInfoTableCFHandle = snapshotInfoTableCFHandle;
   }
@@ -377,7 +378,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   public synchronized void setCompactionLogTableCFHandle(
       ColumnFamilyHandle compactionLogTableCFHandle) {
-    Preconditions.checkNotNull(compactionLogTableCFHandle,
+    Objects.requireNonNull(compactionLogTableCFHandle,
         "Column family handle should not be null");
     this.compactionLogTableCFHandle = compactionLogTableCFHandle;
   }
@@ -387,7 +388,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param activeRocksDB RocksDB
    */
   public synchronized void setActiveRocksDB(ManagedRocksDB activeRocksDB) {
-    Preconditions.checkNotNull(activeRocksDB, "RocksDB should not be null.");
+    Objects.requireNonNull(activeRocksDB, "RocksDB should not be null.");
     this.activeRocksDB = activeRocksDB;
   }
 
@@ -728,12 +729,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   private void preconditionChecksForLoadAllCompactionLogs() {
-    Preconditions.checkNotNull(compactionLogDir,
+    Objects.requireNonNull(compactionLogDir,
         "Compaction log directory must be set.");
-    Preconditions.checkNotNull(compactionLogTableCFHandle,
+    Objects.requireNonNull(compactionLogTableCFHandle,
         "compactionLogTableCFHandle must be set before calling " +
             "loadAllCompactionLogs.");
-    Preconditions.checkNotNull(activeRocksDB,
+    Objects.requireNonNull(activeRocksDB,
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
 
