@@ -33,7 +33,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param stat - SCMNodeStat.
    */
   public SCMNodeMetric(SCMNodeStat stat) {
-    this.stat = stat;
+    this.stat = Objects.requireNonNull(stat, "stat == null");
   }
 
   /**
@@ -58,8 +58,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
-    Objects.requireNonNull(this.stat, "Argument cannot be null");
-    Objects.requireNonNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "o == null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
