@@ -71,8 +71,7 @@ public class BlockTokenVerifier extends
   @Override
   protected Object getService(ContainerCommandRequestProtoOrBuilder cmd) {
     BlockID blockID = HddsUtils.getBlockID(cmd);
-    Objects.requireNonNull(blockID,
-        String.format("no blockID in %s command", cmd.getCmdType()));
+    Objects.requireNonNull(blockID, () -> "blockID == null in command " + cmd.getCmdType());
     return getTokenService(blockID);
   }
 
