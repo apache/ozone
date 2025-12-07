@@ -192,8 +192,7 @@ class PipelineStateMap {
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state) {
-    Objects
-        .requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
     Objects.requireNonNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
