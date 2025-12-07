@@ -29,7 +29,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -45,7 +44,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       SCMPipelineMetrics.class.getSimpleName();
 
-  private MetricsRegistry registry;
   private static SCMPipelineMetrics instance;
 
   private @Metric MutableCounterLong numPipelineAllocated;
@@ -61,7 +59,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
 
   /** Private constructor. */
   private SCMPipelineMetrics() {
-    this.registry = new MetricsRegistry(SOURCE_NAME);
     numBlocksAllocated = new ConcurrentHashMap<>();
   }
 

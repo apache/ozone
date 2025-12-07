@@ -52,10 +52,6 @@ public class XceiverClientMetrics implements MetricsSource {
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
-  @SuppressWarnings("PMD.SingularField")
-  private MetricsRegistry registry;
-
   public XceiverClientMetrics() {
     init();
   }
@@ -64,7 +60,7 @@ public class XceiverClientMetrics implements MetricsSource {
     OzoneConfiguration conf = new OzoneConfiguration();
     int[] intervals = conf.getInts(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
-    this.registry = new MetricsRegistry(SOURCE_NAME);
+    MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
     this.pendingOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsArray = new EnumMap<>(ContainerProtos.Type.class);

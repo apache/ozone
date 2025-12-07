@@ -29,7 +29,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -60,13 +59,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
   private MutableGaugeLong containersSufficientlyReplicatedTotal;
 
-  private MetricsRegistry registry;
-
   private Map<String, ContainerStateInWorkflow> metricsByHost;
 
   /** Private constructor. */
   private NodeDecommissionMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     metricsByHost = new HashMap<>();
   }
 
