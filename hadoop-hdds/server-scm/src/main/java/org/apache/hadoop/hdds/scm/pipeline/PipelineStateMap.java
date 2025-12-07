@@ -255,8 +255,7 @@ class PipelineStateMap {
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
-    Objects
-        .requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
     Objects.requireNonNull(state, "Pipeline state cannot be null");
     Preconditions
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
