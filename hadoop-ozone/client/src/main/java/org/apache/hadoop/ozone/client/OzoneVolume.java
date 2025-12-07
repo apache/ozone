@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -401,7 +401,7 @@ public class OzoneVolume extends WithMetadata {
 
   public static Builder newBuilder(ConfigurationSource conf,
       ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    Objects.requireNonNull(proxy, "Client proxy is not set.");
     return new Builder(conf, proxy);
   }
 

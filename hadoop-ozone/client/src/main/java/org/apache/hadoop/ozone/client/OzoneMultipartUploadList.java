@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.List;
 
 /**
@@ -35,7 +35,7 @@ public class OzoneMultipartUploadList {
       String nextKeyMarker,
       String nextUploadIdMarker,
       boolean isTruncated) {
-    Preconditions.checkNotNull(uploads);
+    Objects.requireNonNull(uploads, "uploads == null");
     this.uploads = uploads;
     this.nextKeyMarker = nextKeyMarker;
     this.nextUploadIdMarker = nextUploadIdMarker;

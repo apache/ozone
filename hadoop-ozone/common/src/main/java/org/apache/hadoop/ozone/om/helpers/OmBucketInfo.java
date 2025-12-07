@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -600,10 +599,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     @Override
     protected void validate() {
       super.validate();
-      Preconditions.checkNotNull(volumeName);
-      Preconditions.checkNotNull(bucketName);
-      Preconditions.checkNotNull(acls);
-      Preconditions.checkNotNull(storageType);
+      Objects.requireNonNull(volumeName, "volumeName == null");
+      Objects.requireNonNull(bucketName, "bucketName == null");
+      Objects.requireNonNull(acls, "acls == null");
+      Objects.requireNonNull(storageType, "storageType == null");
     }
 
     @Override

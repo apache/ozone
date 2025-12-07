@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import java.util.Objects;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ProtoUtils;
 import jakarta.annotation.Nonnull;
@@ -833,7 +834,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
-    Preconditions.checkNotNull(locationInfoList);
+    Objects.requireNonNull(locationInfoList, "locationInfoList == null");
     KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -1663,7 +1664,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       OmKeyArgs omKeyArgs, long clientId) throws IOException {
 
     List<OmKeyLocationInfo> locationInfoList = omKeyArgs.getLocationInfoList();
-    Preconditions.checkNotNull(locationInfoList);
+    Objects.requireNonNull(locationInfoList, "locationInfoList == null");
 
 
     MultipartCommitUploadPartRequest.Builder multipartCommitUploadPartRequest

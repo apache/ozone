@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
@@ -357,7 +358,7 @@ public class KeyOutputStream extends OutputStream
     }
 
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -384,7 +385,7 @@ public class KeyOutputStream extends OutputStream
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);

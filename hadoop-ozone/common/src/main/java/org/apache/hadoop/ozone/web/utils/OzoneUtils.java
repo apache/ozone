@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.web.utils;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -125,7 +125,7 @@ public final class OzoneUtils {
    * @return time in milliseconds
    */
   public static long formatDate(String date) throws ParseException {
-    Preconditions.checkNotNull(date, "Date string should not be null.");
+    Objects.requireNonNull(date, "Date string should not be null.");
     return DATE_FORMAT.get().parse(date).getTime();
   }
   

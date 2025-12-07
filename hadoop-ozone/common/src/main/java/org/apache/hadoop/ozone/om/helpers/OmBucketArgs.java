@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -293,8 +293,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
      * @return instance of OmBucketArgs.
      */
     public OmBucketArgs build() {
-      Preconditions.checkNotNull(volumeName);
-      Preconditions.checkNotNull(bucketName);
+      Objects.requireNonNull(volumeName, "volumeName == null");
+      Objects.requireNonNull(bucketName, "bucketName == null");
       return new OmBucketArgs(this);
     }
   }

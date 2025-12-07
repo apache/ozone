@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -394,7 +395,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private void handleException(BlockOutputStreamEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean containerExclusionException = checkIfContainerToExclude(t);
     if (containerExclusionException) {
       getBlockOutputStreamEntryPool().getExcludeList().addPipeline(streamEntry.getPipeline().getId());

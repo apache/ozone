@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -91,8 +91,8 @@ public final class ServiceInfo {
                       OzoneManagerVersion omVersion,
                       OMRoleInfo omRole,
                       OzoneFsServerDefaults serverDefaults) {
-    Preconditions.checkNotNull(nodeType);
-    Preconditions.checkNotNull(hostname);
+    Objects.requireNonNull(nodeType, "nodeType == null");
+    Objects.requireNonNull(hostname, "hostname == null");
     this.nodeType = nodeType;
     this.hostname = hostname;
     this.omVersion = omVersion;
