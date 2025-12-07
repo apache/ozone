@@ -64,46 +64,51 @@ public class ReconTaskStatusUpdaterManager {
   /**
    * Lazy initialization - loads existing tasks from DB on first access.
    * This ensures the DB schema is ready (after upgrades have run).
+   * Uses double-checked locking for performance optimization.
    */
-  private synchronized void ensureInitialized() {
+  private void ensureInitialized() {
     if (!initialized.get()) {
-      try {
-        LOG.info("Initializing ReconTaskStatusUpdaterManager - loading existing tasks from DB");
+      synchronized (this) {
+        if (!initialized.get()) {
+          try {
+            LOG.info("Initializing ReconTaskStatusUpdaterManager - loading existing tasks from DB");
 
-        List<ReconTaskStatus> tasks;
-        DSLContext dsl = DSL.using(reconTaskStatusDao.configuration());
+            List<ReconTaskStatus> tasks;
+            DSLContext dsl = DSL.using(reconTaskStatusDao.configuration());
 
-        // Check if upgrade columns exist
-        if (columnExists(dsl, "LAST_TASK_RUN_STATUS")) {
-          // Schema is upgraded - use normal DAO with all columns
-          tasks = reconTaskStatusDao.findAll();
-          LOG.debug("Loaded tasks using full schema (all columns present)");
-        } else {
-          // Schema not upgraded yet - query only base columns that always exist
-          LOG.debug("Upgrade columns not present, querying base columns only");
-          tasks = dsl.select(
-                  DSL.field(name("task_name")),
-                  DSL.field(name("last_updated_timestamp")),
-                  DSL.field(name("last_updated_seq_number")))
-              .from(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
-              .fetch(record -> new ReconTaskStatus(
-                  record.get(DSL.field(name("task_name")), String.class),
-                  record.get(DSL.field(name("last_updated_timestamp")), Long.class),
-                  record.get(DSL.field(name("last_updated_seq_number")), Long.class),
-                  0,  // Default for last_task_run_status
-                  0   // Default for is_current_task_running
-              ));
+            // Check if upgrade columns exist
+            if (columnExists(dsl, "LAST_TASK_RUN_STATUS")) {
+              // Schema is upgraded - use normal DAO with all columns
+              tasks = reconTaskStatusDao.findAll();
+              LOG.debug("Loaded tasks using full schema (all columns present)");
+            } else {
+              // Schema not upgraded yet - query only base columns that always exist
+              LOG.debug("Upgrade columns not present, querying base columns only");
+              tasks = dsl.select(
+                      DSL.field(name("task_name")),
+                      DSL.field(name("last_updated_timestamp")),
+                      DSL.field(name("last_updated_seq_number")))
+                  .from(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
+                  .fetch(record -> new ReconTaskStatus(
+                      record.get(DSL.field(name("task_name")), String.class),
+                      record.get(DSL.field(name("last_updated_timestamp")), Long.class),
+                      record.get(DSL.field(name("last_updated_seq_number")), Long.class),
+                      0,  // Default for last_task_run_status
+                      0   // Default for is_current_task_running
+                  ));
+            }
+
+            for (ReconTaskStatus task : tasks) {
+              updaterCache.put(task.getTaskName(),
+                  new ReconTaskStatusUpdater(reconTaskStatusDao, task));
+            }
+
+            LOG.info("Loaded {} existing tasks from DB", tasks.size());
+            initialized.set(true);
+          } catch (Exception e) {
+            LOG.warn("Could not load existing tasks from DB, will retry on next access: {}", e.getMessage());
+          }
         }
-
-        for (ReconTaskStatus task : tasks) {
-          updaterCache.put(task.getTaskName(),
-              new ReconTaskStatusUpdater(reconTaskStatusDao, task));
-        }
-
-        LOG.info("Loaded {} existing tasks from DB", tasks.size());
-        initialized.set(true);
-      } catch (Exception e) {
-        LOG.debug("Could not load tasks from DB yet, will retry: {}", e.getMessage());
       }
     }
   }
