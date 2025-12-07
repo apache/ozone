@@ -471,18 +471,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           dir.getProtobuf(ClientVersion.CURRENT_VERSION));
     }
 
-    if (dirExclusiveRanges != null) {
-      for (DeleteKeysResult.ExclusiveRange range : dirExclusiveRanges) {
-        purgePathsRequest.addDeleteRangeSubDirs(
-            HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
-      }
+    for (DeleteKeysResult.ExclusiveRange range : dirExclusiveRanges) {
+      purgePathsRequest.addDeleteRangeSubDirs(
+          HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
     }
 
-    if (fileExclusiveRanges != null) {
-      for (DeleteKeysResult.ExclusiveRange range : fileExclusiveRanges) {
-        purgePathsRequest.addDeleteRangeSubFiles(
-            HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
-      }
+    for (DeleteKeysResult.ExclusiveRange range : fileExclusiveRanges) {
+      purgePathsRequest.addDeleteRangeSubFiles(
+          HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
     }
 
     return purgePathsRequest.build();

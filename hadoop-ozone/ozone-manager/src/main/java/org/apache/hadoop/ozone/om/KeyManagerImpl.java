@@ -2297,33 +2297,27 @@ public class KeyManagerImpl implements KeyManager {
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId, parentInfo.getObjectID(), "");
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
       String startKey = null;
-      String lastLoopExclusiveKey = getLexicographicallyHigherString(seekFileInDB);
       List<DeleteKeysResult.ExclusiveRange> keyRanges = new ArrayList<>();
-      boolean processedAllKeys = true;
-      while (iterator.hasNext()) {
+      while (iterator.hasNext() && remainingNum > 0) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
-        String tableKey = entry.getKey();
-        if (remainingNum <= 0) {
-          lastLoopExclusiveKey = tableKey;
-          processedAllKeys = false;
-          break;
-        }
         if (deleteKeyFilter.apply(keyInfo)) {
           keyInfos.add(keyInfo.getValue());
           remainingNum--;
           if (startKey == null) {
-            startKey = tableKey;
+            startKey = entry.getKey();
           }
         } else {
           if (startKey != null) {
-            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, tableKey));
+            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, entry.getKey()));
           }
           startKey = null;
         }
       }
+      boolean processedAllKeys = !iterator.hasNext();
       if (startKey != null) {
-        keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, lastLoopExclusiveKey));
+        keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey,
+            processedAllKeys ? getLexicographicallyHigherString(seekFileInDB) : iterator.next().getKey()));
       }
       return new DeleteKeysResult(keyInfos, keyRanges, processedAllKeys);
     }
