@@ -147,9 +147,9 @@ public class NamespaceSummaryResponse {
     }
 
     public NamespaceSummaryResponse build() {
-      Objects.requireNonNull(this.path, "this.path == null");
-      Objects.requireNonNull(this.entityType, "this.entityType == null");
-      Objects.requireNonNull(this.status, "this.status == null");
+      Objects.requireNonNull(path, "path == null");
+      Objects.requireNonNull(entityType, "entityType == null");
+      Objects.requireNonNull(status, "status == null");
 
       return new NamespaceSummaryResponse(this);
     }

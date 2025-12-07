@@ -245,7 +245,7 @@ public final class ClusterStateResponse {
     }
 
     public ClusterStateResponse build() {
-      Objects.requireNonNull(this.storageReport, "this.storageReport == null");
+      Objects.requireNonNull(storageReport, "storageReport == null");
 
       return new ClusterStateResponse(this);
     }

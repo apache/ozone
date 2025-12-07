@@ -219,8 +219,7 @@ public class UpgradeContainerSchema extends RepairTool {
         List<ContainerUpgradeResult> resultList = new ArrayList<>();
         final File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
 
-        Objects.requireNonNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
-            "cannot be null");
+        Objects.requireNonNull(hddsVolumeRootDir, "hddsVolumeRootDir == null");
 
         // check CID directory and current file
         File clusterIDDir = new File(hddsVolume.getStorageDir(),
