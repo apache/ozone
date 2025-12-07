@@ -151,14 +151,10 @@ public final class CompactionLogEntry implements
     public Builder(long dbSequenceNumber, long compactionTime,
                    List<CompactionFileInfo> inputFileInfoList,
                    List<CompactionFileInfo> outputFileInfoList) {
-      Objects.requireNonNull(inputFileInfoList,
-          "inputFileInfoList is required parameter.");
-      Objects.requireNonNull(outputFileInfoList,
-          "outputFileInfoList is required parameter.");
       this.dbSequenceNumber = dbSequenceNumber;
       this.compactionTime = compactionTime;
-      this.inputFileInfoList = inputFileInfoList;
-      this.outputFileInfoList = outputFileInfoList;
+      this.inputFileInfoList = Objects.requireNonNull(inputFileInfoList, "inputFileInfoList == null");
+      this.outputFileInfoList = Objects.requireNonNull(outputFileInfoList, "outputFileInfoList == null");
     }
 
     public Builder setCompactionReason(String compactionReason) {

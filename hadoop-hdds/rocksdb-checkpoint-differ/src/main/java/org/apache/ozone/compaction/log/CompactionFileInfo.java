@@ -126,8 +126,7 @@ public final class CompactionFileInfo extends SstFileInfo {
     private boolean pruned = false;
 
     public Builder(String fileName) {
-      Objects.requireNonNull(fileName, "FileName is required parameter.");
-      this.fileName = fileName;
+      this.fileName = Objects.requireNonNull(fileName, "fileName == null");
     }
 
     public Builder setStartRange(String startRange) {

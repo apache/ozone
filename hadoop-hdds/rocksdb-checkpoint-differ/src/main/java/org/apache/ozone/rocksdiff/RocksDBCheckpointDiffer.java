@@ -219,13 +219,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                           String activeDBLocationName,
                           ConfigurationSource configuration,
                           Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
-    Objects.requireNonNull(metadataDirName, "metadataDirName == null");
+    this.metadataDir = Objects.requireNonNull(metadataDirName, "metadataDirName == null");
     Objects.requireNonNull(sstBackupDirName, "sstBackupDirName == null");
     Objects.requireNonNull(compactionLogDirName, "compactionLogDirName == null");
     Objects.requireNonNull(activeDBLocationName, "activeDBLocationName == null");
     Objects.requireNonNull(lockSupplier, "lockSupplier == null");
     this.lock = new BootstrapStateHandler.Lock(lockSupplier);
-    this.metadataDir = metadataDirName;
     this.compactionLogDir =
         createCompactionLogDir(metadataDirName, compactionLogDirName);
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
@@ -363,24 +362,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   /**
    * Set SnapshotInfoTable DB column family handle to be used in DB listener.
-   * @param snapshotInfoTableCFHandle ColumnFamilyHandle
+   * @param handle ColumnFamilyHandle
    */
   public void setSnapshotInfoTableCFHandle(
-      ColumnFamilyHandle snapshotInfoTableCFHandle) {
-    Objects.requireNonNull(snapshotInfoTableCFHandle,
-        "Column family handle should not be null");
-    this.snapshotInfoTableCFHandle = snapshotInfoTableCFHandle;
+      ColumnFamilyHandle handle) {
+    this.snapshotInfoTableCFHandle = Objects.requireNonNull(handle, "handle == null");
   }
 
   /**
    * Set CompactionLogTable DB column family handle to access the table.
-   * @param compactionLogTableCFHandle ColumnFamilyHandle
+   * @param handle ColumnFamilyHandle
    */
   public synchronized void setCompactionLogTableCFHandle(
-      ColumnFamilyHandle compactionLogTableCFHandle) {
-    Objects.requireNonNull(compactionLogTableCFHandle,
-        "Column family handle should not be null");
-    this.compactionLogTableCFHandle = compactionLogTableCFHandle;
+      ColumnFamilyHandle handle) {
+    this.compactionLogTableCFHandle = Objects.requireNonNull(handle, "handle == null");
   }
 
   /**

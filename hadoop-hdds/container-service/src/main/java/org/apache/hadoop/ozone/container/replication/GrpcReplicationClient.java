@@ -160,10 +160,9 @@ public class GrpcReplicationClient implements AutoCloseable {
         Path outputPath) {
       this.response = response;
       this.containerId = containerId;
-      this.outputPath = outputPath;
+      this.outputPath = Objects.requireNonNull(outputPath, "outputPath == null");
       try {
-        Objects.requireNonNull(outputPath, "Output path cannot be null");
-        Path parentPath = Objects.requireNonNull(outputPath.getParent(), "parentPath == null");
+        Path parentPath = Objects.requireNonNull(this.outputPath.getParent(), "parentPath == null");
         Files.createDirectories(parentPath);
         stream = Files.newOutputStream(outputPath);
       } catch (IOException e) {

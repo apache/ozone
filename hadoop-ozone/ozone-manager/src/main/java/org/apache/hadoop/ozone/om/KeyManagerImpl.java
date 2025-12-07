@@ -542,8 +542,7 @@ public class KeyManagerImpl implements KeyManager {
         });
     long generateEDEKTime = monotonicNow() - generateEDEKStartTime;
     LOG.debug("generateEDEK takes {} ms", generateEDEKTime);
-    Objects.requireNonNull(edek, "edek == null");
-    return edek;
+    return Objects.requireNonNull(edek, "edek == null");
   }
 
   @Override
