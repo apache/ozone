@@ -48,7 +48,7 @@ final class DiskBalancerSubCommandUtil {
    * <p>The address can be provided in two formats:
    * <ul>
    *   <li>"hostname:port" - Uses the specified port</li>
-   *   <li>"hostname" - Uses the default CLIENT_RPC port (9858)</li>
+   *   <li>"hostname" - Uses the default CLIENT_RPC port (19864)</li>
    * </ul>
    * 
    * @param address the datanode address in "host:port" or "host" format
