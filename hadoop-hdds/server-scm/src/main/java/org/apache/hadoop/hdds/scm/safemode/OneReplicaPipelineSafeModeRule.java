@@ -192,7 +192,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
     for (Pipeline pipeline : openRatisPipelines) {
       PipelineID pipelineID = pipeline.getId();
-      boolean atleastOnePipelineReported = pipeline.getNodeSet().size() >= 1;
+      boolean atleastOnePipelineReported = !pipeline.getNodeSet().isEmpty();
       boolean notAlreadyReported = !reportedPipelineIDSet.contains(pipelineID);
       boolean wasExistingPipeline = oldPipelineIDSet.contains(pipelineID);
 
