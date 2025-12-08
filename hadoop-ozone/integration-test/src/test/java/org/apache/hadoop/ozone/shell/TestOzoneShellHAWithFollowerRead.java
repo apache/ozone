@@ -25,6 +25,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /**
  * This class tests Ozone sh shell command with FollowerRead.
  * Inspired by TestS3Shell
@@ -64,7 +67,7 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     super.testListAllKeysInternal("skipvol2");
 
     long curMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
-    Assertions.assertEquals(lastMetrics, curMetrics);
+    assertEquals(lastMetrics, curMetrics);
 
     getCluster().getOMLeader().setConfiguration(oldConf);
   }
@@ -77,18 +80,20 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     OzoneConfiguration newConf2 = new OzoneConfiguration(newConf1);
     newConf2.setLong("ozone.om.follower.read.local.lease.time.ms", -1000);
 
-    getCluster().getOzoneManager(1).setConfiguration(newConf1);
-    getCluster().getOzoneManager(2).setConfiguration(newConf2);
+    try {
+      getCluster().getOzoneManager(1).setConfiguration(newConf1);
+      getCluster().getOzoneManager(2).setConfiguration(newConf2);
 
-    String[] args = new String[] {"volume", "list"};
-    for (int i = 0; i < 100; i++) {
-      execute(getOzoneShell(), args);
+      String[] args = new String[]{"volume", "list"};
+      for (int i = 0; i < 100; i++) {
+        execute(getOzoneShell(), args);
+      }
+      assertThat(getCluster().getOzoneManager(1).getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
+      assertEquals(0, getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseSuccess());
+      assertThat(getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0).isTrue();
+    } finally {
+      getCluster().getOzoneManager(1).setConfiguration(oldConf);
+      getCluster().getOzoneManager(2).setConfiguration(oldConf);
     }
-    Assertions.assertTrue(getCluster().getOzoneManager(1).getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0);
-    Assertions.assertEquals(0, getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseSuccess());
-    Assertions.assertTrue(getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0);
-
-    getCluster().getOzoneManager(1).setConfiguration(oldConf);
-    getCluster().getOzoneManager(2).setConfiguration(oldConf);
   }
 }
