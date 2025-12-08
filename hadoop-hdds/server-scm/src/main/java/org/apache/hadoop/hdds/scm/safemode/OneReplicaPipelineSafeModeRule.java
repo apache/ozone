@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,7 +52,7 @@ public class OneReplicaPipelineSafeModeRule extends
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
 
   private int thresholdCount;
-  private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
+  private Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
   private Set<PipelineID> oldPipelineIDSet;
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
@@ -85,11 +86,19 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
+    if (validateBasedOnReportProcessing()) {
+      return currentReportedPipelineCount >= thresholdCount;
+    }
+
+    updateReportedPipelineSet();
     return currentReportedPipelineCount >= thresholdCount;
   }
 
   @Override
   protected synchronized void process(PipelineReportFromDatanode report) {
+    if (!validateBasedOnReportProcessing()) {
+      return;
+    }
     Objects.requireNonNull(report, "report == null");
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
@@ -137,6 +146,11 @@ public class OneReplicaPipelineSafeModeRule extends
     return currentReportedPipelineCount;
   }
 
+  @VisibleForTesting
+  public Set<PipelineID> getReportedPipelineIDSet() {
+    return reportedPipelineIDSet;
+  }
+
   @Override
   public String getStatusText() {
     String status = String.format(
@@ -167,6 +181,25 @@ public class OneReplicaPipelineSafeModeRule extends
     } else {
       if (!validate()) {
         initializeRule(true);
+      }
+    }
+  }
+
+  private void updateReportedPipelineSet() {
+    List<Pipeline> openRatisPipelines =
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN);
+
+    for (Pipeline pipeline : openRatisPipelines) {
+      PipelineID pipelineID = pipeline.getId();
+      boolean atleastOnePipelineReported = pipeline.getNodeSet().size() >= 1;
+      boolean notAlreadyReported = !reportedPipelineIDSet.contains(pipelineID);
+      boolean wasExistingPipeline = oldPipelineIDSet.contains(pipelineID);
+
+      if (atleastOnePipelineReported && notAlreadyReported && wasExistingPipeline) {
+        getSafeModeMetrics().incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
+        currentReportedPipelineCount++;
+        reportedPipelineIDSet.add(pipelineID);
       }
     }
   }
