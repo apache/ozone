@@ -117,10 +117,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // All other S3 bucket layouts must still enforce strict naming rules.
     if (!globalStrict && isS3Bucket) {
       if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-        // S3 + FSO + strict=false → 放寬（允許 '_' 等非 S3 字元）
+        // S3 + FSO + strict=false → bypass strict S3 validation (allow '_' and other non-S3 characters)
         effectiveStrict = false;
       } else {
-        // S3 + 非 FSO + strict=false → 仍然嚴格（不允許 '_'）
+        // S3 + non-FSO + strict=false → strict S3 validation still applies ( '_' and other non-S3 characters are not permitted )
         effectiveStrict = true;
       }
     }
