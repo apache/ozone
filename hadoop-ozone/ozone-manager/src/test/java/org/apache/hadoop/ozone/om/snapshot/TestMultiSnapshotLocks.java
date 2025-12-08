@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,9 +32,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -64,6 +67,21 @@ public class TestMultiSnapshotLocks {
   void setUp() {
     // Initialize MultiLocks with mock dependencies
     multiSnapshotLocks = new MultiSnapshotLocks(mockLock, mockResource, true);
+  }
+
+  @Test
+  public void testMultiSnapshotLocksWithMultipleResourceLocksMultipleTimes() throws OMException {
+    OzoneManagerLock omLock = new OzoneManagerLock(new OzoneConfiguration());
+    MultiSnapshotLocks multiSnapshotLocks1 = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true);
+    MultiSnapshotLocks multiSnapshotLocks2 = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true);
+    Collection<UUID> uuid1 = Collections.singleton(UUID.randomUUID());
+    Collection<UUID> uuid2 = Collections.singleton(UUID.randomUUID());
+    for (int i = 0; i < 10; i++) {
+      assertTrue(multiSnapshotLocks1.acquireLock(uuid1).isLockAcquired());
+      assertTrue(multiSnapshotLocks2.acquireLock(uuid2).isLockAcquired());
+      multiSnapshotLocks1.releaseLock();
+      multiSnapshotLocks2.releaseLock();
+    }
   }
 
   @Test
@@ -107,7 +125,8 @@ public class TestMultiSnapshotLocks {
     when(mockLock.acquireWriteLocks(eq(mockResource), anyCollection())).thenReturn(mockLockDetails);
     multiSnapshotLocks.acquireLock(objects);
     assertFalse(multiSnapshotLocks.getObjectLocks().isEmpty());
-
+    when(mockLockDetails.isLockAcquired()).thenReturn(false);
+    when(mockLock.releaseWriteLocks(eq(mockResource), anyCollection())).thenReturn(mockLockDetails);
     // Now release locks
     multiSnapshotLocks.releaseLock();
 

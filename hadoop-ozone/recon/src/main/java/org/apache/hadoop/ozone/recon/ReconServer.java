@@ -105,18 +105,18 @@ public class ReconServer extends GenericCli implements Callable<Void> {
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
-
-    injector = Guice.createInjector(new ReconControllerModule(),
-        new ReconRestServletModule(configuration),
-        new ReconSchemaGenerationModule());
-
-    //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
-    ReconGuiceServletContextListener.setInjector(injector);
-
-    reconStorage = injector.getInstance(ReconStorageConfig.class);
-
     LOG.info("Initializing Recon server...");
     try {
+      injector = Guice.createInjector(new ReconControllerModule(),
+          new ReconRestServletModule(configuration),
+          new ReconSchemaGenerationModule());
+
+      //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
+      ReconGuiceServletContextListener.setInjector(injector);
+
+      reconStorage = injector.getInstance(ReconStorageConfig.class);
+
+
       loginReconUserIfSecurityEnabled(configuration);
       try {
         if (reconStorage.getState() != INITIALIZED) {
@@ -177,6 +177,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       layoutVersionManager.finalizeLayoutFeatures();
 
       LOG.info("Recon schema versioning completed.");
+
+      // Register ReconTaskStatusMetrics after schema upgrade completes
+      // This ensures the RECON_TASK_STATUS table has all required columns
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.register();
+        LOG.debug("ReconTaskStatusMetrics registered after schema upgrade");
+      }
 
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
@@ -274,9 +281,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
-      if (reconTaskStatusMetrics != null) {
-        reconTaskStatusMetrics.register();
-      }
       if (httpServer != null) {
         httpServer.start();
       }

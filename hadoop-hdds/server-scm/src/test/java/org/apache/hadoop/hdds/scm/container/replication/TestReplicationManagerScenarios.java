@@ -183,7 +183,7 @@ public class TestReplicationManagerScenarios {
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -261,7 +261,6 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
-    ReplicationManagerReport repReport = new ReplicationManagerReport();
     ReplicationQueue repQueue = new ReplicationQueue();
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
@@ -269,6 +268,7 @@ public class TestReplicationManagerScenarios {
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
     ReplicationManager replicationManager = createReplicationManager();
+    ReplicationManagerReport repReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
 
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
@@ -296,7 +296,7 @@ public class TestReplicationManagerScenarios {
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
-    ReplicationManagerReport roReport = new ReplicationManagerReport();
+    ReplicationManagerReport roReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, roReport);
     assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);

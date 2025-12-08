@@ -37,7 +37,7 @@ ENDRULE
 
 
 RULE Hadoop RPC source IP
-CLASS org.apache.hadoop.ipc.Server$RpcCall
+CLASS org.apache.hadoop.ipc_.Server$RpcCall
 METHOD run
 IF true
 DO link(Thread.currentThread(), "source", $0.connection.toString())

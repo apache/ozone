@@ -202,4 +202,24 @@ public final class S3Utils {
     return DigestUtils.sha256Hex(input);
   }
 
+  /**
+   * Strips leading and trailing double quotes from the given string.
+   *
+   * @param value the input string
+   * @return the string without leading and trailing double quotes
+   */
+  public static String stripQuotes(String value) {
+    return StringUtils.strip(value, "\"");
+  }
+
+  /**
+   * Wraps the given string in double quotes.
+   *
+   * @param value the input string
+   * @return the string wrapped in double quotes
+   */
+  public static String wrapInQuotes(String value) {
+    return StringUtils.wrap(value, '\"');
+  }
+
 }

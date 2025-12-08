@@ -21,11 +21,11 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -66,11 +66,29 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    super.preExecute(ozoneManager);
+
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     // Verify resource name
     OmUtils.validateVolumeName(volumeInfo.getVolume(),
         ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            volumeInfo.getVolume(), null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_VOLUME,
+                buildVolumeAuditMap(volumeInfo.getVolume()), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
 
     // Set creation time & set modification time
     long initialTime = Time.now();
@@ -92,7 +110,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
-    Preconditions.checkNotNull(createVolumeRequest);
+    Objects.requireNonNull(createVolumeRequest, "createVolumeRequest == null");
     VolumeInfo volumeInfo = createVolumeRequest.getVolumeInfo();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -111,27 +129,18 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     boolean acquiredUserLock = false;
     Exception exception = null;
     OMClientResponse omClientResponse = null;
-    OmVolumeArgs omVolumeArgs = null;
+    final OmVolumeArgs omVolumeArgs;
     Map<String, String> auditMap = null;
     try {
-      omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      omVolumeArgs.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-
+      omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+          .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       auditMap = omVolumeArgs.toAuditMap();
-
-      // check acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
-            null, null);
-      }
-
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
@@ -158,7 +167,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
             ozoneManager.getConfig());
         // ACLs from VolumeArgs
-        if (omVolumeArgs.getAcls() != null) {
+        if (omVolumeArgs.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
           listOfAcls.addAll(omVolumeArgs.getAcls());
         }
         // Remove the duplicates

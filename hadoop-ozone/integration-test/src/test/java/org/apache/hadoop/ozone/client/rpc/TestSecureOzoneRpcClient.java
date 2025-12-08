@@ -90,6 +90,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -310,10 +311,12 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
         assertEquals(committedBytes + dataSize,
             getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
         // check used quota
-        bucket = volume.getBucket(bucketName);
-        assertEquals(1, bucket.getUsedNamespace());
-        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
-
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> 1 == volume.getBucket(bucketName).getUsedNamespace(),
+            1000, 30000);
+        GenericTestUtils.waitFor(
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> dataSize * ReplicationFactor.THREE.getValue()
+                == volume.getBucket(bucketName).getUsedBytes(), 1000, 30000);
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();

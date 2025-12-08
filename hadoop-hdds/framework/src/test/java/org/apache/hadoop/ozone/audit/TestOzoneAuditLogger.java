@@ -44,8 +44,6 @@ public class TestOzoneAuditLogger {
 
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j2.contextSelector",
-        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
   private static final AuditLogger AUDIT =
@@ -124,8 +122,8 @@ public class TestOzoneAuditLogger {
   @Test
   public void verifyDefaultLogLevelForWriteSuccess() throws IOException {
     AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
-    String expected =
-        "INFO  | OMAudit | ? | " + WRITE_SUCCESS_MSG.getFormattedMessage();
+    String expected = "INFO  | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | "
+        + WRITE_SUCCESS_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -136,8 +134,8 @@ public class TestOzoneAuditLogger {
   @Test
   public void verifyDefaultLogLevelForWriteFailure() throws IOException {
     AUDIT.logWriteFailure(WRITE_FAIL_MSG);
-    String expected =
-        "ERROR | OMAudit | ? | " + WRITE_FAIL_MSG.getFormattedMessage();
+    String expected = "ERROR | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | "
+            + WRITE_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -147,8 +145,8 @@ public class TestOzoneAuditLogger {
   @Test
   public void verifyDefaultLogLevelForReadSuccess() throws IOException {
     AUDIT.logReadSuccess(READ_SUCCESS_MSG);
-    String expected =
-        "INFO  | OMAudit | ? | " + READ_SUCCESS_MSG.getFormattedMessage();
+    String expected = "INFO  | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | "
+            + READ_SUCCESS_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -159,7 +157,7 @@ public class TestOzoneAuditLogger {
   public void verifyDefaultLogLevelForFailure() throws IOException {
     AUDIT.logReadFailure(READ_FAIL_MSG);
     String expected =
-        "ERROR | OMAudit | ? | " + READ_FAIL_MSG.getFormattedMessage();
+        "ERROR | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | " + READ_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -167,7 +165,7 @@ public class TestOzoneAuditLogger {
   public void verifyDefaultLogLevelForAuthFailure() throws IOException {
     AUDIT.logAuthFailure(AUTH_FAIL_MSG);
     String expected =
-        "ERROR | OMAudit | ? | " + AUTH_FAIL_MSG.getFormattedMessage();
+        "ERROR | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | " + AUTH_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
@@ -212,7 +210,7 @@ public class TestOzoneAuditLogger {
             .withException(testException).build();
     AUDIT.logWriteFailure(exceptionAuditMessage);
     verifyLog(
-        "ERROR | OMAudit | ? | user=john | "
+        "ERROR | OMAudit | org.apache.hadoop.ozone.audit.TestOzoneAuditLogger | user=john | "
             + "ip=192.168.0.1 | op=CREATE_VOLUME "
             + "{\"key1\":\"value1\",\"key2\":\"value2\"} | ret=FAILURE",
         "org.apache.hadoop.ozone.audit."

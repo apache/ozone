@@ -20,19 +20,16 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.AuditLoggerType;
-import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
@@ -48,20 +45,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
  * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
-
-  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
-  private static final String AUDIT_PARAM_FROM_SNAPSHOT_ID = "fromSnapshotId";
-  private static final String AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY = "fromSnapshotTableKey";
-  private static final String AUDIT_PARAM_NEXT_SNAPSHOT_ID = "nextSnapshotId";
-  private static final String AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY = "nextSnapshotTableKey";
-  private static final String AUDIT_PARAM_KEYS_MOVED = "keysMoved";
-  private static final String AUDIT_PARAM_RENAMED_KEYS_MOVED = "renamedKeysMoved";
-  private static final String AUDIT_PARAM_DIRS_MOVED = "dirsMoved";
-  private static final String AUDIT_PARAM_RECLAIM_KEYS = "reclaimKeys";
-  private static final String AUDIT_PARAM_KEYS_MOVED_LIST = "keysMovedList";
-  private static final String AUDIT_PARAM_RENAMED_KEYS_LIST = "renamedKeysList";
-  private static final String AUDIT_PARAM_DIRS_MOVED_LIST = "dirsMovedList";
-  private static final String AUDIT_PARAM_RECLAIM_KEYS_LIST = "reclaimKeysList";
 
   public OMSnapshotMoveDeletedKeysRequest(OMRequest omRequest) {
     super(omRequest);
@@ -86,7 +69,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       // Check the snapshot exists.
       SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
@@ -98,49 +80,23 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
       List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
-
+      OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager, snapshotInfo.getVolumeName(),
+          snapshotInfo.getBucketName());
       OMSnapshotMoveUtils.updateCache(ozoneManager, fromSnapshot, nextSnapshot, context);
-      omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), fromSnapshot, nextSnapshot,
-          nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
-
-      auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
-      auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
-      if (nextSnapshot != null) {
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
-      }
-      auditParams.put(AUDIT_PARAM_KEYS_MOVED, String.valueOf(nextDBKeysList.size()));
-      auditParams.put(AUDIT_PARAM_RENAMED_KEYS_MOVED, String.valueOf(renamedKeysList.size()));
-      auditParams.put(AUDIT_PARAM_DIRS_MOVED, String.valueOf(movedDirs.size()));
-      auditParams.put(AUDIT_PARAM_RECLAIM_KEYS, String.valueOf(reclaimKeysList.size()));
-
-      if (!nextDBKeysList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_KEYS_MOVED_LIST, nextDBKeysList.toString());
-      }
-      if (!renamedKeysList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_RENAMED_KEYS_LIST, renamedKeysList.toString());
-      }
-      if (!movedDirs.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_DIRS_MOVED_LIST, movedDirs.toString());
-      }
-      if (!reclaimKeysList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_RECLAIM_KEYS_LIST, reclaimKeysList.toString());
-      }
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_MOVE_DEL_KEYS,
-          auditParams));
+      omClientResponse = new OMSnapshotMoveDeletedKeysResponse.Builder()
+          .setOmResponse(omResponse.build())
+          .setFromSnapshot(fromSnapshot)
+          .setNextSnapshot(nextSnapshot)
+          .setNextDBKeysList(nextDBKeysList)
+          .setReclaimKeysList(reclaimKeysList)
+          .setRenamedKeysList(renamedKeysList)
+          .setMovedDirs(movedDirs)
+          .setBucketId(omBucketInfo.getObjectID())
+          .build();
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           createErrorOMResponse(omResponse, ex));
-      auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
-      auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
-      if (nextSnapshot != null) {
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
-      }
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_DEL_KEYS,
-          auditParams, ex));
     }
 
     return omClientResponse;

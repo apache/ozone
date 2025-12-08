@@ -125,30 +125,32 @@ public class RunningDatanodeState implements DatanodeState {
     this.ecs = e;
   }
 
-  @SuppressWarnings("checkstyle:Indentation")
   private Callable<EndPointStates> buildEndPointTask(
       EndpointStateMachine endpoint) {
     switch (endpoint.getState()) {
-      case GETVERSION:
-        return new VersionEndpointTask(endpoint, conf,
-            context.getParent().getContainer());
-      case REGISTER:
-        return RegisterEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setContext(context)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setOzoneContainer(context.getParent().getContainer())
-            .build();
-      case HEARTBEAT:
-        return HeartbeatEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setContext(context)
-            .build();
-      default:
-        return null;
+    case GETVERSION:
+      // set the next heartbeat time to current to avoid wait for next heartbeat as REGISTER can be triggered
+      // immediately after GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
+      return new VersionEndpointTask(endpoint, conf,
+          context.getParent().getContainer());
+    case REGISTER:
+      return RegisterEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setContext(context)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setOzoneContainer(context.getParent().getContainer())
+          .build();
+    case HEARTBEAT:
+      return HeartbeatEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setContext(context)
+          .build();
+    default:
+      return null;
     }
   }
 

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -49,6 +51,25 @@ public interface IAccessAuthorizer {
       throws OMException;
 
   /**
+   * Attempts to authorize an STS AssumeRole request. If authorized, returns a String
+   * representation of the authorized session policy. This return value must be supplied on the subsequent
+   * {@link IAccessAuthorizer#checkAccess(IOzoneObj, RequestContext)} call, using the
+   * {@link RequestContext.Builder#setSessionPolicy(String)} parameter, and the authorizer will
+   * use the Role permissions and the session policy permissions to determine if
+   * the attempted action should be allowed for the given STS token.
+   * <p>
+   * The user making this call must have the {@link ACLType#ASSUME_ROLE} permission.
+   *
+   * @param assumeRoleRequest   the AssumeRole request containing role and optional limited scope policy grants
+   * @return                    a String representing the permissions granted according to the authorizer.
+   * @throws OMException        if the caller is not authorized, either for the role and/or policy or for the
+   *                            {@link ACLType#ASSUME_ROLE} permission
+   */
+  default String generateAssumeRoleSessionPolicy(AssumeRoleRequest assumeRoleRequest) throws OMException {
+    throw new OMException("The generateAssumeRoleSessionPolicy call is not supported", NOT_SUPPORTED_OPERATION);
+  }
+
+  /**
    * @return true for Ozone-native authorizer
    */
   default boolean isNative() {
@@ -67,7 +88,9 @@ public interface IAccessAuthorizer {
     READ_ACL,
     WRITE_ACL,
     ALL,
-    NONE;
+    NONE,
+    ASSUME_ROLE;   // ability to create STS tokens
+
     private static int length = ACLType.values().length;
     static {
       if (length > 16) {
@@ -121,6 +144,8 @@ public interface IAccessAuthorizer {
         return ACLType.ALL;
       case OzoneConsts.OZONE_ACL_NONE:
         return ACLType.NONE;
+      case OzoneConsts.OZONE_ACL_ASSUME_ROLE:
+        return ACLType.ASSUME_ROLE;
       default:
         throw new IllegalArgumentException("[" + type + "] ACL right is not " +
             "recognized");
@@ -161,6 +186,8 @@ public interface IAccessAuthorizer {
         return OzoneConsts.OZONE_ACL_ALL;
       case NONE:
         return OzoneConsts.OZONE_ACL_NONE;
+      case ASSUME_ROLE:
+        return OzoneConsts.OZONE_ACL_ASSUME_ROLE;
       default:
         throw new IllegalArgumentException("ACL right is not recognized");
       }

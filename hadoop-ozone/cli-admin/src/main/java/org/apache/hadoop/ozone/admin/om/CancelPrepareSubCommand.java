@@ -32,22 +32,17 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class
 )
 public class CancelPrepareSubCommand implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
 
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID",
-      required = false
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client = parent.createOmClient(omServiceId);
-    client.cancelOzoneManagerPrepare();
-    System.out.println("Cancel prepare succeeded, cluster can now accept " +
-        "write requests.");
+    try (OzoneManagerProtocol client = omServiceOption.newClient()) {
+      client.cancelOzoneManagerPrepare();
+      System.out.println("Cancel prepare succeeded, cluster can now accept " +
+          "write requests.");
+    }
     return null;
   }
 }
