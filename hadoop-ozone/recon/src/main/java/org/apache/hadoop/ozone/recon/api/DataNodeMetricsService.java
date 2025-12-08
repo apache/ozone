@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class DataNodeMetricsService {
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
-  private static ExecutorService executorService;
+  private final ExecutorService executorService;
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
   private Long totalPendingDeletion = 0L;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
