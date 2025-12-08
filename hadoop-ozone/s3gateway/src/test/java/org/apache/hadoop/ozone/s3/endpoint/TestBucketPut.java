@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -46,7 +48,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -75,6 +76,8 @@ public class TestBucketPut {
           "    </Grant>" +
           "  </AccessControlList>" +
           "</AccessControlPolicy>";
+  private static final String ACL = "acl";
+  private static final String WHITESPACE_ONLY = "  ";
 
   @BeforeEach
   public void setup() throws Exception {
@@ -97,8 +100,8 @@ public class TestBucketPut {
 
     InputStream body = new ByteArrayInputStream(VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
 
-    Response resp = bucketEndpoint.put(bucketName, "acl", body);
-    assertEquals(200, resp.getStatus());
+    Response resp = bucketEndpoint.put(bucketName, ACL, body);
+    assertEquals(HTTP_OK, resp.getStatus());
   }
 
   @Test
@@ -106,7 +109,7 @@ public class TestBucketPut {
     bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
 
     WebApplicationException wae = assertThrows(WebApplicationException.class,
-        () -> bucketEndpoint.put(bucketName, "acl", null));
+        () -> bucketEndpoint.put(bucketName, ACL, null));
 
     Throwable cause = wae.getCause();
     assertNotNull(cause);
@@ -115,13 +118,13 @@ public class TestBucketPut {
     OS3Exception os3 = (OS3Exception) cause;
 
     assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
-    assertEquals(400, os3.getHttpCode());
+    assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
   }
 
   @Test
   public void testBucketPut() throws Exception {
     Response response = bucketEndpoint.put(bucketName, null, null);
-    assertEquals(200, response.getStatus());
+    assertEquals(HTTP_OK, response.getStatus());
     assertNotNull(response.getLocation());
 
     // Create-bucket on an existing bucket fails
@@ -134,7 +137,7 @@ public class TestBucketPut {
   @Test
   public void testPutAclOnNonExistingBucket() throws Exception {
     OS3Exception e = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, "acl", null));
+        () -> bucketEndpoint.put(bucketName, ACL, null));
     assertEquals(NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
   }
@@ -146,9 +149,9 @@ public class TestBucketPut {
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn("id=\"owner-id\"");
 
-    Response resp = bucketEndpoint.put(bucketName, "acl", null);
+    Response resp = bucketEndpoint.put(bucketName, ACL, null);
 
-    assertEquals(200, resp.getStatus());
+    assertEquals(HTTP_OK, resp.getStatus());
   }
 
   @Test
@@ -159,7 +162,7 @@ public class TestBucketPut {
         "not-xml".getBytes(StandardCharsets.UTF_8));
 
     WebApplicationException wae = assertThrows(WebApplicationException.class,
-        () -> bucketEndpoint.put(bucketName, "acl", body));
+        () -> bucketEndpoint.put(bucketName, ACL, body));
 
     Throwable cause = wae.getCause();
     assertNotNull(cause);
@@ -177,11 +180,11 @@ public class TestBucketPut {
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn("id\"owner-id\"");
 
-    OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, "acl", null));
+    OS3Exception os3 = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put(bucketName, ACL, null));
 
-    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
-    assertEquals(400, ex.getHttpCode());
+    assertEquals(INVALID_ARGUMENT.getCode(), os3.getCode());
+    assertEquals(400, os3.getHttpCode());
   }
 
   @Test
@@ -196,8 +199,8 @@ public class TestBucketPut {
     InputStream body = new ByteArrayInputStream(
         VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
 
-    Response resp = bucketEndpoint.put(bucketName, "acl", body);
-    assertEquals(200, resp.getStatus());
+    Response resp = bucketEndpoint.put(bucketName, ACL, body);
+    assertEquals(HTTP_OK, resp.getStatus());
 
     OzoneBucket bucket = bucketEndpoint.getClient()
          .getObjectStore()
@@ -230,9 +233,9 @@ public class TestBucketPut {
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(""); // empty
 
-    Response resp = bucketEndpoint.put(bucketName, "acl", null);
+    Response resp = bucketEndpoint.put(bucketName, ACL, null);
 
-    Assertions.assertEquals(200, resp.getStatus());
+    assertEquals(HTTP_OK, resp.getStatus());
   }
 
   @Test
@@ -240,12 +243,12 @@ public class TestBucketPut {
     bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
 
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
-        .thenReturn("  "); // whitespace only
+        .thenReturn(WHITESPACE_ONLY); // whitespace only
 
     OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, "acl", null));
+        () -> bucketEndpoint.put(bucketName, ACL, null));
 
-    Assertions.assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
-    Assertions.assertEquals(400, ex.getHttpCode());
+    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals(400, ex.getHttpCode());
   }
 }
