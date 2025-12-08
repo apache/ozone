@@ -170,7 +170,6 @@ public class ReplicationServer {
 
     public static final String PREFIX = "hdds.datanode.replication";
     public static final String STREAMS_LIMIT_KEY = "streams.limit";
-    public static final String QUEUE_LIMIT = "queue.limit";
 
     public static final String REPLICATION_STREAMS_LIMIT_KEY =
         PREFIX + "." + STREAMS_LIMIT_KEY;
@@ -189,7 +188,7 @@ public class ReplicationServer {
      * The maximum number of replication commands a single datanode can execute
      * simultaneously.
      */
-    @Config(key = STREAMS_LIMIT_KEY,
+    @Config(key = "hdds.datanode.replication.streams.limit",
         type = ConfigType.INT,
         defaultValue = "10",
         tags = {DATANODE},
@@ -201,7 +200,7 @@ public class ReplicationServer {
     /**
      * The maximum of replication request queue length.
      */
-    @Config(key = QUEUE_LIMIT,
+    @Config(key = "hdds.datanode.replication.queue.limit",
         type = ConfigType.INT,
         defaultValue = "4096",
         tags = {DATANODE},
@@ -210,12 +209,12 @@ public class ReplicationServer {
     )
     private int replicationQueueLimit = 4096;
 
-    @Config(key = "port", defaultValue = "9886",
+    @Config(key = "hdds.datanode.replication.port", defaultValue = "9886",
         description = "Port used for the server2server replication server",
         tags = {DATANODE, MANAGEMENT})
     private int port;
 
-    @Config(key = OUTOFSERVICE_FACTOR_KEY,
+    @Config(key = "hdds.datanode.replication.outofservice.limit.factor",
         type = ConfigType.DOUBLE,
         defaultValue = OUTOFSERVICE_FACTOR_DEFAULT_VALUE,
         tags = {DATANODE, SCM},

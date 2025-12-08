@@ -38,7 +38,7 @@ public class OmConfig extends ReconfigurableConfig {
 
   /** This config needs to be enabled, when S3G created objects used via FileSystem API. */
   @Config(
-      key = "enable.filesystem.paths",
+      key = "ozone.om.enable.filesystem.paths",
       defaultValue = "false",
       description = "If true, key names will be interpreted as file system paths. " +
           "'/' will be treated as a special character and paths will be normalized " +
@@ -64,7 +64,7 @@ public class OmConfig extends ReconfigurableConfig {
   private boolean keyNameCharacterCheckEnabled;
 
   @Config(
-      key = "server.list.max.size",
+      key = "ozone.om.server.list.max.size",
       defaultValue = "1000",
       description = "Configuration property to configure the max server side response size for list calls on om.",
       reconfigurable = true,
@@ -73,7 +73,7 @@ public class OmConfig extends ReconfigurableConfig {
   private long maxListSize;
 
   @Config(
-      key = "user.max.volume",
+      key = "ozone.om.user.max.volume",
       defaultValue = "1024",
       description = "The maximum number of volumes a user can have on a cluster.Increasing or " +
           "decreasing this number has no real impact on ozone cluster. This is " +
@@ -84,7 +84,7 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private int maxUserVolumeCount;
 
-  @Config(key = "upgrade.finalization.ratis.based.timeout",
+  @Config(key = "ozone.om.upgrade.finalization.ratis.based.timeout",
       defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {ConfigTag.OM, ConfigTag.UPGRADE},
@@ -97,7 +97,7 @@ public class OmConfig extends ReconfigurableConfig {
   private long ratisBasedFinalizationTimeout = Duration.ofSeconds(30).getSeconds();
 
   // OM Default user/group permissions
-  @Config(key = "user.rights",
+  @Config(key = "ozone.om.user.rights",
       defaultValue = "ALL",
       type = ConfigType.STRING,
       tags = {ConfigTag.OM, ConfigTag.SECURITY},
@@ -107,7 +107,7 @@ public class OmConfig extends ReconfigurableConfig {
   private String userDefaultRights;
   private Set<ACLType> userDefaultRightSet;
 
-  @Config(key = "group.rights",
+  @Config(key = "ozone.om.group.rights",
       defaultValue = "READ, LIST",
       type = ConfigType.STRING,
       tags = {ConfigTag.OM, ConfigTag.SECURITY},
@@ -117,7 +117,7 @@ public class OmConfig extends ReconfigurableConfig {
   private String groupDefaultRights;
   private Set<ACLType> groupDefaultRightSet;
 
-  @Config(key = "object.creation.ignore.client.acls",
+  @Config(key = "ozone.om.object.creation.ignore.client.acls",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = {ConfigTag.OM, ConfigTag.SECURITY},
