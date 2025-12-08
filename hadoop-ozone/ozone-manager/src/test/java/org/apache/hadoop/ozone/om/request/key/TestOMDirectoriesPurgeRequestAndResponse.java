@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -185,8 +188,8 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         volumeId, bucketId, purgeDeletedDir, subFiles, subDirs);
     purgePathRequestList.add(request);
     return createPurgeKeysRequest(fromSnapshot, purgePathRequestList, Collections.singletonList(
-        BucketNameInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
-            .setBucketId(bucketId).setVolumeId(volumeId).buildPartial()));
+        BucketNameInfo.newBuilder().setVolumeName(bucketInfo.getVolumeName()).setBucketName(bucketInfo.getBucketName())
+            .setBucketId(bucketId).setVolumeId(volumeId).build()));
   }
 
   private PurgePathRequest wrapPurgeRequest(
@@ -356,8 +359,10 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   }
 
   @ParameterizedTest
-  @CsvSource(value = {"false,false", "false,true", "true,false", "true,true"})
-  public void testDirectoryPurge(boolean fromSnapshot, boolean purgeDirectory) throws Exception {
+  @CsvSource(value = {"false,false,0", "false,true,0", "true,false,0", "true,true,0",
+      "false,false,10", "false,true,10", "true,false,10", "true,true,10"})
+  public void testDirectoryPurge(boolean fromSnapshot, boolean purgeDirectory, int numberOfSubEntries)
+      throws Exception {
     when(ozoneManager.getDefaultReplicationConfig())
         .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     String bucket = "bucket" + RandomUtils.secure().randomInt();
@@ -366,6 +371,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long purgeUsedNamespaceCountBeforePurge = bucketInfo.getSnapshotUsedNamespace();
     OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
         .setName("dir1")
         .setCreationTime(Time.now())
@@ -382,7 +388,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> subDirKeys = new ArrayList<>();
     List<String> deletedSubDirKeys = new ArrayList<>();
     List<String> deletedSubFiles = new ArrayList<>();
-    for (int id = 1; id < 10; id++) {
+    for (int id = 0; id < numberOfSubEntries; id++) {
       OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
           .setName("subdir" + id)
           .setCreationTime(Time.now())
@@ -427,11 +433,33 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OMRequest omRequest = createPurgeKeysRequest(snapshotInfo == null ? null : snapshotInfo.getTableKey(),
         purgeDirectory ? deletedDirKey : null, subDirs, subFiles, bucketInfo);
     OMRequest preExecutedRequest = preExecute(omRequest);
-    OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
-        new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
+    OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest = new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
     OMDirectoriesPurgeResponseWithFSO omClientResponse = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
         .validateAndUpdateCache(ozoneManager, 100L);
+
+    IOzoneManagerLock lock = spy(omMetadataManager.getLock());
+    when(omMetadataManager.getLock()).thenReturn(lock);
+    List<String> locks = Lists.newArrayList();
+    doAnswer(i -> {
+      locks.add(i.getArgument(1));
+      return i.callRealMethod();
+    }).when(lock).acquireReadLock(eq(SNAPSHOT_DB_CONTENT_LOCK), anyString());
+
+    List<String> snapshotIds;
+    if (fromSnapshot) {
+      snapshotIds = Collections.singletonList(snapshotInfo.getSnapshotId().toString());
+    } else {
+      snapshotIds = Collections.emptyList();
+    }
+
     performBatchOperationCommit(omClientResponse);
+    assertEquals(snapshotIds, locks);
+    OmBucketInfo updatedBucketInfo = purgeDirectory || numberOfSubEntries > 0 ?
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey) : omMetadataManager.getBucketTable().get(bucketKey);
+    long currentSnapshotUsedNamespace = updatedBucketInfo.getSnapshotUsedNamespace();
+
+    assertEquals(purgeUsedNamespaceCountBeforePurge - (purgeDirectory ? 1 : 0) +
+            (2 * (long)numberOfSubEntries), currentSnapshotUsedNamespace);
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = fromSnapshot ? ozoneManager.getOmSnapshotManager()
         .getSnapshot(snapshotInfo.getSnapshotId()) : null) {
       OMMetadataManager metadataManager = fromSnapshot ? snapshot.get().getMetadataManager() :
@@ -590,13 +618,21 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     validateDeletedKeys(omMetadataManager, deletedKeyNames);
   }
 
-  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse) throws IOException {
-    try (BatchOperation batchOperation =
-             omMetadataManager.getStore().initBatchOperation()) {
-      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-      // Do manual commit and see whether addToBatch is successful or not.
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
+  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse)
+      throws ExecutionException, InterruptedException {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture.runAsync(() -> {
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+        // Do manual commit and see whether addToBatch is successful or not.
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      } catch (IOException e) {
+        future.completeExceptionally(e);
+        return;
+      }
+      future.complete(null);
+    });
+    future.get();
   }
 
   @Nonnull

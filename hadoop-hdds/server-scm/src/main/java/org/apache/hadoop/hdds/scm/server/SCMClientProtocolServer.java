@@ -35,6 +35,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
@@ -89,6 +91,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -103,9 +106,9 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -643,11 +646,17 @@ public class SCMClientProtocolServer implements
       List<HddsProtos.Node> result = new ArrayList<>();
       for (DatanodeDetails node : queryNode(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        result.add(HddsProtos.Node.newBuilder()
+        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState())
-            .build());
+            .addNodeOperationalStates(ns.getOperationalState());
+        
+        if (datanodeInfo != null) {
+          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+        }
+        result.add(nodeBuilder.build());
       }
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.QUERY_NODE, auditMap));
@@ -669,11 +678,17 @@ public class SCMClientProtocolServer implements
       DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
       if (node != null) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        result = HddsProtos.Node.newBuilder()
+        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.getProtoBufMessage())
             .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState())
-            .build();
+            .addNodeOperationalStates(ns.getOperationalState());
+
+        if (datanodeInfo != null) {
+          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+        }
+        result = nodeBuilder.build();
       }
     } catch (NodeNotFoundException e) {
       IOException ex = new IOException(
@@ -970,6 +985,23 @@ public class SCMClientProtocolServer implements
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     return 0;
+  }
+
+  @Nullable
+  @Override
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() {
+    final Map<String, String> auditMap = Maps.newHashMap();
+    try {
+      DeletedBlocksTransactionSummary summary =
+          scm.getScmBlockManager().getDeletedBlockLog().getTransactionSummary();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap));
+      return summary;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap, ex));
+      throw ex;
+    }
   }
 
   /**

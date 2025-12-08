@@ -82,7 +82,7 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public static ContainerSet newRwContainerSet(
       WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
-    Objects.requireNonNull(metadataStore, "WitnessedContainerMetadataStore == null");
+    Objects.requireNonNull(metadataStore, "metadataStore == null");
     return new ContainerSet(metadataStore, recoveringTimeout);
   }
 
@@ -187,7 +187,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   private boolean addContainer(Container<?> container, boolean overwrite) throws
       StorageContainerException {
-    Preconditions.checkNotNull(container, "container cannot be null");
+    Objects.requireNonNull(container, "container == null");
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
@@ -204,6 +204,10 @@ public class ContainerSet implements Iterable<Container<?>> {
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);
+      }
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(containerId);
       }
       return true;
     } else {
@@ -299,6 +303,10 @@ public class ContainerSet implements Iterable<Container<?>> {
           "containerMap", containerId);
       return false;
     } else {
+      HddsVolume volume = removed.getContainerData().getVolume();
+      if (volume != null) {
+        volume.removeContainer(containerId);
+      }
       LOG.debug("Container with containerId {} is removed from containerMap",
           containerId);
       return true;
@@ -408,14 +416,20 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return {@literal Iterator<Container<?>>}
    */
   public Iterator<Container<?>> getContainerIterator(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-            .getStorageID()))
-        .sorted(ContainerDataScanOrder.INSTANCE)
-        .iterator();
+    Objects.requireNonNull(volume, "volume == null");
+    Iterator<Long> containerIdIterator = volume.getContainerIterator();
+
+    List<Container<?>> containers = new ArrayList<>();
+    while (containerIdIterator.hasNext()) {
+      Long containerId = containerIdIterator.next();
+      Container<?> container = containerMap.get(containerId);
+      if (container != null) {
+        containers.add(container);
+      }
+    }
+    containers.sort(ContainerDataScanOrder.INSTANCE);
+
+    return containers.iterator();
   }
 
   /**
@@ -425,12 +439,8 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return number of containers
    */
   public long containerCount(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
-    Preconditions.checkNotNull(volume.getStorageID());
-    String volumeUuid = volume.getStorageID();
-    return containerMap.values().stream()
-        .filter(x -> volumeUuid.equals(x.getContainerData().getVolume()
-        .getStorageID())).count();
+    Objects.requireNonNull(volume, "volume == null");
+    return volume.getContainerCount();
   }
 
   /**
@@ -469,8 +479,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   public void listContainer(long startContainerId, long count,
                             List<ContainerData> data) throws
       StorageContainerException {
-    Preconditions.checkNotNull(data,
-        "Internal assertion: data cannot be null");
+    Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(startContainerId >= 0,
         "Start container Id cannot be negative");
     Preconditions.checkState(count > 0,

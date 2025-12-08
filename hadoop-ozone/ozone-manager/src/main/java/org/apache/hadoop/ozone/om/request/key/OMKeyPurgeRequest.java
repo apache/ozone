@@ -97,11 +97,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
         UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
-        if (!validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-            expectedPreviousSnapshotId)) {
-          return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
-              new OMException("Snapshot validation failed", OMException.ResultCodes.INVALID_REQUEST)));
-        }
+        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId);
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);
@@ -127,9 +124,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       OMException oe = new OMException("No keys found to be purged or renamed in the request.",
           OMException.ResultCodes.KEY_DELETION_ERROR);
-      if (LOG.isDebugEnabled()) {
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
-      }
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
 
@@ -146,6 +141,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // last purge transaction when running for AOS
         deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
+      List<OmBucketInfo> bucketInfoList = updateBucketSize(purgeKeysRequest.getBucketPurgeKeysSizeList(),
+          omMetadataManager);
+
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
         if (fromSnapshotInfo != null) {
@@ -161,20 +159,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         }
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
       }
+      return new OMKeyPurgeResponse(omResponse.build(), keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo,
+          keysToUpdateList, bucketInfoList);
     } catch (IOException e) {
-      if (LOG.isDebugEnabled()) {
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
-      }
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
-    }
-    try {
-      List<OmBucketInfo> bucketInfoList = updateBucketSize(purgeKeysRequest.getBucketPurgeKeysSizeList(),
-          omMetadataManager);
-      return new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList, bucketInfoList);
-    } catch (OMException oe) {
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
-      return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
   }
 
@@ -226,5 +215,4 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketKeyList));
     }
   }
-
 }

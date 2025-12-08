@@ -67,7 +67,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
         + (numOfChildDirs + 1) * Long.BYTES // 1 long field for parentId + list size
         + Short.BYTES // 2 dummy shorts to track length
         + dirName.length // directory name length
-        + Long.BYTES; // Added space for parentId serialization
+        + 2 * Long.BYTES; // Added space for parentId serialization and replicated size of files
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
@@ -85,6 +85,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     out.write(integerCodec.toPersistedFormat(dirName.length));
     out.write(dirName);
     out.write(longCodec.toPersistedFormat(object.getParentId()));
+    out.write(longCodec.toPersistedFormat(object.getReplicatedSizeOfFiles()));
 
     return out.toByteArray();
   }
@@ -112,6 +113,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
     int strLen = in.readInt();
     if (strLen == 0) {
+      //we need to read even though dir name is empty
+      readParentIdAndReplicatedSize(in, res);
       return res;
     }
     byte[] buffer = new byte[strLen];
@@ -119,15 +122,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     assert (bytesRead == strLen);
     String dirName = stringCodec.fromPersistedFormat(buffer);
     res.setDirName(dirName);
-
-    // Check if there is enough data available to read the parentId
-    if (in.available() >= Long.BYTES) {
-      long parentId = in.readLong();
-      res.setParentId(parentId);
-    } else {
-      // Set default parentId to -1 indicating it's from old format
-      res.setParentId(-1);
-    }
+    readParentIdAndReplicatedSize(in, res);
     return res;
   }
 
@@ -136,10 +131,24 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary copy = new NSSummary();
     copy.setNumOfFiles(object.getNumOfFiles());
     copy.setSizeOfFiles(object.getSizeOfFiles());
+    copy.setReplicatedSizeOfFiles(object.getReplicatedSizeOfFiles());
     copy.setFileSizeBucket(object.getFileSizeBucket());
     copy.setChildDir(object.getChildDir());
     copy.setDirName(object.getDirName());
     copy.setParentId(object.getParentId());
     return copy;
+  }
+
+  private void readParentIdAndReplicatedSize(DataInputStream input, NSSummary output) throws IOException {
+    if (input.available() >= 2 * Long.BYTES) {
+      output.setParentId(input.readLong());
+      output.setReplicatedSizeOfFiles(input.readLong());
+    } else if (input.available() >= Long.BYTES) {
+      output.setParentId(input.readLong());
+      output.setReplicatedSizeOfFiles(-1);
+    } else {
+      output.setParentId(-1);
+      output.setReplicatedSizeOfFiles(-1);
+    }
   }
 }

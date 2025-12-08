@@ -201,7 +201,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -265,7 +264,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(

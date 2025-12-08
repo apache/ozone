@@ -114,6 +114,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -733,7 +734,7 @@ public class TestOMDbCheckpointServlet {
     writeClient.createSnapshot(vname, bname, snapshotName);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotPath = getSnapshotPath(conf, snapshotInfo)
+    String snapshotPath = getSnapshotPath(conf, snapshotInfo, 0)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
         100, 30000);
@@ -856,8 +857,7 @@ public class TestOMDbCheckpointServlet {
 
     // Confirm the other handlers are locked out when the bootstrap
     //  servlet takes the lock.
-    try (BootstrapStateHandler.Lock ignoredLock =
-        spyServlet.getBootstrapStateLock().lock()) {
+    try (AutoCloseable ignoredLock = spyServlet.getBootstrapStateLock().acquireWriteLock()) {
       confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
       confirmServletLocksOutOtherHandler(snapshotDeletingService,
           executorService);
@@ -898,8 +898,7 @@ public class TestOMDbCheckpointServlet {
   private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
-    try (BootstrapStateHandler.Lock ignoredLock =
-        handler.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable ignoredLock = handler.getBootstrapStateLock().acquireWriteLock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
       assertThrows(TimeoutException.class,
@@ -912,8 +911,7 @@ public class TestOMDbCheckpointServlet {
       ExecutorService executorService) {
     return executorService.submit(() -> {
       try {
-        handler.getBootstrapStateLock().lock();
-        handler.getBootstrapStateLock().unlock();
+        handler.getBootstrapStateLock().acquireWriteLock().close();
         return true;
       } catch (InterruptedException e) {
       }

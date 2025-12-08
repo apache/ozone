@@ -35,7 +35,7 @@ public class TestDecayRpcSchedulerUtil {
   private static final String METRIC_NAME_VOLUME = "Volume";
 
   private static final String RECORD_NAME =
-      "org.apache.hadoop.ipc.DecayRpcScheduler";
+      "org.apache.hadoop.ipc_.DecayRpcScheduler";
   private static final String METRIC_NAME =
       "Caller(" + USERNAME + ")." + METRIC_NAME_VOLUME;
 

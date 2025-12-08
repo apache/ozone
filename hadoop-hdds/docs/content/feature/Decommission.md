@@ -108,9 +108,9 @@ The following metrics can be used to monitor the progress of DataNode decommissi
 These metrics are available on the SCM and provide a cluster-wide view of the replication process. During decommissioning, you should see an increase in these metrics. The name in parentheses is the corresponding Prometheus metric name.
 
 *   `InflightReplication` (`replication_manager_metrics_inflight_replication`): The number of container replication requests currently in progress.
-*   `replicationCmdsSentTotal` (`replication_manager_metrics_replication_cmds_sent_total`): The total number of replication commands sent to datanodes.
+*   `replicationCmdsSentTotal` (`replication_manager_metrics_replication_cmds_sent_total`): The total number of replication commands sent to DataNodes.
 *   `replicasCreatedTotal` (`replication_manager_metrics_replicas_created_total`): The total number of container replicas successfully created.
-*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source datanodes were overloaded. If this value is high, it might indicate that the source datanodes (including the decommissioning one) are too busy.
+*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source DataNodes were overloaded. If this value is high, it might indicate that the source DataNodes (including the decommissioning one) are too busy.
 
 ##### Datanode-side Metrics (`MeasuredReplicator` metrics)
 
@@ -122,7 +122,7 @@ These metrics are available on each DataNode. For a decommissioning node, they s
 *   `failure` (`measured_replicator_failure`): The number of failed replication tasks.
 *   `failureTime` (`measured_replicator_failure_time`): The total time spent on failed replication tasks.
 *   `failureBytes` (`measured_replicator_failure_bytes`): The total bytes that failed to be transferred.
-*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the datanode is overloaded.
+*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the DataNode is overloaded.
 
 By monitoring these metrics, administrators can get a clear picture of the decommissioning progress and identify potential bottlenecks.
 
