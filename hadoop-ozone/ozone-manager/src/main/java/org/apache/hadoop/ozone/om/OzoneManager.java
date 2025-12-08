@@ -46,7 +46,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -4275,8 +4274,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (Files.exists(checkpointLocation) && Files.isDirectory(checkpointLocation)) {
       try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
         for (Path checkpointItem : checkpointContents.collect(Collectors.toList())) {
-          String itemName = checkpointItem.getFileName().toString();
-
+          Path fileName = checkpointItem.getFileName();
+          if (fileName == null) {
+            LOG.warn("Skipping path with no file name: {}", checkpointItem);
+            continue;
+          }
+          String itemName = fileName.toString();
           // Skip backup directories, raft logs, and marker files
           if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX)
               || itemName.equals(DB_TRANSIENT_MARKER) ||
@@ -4326,8 +4329,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
         for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
-          String itemName = sourcePath.getFileName().toString();
-
+          Path fileName = sourcePath.getFileName();
+          if (fileName == null) {
+            LOG.warn("Skipping path with no file name: {}", sourcePath);
+            continue;
+          }
+          String itemName = fileName.toString();
           // Skip backup directories, raft logs, and marker files
           if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
               itemName.equals(DB_TRANSIENT_MARKER) ||
