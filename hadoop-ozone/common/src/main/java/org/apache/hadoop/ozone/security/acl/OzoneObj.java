@@ -146,4 +146,20 @@ public abstract class OzoneObj implements IOzoneObj {
     return auditMap;
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    } else if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    final OzoneObj that = (OzoneObj) o;
+    return resType == that.resType && storeType == that.storeType;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(resType, storeType);
+  }
 }
