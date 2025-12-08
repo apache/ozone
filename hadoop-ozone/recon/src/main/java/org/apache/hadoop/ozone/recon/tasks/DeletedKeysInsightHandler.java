@@ -119,9 +119,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    @SuppressWarnings("unchecked")
-    Table<String, RepeatedOmKeyInfo> table = 
-        (Table<String, RepeatedOmKeyInfo>) omMetadataManager.getTable(tableName);
+    Table<String, RepeatedOmKeyInfo> table = omMetadataManager.getDeletedTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = iterator.next();
