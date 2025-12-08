@@ -76,7 +76,7 @@ public final class AclListBuilder {
   /** Set the list being built to {@code acls}.  For further mutations to work, it must be modifiable. */
   public void set(@Nonnull List<OzoneAcl> acls) {
     Objects.requireNonNull(acls, "acls == null");
-    changed |= !Objects.equals(updatedList, acls);
+    changed |= !acls.equals(updatedList != null ? updatedList : originalList);
     updatedList = acls;
   }
 
