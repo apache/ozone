@@ -95,18 +95,29 @@ public class TestOmPrefixInfo {
 
     assertEquals(omPrefixInfo, clonePrefixInfo);
 
-    OmPrefixInfo modifiedPrefixInfo = new OmPrefixInfo.Builder(omPrefixInfo)
+    OmPrefixInfo modifiedPrefixInfo = omPrefixInfo.toBuilder()
         .addAcls(Collections.singletonList(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER, username,
             ACCESS, IAccessAuthorizer.ACLType.READ)))
         .build();
 
     assertNotEquals(modifiedPrefixInfo, clonePrefixInfo);
+  }
+
+  @Test
+  public void testImmutability() {
+    String testPath = "/my/custom/path";
+    String username = "myuser";
+    OmPrefixInfo omPrefixInfo = getOmPrefixInfoForTest(testPath,
+        IAccessAuthorizer.ACLIdentityType.USER,
+        username,
+        IAccessAuthorizer.ACLType.WRITE,
+        ACCESS);
+
     assertThrows(UnsupportedOperationException.class,
         () -> omPrefixInfo.getAcls().add(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER, username,
             ACCESS, IAccessAuthorizer.ACLType.READ)));
-
   }
 
   @Test

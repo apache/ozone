@@ -262,8 +262,7 @@ public class PrefixManagerImpl implements PrefixManager {
     prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
 
     if (!isRatisEnabled) {
-      metadataManager.getPrefixTable().put(ozoneObj.getPath(),
-          updatedPrefixInfo);
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), updatedPrefixInfo);
     }
     return new OMPrefixAclOpResult(updatedPrefixInfo, changed);
   }
@@ -290,8 +289,7 @@ public class PrefixManagerImpl implements PrefixManager {
     } else {
       prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
       if (!isRatisEnabled) {
-        metadataManager.getPrefixTable().put(ozoneObj.getPath(),
-            updatedPrefixInfo);
+        metadataManager.getPrefixTable().put(ozoneObj.getPath(), updatedPrefixInfo);
       }
     }
     return new OMPrefixAclOpResult(updatedPrefixInfo, removed);
@@ -348,8 +346,7 @@ public class PrefixManagerImpl implements PrefixManager {
         .build();
     prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
     if (!isRatisEnabled) {
-      metadataManager.getPrefixTable().put(ozoneObj.getPath(),
-          updatedPrefixInfo);
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), updatedPrefixInfo);
     }
     return new OMPrefixAclOpResult(updatedPrefixInfo, changed);
   }

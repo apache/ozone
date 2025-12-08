@@ -45,7 +45,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
       OmPrefixInfo.class);
 
   private final String name;
-  private final List<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
 
   private OmPrefixInfo(Builder b) {
     super(b);
@@ -63,7 +63,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
+    return acls;
   }
 
   /**
