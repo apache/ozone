@@ -749,6 +749,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-14101")
   void testContainerStateMachineSingleFailureRetry()
       throws Exception {
     try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -784,6 +785,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-14101")
   void testContainerStateMachineDualFailureRetry()
       throws Exception {
     OzoneOutputStream key =

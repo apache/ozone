@@ -635,10 +635,8 @@ public final class HddsUtils {
    *     ancestor of {@code path}
    */
   public static void validatePath(Path path, Path ancestor) {
-    Preconditions.checkNotNull(path,
-        "Path should not be null");
-    Preconditions.checkNotNull(ancestor,
-        "Ancestor should not be null");
+    Objects.requireNonNull(path, "Path should not be null");
+    Objects.requireNonNull(ancestor, "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path %s should be a descendant of %s", path, ancestor);
@@ -852,8 +850,7 @@ public final class HddsUtils {
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "HddsProtos.UUID can't be null to transform to java UUID.");
+    Objects.requireNonNull(uuid, "HddsProtos.UUID can't be null to transform to java UUID.");
     return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
   }
 
@@ -861,8 +858,7 @@ public final class HddsUtils {
    * Transform a Java UUID to protobuf UUID.
    */
   public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "UUID can't be null to transform to protobuf UUID.");
+    Objects.requireNonNull(uuid, "UUID can't be null to transform to protobuf UUID.");
     return HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())

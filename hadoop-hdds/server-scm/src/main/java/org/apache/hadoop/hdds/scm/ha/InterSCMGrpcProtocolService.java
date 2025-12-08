@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder.forServer;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,7 +52,7 @@ public class InterSCMGrpcProtocolService {
 
   InterSCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) throws IOException {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
@@ -82,7 +82,7 @@ public class InterSCMGrpcProtocolService {
             "InterSCMGrpcProtocolService GRPC endpoint.");
       }
     }
-    Preconditions.checkNotNull(b);
+    Objects.requireNonNull(b, "b == null");
     server = nettyServerBuilder.build();
   }
 
