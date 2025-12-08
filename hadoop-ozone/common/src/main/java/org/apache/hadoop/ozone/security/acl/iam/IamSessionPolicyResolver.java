@@ -527,7 +527,13 @@ public final class IamSessionPolicyResolver {
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       } else if (action == S3Action.ALL_S3) {
         // For s3:*, ALL should only apply at the bucket level; grant READ at volume for navigation
-        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        // However, resource "arn:aws:s3:::*" can apply to volume as well (as explained above)
+        // If the bucket is "*", include the volumePerms, otherwise just include READ for navigation.
+        if ("*".equals(resourceSpec.bucket)) {
+          addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+        } else {
+          addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        }
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
 

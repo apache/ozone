@@ -1416,8 +1416,8 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
 
     // Ensure what we got is what we expected
-    assertThat(resolvedFromNativeAuthorizer.isEmpty());
-    assertThat(resolvedFromRangerAuthorizer.isEmpty());
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
   }
 
   @Test
@@ -1715,7 +1715,8 @@ public class TestIamSessionPolicyResolver {
     final Set<IOzoneObj> bucketSet = objSet(bucket("*"));
     final Set<ACLType> bucketAcls = acls(ALL);
     expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
-    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("*", "*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(key("*", "*")), acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume()), acls(READ, LIST)));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1904,8 +1905,8 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
 
     // Ensure what we got is what we expected
-    assertThat(resolvedFromNativeAuthorizer.isEmpty());
-    assertThat(resolvedFromRangerAuthorizer.isEmpty());
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
   }
 
   @Test
