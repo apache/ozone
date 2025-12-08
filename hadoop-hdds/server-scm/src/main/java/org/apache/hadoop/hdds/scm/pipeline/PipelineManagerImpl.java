@@ -641,7 +641,7 @@ public class PipelineManagerImpl implements PipelineManager {
       if (!(node instanceof DatanodeInfo)) {
         node = nodeManager.getDatanodeInfo(node);
       }
-      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
+      if (!SCMCommonPlacementPolicy.checkSpace(node, 0, containerSize, null)) {
         return false;
       }
     }

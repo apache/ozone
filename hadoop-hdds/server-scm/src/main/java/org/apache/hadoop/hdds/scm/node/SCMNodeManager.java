@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
+import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.checkSpace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.SCMDatanodeSpaceCheckResult;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -1384,8 +1385,10 @@ public class SCMNodeManager implements NodeManager {
         StorageUnit.BYTES);
 
     int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
-        .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
-            && !hasEnoughCommittedVolumeSpace(dn, blockSize))
+        .filter(dn -> {
+          SCMDatanodeSpaceCheckResult result = checkSpace(dn, minRatisVolumeSizeBytes, containerSize, conf);
+          return !result.hasEnoughSpace() && !hasEnoughCommittedVolumeSpace(dn, blockSize);
+        })
         .count();
 
     nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
