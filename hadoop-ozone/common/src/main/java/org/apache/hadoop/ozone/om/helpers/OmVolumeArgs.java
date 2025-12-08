@@ -375,9 +375,9 @@ public final class OmVolumeArgs extends WithObjectID
     @Override
     protected void validate() {
       super.validate();
-      Preconditions.checkNotNull(adminName);
-      Preconditions.checkNotNull(ownerName);
-      Preconditions.checkNotNull(volume);
+      Objects.requireNonNull(adminName, "adminName == null");
+      Objects.requireNonNull(ownerName, "ownerName == null");
+      Objects.requireNonNull(volume, "volume == null");
       Preconditions.checkState(refCount >= 0L, "refCount should not be negative, but was: " + refCount);
     }
 
