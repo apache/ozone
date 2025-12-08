@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -114,8 +113,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
       ClientTrustManager trustManager) {
     super();
-    Preconditions.checkNotNull(pipeline);
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(pipeline, "pipeline == null");
+    Objects.requireNonNull(config, "config == null");
     setTimeout(config.getTimeDuration(OzoneConfigKeys.
         OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
         .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
@@ -508,7 +507,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       reply.setResponse(CompletableFuture.completedFuture(responseProto));
       return reply;
     } else {
-      Objects.requireNonNull(ioException);
+      Objects.requireNonNull(ioException, "ioException == null");
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
