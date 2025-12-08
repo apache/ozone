@@ -120,7 +120,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         // S3 + FSO + strict=false → bypass strict S3 validation (allow '_' and other non-S3 characters)
         effectiveStrict = false;
       } else {
-        // S3 + non-FSO + strict=false → strict S3 validation still applies ( '_' and other non-S3 characters are not permitted )
+        // S3 + non-FSO + strict=false → strict S3 validation still applies
+        // '_' and other non-S3 characters are not permitted
         effectiveStrict = true;
       }
     }
