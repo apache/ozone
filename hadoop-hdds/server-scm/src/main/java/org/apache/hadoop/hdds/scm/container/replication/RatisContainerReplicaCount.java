@@ -546,7 +546,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     return !isSufficientlyReplicated();
   }
 
-
   /**
    * Return true if the container is over replicated. Decommission and
    * maintenance containers are ignored for this check.
