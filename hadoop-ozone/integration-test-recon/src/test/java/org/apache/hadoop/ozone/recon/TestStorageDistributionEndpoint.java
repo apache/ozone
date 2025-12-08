@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.recon.TestReconEndpointUtil.getReconWebAdd
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -265,6 +266,8 @@ public class TestStorageDistributionEndpoint {
         assertNotNull(pendingDeletion);
         assertEquals(30, pendingDeletion.getTotalPendingDeletion());
         assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
+        assertEquals(pendingDeletion.getTotalNodesQueries(), pendingDeletion.getPendingDeletionPerDataNode().size());
+        assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
         pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
           assertEquals(10, dn.getPendingBlockSize());
         });
@@ -274,6 +277,26 @@ public class TestStorageDistributionEndpoint {
         return false;
       }
     }, 2000, 60000);
+    cluster.getHddsDatanodes().get(0).stop();
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(getReconWebAddress(conf))
+            .append(PENDING_DELETION_ENDPOINT + "?component=dn");
+        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+        DataNodeMetricsServiceResponse pendingDeletion =
+            MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+        assertNotNull(pendingDeletion);
+        assertEquals(1, pendingDeletion.getTotalNodeQueryFailures());
+        assertTrue(pendingDeletion.getPendingDeletionPerDataNode()
+            .stream()
+            .anyMatch(dn -> dn.getPendingBlockSize() == -1));
+        return true;
+      } catch (Throwable e) {
+        return false;
+      }
+    }, 2000, 30000);
   }
 
   private void verifyBlocksCreated(

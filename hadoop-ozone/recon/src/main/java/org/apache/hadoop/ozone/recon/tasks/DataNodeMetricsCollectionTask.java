@@ -49,6 +49,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private final DatanodeDetails nodeDetails;
   private final int httpConnectionTimeout;
   private final int httpSocketTimeout;
+  private final int httpRequestTimeout;
   private final boolean httpsEnabled;
 
   public DataNodeMetricsCollectionTask(Builder builder) {
@@ -56,6 +57,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     this.httpConnectionTimeout = builder.httpConnectionTimeout;
     this.httpSocketTimeout = builder.httpSocketTimeout;
     this.httpsEnabled = builder.httpsEnabled;
+    this.httpRequestTimeout = builder.httpRequestTimeout;
   }
 
   @Override
@@ -66,6 +68,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
         .setDefaultRequestConfig(RequestConfig.custom()
             .setConnectTimeout(httpConnectionTimeout * 1000)
             .setSocketTimeout(httpSocketTimeout * 1000)
+            .setConnectionRequestTimeout(httpRequestTimeout * 1000)
             .build())
         .build()) {
 
@@ -137,6 +140,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     private DatanodeDetails nodeDetails;
     private int httpConnectionTimeout;
     private int httpSocketTimeout;
+    private int httpRequestTimeout;
     private boolean httpsEnabled;
 
     public Builder setNodeDetails(DatanodeDetails nodeDetails) {
@@ -151,6 +155,11 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
 
     public Builder setHttpSocketTimeout(int httpSocketTimeout) {
       this.httpSocketTimeout = httpSocketTimeout;
+      return this;
+    }
+
+    public Builder setHttpRequestTimeout(int httpRequestTimeout) {
+      this.httpRequestTimeout = httpRequestTimeout;
       return this;
     }
 

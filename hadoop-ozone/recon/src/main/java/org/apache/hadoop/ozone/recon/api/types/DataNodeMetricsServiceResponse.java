@@ -36,17 +36,25 @@ public class DataNodeMetricsServiceResponse {
   private Long totalPendingDeletion;
   @JsonProperty("pendingDeletionPerDataNode")
   private List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode;
+  @JsonProperty("totalNodesQueries")
+  private int totalNodesQueries;
+  @JsonProperty("totalNodeQueriesFailed")
+  private long totalNodeQueryFailures;
 
   public DataNodeMetricsServiceResponse(Builder builder) {
     this.status = builder.status;
     this.totalPendingDeletion = builder.totalPendingDeletion;
     this.pendingDeletionPerDataNode = builder.pendingDeletion;
+    this.totalNodesQueries = builder.totalNodesQueries;
+    this.totalNodeQueryFailures = builder.totalNodeQueryFailures;
   }
 
   public DataNodeMetricsServiceResponse() {
     this.status = DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED;
     this.totalPendingDeletion = 0L;
     this.pendingDeletionPerDataNode = null;
+    this.totalNodesQueries = 0;
+    this.totalNodeQueryFailures = 0;
   }
 
   public DataNodeMetricsService.MetricCollectionStatus getStatus() {
@@ -59,6 +67,14 @@ public class DataNodeMetricsServiceResponse {
 
   public List<DatanodePendingDeletionMetrics> getPendingDeletionPerDataNode() {
     return pendingDeletionPerDataNode;
+  }
+
+  public int getTotalNodesQueries() {
+    return totalNodesQueries;
+  }
+
+  public long getTotalNodeQueryFailures() {
+    return totalNodeQueryFailures;
   }
 
   public  static Builder newBuilder() {
@@ -79,6 +95,8 @@ public class DataNodeMetricsServiceResponse {
     private DataNodeMetricsService.MetricCollectionStatus status;
     private Long totalPendingDeletion;
     private List<DatanodePendingDeletionMetrics> pendingDeletion;
+    private int totalNodesQueries;
+    private long totalNodeQueryFailures;
 
     public Builder setStatus(DataNodeMetricsService.MetricCollectionStatus status) {
       this.status = status;
@@ -92,6 +110,16 @@ public class DataNodeMetricsServiceResponse {
 
     public Builder setPendingDeletion(List<DatanodePendingDeletionMetrics> pendingDeletion) {
       this.pendingDeletion = pendingDeletion;
+      return this;
+    }
+
+    public Builder setTotalNodesQueries(int totalNodesQueries) {
+      this.totalNodesQueries = totalNodesQueries;
+      return this;
+    }
+
+    public Builder setTotalNodeQueryFailures(long totalNodeQueryFailures) {
+      this.totalNodeQueryFailures = totalNodeQueryFailures;
       return this;
     }
 
