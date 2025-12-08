@@ -385,7 +385,8 @@ class TestOmSnapshotManager {
     // Pointers to follower links to be created.
     File f1FileLink = new File(snapshot2Path.toFile(), "f1.sst");
     File s1FileLink = new File(snapshot2Path.toFile(), "s1.sst");
-
+    Object s1FileInode = getINode(s1File.toPath());
+    Object f1FileInode = getINode(f1File.toPath());
     // Create links on the follower from list.
     InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
         new InodeMetadataRocksDBCheckpoint(candidateDir.toPath());
@@ -393,11 +394,11 @@ class TestOmSnapshotManager {
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
-    assertEquals(getINode(s1File.toPath()),
+    assertEquals(s1FileInode,
         getINode(s1FileLink.toPath()), "link matches original file");
 
     assertTrue(f1FileLink.exists());
-    assertEquals(getINode(f1File.toPath()),
+    assertEquals(f1FileInode,
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 

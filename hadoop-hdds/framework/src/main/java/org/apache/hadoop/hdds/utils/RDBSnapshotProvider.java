@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,7 +127,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
           targetFile, unTarredDb.toAbsolutePath());
       if (ratisSnapshotComplete(unTarredDb)) {
         LOG.info("Ratis snapshot transfer is complete.");
-        return new InodeMetadataRocksDBCheckpoint(unTarredDb);
+        return getCheckpointFromUntarredDb(unTarredDb);
       }
     }
   }
@@ -176,17 +175,12 @@ public abstract class RDBSnapshotProvider implements Closeable {
   }
 
   /**
-   * Untar the downloaded snapshot and convert to {@link RocksDBCheckpoint}.
+   * convert untarredDbDir to to {@link RocksDBCheckpoint}.
    *
-   * @param snapshot the downloaded snapshot tar file
-   * @param untarDir the directory to place the untarred files
-   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
    * @return {@link RocksDBCheckpoint}
    * @throws IOException
    */
-  public RocksDBCheckpoint getCheckpointFromSnapshotFile(File snapshot,
-      File untarDir, boolean deleteSnapshot) throws IOException {
-    Path untarredDbDir = untarContentsOfTarball(snapshot, untarDir, deleteSnapshot);
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
     return new RocksDBCheckpoint(untarredDbDir);
   }
 

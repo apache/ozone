@@ -966,6 +966,10 @@ public class TestOMRatisSnapshots {
     TermIndex followerTermIndex = followerRatisServer.getLastAppliedTermIndex();
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
     assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    assertTrue(omDbDir.toFile().mkdir());
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+
     TermIndex newTermIndex = followerOM.installCheckpoint(
         leaderOMNodeId, leaderCheckpointLocation);
 
@@ -1008,13 +1012,17 @@ public class TestOMRatisSnapshots {
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
     assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    assertTrue(omDbDir.toFile().mkdir());
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
-        .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
+        .getTrxnInfoFromCheckpoint(conf, omDbDir);
 
     // Corrupt the leader checkpoint and install that on the OM. The
     // operation should fail and OM should shutdown.
     boolean delete = true;
-    File[] files = leaderCheckpointLocation.toFile().listFiles();
+    File[] files = omDbDir.toFile().listFiles();
     assertNotNull(files);
     for (File file : files) {
       if (file.getName().contains(".sst")) {
@@ -1039,6 +1047,57 @@ public class TestOMRatisSnapshots {
         "Failed to reload OM state and instantiate services.");
     String msg = "RPC server is stopped";
     assertLogCapture(logCapture, msg);
+  }
+
+  /**
+   * Moves all contents from the checkpoint location into the omDbDir.
+   * This reorganizes the checkpoint structure so that all checkpoint files
+   * are contained within the om.db directory.
+   *
+   * @param checkpointLocation the source checkpoint location containing files/directories
+   * @param omDbDir the target directory (om.db) where contents should be moved
+   * @throws IOException if file operations fail
+   */
+  private void moveCheckpointContentsToOmDbDir(Path checkpointLocation, Path omDbDir)
+      throws IOException {
+    File checkpointLocationFile = checkpointLocation.toFile();
+    File omDbDirFile = omDbDir.toFile();
+
+    // Ensure omDbDir exists
+    if (!omDbDirFile.exists()) {
+      if (!omDbDirFile.mkdirs()) {
+        throw new IOException("Failed to create directory: " + omDbDir);
+      }
+    }
+
+    if (!checkpointLocationFile.exists() || !checkpointLocationFile.isDirectory()) {
+      throw new IOException("Checkpoint location does not exist or is not a directory: " + checkpointLocation);
+    }
+
+    // Move all contents from checkpointLocation to omDbDir
+    File[] contents = checkpointLocationFile.listFiles();
+    if (contents != null) {
+      for (File item : contents) {
+        // Skip the target directory itself if it already exists in source
+        if (item.getName().equals(omDbDir.getFileName().toString())) {
+          continue;
+        }
+
+        Path targetPath = omDbDir.resolve(item.getName());
+
+        // Delete target if it exists
+        if (Files.exists(targetPath)) {
+          if (Files.isDirectory(targetPath)) {
+            FileUtils.deleteDirectory(targetPath.toFile());
+          } else {
+            Files.delete(targetPath);
+          }
+        }
+
+        // Move item to target - Files.move handles both files and directories recursively
+        Files.move(item.toPath(), targetPath);
+      }
+    }
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
