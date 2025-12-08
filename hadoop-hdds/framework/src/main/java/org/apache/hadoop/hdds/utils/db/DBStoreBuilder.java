@@ -28,7 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -278,13 +277,13 @@ public final class DBStoreBuilder {
   }
 
   public DBStoreBuilder setPath(Path path) {
-    Preconditions.checkNotNull(path);
+    Objects.requireNonNull(path, "path == null");
     dbPath = path;
     return this;
   }
 
   public DBStoreBuilder setOptionsPath(Path optionsPath) {
-    Preconditions.checkNotNull(optionsPath);
+    Objects.requireNonNull(optionsPath, "optionsPath == null");
     this.optionsPath = optionsPath;
     return this;
   }

@@ -41,7 +41,6 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -51,6 +50,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -142,8 +142,8 @@ public class SCMDatanodeProtocolServer implements
 
     // This constructor has broken down to smaller methods so that Recon's
     // passive SCM server can override them.
-    Preconditions.checkNotNull(scm, "SCM cannot be null");
-    Preconditions.checkNotNull(eventPublisher, "EventPublisher cannot be null");
+    Objects.requireNonNull(scm, "SCM cannot be null");
+    Objects.requireNonNull(eventPublisher, "EventPublisher cannot be null");
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;

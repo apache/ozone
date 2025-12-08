@@ -56,7 +56,13 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.container.common"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.hadoop.ozone.om"), Level.ERROR);
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("org.apache.ratis"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("BackgroundPipelineScrubber"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("ExpiredContainerReplicaOpScrubber"), Level.ERROR);
+    GenericTestUtils.setLogLevel(LoggerFactory.getLogger("SCMHATransactionMonitor"), Level.ERROR);
     GenericTestUtils.setLogLevel(GrpcXceiverService.class, Level.ERROR);
+
+//    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(StreamBlockInputStream.class), Level.TRACE);
+//    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(XceiverClientGrpc.class), Level.TRACE);
   }
 
   /**
@@ -94,6 +100,8 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       LOG.info("---------------------------------------------------------");
       LOG.info("writeRandomBytes {} bytes", inputData.length);
 
+      runTestPositionedRead(keyName, ByteBuffer.wrap(new byte[inputData.length]));
+
       for (int i = 1; i <= 10; i++) {
         runTestReadKey(keyName, keyLength / i, randomReadOffset, keyLength);
       }
@@ -126,6 +134,53 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
         pos += read;
       }
       assertEquals(keyLength, pos);
+    }
+  }
+
+  void runTestPositionedRead(String key, ByteBuffer buffer) throws Exception {
+    try (KeyInputStream in = bucket.getKeyInputStream(key)) {
+      runTestPositionedRead(buffer, in, 0, 0);
+      runTestPositionedRead(buffer, in, 0, 1);
+      runTestPositionedRead(buffer, in, inputData.length, 0);
+      runTestPositionedRead(buffer, in, inputData.length - 1, 1);
+      for (int i = 0; i < 5; i++) {
+        runTestPositionedRead(buffer, in);
+      }
+    }
+  }
+
+  void runTestPositionedRead(ByteBuffer buffer, KeyInputStream in) throws Exception {
+    final int position = ThreadLocalRandom.current().nextInt(inputData.length - 1);
+    runTestPositionedRead(buffer, in, position, 0);
+    runTestPositionedRead(buffer, in, position, 1);
+    final int n = 2 + ThreadLocalRandom.current().nextInt(inputData.length - 1 - position);
+    runTestPositionedRead(buffer, in, position, n);
+  }
+
+  void runTestPositionedRead(ByteBuffer buffer, KeyInputStream in, int pos, int length) throws Exception {
+    LOG.info("runTestPositionedRead: position={}, length={}", pos, length);
+    assertTrue(pos + length <= inputData.length);
+    buffer = buffer.duplicate();
+
+    // seek and read
+    buffer.position(0).limit(length);
+    in.seek(pos);
+    while (buffer.hasRemaining()) {
+      in.read(buffer);
+    }
+    assertData(pos, length, buffer);
+
+    // positioned read
+    buffer.position(0).limit(length);
+    in.readFully(pos, buffer);
+    assertData(pos, length, buffer);
+  }
+
+  void assertData(int pos, int length, ByteBuffer buffer) {
+    buffer.flip();
+    assertEquals(length, buffer.remaining());
+    for (int i = 0; i < length; i++) {
+      assertEquals(inputData[pos + i], buffer.get(i), "pos=" + pos + ", i=" + i);
     }
   }
 
