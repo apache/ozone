@@ -539,6 +539,13 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     return delta <= 0;
   }
 
+  /**
+   * @return true if the container is under replicated, false otherwise
+   */
+  public boolean isUnderReplicated() {
+    return !isSufficientlyReplicated();
+  }
+
 
   /**
    * Return true if the container is over replicated. Decommission and
