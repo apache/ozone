@@ -75,7 +75,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
     private String name;
     private String owner;
 
@@ -153,7 +153,8 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
-    public OmDirectoryInfo build() {
+    @Override
+    protected OmDirectoryInfo buildObject() {
       return new OmDirectoryInfo(this);
     }
   }

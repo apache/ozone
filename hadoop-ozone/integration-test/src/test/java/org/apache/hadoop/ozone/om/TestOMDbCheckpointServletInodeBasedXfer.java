@@ -35,11 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
@@ -105,13 +107,13 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -170,7 +172,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    om = cluster.getOzoneManager();
+    OzoneManager normalOm = cluster.getOzoneManager();
+    om = spy(normalOm);
   }
 
   private void setupMocks() throws Exception {
@@ -245,7 +248,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
+        .transferSnapshotData(anySet(), any(), anyCollection(), anyCollection(), any(), any(), anyMap());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
@@ -630,74 +633,31 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   @Test
   public void testBootstrapLockCoordination() throws Exception {
-    // Create mocks for all background services
-    KeyDeletingService mockDeletingService = mock(KeyDeletingService.class);
-    DirectoryDeletingService mockDirDeletingService = mock(DirectoryDeletingService.class);
-    SstFilteringService mockFilteringService = mock(SstFilteringService.class);
-    SnapshotDeletingService mockSnapshotDeletingService = mock(SnapshotDeletingService.class);
-    RocksDBCheckpointDiffer mockCheckpointDiffer = mock(RocksDBCheckpointDiffer.class);
-    // Create mock locks for each service
-    BootstrapStateHandler.Lock mockDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockDeletingLock.acquireWriteLock()).thenReturn(mockDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockDirDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockDirDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockDirDeletingLock.acquireWriteLock()).thenReturn(mockDirDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockFilteringLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockFilteringAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockFilteringLock.acquireWriteLock()).thenReturn(mockFilteringAcquiredLock);
-
-    BootstrapStateHandler.Lock mockSnapshotDeletingLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockSnapshotDeletingAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockSnapshotDeletingLock.acquireWriteLock()).thenReturn(mockSnapshotDeletingAcquiredLock);
-
-    BootstrapStateHandler.Lock mockCheckpointDifferLock = mock(BootstrapStateHandler.Lock.class);
-    UncheckedAutoCloseable mockCheckpointDifferAcquiredLock = mock(UncheckedAutoCloseable.class);
-    when(mockCheckpointDifferLock.acquireWriteLock()).thenReturn(mockCheckpointDifferAcquiredLock);
-
-    // Configure service mocks to return their respective locks
-    when(mockDeletingService.getBootstrapStateLock()).thenReturn(mockDeletingLock);
-    when(mockDirDeletingService.getBootstrapStateLock()).thenReturn(mockDirDeletingLock);
-    when(mockFilteringService.getBootstrapStateLock()).thenReturn(mockFilteringLock);
-    when(mockSnapshotDeletingService.getBootstrapStateLock()).thenReturn(mockSnapshotDeletingLock);
-    when(mockCheckpointDiffer.getBootstrapStateLock()).thenReturn(mockCheckpointDifferLock);
-    // Mock KeyManager and its services
-    KeyManager mockKeyManager = mock(KeyManager.class);
-    when(mockKeyManager.getDeletingService()).thenReturn(mockDeletingService);
-    when(mockKeyManager.getDirDeletingService()).thenReturn(mockDirDeletingService);
-    when(mockKeyManager.getSnapshotSstFilteringService()).thenReturn(mockFilteringService);
-    when(mockKeyManager.getSnapshotDeletingService()).thenReturn(mockSnapshotDeletingService);
     // Mock OMMetadataManager and Store
     OMMetadataManager mockMetadataManager = mock(OMMetadataManager.class);
     DBStore mockStore = mock(DBStore.class);
     when(mockMetadataManager.getStore()).thenReturn(mockStore);
-    when(mockStore.getRocksDBCheckpointDiffer()).thenReturn(mockCheckpointDiffer);
     // Mock OzoneManager
     OzoneManager mockOM = mock(OzoneManager.class);
-    when(mockOM.getKeyManager()).thenReturn(mockKeyManager);
     when(mockOM.getMetadataManager()).thenReturn(mockMetadataManager);
+
+    IOzoneManagerLock mockOmLock = mock(IOzoneManagerLock.class);
+    when(mockOmLock.acquireResourceLock(any())).thenCallRealMethod();
+    when(mockOmLock.acquireResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(mockMetadataManager.getLock()).thenReturn(mockOmLock);
     // Create the actual Lock instance (this tests the real implementation)
     OMDBCheckpointServlet.Lock bootstrapLock = new OMDBCheckpointServlet.Lock(mockOM);
     // Test successful lock acquisition
     UncheckedAutoCloseable result = bootstrapLock.acquireWriteLock();
     // Verify all service locks were acquired
-    verify(mockDeletingLock).acquireWriteLock();
-    verify(mockDirDeletingLock).acquireWriteLock();
-    verify(mockFilteringLock).acquireWriteLock();
-    verify(mockSnapshotDeletingLock).acquireWriteLock();
-    verify(mockCheckpointDifferLock).acquireWriteLock();
+    verify(mockOmLock).acquireResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK));
     // Verify double buffer flush was called
     verify(mockOM).awaitDoubleBufferFlush();
     // Test unlock
     result.close();
-    // Verify all service locks were released
-    verify(mockDeletingAcquiredLock).close();
-    verify(mockDirDeletingAcquiredLock).close();
-    verify(mockFilteringAcquiredLock).close();
-    verify(mockSnapshotDeletingAcquiredLock).close();
-    verify(mockCheckpointDifferAcquiredLock).close();
+    verify(mockOmLock).releaseResourceWriteLock(eq(DAGLeveledResource.BOOTSTRAP_LOCK));
+
   }
 
   /**
@@ -811,27 +771,33 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .filter(snap -> snap.getName().equals("snapshot1"))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot1 not found"));
-
     // Setup servlet mocks for checkpoint processing
     setupMocks();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
 
     // Create a checkpoint that captures current state (S1)
-    DBStore dbStore = om.getMetadataManager().getStore();
-    DBStore spyDbStore = spy(dbStore);
-    AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
+    DBStore spyDbStore = spy(om.getMetadataManager().getStore());
 
-    when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
-      // Purge snapshot2 before checkpoint
+    AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
+    SnapshotCache spySnapshotCache = spy(om.getOmSnapshotManager().getSnapshotCache());
+    OmSnapshotManager spySnapshotManager = spy(om.getOmSnapshotManager());
+    when(om.getOmSnapshotManager()).thenReturn(spySnapshotManager);
+    when(spySnapshotManager.getSnapshotCache()).thenReturn(spySnapshotCache);
+    // Mock the snapshot cache to create a snapshot2 just after taking a snapshot cache lock.
+    doAnswer(invocationOnMock -> {
+      Object ret = invocationOnMock.callRealMethod();
       // create snapshot 3 before checkpoint
       client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot2");
       // Also wait for double buffer to flush to ensure all transactions are committed
       om.awaitDoubleBufferFlush();
-      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      return ret;
+    }).when(spySnapshotCache).lock();
+    doAnswer(invocation -> {
+      DBCheckpoint checkpoint = (DBCheckpoint) spy(invocation.callRealMethod());
       doNothing().when(checkpoint).cleanupCheckpoint(); // Don't cleanup for verification
       capturedCheckpoint.set(checkpoint);
       return checkpoint;
-    });
+    }).when(spyDbStore).getCheckpoint(eq(true));
 
     // Initialize servlet
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),

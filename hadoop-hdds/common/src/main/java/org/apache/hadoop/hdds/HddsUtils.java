@@ -79,11 +79,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcException;
-import org.apache.hadoop.ipc.RpcNoSuchMethodException;
-import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RpcException;
+import org.apache.hadoop.ipc_.RpcNoSuchMethodException;
+import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -418,6 +418,7 @@ public final class HddsUtils {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
+    case ReadBlock:
     case ListBlock:
     case GetBlock:
     case GetSmallFile:
@@ -478,6 +479,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case ReadChunk:
+    case ReadBlock:
     case WriteChunk:
     case FinalizeBlock:
       return true;
@@ -551,6 +553,11 @@ public final class HddsUtils {
     case ReadChunk:
       if (msg.hasReadChunk()) {
         blockID = msg.getReadChunk().getBlockID();
+      }
+      break;
+    case ReadBlock:
+      if (msg.hasReadBlock()) {
+        blockID = msg.getReadBlock().getBlockID();
       }
       break;
     case WriteChunk:

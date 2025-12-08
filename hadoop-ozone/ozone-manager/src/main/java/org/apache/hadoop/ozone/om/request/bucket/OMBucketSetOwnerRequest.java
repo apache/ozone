@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -80,7 +80,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     final long transactionLogIndex = context.getIndex();
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-    Preconditions.checkNotNull(setBucketPropertyRequest);
+    Objects.requireNonNull(setBucketPropertyRequest, "setBucketPropertyRequest == null");
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -150,13 +150,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       OmBucketInfo newOmBucketInfo = omBucketInfo.toBuilder()
           .setOwner(newOwner)
           .setModificationTime(setBucketPropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
           .build();
 
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",
           newOwner, bucketName, volumeName);
-
-      // Set the updateID to current transaction log index
-      newOmBucketInfo.setUpdateID(transactionLogIndex);
 
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(

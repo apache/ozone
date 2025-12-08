@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -33,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -89,7 +89,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
     CommitKeyRequest commitKeyRequest = request.getCommitKeyRequest();
-    Preconditions.checkNotNull(commitKeyRequest);
+    Objects.requireNonNull(commitKeyRequest, "commitKeyRequest == null");
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
@@ -276,9 +276,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .setUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
       }
@@ -299,20 +299,20 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setExpectedDataGeneration(null);
-
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.putAll(KeyValueUtil.getFromProtobuf(
-              commitKeyArgs.getMetadataList())));
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      // Combination
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setExpectedDataGeneration(null)
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                commitKeyArgs.getMetadataList()))
+          .setUpdateID(trxnLogIndex)
+          .setDataSize(commitKeyArgs.getDataSize())
+          .build();
 
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
 
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();

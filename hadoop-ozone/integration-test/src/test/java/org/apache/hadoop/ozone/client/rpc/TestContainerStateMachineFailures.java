@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -87,10 +88,12 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -98,6 +101,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -135,7 +139,7 @@ public class TestContainerStateMachineFailures {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 2000,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
@@ -764,9 +768,14 @@ public class TestContainerStateMachineFailures {
       assertEquals(1, locationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      ContainerSet containerSet = cluster.getHddsDatanode(omKeyLocationInfo.getPipeline().getLeaderNode())
+          .getDatanodeStateMachine().getContainer().getContainerSet();
 
       induceFollowerFailure(omKeyLocationInfo, 2);
       key.flush();
+      // wait for container close for failure in flush for both followers applyTransaction failure
+      GenericTestUtils.waitFor(() -> containerSet.getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
+              .getState().equals(ContainerProtos.ContainerDataProto.State.CLOSED), 100, 30000);
       key.write("ratis".getBytes(UTF_8));
       key.flush();
     }
@@ -803,6 +812,57 @@ public class TestContainerStateMachineFailures {
     key.flush();
     key.close();
     validateData("ratis1", 2, "ratisratisratisratis");
+  }
+
+  @Test
+  void testContainerStateMachineAllNodeFailure()
+      throws Exception {
+    // mark all dn volume as full to induce failure
+    List<Pair<StorageVolume, Long>> increasedVolumeSpace = new ArrayList<>();
+    cluster.getHddsDatanodes().forEach(
+        dn -> {
+          List<StorageVolume> volumesList = dn.getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList();
+          volumesList.forEach(sv -> {
+            if (sv.getVolumeUsage().isPresent()) {
+              increasedVolumeSpace.add(Pair.of(sv, sv.getCurrentUsage().getAvailable()));
+              sv.getVolumeUsage().get().incrementUsedSpace(sv.getCurrentUsage().getAvailable());
+            }
+          });
+        }
+    );
+
+    long startTime = Time.monotonicNow();
+    ReplicationConfig replicationConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.THREE);
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName).createKey(
+        "testkey1", 1024, replicationConfig, new HashMap<>())) {
+
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      fail();
+    } catch (IOException ex) {
+      assertTrue(ex.getMessage().contains("Retry request failed. retries get failed due to exceeded" +
+          " maximum allowed retries number: 5"), ex.getMessage());
+    } finally {
+      increasedVolumeSpace.forEach(e -> e.getLeft().getVolumeUsage().ifPresent(
+          p -> p.decrementUsedSpace(e.getRight())));
+      // test execution is less than 2 sec but to be safe putting 30 sec as without fix, taking more than 60 sec
+      assertTrue(Time.monotonicNow() - startTime < 30000, "Operation took longer than expected: "
+          + (Time.monotonicNow() - startTime));
+    }
+
+    // previous pipeline gets closed due to disk full failure, so created a new pipeline and write should succeed,
+    // and this ensures later test case can pass (should not fail due to pipeline unavailability as timeout is 200ms
+    // for pipeline creation which can fail in testcase later on)
+    Pipeline pipeline = cluster.getStorageContainerManager().getPipelineManager().createPipeline(replicationConfig);
+    cluster.getStorageContainerManager().getPipelineManager().waitPipelineReady(pipeline.getId(), 60000);
+
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName).createKey(
+        "testkey2", 1024, replicationConfig, new HashMap<>())) {
+
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+    }
   }
 
   private void induceFollowerFailure(OmKeyLocationInfo omKeyLocationInfo,

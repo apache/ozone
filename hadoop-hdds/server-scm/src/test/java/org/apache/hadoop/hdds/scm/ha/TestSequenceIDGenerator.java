@@ -25,8 +25,8 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
@@ -154,7 +154,7 @@ public class TestSequenceIDGenerator {
       @Override
       public StateManager createStateManager(
           SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
-        Preconditions.checkNotNull(scmhaManager);
+        Objects.requireNonNull(scmhaManager, "scmhaManager == null");
         return stateManager;
       }
     };

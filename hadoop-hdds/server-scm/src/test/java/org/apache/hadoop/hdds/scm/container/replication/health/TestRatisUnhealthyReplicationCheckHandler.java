@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +68,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     handler = new RatisUnhealthyReplicationCheckHandler();
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(maintenanceRedundancy)

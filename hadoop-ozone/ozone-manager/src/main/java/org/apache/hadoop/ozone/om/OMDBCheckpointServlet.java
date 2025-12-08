@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -27,12 +28,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -40,13 +41,11 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -353,12 +352,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     OmSnapshotLocalDataManager snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     // get snapshotInfo entries
-    OmMetadataManagerImpl checkpointMetadataManager =
+    try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        iterator = checkpointMetadataManager
-        .getSnapshotInfoTable().iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            iterator = checkpointMetadataManager
+            .getSnapshotInfoTable().iterator()) {
 
       // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
@@ -372,8 +371,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           snapshotPaths.add(path);
         }
       }
-    } finally {
-      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }
@@ -535,8 +532,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Check if the files are hard linked to each other.
       // Note comparison must be done against srcPath, because
       // destPath may only exist on Follower.
-      if (OmSnapshotUtils.getINode(srcPath).equals(
-          OmSnapshotUtils.getINode(file))) {
+      if (getINode(srcPath).equals(getINode(file))) {
         return destPath;
       } else {
         LOG.info("Found non linked sst files with the same name: {}, {}",
@@ -662,40 +658,20 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   static class Lock extends BootstrapStateHandler.Lock {
-    private final List<BootstrapStateHandler.Lock> locks;
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
-      Preconditions.checkNotNull(om);
-      Preconditions.checkNotNull(om.getKeyManager());
-      Preconditions.checkNotNull(om.getMetadataManager());
-      Preconditions.checkNotNull(om.getMetadataManager().getStore());
-
+      super((readLock) -> {
+        return om.getMetadataManager().getLock().acquireResourceLock(BOOTSTRAP_LOCK);
+      });
       this.om = om;
-
-      locks = Stream.of(
-          om.getKeyManager().getDeletingService(),
-          om.getKeyManager().getDirDeletingService(),
-          om.getKeyManager().getSnapshotSstFilteringService(),
-          om.getKeyManager().getSnapshotDeletingService(),
-          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
-      )
-          .filter(Objects::nonNull)
-          .map(BootstrapStateHandler::getBootstrapStateLock)
-          .collect(Collectors.toList());
     }
 
     @Override
     public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
-      // First lock all the handlers.
-      List<UncheckedAutoCloseable> acquiredLocks = new ArrayList<>(locks.size());
-      for (BootstrapStateHandler.Lock lock : locks) {
-        acquiredLocks.add(lock.acquireWriteLock());
-      }
-
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
-      return () -> acquiredLocks.forEach(UncheckedAutoCloseable::close);
+      return super.acquireWriteLock();
     }
 
     @Override

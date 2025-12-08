@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
@@ -183,7 +182,7 @@ public class TestScmDataDistributionFinalization {
   @Test
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
     init(new OzoneConfiguration(), null, true);
-    assertNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
+    assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
@@ -288,7 +287,7 @@ public class TestScmDataDistributionFinalization {
     StorageContainerManager activeSCM = cluster.getActiveSCM();
     activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, false));
     flushDBTransactionBuffer(activeSCM);
-    assertNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
+    assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
@@ -366,7 +365,7 @@ public class TestScmDataDistributionFinalization {
 
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
-        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 10000);
+        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 30000);
   }
 
   private Map<Long, List<DeletedBlock>> generateDeletedBlocks(int dataSize, boolean withSize) {

@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -48,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
@@ -135,8 +135,8 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
     private DBStore tempDB;
-    private TypedTable<String, byte[]> reachableTable;
-    private TypedTable<String, byte[]> unreachableTable;
+    private Table<String, byte[]> reachableTable;
+    private Table<String, byte[]> unreachableTable;
     private final ReportStatistics reachableStats;
     private final ReportStatistics unreachableStats;
     private final ReportStatistics unreferencedStats;
@@ -622,7 +622,9 @@ public class FSORepairTool extends RepairTool {
           "not exist or is not a RocksDB directory.", dbPath));
     }
     // Load RocksDB and tables needed.
-    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
+    OmReadOnlyLock omReadOnlyLock = new OmReadOnlyLock();
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1,
+        omReadOnlyLock);
   }
 
   /**

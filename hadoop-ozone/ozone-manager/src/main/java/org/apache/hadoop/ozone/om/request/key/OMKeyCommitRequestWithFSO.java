@@ -204,11 +204,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
         openKeyToDelete = openKeyToDelete.toBuilder()
             .addMetadata(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true")
+            .setUpdateID(trxnLogIndex)
             .build();
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex);
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);
+            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, trxnLogIndex);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -224,16 +224,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      omKeyInfo = omKeyInfo.withMetadataMutations(metadata ->
-          metadata.putAll(KeyValueUtil.getFromProtobuf(
-              commitKeyArgs.getMetadataList())));
-      omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
+      // Set the new metadata from the request and UpdateID to current
+      // transactionLogIndex
+      omKeyInfo = omKeyInfo.toBuilder()
+          .addAllMetadata(KeyValueUtil.getFromProtobuf(
+              commitKeyArgs.getMetadataList()))
+          .setDataSize(commitKeyArgs.getDataSize())
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       List<OmKeyLocationInfo> uncommitted =
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
@@ -326,7 +327,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, null, fileName, keyName, trxnLogIndex);
+            dbOpenFileKey, null, keyName, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo = omKeyInfo.withMetadataMutations(
@@ -338,7 +339,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, newOpenKeyInfo, fileName, keyName, trxnLogIndex);
+            dbOpenFileKey, newOpenKeyInfo, keyName, trxnLogIndex);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
