@@ -21,8 +21,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -92,7 +93,7 @@ public class InodeMetadataRocksDBCheckpoint implements DBCheckpoint {
     }
 
     // Track source files that need to be deleted after hardlink creation
-    List<Path> sourceFilesToDelete = new ArrayList<>();
+    Set<Path> sourceFilesToDelete = new HashSet<>();
 
     // Read file and create hardlinks directly in checkpointLocation
     try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {

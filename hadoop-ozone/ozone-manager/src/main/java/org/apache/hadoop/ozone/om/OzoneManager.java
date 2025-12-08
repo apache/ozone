@@ -4247,20 +4247,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Replaces the OM DB with checkpoint data from leader.
-   * Creates a single parent backup directory containing all current state.
+   * Only backs up and replaces directories/files that are present in checkpointLocation.
    *
    * @param lastAppliedIndex last applied transaction index
    * @param oldDB current DB directory
    * @param checkpointLocation checkpoint data directory from leader
-   * @return backup directory containing original state
+   * @return backup directory containing original state (only changed items)
    * @throws IOException if operations fail
    */
-  File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
-      Path checkpointLocation) throws IOException {
+  File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB, Path checkpointLocation)
+      throws IOException {
 
     // Create single parent backup directory
-    String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
-        lastAppliedIndex + "_" + System.currentTimeMillis();
+    String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX + lastAppliedIndex
+        + "_" + System.currentTimeMillis();
     File dbDir = oldDB.getParentFile();
     File dbBackupDir = new File(dbDir, dbBackupName);
 
@@ -4268,43 +4268,55 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException("Failed to create backup directory: " + dbBackupDir);
     }
 
-    // Move entire current state to backup (everything in dbDir that we care about)
-    File[] currentContents = dbDir.listFiles();
-    if (currentContents != null) {
-      for (File item : currentContents) {
-        // Skip backup directories and marker files
-        if (item.getName().startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
-            item.getName().equals(DB_TRANSIENT_MARKER) ||
-            item.getName().equals(OZONE_RATIS_SNAPSHOT_DIR)) {
-          continue;
-        }
+    // Only backup items that are present in checkpointLocation
+    // Track what we backed up for selective restore
+    Set<String> backedUpItems = new HashSet<>();
 
-        // Move to backup - Files.move handles both files and directories recursively
-        Path targetPath = dbBackupDir.toPath().resolve(item.getName());
-        Files.move(item.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+    if (Files.exists(checkpointLocation) && Files.isDirectory(checkpointLocation)) {
+      try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
+        for (Path checkpointItem : checkpointContents.collect(Collectors.toList())) {
+          String itemName = checkpointItem.getFileName().toString();
+
+          // Skip backup directories, raft logs, and marker files
+          if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX)
+              || itemName.equals(DB_TRANSIENT_MARKER) ||
+              itemName.equals(OZONE_RATIS_SNAPSHOT_DIR) ||
+              itemName.equals(new File(getRatisLogDirectory()).getName())) {
+            continue;
+          }
+
+          // Only backup if this item exists in dbDir
+          Path existingItem = dbDir.toPath().resolve(itemName);
+          if (Files.exists(existingItem)) {
+            Path backupTarget = dbBackupDir.toPath().resolve(itemName);
+            Files.move(existingItem, backupTarget);
+            backedUpItems.add(itemName);
+          }
+        }
       }
     }
 
-    // Move checkpoint files
-    moveCheckpointFiles(oldDB, checkpointLocation, dbDir, dbBackupDir);
+    // Move checkpoint files (only items present in checkpointLocation)
+    moveCheckpointFiles(oldDB, checkpointLocation, dbDir, dbBackupDir, backedUpItems);
 
     return dbBackupDir;
   }
 
   /**
-   * Moves all contents from checkpointLocation to dbDir, replacing existing files/dirs.
+   * Moves contents from checkpointLocation to dbDir, replacing existing files/dirs.
+   * Only moves items that are present in checkpointLocation.
    * Uses a single parent backup for rollback on failure.
    *
    * @param oldDB the old DB directory (will be replaced)
    * @param checkpointLocation source directory containing checkpoint data
    * @param dbDir target directory (parent of oldDB)
    * @param dbBackupDir backup directory containing the original state
+   * @param backedUpItems set of item names that were backed up (for selective restore)
    * @throws IOException if file operations fail
    */
   private void moveCheckpointFiles(File oldDB, Path checkpointLocation, File dbDir,
-      File dbBackupDir) throws IOException {
+      File dbBackupDir, Set<String> backedUpItems) throws IOException {
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
-
     try {
       // Create transient marker file
       Files.createFile(markerFile);
@@ -4314,7 +4326,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
         for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
-          Path targetPath = dbDir.toPath().resolve(sourcePath.getFileName());
+          String itemName = sourcePath.getFileName().toString();
+
+          // Skip backup directories, raft logs, and marker files
+          if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
+              itemName.equals(DB_TRANSIENT_MARKER) ||
+              itemName.equals(OZONE_RATIS_SNAPSHOT_DIR) ||
+              itemName.equals(new File(getRatisLogDirectory()).getName())) {
+            continue;
+          }
+          Path targetPath = dbDir.toPath().resolve(itemName);
           if (Files.exists(targetPath)) {
             throw new IOException("Cannnot move checkpoint data into target." +
                 "Checkpoint data already exists: " + targetPath);
@@ -4329,20 +4350,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to move checkpoint data from {} to {}. " +
               "Restoring from backup.",
           checkpointLocation, dbDir, e);
-      // Rollback: restore everything from backup
+      // Rollback: restore only the items that were backed up
       try {
-        // Delete current state
-        FileUtil.fullyDelete(oldDB);
-        if (Files.exists(dbDir.toPath().resolve(OM_SNAPSHOT_DIR))) {
-          FileUtil.fullyDelete(dbDir.toPath().resolve(OM_SNAPSHOT_DIR).toFile());
+        // Delete only the items that were replaced
+        for (String itemName : backedUpItems) {
+          Path targetPath = dbDir.toPath().resolve(itemName);
+          if (Files.exists(targetPath)) {
+            if (Files.isDirectory(targetPath)) {
+              FileUtil.fullyDelete(targetPath.toFile());
+            } else {
+              Files.delete(targetPath);
+            }
+          }
         }
-        // Restore from backup - move everything back from backupDir
+        // Restore from backup - only restore items that were backed up
         if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
           File[] backupContents = dbBackupDir.listFiles();
           if (backupContents != null) {
             for (File backupItem : backupContents) {
-              Path targetPath = dbDir.toPath().resolve(backupItem.getName());
-              Files.move(backupItem.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+              String itemName = backupItem.getName();
+              if (backedUpItems.contains(itemName)) {
+                Path targetPath = dbDir.toPath().resolve(itemName);
+                Files.move(backupItem.toPath(), targetPath);
+              }
             }
           }
         }
