@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
@@ -24,9 +27,6 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests Ozone sh shell command with FollowerRead.
