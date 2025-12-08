@@ -1078,8 +1078,12 @@ public class TestOMRatisSnapshots {
     File[] contents = checkpointLocationFile.listFiles();
     if (contents != null) {
       for (File item : contents) {
+        String name = item != null ? item.getName() : null;
+        Path fileName = omDbDir.getFileName();
         // Skip the target directory itself if it already exists in source
-        if (item.getName().equals(omDbDir.getFileName().toString())) {
+        assertNotNull(name);
+        assertNotNull(fileName);
+        if (name.equals(fileName.toString())) {
           continue;
         }
 
