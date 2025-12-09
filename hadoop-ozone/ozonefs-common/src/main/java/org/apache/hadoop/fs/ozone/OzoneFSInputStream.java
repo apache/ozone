@@ -213,32 +213,33 @@ public class OzoneFSInputStream extends FSInputStream
    * @param ranges list of file ranges to read
    * @param allocate function to allocate ByteBuffer for each range
    * @throws IOException if there is an error performing the reads
+   * @apiNote This method is synchronized to prevent race conditions from
+   *          concurrent readVectored() calls on the same stream instance.
    */
   @Override
-  public void readVectored(
-      List<? extends FileRange> ranges,
-      IntFunction<ByteBuffer> allocate
-  ) throws IOException {
+  public synchronized void readVectored(List<? extends FileRange> ranges,
+                           IntFunction<ByteBuffer> allocate) throws IOException {
     TracingUtil.executeInNewSpan("OzoneFSInputStream.readVectored", () -> {
       // Save the initial position
       final long initialPosition = getPos();
 
-      try {
-        VectoredReadUtils.performVectoredRead(ranges, allocate, (offset, buffer) -> {
-          int length = buffer.remaining();
-          readFully(offset, buffer);
-
-          // Update statistics
-          if (statistics != null) {
-            statistics.incrementBytesRead(length);
+      // Use common vectored read implementation
+      VectoredReadUtils.performVectoredRead(
+          ranges,
+          allocate,
+          (offset, buffer) -> {
+            // readFully is synchronized and uses positioned reads
+            // which automatically preserve stream position
+            readFully(offset, buffer);
+            if (statistics != null) {
+              statistics.incrementBytesRead(buffer.remaining());
+            }
           }
-        });
-      } finally {
-        // Restore position
-        synchronized (this) {
-          seek(initialPosition);
-        }
-      }
+      );
+
+      // Restore position before returning from method
+      seek(initialPosition);
+
       return null;
     });
   }

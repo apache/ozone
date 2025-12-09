@@ -17,9 +17,13 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static java.util.Objects.requireNonNull;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.IntFunction;
@@ -28,6 +32,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * Utility class for vectored read operations.
+ * Based on Hadoop's org.apache.hadoop.fs.VectoredReadUtils.
  */
 @InterfaceAudience.Private
 public final class VectoredReadUtils {
@@ -36,7 +41,7 @@ public final class VectoredReadUtils {
   }
 
   /**
-   * Functional interface for reading data into a buffer from a specific offset.
+   * Functional interface for reading a range of data.
    */
   @FunctionalInterface
   public interface RangeReader {
@@ -51,65 +56,90 @@ public final class VectoredReadUtils {
   }
 
   /**
-   * Validates the ranges for vectored read operations.
-   * Checks for null ranges, negative offsets, negative lengths, and overlapping ranges.
+   * Validate a single range.
+   * @param range range to validate.
+   * @return the range.
+   * @param <T> range type
+   * @throws IllegalArgumentException the range length is negative
+   * @throws EOFException the range offset is negative
+   * @throws NullPointerException if the range is null.
+   */
+  public static <T extends FileRange> T validateRangeRequest(T range)
+      throws EOFException {
+    requireNonNull(range, "range is null");
+
+    if (range.getLength() < 0) {
+      throw new IllegalArgumentException("length is negative in " + range);
+    }
+    if (range.getOffset() < 0) {
+      throw new EOFException("position is negative in range " + range);
+    }
+    return range;
+  }
+
+  /**
+   * Sort the input ranges by offset; no validation is done.
+   * @param input input ranges.
+   * @return a new list of the ranges, sorted by offset.
+   */
+  public static List<? extends FileRange> sortRangeList(List<? extends FileRange> input) {
+    final List<? extends FileRange> l = new ArrayList<>(input);
+    l.sort(Comparator.comparingLong(FileRange::getOffset));
+    return l;
+  }
+
+  /**
+   * Validate a list of ranges (including overlapping checks).
+   * Based on Hadoop's validateAndSortRanges.
+   * Two ranges overlap when the start offset of second is less than
+   * the end offset of first. End offset is calculated as start offset + length.
    *
    * @param ranges list of file ranges to validate
    * @throws NullPointerException if ranges list is null or contains null elements
    * @throws EOFException if any range has a negative offset
-   * @throws IllegalArgumentException if any range has negative length or ranges overlap
+   * @throws IllegalArgumentException if there are overlapping ranges or a range element is invalid
    */
   public static void validateRanges(List<? extends FileRange> ranges) throws IOException {
-    if (ranges == null) {
-      throw new NullPointerException("Ranges list cannot be null");
+    requireNonNull(ranges, "Null input list");
+
+    if (ranges.isEmpty()) {
+      return;
     }
-    for (int i = 0; i < ranges.size(); i++) {
-      FileRange range = ranges.get(i);
-      if (range == null) {
-        throw new NullPointerException("Range at index " + i + " is null");
-      }
-      // Check for negative offset
-      if (range.getOffset() < 0) {
-        throw new EOFException("Range " + i + " has negative offset: " + range.getOffset());
-      }
-      // Check for negative length
-      if (range.getLength() < 0) {
-        throw new IllegalArgumentException("Range " + i + " has negative length: " + range.getLength());
-      }
+
+    if (ranges.size() == 1) {
+      validateRangeRequest(ranges.get(0));
+      return;
     }
-    // Check for overlapping ranges
-    for (int i = 0; i < ranges.size(); i++) {
-      FileRange current = ranges.get(i);
-      long currentEnd = current.getOffset() + current.getLength();
-      for (int j = i + 1; j < ranges.size(); j++) {
-        FileRange other = ranges.get(j);
-        long otherEnd = other.getOffset() + other.getLength();
-        // Check if ranges overlap
-        boolean overlaps = (current.getOffset() < otherEnd && currentEnd > other.getOffset());
-        if (overlaps) {
+
+    // Sort ranges to check for overlaps efficiently
+    List<? extends FileRange> sortedRanges = sortRangeList(ranges);
+    FileRange prev = null;
+    for (final FileRange current : sortedRanges) {
+      validateRangeRequest(current);
+      if (prev != null) {
+        // Check for overlap: current start < prev end
+        if (current.getOffset() < prev.getOffset() + prev.getLength()) {
           throw new IllegalArgumentException(
-              "Range[" + i + "] (" + current.getOffset() + ", " + current.getLength() +
-                  ") overlaps with Range[" + j + "] (" + other.getOffset() + ", " + other.getLength() + ")");
+              "Overlapping ranges " + prev + " and " + current);
         }
       }
+      prev = current;
     }
   }
 
   /**
-   * Performs vectored read by reading each range asynchronously.
-   * This method handles the common logic of setting up CompletableFutures
-   * and submitting async read tasks for each range.
+   * Common implementation for vectored read operations.
+   * Validates ranges and submits async read tasks for each range.
    *
    * @param ranges list of file ranges to read
    * @param allocate function to allocate ByteBuffer for each range
-   * @param reader the function that performs the actual read operation
+   * @param reader function that performs the actual read operation
    * @throws IOException if there is an error during validation
    */
   public static void performVectoredRead(
       List<? extends FileRange> ranges,
       IntFunction<ByteBuffer> allocate,
       RangeReader reader) throws IOException {
-
     // Validate ranges before processing
     validateRanges(ranges);
     // Perform vectored read using positioned read operations
