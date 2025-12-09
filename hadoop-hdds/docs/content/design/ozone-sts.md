@@ -49,8 +49,7 @@ We use a separate port for STS to align with AWS so we don't have conflicts at a
 - Existing dedicated port/endpoint for S3 object APIs.
 
 Furthermore, the initial implementation of Ozone STS focuses only on Apache Ranger for authorization in the first phase, 
-as it aligns more with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.  
-Consideration for the Ozone Native Authorizer will be given when processing IAM policies as described below.
+as it aligns more with IAM policies.  Support for the Ozone Native Authorizer may be provided in a future phase.
 
 ## 3.1 Capabilities
 
@@ -90,11 +89,6 @@ of `*` is supported as well.
 Similarly, an invalid S3 action will be silently ignored.
 - Supported wildcard expansions in Actions are: `s3:*`, `s3:Get*`, `s3:Put*`, `s3:List*`,
 `s3:Create*`, and `s3:Delete*`.
-- If using OzoneNativeAuthorizer, bucket wildcards (ex. ResourceArn `arn:aws:s3:::*`, `arn:aws:s3:::bucket*` or `*`) will be rejected,
-as wildcards are not supported for buckets for the OzoneNativeAuthorizer.
-However, certain object wildcards be accepted.   For example, ResourceArn `arn:aws:s3:::myBucket/*` and `arn:aws:s3:::myBucket/folder/logs/*`
-will be accepted but `arn:aws:s3:::myBucket/file*.txt`
-will not be accepted. Again, these restrictions correspond to the capabilities of the OzoneNativeAuthorizer.
 
 A sample IAM policy that allows read access to all objects in the `example-bucket` bucket is shown below:
 ```JSON
@@ -163,9 +157,7 @@ A user must be configured with a Kerberos identity in Ozone and the S3 `getSecre
 must be called to issue permanent S3 credentials.  With these credentials, the AssumeRole API call can be made, but additional 
 steps below are needed for the call to be successfully authorized.  
 When using RangerOzoneAuthorizer, a role must be configured in Ranger UI for each role the AssumeRole API
-can be used with.  The user making the AssumeRole call must be in this role, and this role must have access
-to the (new) `ASSUME_ROLE` permission in Ranger, in addition to the volumes/buckets/keys and other permissions (such as `READ`,
-`LIST`, etc.) that are required.
+can be used with.  Further, Apache Ranger policies should be in place to grant the user permission to assume the role.
 
 ### 3.6.1 Additions to RangerOzoneAuthorizer
 
