@@ -207,7 +207,7 @@ public abstract class ContainerKeyMapperHelper {
           // Clean up shared resources
           SHARED_CONTAINER_KEY_COUNT_MAP.clear();
           ReconConstants.CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
-          LOG.debug("{}: Last task completed. Cleared shared map and reset initialization flag.", taskName);
+          LOG.info("{}: Last task completed. Cleared shared map and reset initialization flag.", taskName);
         }
       }
 

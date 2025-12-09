@@ -171,6 +171,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
     AtomicLong keyCounter = new AtomicLong();
     AtomicLong prevLogCounter = new AtomicLong();
+    Object logLock = new Object();
 
     // ===== STEP 2: START ITERATOR THREADS =====
     // For each segment boundary, create an iterator thread
@@ -231,10 +232,10 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                 }
                 keyCounter.addAndGet(keyValues.size());
                 if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
-                  synchronized (keyCounter) {
+                  synchronized (logLock) {
                     if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
                       long cnt = keyCounter.get();
-                      LOG.info("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
+                      LOG.debug("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
                       prevLogCounter.set(cnt);
                     }
                   }
