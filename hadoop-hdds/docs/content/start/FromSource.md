@@ -75,7 +75,7 @@ tar xzf protobuf-2.5.0.tar.gz
 pushd protobuf-2.5.0
 
 # Patch to insert arm64 macro
-patch << EOF
+patch -p1 << EOF
 diff --git a/src/google/protobuf/stubs/platform_macros.h b/src/google/protobuf/stubs/platform_macros.h
 index b1df60e..8a68655 100644
 --- a/src/google/protobuf/stubs/platform_macros.h
