@@ -74,12 +74,23 @@ curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/pr
 tar xzf protobuf-2.5.0.tar.gz
 pushd protobuf-2.5.0
 
-# Insert arm64 macro to src/google/protobuf/stubs/platform_macros.h
-sed -i '' '59 a\
-#elif defined(__arm64__)\
-#define GOOGLE_PROTOBUF_ARCH_ARM 1\
-#define GOOGLE_PROTOBUF_ARCH_64_BIT 1\
-' src/google/protobuf/stubs/platform_macros.h
+# Patch to insert arm64 macro
+patch << EOF
+diff --git a/src/google/protobuf/stubs/platform_macros.h b/src/google/protobuf/stubs/platform_macros.h
+index b1df60e..8a68655 100644
+--- a/src/google/protobuf/stubs/platform_macros.h
++++ b/src/google/protobuf/stubs/platform_macros.h
+@@ -57,6 +57,9 @@
+ #elif defined(__ppc__)
+ #define GOOGLE_PROTOBUF_ARCH_PPC 1
+ #define GOOGLE_PROTOBUF_ARCH_32_BIT 1
++#elif defined(__arm64__)
++#define GOOGLE_PROTOBUF_ARCH_ARM 1
++#define GOOGLE_PROTOBUF_ARCH_64_BIT 1
+ #else
+ #error Host architecture was not detected as supported by protobuf
+ #endif
+EOF
 
 # Execute the following commands to build `protoc`
 ./configure --disable-shared
