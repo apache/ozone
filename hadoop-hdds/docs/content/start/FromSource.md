@@ -78,7 +78,8 @@ pushd protobuf-2.5.0
 sed -i '' '59 a\
 #elif defined(__arm64__)\
 #define GOOGLE_PROTOBUF_ARCH_ARM 1\
-#define GOOGLE_PROTOBUF_ARCH_64_BIT 1' src/google/protobuf/stubs/platform_macros.h
+#define GOOGLE_PROTOBUF_ARCH_64_BIT 1\
+' src/google/protobuf/stubs/platform_macros.h
 
 # Execute the following commands to build `protoc`
 ./configure --disable-shared
