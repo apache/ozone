@@ -343,7 +343,8 @@ public class PrefixManagerImpl implements PrefixManager {
       inheritParentAcl(ozoneObj, aclsToSet);
     }
     prefixInfoBuilder.setAcls(aclsToSet);
-    boolean changed = prefixInfoBuilder.isAclsChanged();
+    // For new prefix, creation itself is considered a change regardless of ACL content
+    boolean changed = newPrefix || prefixInfoBuilder.isAclsChanged();
 
     OmPrefixInfo updatedPrefixInfo = prefixInfoBuilder.build();
     prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
