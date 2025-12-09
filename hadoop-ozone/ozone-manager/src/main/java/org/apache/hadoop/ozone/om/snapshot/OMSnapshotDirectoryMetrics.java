@@ -24,18 +24,23 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIRECTOR
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.CompletableFuture;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.io.FileUtils;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -71,15 +76,13 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
   private @Metric MutableGaugeLong numSnapshots;
 
   private final AtomicLong lastUpdateTime = new AtomicLong(0);
-  private final AtomicReference<CompletableFuture<Void>> currentUpdateFutureRef =
-      new AtomicReference<>();
   private final OMMetadataManager metadataManager;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
   // Per-checkpoint-directory metrics storage
   private volatile Map<String, CheckpointMetrics> checkpointMetricsMap = new HashMap<>();
-
-  private Timer updateTimer;
+  private ScheduledExecutorService updateExecutor;
+  private ScheduledFuture<?> updateTask;
 
   /**
    * Starts the periodic metrics update task.
@@ -91,22 +94,49 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
         OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    updateTimer = new Timer("OMSnapshotDirectoryMetricsUpdate", true);
-    updateTimer.schedule(new TimerTask() {
-      @Override
-      public void run() {
-        updateMetricsAsync();
+    updateExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+      Thread t = new Thread(r, "OMSnapshotDirectoryMetricsUpdate");
+      t.setDaemon(true);
+      return t;
+    });
+
+    // Schedule periodic updates
+    updateTask = updateExecutor.scheduleWithFixedDelay(() -> {
+      try {
+        updateMetrics();
+        lastUpdateTime.set(System.currentTimeMillis());
+      } catch (Exception e) {
+        LOG.warn("Failed to update snapshot directory metrics", e);
       }
-    }, 0, updateInterval);
+    }, 0, updateInterval, TimeUnit.MILLISECONDS);
   }
 
   /**
    * Stops the periodic metrics update task.
    */
   public void stop() {
-    if (updateTimer != null) {
-      updateTimer.cancel();
-      updateTimer = null;
+    if (updateTask != null) {
+      updateTask.cancel(false); // Don't interrupt if running
+      updateTask = null;
+    }
+
+    if (updateExecutor != null) {
+      updateExecutor.shutdown();
+      try {
+        // Wait for any running updateMetrics() to complete (with timeout)
+        if (!updateExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+          LOG.warn("Metrics update executor did not terminate in time, forcing shutdown");
+          updateExecutor.shutdownNow();
+          // Wait a bit more for cancellation to take effect
+          if (!updateExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+            LOG.error("Metrics update executor did not terminate after force shutdown");
+          }
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        updateExecutor.shutdownNow();
+      }
+      updateExecutor = null;
     }
   }
 
@@ -150,42 +180,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
   }
 
   /**
-   * Updates all metrics (aggregate and per-checkpoint) asynchronously
-   * in a background thread.
-   */
-  public void updateMetricsAsync() {
-    CompletableFuture<Void> currentUpdateFuture = currentUpdateFutureRef.get();
-    if (currentUpdateFuture != null && !currentUpdateFuture.isDone()) {
-      return;
-    }
-
-    CompletableFuture<Void> newFuture = CompletableFuture.runAsync(() -> {
-      try {
-        updateMetrics();
-        lastUpdateTime.set(System.currentTimeMillis());
-      } catch (Exception e) {
-        LOG.warn("Failed to update snapshot directory metrics", e);
-      } finally {
-        currentUpdateFutureRef.set(null);
-      }
-    });
-
-    // Atomically set the future only if the current value matches what we checked
-    // This prevents race conditions where multiple threads try to set a new future
-    CompletableFuture<Void> expected = currentUpdateFutureRef.get();
-    if (expected == null || expected.isDone()) {
-      // Only set if still null or done (double-check after creating future)
-      if (!currentUpdateFutureRef.compareAndSet(expected, newFuture)) {
-        // Another thread set a future, cancel this one
-        newFuture.cancel(false);
-      }
-    } else {
-      // Another thread started an update, cancel this one
-      newFuture.cancel(false);
-    }
-  }
-
-  /**
    * Updates all metrics synchronously - both aggregate and per-checkpoint-directory.
    */
   @VisibleForTesting
@@ -212,8 +206,14 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
     }
 
     try {
+      // Check for interruption before expensive operations
+      if (Thread.currentThread().isInterrupted()) {
+        LOG.info("Metrics update interrupted, skipping");
+        return;
+      }
+
       // Calculate aggregate metrics
-      long totalSize = FileUtils.sizeOfDirectory(snapshotsDir);
+      long totalSize = calculateDirSizeAccountingForHardlinks(snapshotsDir);
       dbSnapshotsDirSize.set(totalSize);
 
       // Calculate per-checkpoint-directory metrics and aggregate totals
@@ -231,7 +231,7 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
           int sstFileCount = 0;
 
           try {
-            checkpointSize = FileUtils.sizeOfDirectory(checkpointDir);
+            checkpointSize = calculateDirSizeAccountingForHardlinks(checkpointDir);
             File[] sstFiles = checkpointDir.listFiles((dir, name) ->
                 name.toLowerCase().endsWith(ROCKSDB_SST_SUFFIX));
             if (sstFiles != null) {
@@ -266,6 +266,45 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
       LOG.warn("Error calculating snapshot directory metrics", e);
       resetMetrics();
     }
+  }
+
+  /**
+   * Calculates directory size accounting for hardlinks.
+   * (only counts each inode once).
+   * Uses Files.getAttribute to get the inode number and tracks
+   * visited inodes.
+   *
+   * @param directory the directory to calculate size for
+   * @return total size in bytes, counting each inode only once
+   */
+  private long calculateDirSizeAccountingForHardlinks(File directory)
+      throws IOException {
+    Set<Object> visitedInodes = new HashSet<>();
+    long totalSize = 0;
+    try (Stream<Path> paths = Files.walk(directory.toPath())) {
+      for (Path path : paths.collect(Collectors.toList())) {
+        if (Files.isRegularFile(path)) {
+          try {
+            // Get inode number
+            Object fileKey = IOUtils.getINode(path);
+            if (fileKey == null) {
+              // Fallback: use file path + size as unique identifier
+              fileKey = path.toAbsolutePath() + ":" + Files.size(path);
+            }
+            // Only count this file if we haven't seen this inode before
+            if (visitedInodes.add(fileKey)) {
+              totalSize += Files.size(path);
+            }
+          } catch (UnsupportedOperationException | IOException e) {
+            // Fallback: if we can't get inode, just count the file size.
+            LOG.error("Could not get inode for {}, using file size directly: {}",
+                path, e.getMessage());
+            totalSize += Files.size(path);
+          }
+        }
+      }
+    }
+    return totalSize;
   }
 
   /**
