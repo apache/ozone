@@ -58,7 +58,6 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   private final ExecutorService iteratorExecutor; // 5
   private final ExecutorService valueExecutors; // 20
 
-
   private final int maxNumberOfVals;
   private final OMMetadataManager metadataManager;
   private final int maxIteratorTasks;
@@ -66,6 +65,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   private final long logCountThreshold;
 
   private static final Logger LOG = LoggerFactory.getLogger(ParallelTableIteratorOperation.class);
+
   public ParallelTableIteratorOperation(OMMetadataManager metadataManager, Table<K, V> table, Codec<K> keyCodec,
                                         int iteratorCount, int workerCount, int maxNumberOfValsInMemory,
                                         long logThreshold) {
@@ -88,7 +88,6 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
     this.logCountThreshold = logThreshold;
   }
-
 
   private List<K> getBounds(K startKey, K endKey) throws IOException {
     Set<K> keys = new HashSet<>();

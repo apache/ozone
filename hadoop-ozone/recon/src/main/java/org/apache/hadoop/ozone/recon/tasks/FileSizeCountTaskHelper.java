@@ -102,6 +102,7 @@ public abstract class FileSizeCountTaskHelper {
   /**
    * Executes the reprocess method using RocksDB for the given task.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
                                                  ReconFileMetadataManager reconFileMetadataManager,
                                                  BucketLayout bucketLayout,
@@ -139,6 +140,7 @@ public abstract class FileSizeCountTaskHelper {
    * Iterates over the OM DB keys for the given bucket layout using lockless per-worker maps.
    * Each worker maintains its own map to eliminate read lock contention.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static boolean reprocessBucketLayout(BucketLayout bucketLayout,
                                               OMMetadataManager omMetadataManager,
                                               Map<FileSizeCountKey, Long> fileSizeCountMap,
@@ -151,48 +153,48 @@ public abstract class FileSizeCountTaskHelper {
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
 
     // Divide threshold by worker count so each worker flushes independently
-    final long PER_WORKER_THRESHOLD = Math.max(1, fileSizeCountFlushThreshold / maxWorkers);
-    
+    final long perWorkerThreshold = Math.max(1, fileSizeCountFlushThreshold / maxWorkers);
+
     // Map thread IDs to worker-specific maps for lockless updates
     Map<Long, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();
-    
+
     // Lock for coordinating DB flush operations only
     Object flushLock = new Object();
-    
+
     // Lambda executed by workers for each key
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
-        // Get or create this worker's private map using thread ID
-        Map<FileSizeCountKey, Long> workerFileSizeCountMap = allMap.computeIfAbsent(
-            Thread.currentThread().getId(), k -> new HashMap<>());
-        
-        // Update worker's private map without locks
-        handlePutKeyEvent(kv.getValue(), workerFileSizeCountMap);
-        
-        // Flush this worker's map when it reaches threshold
-        if (workerFileSizeCountMap.size() >= PER_WORKER_THRESHOLD) {
-            synchronized (flushLock) {
-                writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
-                workerFileSizeCountMap.clear();
-            }
+      // Get or create this worker's private map using thread ID
+      Map<FileSizeCountKey, Long> workerFileSizeCountMap = allMap.computeIfAbsent(
+          Thread.currentThread().getId(), k -> new HashMap<>());
+
+      // Update worker's private map without locks
+      handlePutKeyEvent(kv.getValue(), workerFileSizeCountMap);
+
+      // Flush this worker's map when it reaches threshold
+      if (workerFileSizeCountMap.size() >= perWorkerThreshold) {
+        synchronized (flushLock) {
+          writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
+          workerFileSizeCountMap.clear();
         }
-        return null;
+      }
+      return null;
     };
-    
+
     try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, PER_WORKER_THRESHOLD)) {
-        keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
+      keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
     } catch (Exception ex) {
-        LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
-        return false;
+      LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
+      return false;
     }
     
     // Final flush: Write remaining entries from all worker maps to DB
     for (Map<FileSizeCountKey, Long> workerFileSizeCountMap : allMap.values()) {
-        if (!workerFileSizeCountMap.isEmpty()) {
-            writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
-            workerFileSizeCountMap.clear();
-        }
+      if (!workerFileSizeCountMap.isEmpty()) {
+        writeCountsToDB(workerFileSizeCountMap, reconFileMetadataManager);
+        workerFileSizeCountMap.clear();
+      }
     }
     
     return true;
