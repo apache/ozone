@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,8 +51,6 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   private OmPrefixInfo(Builder b) {
     super(b);
     this.name = b.name;
-    // acls = b.acls == null ? ImmutableList.of()
-    //     : ImmutableList.copyOf(b.acls);
     this.acls = b.acls.build();
   }
 
@@ -95,7 +92,6 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
 
     public Builder() {
       //Default values
-      // this.acls = new ArrayList<>();
       this(AclListBuilder.empty());
     }
 
@@ -105,21 +101,16 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
 
     public Builder(OmPrefixInfo obj) {
       super(obj);
-      // setName(obj.name);
-      // acls = new ArrayList<>(obj.getAcls());
       this.acls = AclListBuilder.of(obj.acls);
       this.name = obj.name;
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      // acls.clear();
-      // addAcls(listOfAcls);
       acls.set(listOfAcls);
       return this;
     }
 
     public Builder addAcls(List<OzoneAcl> listOfAcls) {
-      // if (listOfAcls != nul
       acls.addAll(listOfAcls);
       return this;
     }
