@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -151,7 +150,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     @Override
     protected void validate() {
       super.validate();
-      Preconditions.checkNotNull(name);
+      Objects.requireNonNull(name, "name == null");
     }
 
     @Override

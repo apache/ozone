@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeUtils.BACKUP_CONTAINER_DATA_FILE_SUFFIX;
 import static org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeUtils.COLUMN_FAMILY_NAMES;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +31,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -219,8 +219,7 @@ public class UpgradeContainerSchema extends RepairTool {
         List<ContainerUpgradeResult> resultList = new ArrayList<>();
         final File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
 
-        Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
-            "cannot be null");
+        Objects.requireNonNull(hddsVolumeRootDir, "hddsVolumeRootDir == null");
 
         // check CID directory and current file
         File clusterIDDir = new File(hddsVolume.getStorageDir(),
