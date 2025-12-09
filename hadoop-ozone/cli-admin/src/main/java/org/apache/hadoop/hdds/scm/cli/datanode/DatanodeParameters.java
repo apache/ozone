@@ -31,8 +31,8 @@ public class DatanodeParameters extends ItemsFromStdin {
 
   @CommandLine.Parameters(description = "Datanode addresses: one or more, separated by spaces." +
       " To read from stdin, specify '-' and supply one item per line." +
-      "Port is optional and defaults to 9858 (CLIENT_RPC port). " +
-      "Examples: 'DN-1', 'DN-1:9858', '192.168.1.10'. ",
+      "Port is optional and defaults to 19864 (CLIENT_RPC port). " +
+      "Examples: 'DN-1', 'DN-1:19864', '192.168.1.10'. ",
       arity = "0..*",
       paramLabel = "<datanode address>")
 

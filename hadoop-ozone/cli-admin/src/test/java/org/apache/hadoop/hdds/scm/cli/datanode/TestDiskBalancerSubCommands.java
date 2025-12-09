@@ -75,9 +75,9 @@ public class TestDiskBalancerSubCommands {
     
     // Create shared list of in-service datanodes
     inServiceDatanodes = new ArrayList<>();
-    inServiceDatanodes.add("host-1:9858");
-    inServiceDatanodes.add("host-2:9858");
-    inServiceDatanodes.add("host-3:9858");
+    inServiceDatanodes.add("host-1:19864");
+    inServiceDatanodes.add("host-2:19864");
+    inServiceDatanodes.add("host-3:19864");
     
     // Create shared mock protocol
     mockProtocol = mock(DiskBalancerProtocol.class);

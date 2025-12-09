@@ -48,15 +48,15 @@ import picocli.CommandLine.Command;
  *
  *      Examples:
  *      ozone admin datanode diskbalancer start DN-1
- *        Start balancer on DN-1 using default port (9858)
+ *        Start balancer on DN-1 using default port (19864)
  *
- *      ozone admin datanode diskbalancer start 192.168.1.10:9858
+ *      ozone admin datanode diskbalancer start 192.168.1.10:19864
  *        Start balancer with explicit port specification
  *
  *      ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
  *        Start balancer on multiple datanodes (using default port)
  *
- *      ozone admin datanode diskbalancer start DN-1:9858 DN-2:9999
+ *      ozone admin datanode diskbalancer start DN-1:19864 DN-2:9999
  *        Start balancer on multiple datanodes with explicit ports
  *
  *      ozone admin datanode diskbalancer start DN-1 -t 5
