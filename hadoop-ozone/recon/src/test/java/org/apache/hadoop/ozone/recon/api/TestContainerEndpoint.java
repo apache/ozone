@@ -81,7 +81,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -101,7 +100,6 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -309,21 +307,21 @@ public class TestContainerEndpoint {
         new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
     ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
         new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
-    
+
     // Run both tasks in parallel (like production)
     ExecutorService executor = Executors.newFixedThreadPool(2);
     try {
-        Future<ReconOmTask.TaskResult> obsFuture = executor.submit(
-            () -> containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager));
-        Future<ReconOmTask.TaskResult> fsoFuture = executor.submit(
-            () -> containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager));
-        
-        // Wait for both to complete
-        obsFuture.get();
-        fsoFuture.get();
+      Future<ReconOmTask.TaskResult> obsFuture = executor.submit(
+          () -> containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager));
+      Future<ReconOmTask.TaskResult> fsoFuture = executor.submit(
+          () -> containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager));
+
+      // Wait for both to complete
+      obsFuture.get();
+      fsoFuture.get();
     } finally {
-        executor.shutdown();
-        executor.awaitTermination(10, TimeUnit.SECONDS);
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
     }
   }
 
