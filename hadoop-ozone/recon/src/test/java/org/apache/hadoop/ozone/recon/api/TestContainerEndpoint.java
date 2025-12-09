@@ -47,6 +47,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
@@ -77,6 +81,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -96,6 +101,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -103,6 +109,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
@@ -297,14 +304,27 @@ public class TestContainerEndpoint {
     reprocessContainerKeyMapper();
   }
 
-  private void reprocessContainerKeyMapper() {
+  private void reprocessContainerKeyMapper() throws Exception {
     ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
         new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
-    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
-
     ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
         new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
-    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
+    
+    // Run both tasks in parallel (like production)
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+        Future<ReconOmTask.TaskResult> obsFuture = executor.submit(
+            () -> containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager));
+        Future<ReconOmTask.TaskResult> fsoFuture = executor.submit(
+            () -> containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager));
+        
+        // Wait for both to complete
+        obsFuture.get();
+        fsoFuture.get();
+    } finally {
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
   }
 
   private void setUpFSOData() throws IOException {
@@ -435,7 +455,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetKeysForContainer() throws IOException {
+  public void testGetKeysForContainer() throws Exception {
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
@@ -513,7 +533,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetKeysForContainerWithPrevKey() throws IOException {
+  public void testGetKeysForContainerWithPrevKey() throws Exception {
     // test if prev-key param works as expected
     Response response = containerEndpoint.getKeysForContainer(
         1L, -1, "/sampleVol/bucketOne/key_one");
@@ -1370,7 +1390,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetContainerInsightsNonSCMContainersWithPrevKey()
-      throws IOException, TimeoutException {
+      throws Exception {
 
     // Add 3 more containers to OM making total container in OM to 5
     String[] keys = {"key_three", "key_four", "key_five"};
@@ -1821,7 +1841,7 @@ public class TestContainerEndpoint {
    * and then verifies that the ContainerEndpoint returns two distinct key records.
    */
   @Test
-  public void testDuplicateFSOKeysForContainerEndpoint() throws IOException {
+  public void testDuplicateFSOKeysForContainerEndpoint() throws Exception {
     // Set up duplicate FSO file keys.
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
