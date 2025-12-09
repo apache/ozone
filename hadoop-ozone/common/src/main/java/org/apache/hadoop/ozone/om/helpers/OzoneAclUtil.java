@@ -165,7 +165,7 @@ public final class OzoneAclUtil {
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
-    return inheritDefaultAcls(acls::add, parentAcls, scope);
+    return inheritDefaultAcls(acl -> addAcl(acls, acl), parentAcls, scope);
   }
 
   private static boolean inheritDefaultAcls(Predicate<OzoneAcl> op,
