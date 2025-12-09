@@ -454,14 +454,7 @@ public class RpcClient implements ClientProtocol {
     builder.setUsedNamespace(0L);
     builder.addAllMetadata(volArgs.getMetadata());
     //ACLs from VolumeArgs
-    List<OzoneAcl> volumeAcls = volArgs.getAcls();
-    if (volumeAcls != null) {
-      //Remove duplicates and add ACLs
-      for (OzoneAcl ozoneAcl :
-          volumeAcls.stream().distinct().collect(Collectors.toList())) {
-        builder.addOzoneAcls(ozoneAcl);
-      }
-    }
+    builder.acls().addAll(volArgs.getAcls());
 
     if (volArgs.getQuotaInBytes() == 0) {
       LOG.info("Creating Volume: {}, with {} as owner.", volumeName, owner);
