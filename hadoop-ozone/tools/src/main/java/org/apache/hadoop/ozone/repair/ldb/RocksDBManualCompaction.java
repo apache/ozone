@@ -41,11 +41,16 @@ import picocli.CommandLine;
     name = "compact",
     description = "CLI to compact a column-family in the DB while the service is offline.\n" +
         "Note: If om.db is compacted with this tool then it will negatively impact " +
-        "the Ozone Manager's efficient snapshot diff.",
+        "the Ozone Manager's efficient snapshot diff." + 
+        " The corresponding OM, SCM or Datanode role should be stopped for this tool.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
 public class RocksDBManualCompaction extends RepairTool {
+
+  private static final String WARNING_TO_STOP_SERVICE =
+      "WARNING: Ensure the related service is stopped before compacting this database." +
+          " Do you want to continue (y/N)? ";
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -57,8 +62,27 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Column family name")
   private String columnFamilyName;
 
+  private String getConsoleReadLineWithFormat() {
+    err().printf(WARNING_TO_STOP_SERVICE);
+    return getScanner().nextLine().trim();
+  }
+
+  /**
+   * This tool does not override {@link RepairTool#serviceToBeOffline()}
+   * as it is a generic RocksDB compaction tool that can be used for ANY
+   * RocksDB database. Added a warning to ensure users stop the service
+   * before running compaction.
+   */
   @Override
   public void execute() throws Exception {
+    if (!isDryRun()) {
+      confirmUser();
+      final boolean confirmed = "y".equalsIgnoreCase(getConsoleReadLineWithFormat());
+      if (!confirmed) {
+        throw new IllegalStateException("Aborting compaction.");
+      }
+    }
+
     ManagedConfigOptions configOptions = new ManagedConfigOptions();
     ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();

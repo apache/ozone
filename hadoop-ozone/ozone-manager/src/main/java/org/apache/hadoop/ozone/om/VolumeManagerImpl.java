@@ -49,7 +49,7 @@ public class VolumeManagerImpl implements VolumeManager {
 
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume, "volume == null");
     metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volume);
     try {
       String dbVolumeKey = metadataManager.getVolumeKey(volume);

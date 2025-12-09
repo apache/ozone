@@ -23,13 +23,13 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -84,7 +84,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
         .getCreateFileRequest();
-    Preconditions.checkNotNull(createFileRequest);
+    Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 

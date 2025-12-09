@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 
@@ -78,6 +79,7 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+    tableHandlers.put(MULTIPART_INFO_TABLE, new MultipartInfoInsightHandler());
     this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);

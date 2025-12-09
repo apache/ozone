@@ -17,56 +17,68 @@
 
 package org.apache.ozone.rocksdiff;
 
-import java.util.Map;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.NavigableMap;
+import java.util.Set;
 import java.util.UUID;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 
 /**
  * Snapshot information node class for the differ.
  */
 public class DifferSnapshotInfo {
-  private final String dbPath;
-  private final UUID snapshotId;
-  private final long snapshotGeneration;
+  private final UUID id;
+  private final long generation;
+  private final Function<Integer, Path> dbPathFunction;
+  private final NavigableMap<Integer, List<SstFileInfo>> versionSstFiles;
 
-  private final Map<String, String> tablePrefixes;
-
-  private final ManagedRocksDB rocksDB;
-
-  public DifferSnapshotInfo(String db, UUID id, long gen,
-                            Map<String, String> prefixes,
-                            ManagedRocksDB rocksDB) {
-    dbPath = db;
-    snapshotId = id;
-    snapshotGeneration = gen;
-    tablePrefixes = prefixes;
-    this.rocksDB = rocksDB;
+  public DifferSnapshotInfo(Function<Integer, Path> dbPathFunction, UUID id, long gen,
+                            NavigableMap<Integer, List<SstFileInfo>> sstFiles) {
+    this.dbPathFunction = dbPathFunction;
+    this.id = id;
+    generation = gen;
+    this.versionSstFiles = sstFiles;
   }
 
-  public String getDbPath() {
-    return dbPath;
+  public Path getDbPath(int version) {
+    return dbPathFunction.apply(version);
   }
 
-  public UUID getSnapshotId() {
-    return snapshotId;
+  public UUID getId() {
+    return id;
   }
 
-  public long getSnapshotGeneration() {
-    return snapshotGeneration;
+  public long getGeneration() {
+    return generation;
   }
 
-  public Map<String, String> getTablePrefixes() {
-    return tablePrefixes;
+  List<SstFileInfo> getSstFiles(int version, Set<String> tablesToLookup) {
+    return versionSstFiles.get(version).stream()
+        .filter(sstFileInfo -> tablesToLookup.contains(sstFileInfo.getColumnFamily()))
+        .collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  SstFileInfo getSstFile(int version, String fileName) {
+    return versionSstFiles.get(version).stream()
+        .filter(sstFileInfo -> sstFileInfo.getFileName().equals(fileName))
+        .findFirst().orElse(null);
+  }
+
+  Integer getMaxVersion() {
+    return versionSstFiles.lastKey();
   }
 
   @Override
   public String toString() {
-    return String.format("DifferSnapshotInfo{dbPath='%s', snapshotID='%s', " +
-            "snapshotGeneration=%d, tablePrefixes size=%s}",
-        dbPath, snapshotId, snapshotGeneration, tablePrefixes.size());
-  }
-
-  public ManagedRocksDB getRocksDB() {
-    return rocksDB;
+    return String.format("DifferSnapshotInfo{dbPath='%s', id='%s', generation=%d}",
+        versionSstFiles.keySet().stream().collect(toMap(identity(), dbPathFunction::apply)), id, generation);
   }
 }

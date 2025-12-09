@@ -18,18 +18,13 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -214,26 +209,6 @@ public final class SnapshotUtils {
 
     }
     return null;
-  }
-
-  /**
-   * Return a map column family to prefix for the keys in the table for
-   * the given volume and bucket.
-   * Column families, map is returned for, are keyTable, dirTable and fileTable.
-   */
-  public static Map<String, String> getColumnFamilyToKeyPrefixMap(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
-      String bucketName
-  ) throws IOException {
-    String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-    String keyPrefixFso = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-
-    Map<String, String> columnFamilyToPrefixMap = new HashMap<>();
-    columnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
-    columnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
-    columnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
-    return columnFamilyToPrefixMap;
   }
 
   /**

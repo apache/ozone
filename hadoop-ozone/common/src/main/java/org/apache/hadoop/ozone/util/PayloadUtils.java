@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.util;
 
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -52,7 +52,7 @@ public final class PayloadUtils {
   }
 
   public static com.google.protobuf.ByteString generatePayloadProto2(int payloadSizeBytes) {
-    return Proto2Utils.unsafeByteString(generatePayload(payloadSizeBytes));
+    return ProtoUtils.unsafeByteString(generatePayload(payloadSizeBytes));
   }
 
   public static ByteString generatePayloadProto3(int payloadSizeBytes) {

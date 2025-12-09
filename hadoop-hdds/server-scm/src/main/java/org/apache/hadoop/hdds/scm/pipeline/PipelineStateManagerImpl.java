@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -363,7 +363,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     }
 
     public PipelineStateManager build() throws IOException {
-      Preconditions.checkNotNull(pipelineStore);
+      Objects.requireNonNull(pipelineStore, "pipelineStore == null");
 
       final PipelineStateManager pipelineStateManager =
           new PipelineStateManagerImpl(
