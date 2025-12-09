@@ -22,8 +22,11 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 /**
@@ -78,6 +81,16 @@ public final class SafeModeRuleFactory {
     safeModeRules.add(datanodeRule);
 
     preCheckRules.add(datanodeRule);
+
+    OzoneStorageContainerManager ozoneScm = scmContext.getScm();
+    if (ozoneScm instanceof StorageContainerManager) {
+      StorageContainerManager scm = (StorageContainerManager) ozoneScm;
+      SCMHAManager scmHAManager = scm.getScmHAManager();
+      if (scmHAManager != null && scmHAManager.getRatisServer() != null) {
+        safeModeRules.add(new StateMachineReadyRule(eventQueue, safeModeManager,
+            scmHAManager.getRatisServer().getSCMStateMachine()));
+      }
+    }
 
     if (pipelineManager != null) {
       safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,

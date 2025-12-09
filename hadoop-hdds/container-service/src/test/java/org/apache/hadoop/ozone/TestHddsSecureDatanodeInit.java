@@ -42,7 +42,7 @@ import java.security.PublicKey;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -318,7 +318,7 @@ public class TestHddsSecureDatanodeInit {
 
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509Certificate newCert =
-        generateX509Cert(null, LocalDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
+        generateX509Cert(null, ZonedDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
         SCMSecurityProtocolProtos.SCMGetCertResponseProto
@@ -391,7 +391,7 @@ public class TestHddsSecureDatanodeInit {
 
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509Certificate newCert =
-        generateX509Cert(null, LocalDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
+        generateX509Cert(null, ZonedDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     // provide an invalid SCMGetCertResponseProto. Without
     // setX509CACertificate(pemCert), signAndStoreCert will throw exception.
@@ -441,12 +441,12 @@ public class TestHddsSecureDatanodeInit {
   }
 
   private static X509Certificate generateX509Cert(KeyPair keyPair,
-      LocalDateTime startDate, Duration certLifetime) throws Exception {
+      ZonedDateTime startDate, Duration certLifetime) throws Exception {
     if (keyPair == null) {
       keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     }
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return SelfSignedCertificate.newBuilder()
         .setBeginDate(start)
         .setEndDate(end)

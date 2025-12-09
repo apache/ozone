@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.debug.datanode.container;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,6 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
@@ -164,7 +164,7 @@ public class ContainerCommands extends AbstractSubcommand {
   }
 
   private String getClusterId(String storageDir) throws IOException {
-    Preconditions.checkNotNull(storageDir);
+    Objects.requireNonNull(storageDir, "storageDir == null");
     try (Stream<Path> stream = Files.list(Paths.get(storageDir, "hdds"))) {
       final Path firstStorageDirPath = stream.filter(Files::isDirectory)
           .findFirst().get().getFileName();

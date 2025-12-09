@@ -72,7 +72,7 @@ cp $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-linux-aarc
 # Patch protobuf 2.5.0 - this is needed for Hadoop 2 support
 curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz
 tar xzf protobuf-2.5.0.tar.gz
-cd protobuf-2.5.0
+pushd protobuf-2.5.0
 
 # Insert arm64 macro to src/google/protobuf/stubs/platform_macros.h
 sed -i '' '59 a\
@@ -88,6 +88,7 @@ make -j
 mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=2.5.0 -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
 # Workaround for Maven 3.9.x. Not needed for 3.8.x and earlier
 mv $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-osx-aarch_64.exe
+popd
 ```
 
 ## Build Ozone

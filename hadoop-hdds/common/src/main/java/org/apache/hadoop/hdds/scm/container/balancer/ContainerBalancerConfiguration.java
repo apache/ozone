@@ -43,7 +43,7 @@ public final class ContainerBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerConfiguration.class);
 
-  @Config(key = "utilization.threshold", type = ConfigType.AUTO, defaultValue =
+  @Config(key = "hdds.container.balancer.utilization.threshold", type = ConfigType.AUTO, defaultValue =
       "10", tags = {ConfigTag.BALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "cluster is considered balanced if for each datanode, the " +
@@ -52,19 +52,19 @@ public final class ContainerBalancerConfiguration {
           " of the entire cluster) no more than the threshold.")
   private String threshold = "10";
 
-  @Config(key = "datanodes.involved.max.percentage.per.iteration", type =
+  @Config(key = "hdds.container.balancer.datanodes.involved.max.percentage.per.iteration", type =
       ConfigType.INT, defaultValue = "20", tags = {ConfigTag.BALANCER},
       description = "Maximum percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration.")
   private int maxDatanodesPercentageToInvolvePerIteration = 20;
 
-  @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
+  @Config(key = "hdds.container.balancer.size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "500GB", tags = {ConfigTag.BALANCER},
       description = "The maximum size of data in bytes that will be moved " +
           "by Container Balancer in one iteration.")
   private long maxSizeToMovePerIteration = 500 * OzoneConsts.GB;
 
-  @Config(key = "size.entering.target.max", type = ConfigType.SIZE,
+  @Config(key = "hdds.container.balancer.size.entering.target.max", type = ConfigType.SIZE,
       defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can enter a target datanode in each " +
       "iteration while balancing. This is the sum of data from multiple " +
@@ -72,7 +72,7 @@ public final class ContainerBalancerConfiguration {
       " (or default) ozone.scm.container.size.")
   private long maxSizeEnteringTarget;
 
-  @Config(key = "size.leaving.source.max", type = ConfigType.SIZE,
+  @Config(key = "hdds.container.balancer.size.leaving.source.max", type = ConfigType.SIZE,
       defaultValue = "26GB", tags = {ConfigTag.BALANCER}, description = "The " +
       "maximum size that can leave a source datanode in each " +
       "iteration while balancing. This is the sum of data moving to multiple " +
@@ -80,24 +80,24 @@ public final class ContainerBalancerConfiguration {
       " (or default) ozone.scm.container.size.")
   private long maxSizeLeavingSource;
 
-  @Config(key = "iterations", type = ConfigType.INT,
+  @Config(key = "hdds.container.balancer.iterations", type = ConfigType.INT,
       defaultValue = "10", tags = {ConfigTag.BALANCER},
       description = "The number of iterations that Container Balancer will " +
           "run for.")
   private int iterations = 10;
 
-  @Config(key = "exclude.containers", type = ConfigType.STRING, defaultValue =
+  @Config(key = "hdds.container.balancer.exclude.containers", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
-  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "65m",
+  @Config(key = "hdds.container.balancer.move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
           "from source to target.")
   private long moveTimeout = Duration.ofMinutes(65).toMillis();
 
-  @Config(key = "move.replication.timeout", type = ConfigType.TIME,
+  @Config(key = "hdds.container.balancer.move.replication.timeout", type = ConfigType.TIME,
       defaultValue = "50m", tags = {ConfigTag.BALANCER}, description = "The " +
       "amount of time to allow a single container's replication from source " +
       "to target as part of container move. For example, if \"hdds.container" +
@@ -105,33 +105,33 @@ public final class ContainerBalancerConfiguration {
       "50 minutes will be the deadline for replication to complete.")
   private long moveReplicationTimeout = Duration.ofMinutes(50).toMillis();
 
-  @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
+  @Config(key = "hdds.container.balancer.balancing.iteration.interval", type = ConfigType.TIME,
       defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
       "The interval period between each iteration of Container Balancer.")
   private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
-  @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
+  @Config(key = "hdds.container.balancer.include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
       "hostnames or ip addresses separated by commas. Only the Datanodes " +
       "specified in this list are balanced. This configuration is empty by " +
       "default and is applicable only if it is non-empty.")
   private String includeNodes = "";
 
-  @Config(key = "exclude.datanodes", type = ConfigType.STRING, defaultValue =
+  @Config(key = "hdds.container.balancer.exclude.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
       "hostnames or ip addresses separated by commas. The Datanodes specified" +
       " in this list are excluded from balancing. This configuration is empty" +
       " by default.")
   private String excludeNodes = "";
 
-  @Config(key = "move.networkTopology.enable", type = ConfigType.BOOLEAN,
+  @Config(key = "hdds.container.balancer.move.networkTopology.enable", type = ConfigType.BOOLEAN,
       defaultValue = "false", tags = {ConfigTag.BALANCER},
       description = "whether to take network topology into account when " +
           "selecting a target for a source. " +
           "This configuration is false by default.")
   private boolean networkTopologyEnable = false;
 
-  @Config(key = "trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
+  @Config(key = "hdds.container.balancer.trigger.du.before.move.enable", type = ConfigType.BOOLEAN,
       defaultValue = "false", tags = {ConfigTag.BALANCER},
       description = "whether to send command to all the healthy and " +
           "in-service data nodes to run du immediately before starting" +

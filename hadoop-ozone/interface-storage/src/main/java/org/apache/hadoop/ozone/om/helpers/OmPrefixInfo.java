@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -96,7 +95,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   /**
    * Builder for OmPrefixInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> {
     private String name;
     private final List<OzoneAcl> acls;
 
@@ -148,12 +147,14 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
       return this;
     }
 
-    /**
-     * Constructs the OmPrefixInfo.
-     * @return instance of OmPrefixInfo.
-     */
-    public OmPrefixInfo build() {
-      Preconditions.checkNotNull(name);
+    @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(name, "name == null");
+    }
+
+    @Override
+    protected OmPrefixInfo buildObject() {
       return new OmPrefixInfo(this);
     }
   }
@@ -174,11 +175,11 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   }
 
   /**
-   * Parses PrefixInfo protobuf and creates OmPrefixInfo.
+   * Parses PrefixInfo protobuf and creates OmPrefixInfo Builder.
    * @param prefixInfo
-   * @return instance of OmPrefixInfo
+   * @return Builder instance
    */
-  public static OmPrefixInfo getFromProtobuf(PersistedPrefixInfo prefixInfo) {
+  public static Builder builderFromProtobuf(PersistedPrefixInfo prefixInfo) {
     OmPrefixInfo.Builder opib = OmPrefixInfo.newBuilder()
         .setName(prefixInfo.getName());
     if (prefixInfo.getMetadataList() != null) {
@@ -196,7 +197,16 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     if (prefixInfo.hasUpdateID()) {
       opib.setUpdateID(prefixInfo.getUpdateID());
     }
-    return opib.build();
+    return opib;
+  }
+
+  /**
+   * Parses PrefixInfo protobuf and creates OmPrefixInfo.
+   * @param prefixInfo
+   * @return instance of OmPrefixInfo
+   */
+  public static OmPrefixInfo getFromProtobuf(PersistedPrefixInfo prefixInfo) {
+    return builderFromProtobuf(prefixInfo).build();
   }
 
   @Override

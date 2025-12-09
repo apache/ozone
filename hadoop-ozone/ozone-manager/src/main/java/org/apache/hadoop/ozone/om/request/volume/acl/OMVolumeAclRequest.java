@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -31,8 +32,8 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,17 +41,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.ratis.util.function.CheckedBiConsumer;
 
 /**
  * Base class for OMVolumeAcl Request.
  */
 public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
-  private final VolumeAclOp omVolumeAclOp;
+  private final AclOp omVolumeAclOp;
 
-  OMVolumeAclRequest(OzoneManagerProtocolProtos.OMRequest omRequest,
-      VolumeAclOp aclOp) {
+  OMVolumeAclRequest(OzoneManagerProtocolProtos.OMRequest omRequest, AclOp aclOp) {
     super(omRequest);
     omVolumeAclOp = aclOp;
   }
@@ -83,32 +82,26 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume));
       lockAcquired = getOmLockDetails().isLockAcquired();
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
 
       // result is false upon add existing acl or remove non-existing acl
-      boolean applyAcl = true;
-      try {
-        omVolumeAclOp.accept(ozoneAcls, omVolumeArgs);
-      } catch (OMException ex) {
-        applyAcl = false;
-      }
+      omVolumeAclOp.accept(ozoneAcls, builder.acls());
+      boolean applyAcl = builder.acls().isChanged();
 
       // Update only when
       if (applyAcl) {
         // Update the modification time when updating ACLs of Volume.
-        long modificationTime = omVolumeArgs.getModificationTime();
         if (getOmRequest().getAddAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getAddAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getAddAclRequest().getModificationTime());
         } else if (getOmRequest().getSetAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getSetAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getSetAclRequest().getModificationTime());
         } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getRemoveAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getRemoveAclRequest().getModificationTime());
         }
-        omVolumeArgs.setModificationTime(modificationTime);
 
-        omVolumeArgs.setUpdateID(trxnLogIndex);
+        omVolumeArgs = builder
+            .setUpdateID(trxnLogIndex)
+            .build();
 
         // update cache.
         omMetadataManager.getVolumeTable().addCacheEntry(
@@ -196,8 +189,8 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   /**
    * Volume ACL operation.
    */
-  public interface VolumeAclOp extends
-      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
+  public interface AclOp extends
+      BiConsumer<List<OzoneAcl>, AclListBuilder> {
     // just a shortcut to avoid having to repeat long list of generic parameters
   }
 }
