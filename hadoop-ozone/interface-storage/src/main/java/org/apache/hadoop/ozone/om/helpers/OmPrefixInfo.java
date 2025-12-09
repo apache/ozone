@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,13 +30,14 @@ import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
  * can be extended for other OzFS optimizations in future.
  */
-// TODO: support Auditable interface
 @Immutable
 public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPrefixInfo> {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
@@ -49,9 +51,10 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
 
   private OmPrefixInfo(Builder b) {
     super(b);
-    name = b.name;
-    acls = b.acls == null ? ImmutableList.of()
-        : ImmutableList.copyOf(b.acls);
+    this.name = b.name;
+    // acls = b.acls == null ? ImmutableList.of()
+    //     : ImmutableList.copyOf(b.acls);
+    this.acls = b.acls.build();
   }
 
   public static Codec<OmPrefixInfo> getCodec() {
@@ -79,39 +82,60 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
    *
    * @return Builder
    */
-  public static OmPrefixInfo.Builder newBuilder() {
-    return new OmPrefixInfo.Builder();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
    * Builder for OmPrefixInfo.
    */
-  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> {
+  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> implements Auditable {
     private String name;
-    private final List<OzoneAcl> acls;
+    private final AclListBuilder acls;
 
     public Builder() {
       //Default values
-      this.acls = new ArrayList<>();
+      // this.acls = new ArrayList<>();
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
     }
 
     public Builder(OmPrefixInfo obj) {
       super(obj);
-      setName(obj.name);
-      acls = new ArrayList<>(obj.getAcls());
+      // setName(obj.name);
+      // acls = new ArrayList<>(obj.getAcls());
+      this.acls = AclListBuilder.of(obj.acls);
+      this.name = obj.name;
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      acls.clear();
-      addAcls(listOfAcls);
+      // acls.clear();
+      // addAcls(listOfAcls);
+      acls.set(listOfAcls);
       return this;
     }
 
     public Builder addAcls(List<OzoneAcl> listOfAcls) {
-      if (listOfAcls != null) {
-        acls.addAll(listOfAcls);
-      }
+      // if (listOfAcls != nul
+      acls.addAll(listOfAcls);
       return this;
+    }
+
+    public Builder addAcl(OzoneAcl acl) {
+      acls.add(acl);
+      return this;
+    }
+
+    public Builder removeAcl(OzoneAcl acl) {
+      acls.remove(acl);
+      return this;
+    }
+
+    public boolean isAclsChanged() {
+      return acls.isChanged();
     }
 
     public Builder setName(String n) {
@@ -153,6 +177,14 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     @Override
     protected OmPrefixInfo buildObject() {
       return new OmPrefixInfo(this);
+    }
+
+    @Override
+    public Map<String, String> toAuditMap() {
+      Map<String, String> auditMap = new LinkedHashMap<>();
+      auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
+      auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
+      return auditMap;
     }
   }
 

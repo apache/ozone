@@ -246,18 +246,17 @@ public class PrefixManagerImpl implements PrefixManager {
       prefixInfoBuilder.setUpdateID(transactionLogIndex);
     }
 
-    List<OzoneAcl> updatedAcls = new ArrayList<>(
-        prefixInfo == null ? EMPTY_ACL_LIST : prefixInfo.getAcls());
-    boolean changed = OzoneAclUtil.addAcl(updatedAcls, ozoneAcl);
-
     // Update the in-memory prefix tree regardless whether the ACL is changed.
     // Under OM HA, update ID of the prefix info is updated for every request.
     if (newPrefix) {
-      inheritParentAcl(ozoneObj, updatedAcls);
+      List<OzoneAcl> inheritedAcls = new ArrayList<>();
+      inheritParentAcl(ozoneObj, inheritedAcls);
+      prefixInfoBuilder.addAcls(inheritedAcls);
     }
-    OmPrefixInfo updatedPrefixInfo = prefixInfoBuilder
-        .setAcls(updatedAcls)
-        .build();
+    prefixInfoBuilder.addAcl(ozoneAcl);
+    boolean changed = prefixInfoBuilder.isAclsChanged();
+
+    OmPrefixInfo updatedPrefixInfo = prefixInfoBuilder.build();
     // update the in-memory prefix tree
     prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
 
@@ -273,15 +272,17 @@ public class PrefixManagerImpl implements PrefixManager {
       return new OMPrefixAclOpResult(null, false);
     }
 
-    List<OzoneAcl> updatedAcls = new ArrayList<>(prefixInfo.getAcls());
-    boolean removed = OzoneAclUtil.removeAcl(updatedAcls, ozoneAcl);
+    OmPrefixInfo.Builder prefixInfoBuilder = prefixInfo.toBuilder();
+    prefixInfoBuilder.removeAcl(ozoneAcl);
+    boolean removed = prefixInfoBuilder.isAclsChanged();
+
     OmPrefixInfo updatedPrefixInfo = removed
-        ? prefixInfo.toBuilder().setAcls(updatedAcls).build()
+        ? prefixInfoBuilder.build()
         : prefixInfo;
 
     // Update in-memory prefix tree regardless whether the ACL is changed.
     // Under OM HA, update ID of the prefix info is updated for every request.
-    if (updatedAcls.isEmpty()) {
+    if (removed && updatedPrefixInfo.getAcls().isEmpty()) {
       prefixTree.removePrefixPath(ozoneObj.getPath());
       if (!isRatisEnabled) {
         metadataManager.getPrefixTable().delete(ozoneObj.getPath());
@@ -336,14 +337,15 @@ public class PrefixManagerImpl implements PrefixManager {
       prefixInfoBuilder.setUpdateID(transactionLogIndex);
     }
 
-    List<OzoneAcl> updatedAcls = new ArrayList<>();
-    boolean changed = OzoneAclUtil.setAcl(updatedAcls, ozoneAcls);
+    List<OzoneAcl> aclsToSet = new ArrayList<>();
+    OzoneAclUtil.setAcl(aclsToSet, ozoneAcls);
     if (newPrefix) {
-      inheritParentAcl(ozoneObj, updatedAcls);
+      inheritParentAcl(ozoneObj, aclsToSet);
     }
-    OmPrefixInfo updatedPrefixInfo = prefixInfoBuilder
-        .setAcls(updatedAcls)
-        .build();
+    prefixInfoBuilder.setAcls(aclsToSet);
+    boolean changed = prefixInfoBuilder.isAclsChanged();
+
+    OmPrefixInfo updatedPrefixInfo = prefixInfoBuilder.build();
     prefixTree.insert(ozoneObj.getPath(), updatedPrefixInfo);
     if (!isRatisEnabled) {
       metadataManager.getPrefixTable().put(ozoneObj.getPath(), updatedPrefixInfo);
