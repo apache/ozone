@@ -367,11 +367,14 @@ public final class ContainerStateManagerImpl
         // Synchronize sequenceId first
         if (containerInfo.getSequenceId() < sequenceId) {
           containerInfo.updateSequenceId(sequenceId);
+        } else {
+          LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
+              containerInfo.getSequenceId(), sequenceId);
         }
         
         final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
-            containerInfo.getState(), event);
+            oldState, event);
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
