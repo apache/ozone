@@ -393,7 +393,7 @@ public final class ServerUtils {
     case SCM:
       return "scm";
     case DATANODE:
-      return "dn";
+      return "datanode";
     case RECON:
       return "recon";
     default:
@@ -406,6 +406,10 @@ public final class ServerUtils {
    * configuration is not set. This creates a component-specific subdirectory
    * under ozone.metadata.dirs to avoid conflicts when multiple components
    * are colocated on the same host.
+   *
+   * New path format: {ozone.metadata.dirs}/{NodeType}.ratis.snapshot
+   * eg: /data/metadata/om.ratis.snapshot
+   *     /data/metadata/scm.ratis.snapshot
    *
    * <p>For backward compatibility during upgrades, this method checks for
    * existing snapshot data in old locations before using the new component-specific
@@ -430,7 +434,7 @@ public final class ServerUtils {
     // Use new component-specific location for new installations
     String componentName = getComponentName(nodeType);
     return Paths.get(metaDirPath.getPath(),
-        componentName + "." + OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR).toString();
+        componentName + ".ratis." + OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR).toString();
   }
 
   /**

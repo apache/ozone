@@ -289,7 +289,7 @@ public class TestServerUtils {
       // Verify Ratis directories use flat naming pattern (component.ratis)
       assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
       assertEquals(new File(metaDir, "om.ratis").getPath(), omRatisDir);
-      assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
+      assertEquals(new File(metaDir, "datanode.ratis").getPath(), dnRatisDir);
 
       // Verify all Ratis directories are different
       assertNotEquals(scmRatisDir, omRatisDir);
@@ -355,10 +355,9 @@ public class TestServerUtils {
       String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.SCM);
       String omSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.OM);
 
-      // Verify snapshot directories use component-specific naming pattern
-      // New structure: <ozone.metadata.dirs>/<component>.snapshot
-      assertEquals(new File(metaDir, "scm.snapshot").getPath(), scmSnapshotDir);
-      assertEquals(new File(metaDir, "om.snapshot").getPath(), omSnapshotDir);
+      // Verify snapshot directories use: <ozone.metadata.dirs>/<component>.ratis.snapshot
+      assertEquals(new File(metaDir, "scm.ratis.snapshot").getPath(), scmSnapshotDir);
+      assertEquals(new File(metaDir, "om.ratis.snapshot").getPath(), omSnapshotDir);
 
       // Verify snapshot directories are different
       assertNotEquals(scmSnapshotDir, omSnapshotDir);
@@ -462,8 +461,8 @@ public class TestServerUtils {
 
       // Both OM and SCM should use component-specific locations, not the shared one
       // This prevents conflicts when both components try to use the same directory
-      assertEquals(new File(metaDir, "scm.snapshot").getPath(), scmSnapshotDir);
-      assertEquals(new File(metaDir, "om.snapshot").getPath(), omSnapshotDir);
+      assertEquals(new File(metaDir, "scm.ratis.snapshot").getPath(), scmSnapshotDir);
+      assertEquals(new File(metaDir, "om.ratis.snapshot").getPath(), omSnapshotDir);
       
       // Verify they are different from each other and from the old shared location
       assertNotEquals(scmSnapshotDir, omSnapshotDir);
