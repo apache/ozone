@@ -441,8 +441,8 @@ public final class ServerUtils {
    *
    * <p>Older versions of Ozone used different directory structures:
    * <ul>
-   *   <li>Versions up to 2.0.0: Shared {@code <ozone.metadata.dirs>/snapshot} for Ratis snapshots (OM, SCM)</li>
    *   <li>Some versions: Ratis snapshot directory inside Ratis storage directory {@code <ratisDir>/snapshot}</li>
+   *   <li>Versions up to 2.0.0: Shared {@code <ozone.metadata.dirs>/snapshot} (OM, SCM)</li>
    * </ul>
    *
    * @param metaDirPath The ozone metadata directory path
@@ -453,8 +453,7 @@ public final class ServerUtils {
     // Check snapshot directory inside old Ratis directories first (nested structure)
     // This handles cases where snapshots were stored inside the Ratis storage directory.
     // For SCM: checks /scm-ha/snapshot then /ratis/snapshot
-    // For OM/DATANODE: checks /ratis/snapshot
-    // This nested structure was primarily used by OM in some intermediate versions
+    // For OM: checks /ratis/snapshot
 
     String[] oldRatisDirs = getOldRatisDirectoryNames(nodeType);
     for (String ratisDirName : oldRatisDirs) {
@@ -468,17 +467,6 @@ public final class ServerUtils {
           return snapshotInRatisDir.getPath();
         }
       }
-    }
-
-    // Check old shared standalone Ratis snapshot location (flat structure)
-    // Used by version 2.0.0 and earlier: /data/metadata/snapshot (shared by OM and SCM)
-    // This standalone structure was shared by both OM and SCM
-    File oldSharedSnapshotDir = new File(metaDirPath, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-    if (isNonEmptyDirectory(oldSharedSnapshotDir)) {
-      LOG.info("Found existing Ratis snapshot directory at old shared location: {}. " +
-              "Using it for backward compatibility during upgrade.",
-          oldSharedSnapshotDir.getPath());
-      return oldSharedSnapshotDir.getPath();
     }
 
     return null;

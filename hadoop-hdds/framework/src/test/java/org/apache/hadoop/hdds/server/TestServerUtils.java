@@ -438,8 +438,9 @@ public class TestServerUtils {
   }
 
   /**
-   * Test backward compatibility: old shared standalone /snapshot directory
-   * should be used when it exists and is non-empty (flat structure).
+   * Test that old shared standalone /snapshot directory is NOT used to avoid conflicts.
+   * Instead, each component should use its own component-specific directory.
+   * This prevents conflicts when both OM and SCM try to use the same directory during upgrades.
    */
   @Test
   public void testBackwardCompatibilityWithOldSharedStandaloneSnapshotDir() throws IOException {
@@ -450,17 +451,24 @@ public class TestServerUtils {
 
     try {
       // Create old shared standalone snapshot directory with some files
+      // This simulates an upgrade scenario from version 2.0.0
       assertTrue(oldSharedSnapshotDir.mkdirs());
       File testFile = new File(oldSharedSnapshotDir, "snapshot-file");
       assertTrue(testFile.createNewFile());
 
-      // Test that OM and SCM use the old shared standalone location
+      // Test that OM and SCM use component-specific directories, NOT the shared one
       String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.SCM);
       String omSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.OM);
 
-      // Both OM and SCM should use the old shared standalone location
-      assertEquals(oldSharedSnapshotDir.getPath(), scmSnapshotDir);
-      assertEquals(oldSharedSnapshotDir.getPath(), omSnapshotDir);
+      // Both OM and SCM should use component-specific locations, not the shared one
+      // This prevents conflicts when both components try to use the same directory
+      assertEquals(new File(metaDir, "scm.snapshot").getPath(), scmSnapshotDir);
+      assertEquals(new File(metaDir, "om.snapshot").getPath(), omSnapshotDir);
+      
+      // Verify they are different from each other and from the old shared location
+      assertNotEquals(scmSnapshotDir, omSnapshotDir);
+      assertNotEquals(oldSharedSnapshotDir.getPath(), scmSnapshotDir);
+      assertNotEquals(oldSharedSnapshotDir.getPath(), omSnapshotDir);
 
     } finally {
       FileUtils.deleteQuietly(metaDir);
