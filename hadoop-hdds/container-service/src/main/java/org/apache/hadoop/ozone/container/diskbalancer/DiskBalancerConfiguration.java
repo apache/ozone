@@ -200,9 +200,9 @@ public final class DiskBalancerConfiguration {
    * @param threshold a percentage value in the range 0 to 100
    */
   public void setThreshold(double threshold) {
-    if (threshold < 0d || threshold >= 100d) {
+    if (threshold <= 0d || threshold >= 100d) {
       throw new IllegalArgumentException(
-          "Threshold must be a percentage(double) in the range 0 to 100.");
+          "Threshold must be a percentage(double) in the range 0 to 100 both exclusive.");
     }
     this.threshold = threshold;
   }
