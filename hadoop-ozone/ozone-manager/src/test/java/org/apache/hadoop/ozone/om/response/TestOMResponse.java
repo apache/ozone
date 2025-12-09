@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -128,12 +128,10 @@ public class TestOMResponse {
 
     // Verify logging occurred
     String logOutput = logCapturer.getOutput();
-    assertTrue(logOutput.contains("Large OMResponse detected"),
-        "Log should contain 'Large OMResponse detected'. Actual log: " + logOutput);
-    assertTrue(logOutput.contains("cmd=ListKeys"), "Log should contain command type. Actual log: " + logOutput);
+    assertThat(logOutput).contains("Large OMResponse detected");
+    assertThat(logOutput).contains("cmd=ListKeys");
     // Verify the size in log matches our response size
-    assertTrue(logOutput.contains("size=" + responseSize + "B"),
-        "Log should contain actual response size. Actual log: " + logOutput);
+    assertThat(logOutput).contains("size=" + responseSize + "B");
   }
 
   @Test
@@ -147,8 +145,6 @@ public class TestOMResponse {
         .build();
 
     long responseSize = smallResponse.getSerializedSize();
-    assertTrue(responseSize < WARN_THRESHOLD,
-        "Small response size " + responseSize + " should be below threshold "
-            + WARN_THRESHOLD);
+    assertThat(responseSize).isLessThan(WARN_THRESHOLD);
   }
 }

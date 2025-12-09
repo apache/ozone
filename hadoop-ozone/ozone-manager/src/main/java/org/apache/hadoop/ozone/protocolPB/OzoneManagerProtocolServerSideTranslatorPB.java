@@ -29,7 +29,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
@@ -64,6 +63,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public static final String MAXIMUM_RESPONSE_LENGTH = "ipc.maximum.response.length";
   public static final int MAXIMUM_RESPONSE_LENGTH_DEFAULT = 134217728;
 
+  private final int maxResponseLength;
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
@@ -96,6 +96,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
+    maxResponseLength = ozoneManager.getConfiguration()
+        .getInt(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
   }
 
   /**
@@ -153,18 +155,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   @VisibleForTesting
   public void logLargeResponseIfNeeded(OMResponse response) {
     try {
-      Configuration conf = ozoneManager.getConfiguration();
-      long maxSize = conf.getLong(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
-      long warnThreshold = maxSize / 2;
-
+      long warnThreshold = maxResponseLength / 2;
       long respSize = response.getSerializedSize();
       if (respSize > warnThreshold) {
         LOG.warn("Large OMResponse detected: cmd={} size={}B threshold={}B ",
             response.getCmdType(), respSize, warnThreshold);
       }
     } catch (Exception e) {
-      // Don't let logging errors disrupt response generation
-      LOG.debug("Failed to log response size", e);
+      LOG.info("Failed to log response size", e);
     }
   }
 
