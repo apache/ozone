@@ -126,7 +126,9 @@ public final class IamSessionPolicyResolver {
 
     validateInputParameters(policyJson, volumeName, authorizerType);
 
-    final Set<AssumeRoleRequest.OzoneGrant> result = new LinkedHashSet<>();
+    // Accumulate ACLs across ALL statements using a single map to allow
+    // cross-statement deduplication and ALL-permission collapsing.
+    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
 
     // Parse JSON into set of statements
     final Set<JsonNode> statements = parseJsonAndRetrieveStatements(policyJson);
@@ -151,13 +153,11 @@ public final class IamSessionPolicyResolver {
       final Set<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
 
       // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
-      final Set<AssumeRoleRequest.OzoneGrant> stmtResults = createPathsAndPermissions(
-          volumeName, authorizerType, mappedS3Actions, resourceSpecs, prefixes);
-
-      result.addAll(stmtResults);
+      createPathsAndPermissions(volumeName, authorizerType, mappedS3Actions, resourceSpecs, prefixes, objToAclsMap);
     }
 
-    return result;
+    // Group accumulated objects by their ACL sets to create final result
+    return groupObjectsByAcls(objToAclsMap);
   }
 
   /**
@@ -418,24 +418,19 @@ public final class IamSessionPolicyResolver {
    * entries pairing sets of IOzoneObjs with the requisite permissions granted (if any).
    */
   @VisibleForTesting
-  static Set<AssumeRoleRequest.OzoneGrant> createPathsAndPermissions(String volumeName, AuthorizerType authorizerType,
-      Set<S3Action> mappedS3Actions, Set<ResourceSpec> resourceSpecs, Set<String> prefixes) {
-    // Create map to collect IOzoneObj to ACLType mappings
-    final Map<IOzoneObj, Set<ACLType>> objToAclsMap = new LinkedHashMap<>();
-
+  static void createPathsAndPermissions(String volumeName, AuthorizerType authorizerType, Set<S3Action> mappedS3Actions,
+      Set<ResourceSpec> resourceSpecs, Set<String> prefixes, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     // Process each resource spec with the given actions
     for (ResourceSpec resourceSpec : resourceSpecs) {
       processResourceSpecWithActions(volumeName, authorizerType, mappedS3Actions, resourceSpec, prefixes, objToAclsMap);
     }
-
-    // Group objects by their ACL sets to create proper entries
-    return groupObjectsByAcls(objToAclsMap);
   }
 
   /**
    * Groups objects by their ACL sets.
    */
-  private static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAcls(Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+  @VisibleForTesting
+  static Set<AssumeRoleRequest.OzoneGrant> groupObjectsByAcls(Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     final Map<Set<ACLType>, Set<IOzoneObj>> groupMap = new LinkedHashMap<>();
 
     // Group objects by their ACL sets only (across resource types)
@@ -526,24 +521,34 @@ public final class IamSessionPolicyResolver {
       // bucket name of "*".  To align with AWS, make sure that in this
       // specific case we also grant the volume-level permissions for volume-scoped
       // actions (currently s3:ListAllMyBuckets).
-      if (action.kind == ActionKind.BUCKET || action == S3Action.ALL_S3 ||
-          action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket)) { // this handles s3:ListAllMyBuckets
+      if (action.kind == ActionKind.BUCKET ||
+          (action.kind == ActionKind.VOLUME && "*".equals(resourceSpec.bucket))) { // this handles s3:ListAllMyBuckets
         addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+        addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
+      } else if (action == S3Action.ALL_S3) {
+        // For s3:*, ALL should only apply at the bucket level; grant READ at volume for navigation
+        // However, resource "arn:aws:s3:::*" can apply to volume as well (as explained above)
+        // If the bucket is "*", include the volumePerms, otherwise just include READ for navigation.
+        if ("*".equals(resourceSpec.bucket)) {
+          addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
+        } else {
+          addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
+        }
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       }
 
-      if (action == S3Action.LIST_BUCKET) {
+      if (action == S3Action.LIST_BUCKET || action == S3Action.ALL_S3) {
         // If condition prefixes are present, these would constrain the object permissions if the action
-        // is s3:ListBucket
+        // is s3:ListBucket or s3:* (which includes s3:ListBucket)
         if (prefixes != null && !prefixes.isEmpty()) {
           for (String prefix : prefixes) {
             createObjectResourcesFromConditionPrefix(
-                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, action.objectPerms);
+                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, EnumSet.of(READ));
           }
         } else {
           // No condition prefixes, but we need READ access to all objects, so use "*" as the prefix
           createObjectResourcesFromConditionPrefix(
-              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, action.objectPerms);
+              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, EnumSet.of(READ));
         }
       }
     }
@@ -556,11 +561,12 @@ public final class IamSessionPolicyResolver {
   private static void processObjectExactResource(String volumeName, Set<S3Action> mappedS3Actions,
       ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
-      addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
       if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
         addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
       } else if (action == S3Action.ALL_S3) {
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
         // For s3:*, ALL should only apply at the object level; grant READ at bucket level for navigation
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
         addAclsForObj(objToAclsMap, keyObj(volumeName, resourceSpec.bucket, resourceSpec.key), action.objectPerms);
@@ -577,10 +583,11 @@ public final class IamSessionPolicyResolver {
       Set<S3Action> mappedS3Actions, ResourceSpec resourceSpec, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
       // Object actions apply to prefix/key resources
-      addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
       if (action.kind == ActionKind.OBJECT) {
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), action.bucketPerms);
       } else if (action == S3Action.ALL_S3) {
+        addAclsForObj(objToAclsMap, volumeObj(volumeName), EnumSet.of(READ));
         // For s3:*, ALL should only apply at the object/prefix level; grant READ at bucket level for navigation
         addAclsForObj(objToAclsMap, bucketObj(volumeName, resourceSpec.bucket), EnumSet.of(READ));
       }
@@ -633,11 +640,26 @@ public final class IamSessionPolicyResolver {
 
   /**
    * Helper method to add ACLs for an IOzoneObj, merging with existing ACLs if present.
+   * If ALL permission is present, no other permissions are added.
    */
   private static void addAclsForObj(Map<IOzoneObj, Set<ACLType>> objToAclsMap, IOzoneObj obj, Set<ACLType> acls) {
     if (acls != null && !acls.isEmpty()) {
       final OzoneObj ozoneObj = (OzoneObj) obj;
-      objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class)).addAll(acls);
+      final Set<ACLType> existingAcls = objToAclsMap.computeIfAbsent(ozoneObj, k -> EnumSet.noneOf(ACLType.class));
+
+      // If ALL is already present, don't add other permissions
+      if (existingAcls.contains(ACLType.ALL)) {
+        return;
+      }
+
+      // If we're about to add ALL, remove all other permissions first
+      if (acls.contains(ACLType.ALL)) {
+        existingAcls.clear();
+        existingAcls.add(ACLType.ALL);
+      } else {
+        // Only add permissions if ALL is not already present
+        existingAcls.addAll(acls);
+      }
     }
   }
 
@@ -808,7 +830,7 @@ public final class IamSessionPolicyResolver {
         EnumSet.of(ACLType.WRITE)),
 
     // Wildcard all
-    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(READ), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
+    ALL_S3("s3:*", ActionKind.ALL, EnumSet.of(READ, LIST), EnumSet.of(ACLType.ALL), EnumSet.of(ACLType.ALL));
 
     private final String name;
     private final ActionKind kind;
