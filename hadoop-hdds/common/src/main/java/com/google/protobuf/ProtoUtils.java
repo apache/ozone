@@ -17,16 +17,16 @@
 
 package com.google.protobuf;
 
-/** Utilities for protobuf v2. */
-public final class Proto2Utils {
+/** Utilities for unshaded protobuf. */
+public final class ProtoUtils {
   /**
    * Similar to {@link ByteString#copyFrom(byte[])} except that this method does not copy.
    * This method is safe only if the content of the array remains unchanged.
    * Otherwise, it violates the immutability of {@link ByteString}.
    */
   public static ByteString unsafeByteString(byte[] array) {
-    return array != null && array.length > 0 ? new LiteralByteString(array) : ByteString.EMPTY;
+    return array != null && array.length > 0 ? ByteString.wrap(array) : ByteString.EMPTY;
   }
 
-  private Proto2Utils() { }
+  private ProtoUtils() { }
 }

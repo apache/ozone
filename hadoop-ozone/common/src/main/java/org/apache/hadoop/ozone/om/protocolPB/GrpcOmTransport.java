@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -322,7 +322,7 @@ public class GrpcOmTransport implements OmTransport {
    */
   @ConfigGroup(prefix = "ozone.om.grpc")
   public static final class GrpcOmTransportConfig {
-    @Config(key = "port", defaultValue = "8981",
+    @Config(key = "ozone.om.grpc.port", defaultValue = "8981",
         description = "Port used for"
             + " the GrpcOmTransport OzoneManagerServiceGrpc server",
         tags = {ConfigTag.MANAGEMENT})

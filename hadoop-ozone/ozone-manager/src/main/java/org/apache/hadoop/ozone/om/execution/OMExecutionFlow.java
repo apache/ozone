@@ -58,23 +58,27 @@ public class OMExecutionFlow {
     // 1. create client request and preExecute
     OMClientRequest omClientRequest = null;
     final OMRequest requestToSubmit;
-    try {
-      omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
-      assert (omClientRequest != null);
-      final OMClientRequest finalOmClientRequest = omClientRequest;
-      requestToSubmit = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
-          () -> finalOmClientRequest.preExecute(ozoneManager));
-    } catch (IOException ex) {
-      if (omClientRequest != null) {
-        OMAuditLogger.log(omClientRequest.getAuditBuilder());
-        omClientRequest.handleRequestFailure(ozoneManager);
+    if (isWrite) {
+      try {
+        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
+        assert (omClientRequest != null);
+        final OMClientRequest finalOmClientRequest = omClientRequest;
+        requestToSubmit = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+            () -> finalOmClientRequest.preExecute(ozoneManager));
+      } catch (IOException ex) {
+        if (omClientRequest != null) {
+          OMAuditLogger.log(omClientRequest.getAuditBuilder());
+          omClientRequest.handleRequestFailure(ozoneManager);
+        }
+        return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
-      return OzoneManagerRatisUtils.createErrorResponse(request, ex);
+    } else {
+      requestToSubmit = request;
     }
 
     // 2. submit request to ratis
     OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
-    if (!response.getSuccess()) {
+    if (!response.getSuccess() && omClientRequest != null) {
       omClientRequest.handleRequestFailure(ozoneManager);
     }
     return response;

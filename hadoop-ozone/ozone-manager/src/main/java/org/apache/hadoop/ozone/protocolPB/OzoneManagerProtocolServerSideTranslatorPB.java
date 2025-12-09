@@ -31,8 +31,8 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.ipc.ProcessingDetails.Timing;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -48,7 +48,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
+import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
+import org.apache.ratis.proto.RaftProtos.ServerRpcProto;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.server.RaftServer.Division;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,17 +190,79 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
     // Read from leader or followers using linearizable read
-    if (omRatisServer.isLinearizableRead()) {
+    if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
+        allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    } 
+    // Get current OM's role
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    // === 1. Follower linearizable read ===
+    if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
+      ozoneManager.getMetrics().incNumLinearizableRead();
       return ozoneManager.getOmExecutionFlow().submit(request, false);
     }
-    // Check if this OM is the leader.
-    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY ||
-        request.getCmdType().equals(PrepareStatus)) {
+    // === 2. Leader local read (skip ReadIndex if allowed) ===
+    if (raftServerStatus == LEADER_AND_READY || request.getCmdType().equals(PrepareStatus)) {
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+      // otherwise use linearizable path when enabled
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      }
+
+      // fallback to local read
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);
     }
+  }
+
+  boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLogLimit, long leaseTimeMsLimit) {
+    final DivisionInfo divisionInfo = ratisDivision.getInfo();
+    final FollowerInfoProto followerInfo = divisionInfo.getRoleInfoProto().getFollowerInfo();
+    if (followerInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Not a follower. ");
+      return false; // not follower
+    }
+    final ServerRpcProto leaderInfo = followerInfo.getLeaderInfo();
+    if (leaderInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: No Leader ");
+      return false; // no leader
+    }
+
+    if (leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+      LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
+      return false; // lease time expired
+    }
+
+    final RaftPeerId leaderId = divisionInfo.getLeaderId();
+    Long leaderCommit = null;
+    if (leaderId != null) {
+      for (CommitInfoProto i : ratisDivision.getCommitInfos()) {
+        if (i.getServer().getId().equals(leaderId.toByteString())) {
+          leaderCommit = i.getCommitIndex();
+        }
+      }
+    }
+    if (leaderCommit == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Leader Commit not exists. ");
+      return false;
+    }
+
+    boolean ret = divisionInfo.getLastAppliedIndex() + leaseLogLimit >= leaderCommit;
+    if (!ret) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailLog();
+      LOG.debug("FollowerRead Local Lease not allowed: Index Lag exceeds limit. ");
+    }
+    return ret;
   }
 
   private ServiceException createLeaderErrorException(

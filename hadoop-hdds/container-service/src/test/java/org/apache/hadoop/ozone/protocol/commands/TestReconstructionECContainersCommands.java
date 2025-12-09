@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,7 +42,7 @@ public class TestReconstructionECContainersCommands {
   @Test
   public void testExceptionIfSourceAndMissingNotSameLength() {
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(new byte[]{1, 2});
+    final ByteString missingContainerIndexes = ProtoUtils.unsafeByteString(new byte[]{1, 2});
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -55,7 +55,7 @@ public class TestReconstructionECContainersCommands {
   @Test
   public void protobufConversion() {
     byte[] missingIndexes = {1, 2};
-    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(missingIndexes);
+    final ByteString missingContainerIndexes = ProtoUtils.unsafeByteString(missingIndexes);
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
     final List<DatanodeDetails> dnDetails = getDNDetails(5);
 

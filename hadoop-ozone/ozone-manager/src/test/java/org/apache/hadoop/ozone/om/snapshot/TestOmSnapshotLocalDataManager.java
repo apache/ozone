@@ -544,7 +544,7 @@ public class TestOmSnapshotLocalDataManager {
     if (purgeSnapshot) {
       assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
-      assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
+      assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
     } else {
       try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
         OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
@@ -969,7 +969,7 @@ public class TestOmSnapshotLocalDataManager {
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
-        localDataManager.getVersionNodeMap();
+        localDataManager.getVersionNodeMapUnmodifiable();
     assertEquals(2, versionMap.size());
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
   }
@@ -999,7 +999,7 @@ public class TestOmSnapshotLocalDataManager {
     when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
-      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
       Map<UUID, UUID> previousMap = ImmutableMap.of(snap2, snap3, snap1, snap2);
       Map<UUID, Map<Integer, OmSnapshotLocalData.VersionMeta>> expectedSstFile = ImmutableMap.of(
           snap3, ImmutableMap.of(0,
@@ -1010,7 +1010,7 @@ public class TestOmSnapshotLocalDataManager {
                   new SstFileInfo(snap1.toString(), snap1 + "k1", snap1 + "k2", KEY_TABLE)))),
           snap2, ImmutableMap.of(0,
               new OmSnapshotLocalData.VersionMeta(0, ImmutableList.of())));
-      for (UUID snapshotId : localDataManager.getVersionNodeMap().keySet()) {
+      for (UUID snapshotId : localDataManager.getVersionNodeMapUnmodifiable().keySet()) {
         try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
                  localDataManager.getOmSnapshotLocalData(snapshotId)) {
           OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
@@ -1022,7 +1022,7 @@ public class TestOmSnapshotLocalDataManager {
         }
       }
     } else {
-      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
     }
   }
 

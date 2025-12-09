@@ -35,11 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
@@ -109,6 +111,7 @@ import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
@@ -169,7 +172,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    om = cluster.getOzoneManager();
+    OzoneManager normalOm = cluster.getOzoneManager();
+    om = spy(normalOm);
   }
 
   private void setupMocks() throws Exception {
@@ -244,7 +248,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
+        .transferSnapshotData(anySet(), any(), anyCollection(), anyCollection(), any(), any(), anyMap());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
@@ -767,27 +771,33 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .filter(snap -> snap.getName().equals("snapshot1"))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("snapshot1 not found"));
-
     // Setup servlet mocks for checkpoint processing
     setupMocks();
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
 
     // Create a checkpoint that captures current state (S1)
-    DBStore dbStore = om.getMetadataManager().getStore();
-    DBStore spyDbStore = spy(dbStore);
-    AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
+    DBStore spyDbStore = spy(om.getMetadataManager().getStore());
 
-    when(spyDbStore.getCheckpoint(true)).thenAnswer(invocation -> {
-      // Purge snapshot2 before checkpoint
+    AtomicReference<DBCheckpoint> capturedCheckpoint = new AtomicReference<>();
+    SnapshotCache spySnapshotCache = spy(om.getOmSnapshotManager().getSnapshotCache());
+    OmSnapshotManager spySnapshotManager = spy(om.getOmSnapshotManager());
+    when(om.getOmSnapshotManager()).thenReturn(spySnapshotManager);
+    when(spySnapshotManager.getSnapshotCache()).thenReturn(spySnapshotCache);
+    // Mock the snapshot cache to create a snapshot2 just after taking a snapshot cache lock.
+    doAnswer(invocationOnMock -> {
+      Object ret = invocationOnMock.callRealMethod();
       // create snapshot 3 before checkpoint
       client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot2");
       // Also wait for double buffer to flush to ensure all transactions are committed
       om.awaitDoubleBufferFlush();
-      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      return ret;
+    }).when(spySnapshotCache).lock();
+    doAnswer(invocation -> {
+      DBCheckpoint checkpoint = (DBCheckpoint) spy(invocation.callRealMethod());
       doNothing().when(checkpoint).cleanupCheckpoint(); // Don't cleanup for verification
       capturedCheckpoint.set(checkpoint);
       return checkpoint;
-    });
+    }).when(spyDbStore).getCheckpoint(eq(true));
 
     // Initialize servlet
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),

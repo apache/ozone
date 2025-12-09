@@ -34,7 +34,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
     + RaftServerConfigKeys.PREFIX)
 public class DatanodeRatisServerConfig {
 
-  @Config(key = "rpc.request.timeout",
+  @Config(key = "hdds.ratis.raft.server.rpc.request.timeout",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -43,7 +43,7 @@ public class DatanodeRatisServerConfig {
   )
   private long requestTimeOut = Duration.ofSeconds(60).toMillis();
 
-  @Config(key = "watch.timeout",
+  @Config(key = "hdds.ratis.raft.server.watch.timeout",
       defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -55,7 +55,7 @@ public class DatanodeRatisServerConfig {
   )
   private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
-  @Config(key = "notification.no-leader.timeout",
+  @Config(key = "hdds.ratis.raft.server.notification.no-leader.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -65,7 +65,7 @@ public class DatanodeRatisServerConfig {
   )
   private long noLeaderTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "rpc.slowness.timeout",
+  @Config(key = "hdds.ratis.raft.server.rpc.slowness.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -75,7 +75,7 @@ public class DatanodeRatisServerConfig {
   )
   private long followerSlownessTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "write.element-limit",
+  @Config(key = "hdds.ratis.raft.server.write.element-limit",
       defaultValue = "1024",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
@@ -84,7 +84,7 @@ public class DatanodeRatisServerConfig {
   )
   private int leaderNumPendingRequests;
 
-  @Config(key = "datastream.request.threads",
+  @Config(key = "hdds.ratis.raft.server.datastream.request.threads",
       defaultValue = "20",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, DATASTREAM},
@@ -93,7 +93,7 @@ public class DatanodeRatisServerConfig {
   )
   private int streamRequestThreads;
 
-  @Config(key = "datastream.client.pool.size",
+  @Config(key = "hdds.ratis.raft.server.datastream.client.pool.size",
       defaultValue = "10",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, DATASTREAM},
@@ -102,7 +102,7 @@ public class DatanodeRatisServerConfig {
   )
   private int clientPoolSize;
 
-  @Config(key = "delete.ratis.log.directory",
+  @Config(key = "hdds.ratis.raft.server.delete.ratis.log.directory",
           defaultValue = "true",
           type = ConfigType.BOOLEAN,
           tags = {OZONE, DATANODE, RATIS},
@@ -111,7 +111,7 @@ public class DatanodeRatisServerConfig {
   )
   private boolean shouldDeleteRatisLogDirectory;
 
-  @Config(key = "leaderelection.pre-vote",
+  @Config(key = "hdds.ratis.raft.server.leaderelection.pre-vote",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, DATANODE, RATIS},
@@ -120,7 +120,7 @@ public class DatanodeRatisServerConfig {
   private boolean preVoteEnabled = true;
 
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
-  @Config(key = "log.appender.wait-time.min",
+  @Config(key = "hdds.ratis.raft.server.log.appender.wait-time.min",
       defaultValue = "0us",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},

@@ -28,6 +28,7 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
@@ -264,7 +265,7 @@ public final class CertificateSignRequest {
     // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public CertificateSignRequest.Builder addDnsName(String dnsName) {
-      Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
+      Objects.requireNonNull(dnsName, "dnsName cannot be null");
       this.addAltName(GeneralName.dNSName, dnsName);
       return this;
     }
@@ -283,7 +284,7 @@ public final class CertificateSignRequest {
 
     // IP address is subject to change which is optional for now.
     public CertificateSignRequest.Builder addIpAddress(String ip) {
-      Preconditions.checkNotNull(ip, "Ip address cannot be null");
+      Objects.requireNonNull(ip, "Ip address cannot be null");
       this.addAltName(GeneralName.iPAddress, ip);
       return this;
     }
@@ -321,8 +322,7 @@ public final class CertificateSignRequest {
 
     public CertificateSignRequest.Builder addServiceName(
         String serviceName) {
-      Preconditions.checkNotNull(
-          serviceName, "Service Name cannot be null");
+      Objects.requireNonNull(serviceName, "Service Name cannot be null");
 
       this.addAltName(GeneralName.otherName, serviceName);
       return this;
@@ -418,7 +418,7 @@ public final class CertificateSignRequest {
     }
 
     public CertificateSignRequest build() throws SCMSecurityException {
-      Preconditions.checkNotNull(key, "KeyPair cannot be null");
+      Objects.requireNonNull(key, "KeyPair cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject), "Subject " +
           "cannot be blank");
 
