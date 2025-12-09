@@ -42,7 +42,7 @@ solutions that want to aggregate data across multiple cloud providers.
 # 3. How Ozone STS Works
 
 The initial implementation of Ozone STS supports only the [AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
-API from the AWS specification.  A new STS endpoint `/sts` on port `9880` will be created to service STS requests in the S3 Gateway.
+API from the AWS specification.  A new STS endpoint `/sts` on port `9880` (port `9881` for https) will be created to service STS requests in the S3 Gateway.
 We use a separate port for STS to align with AWS so we don't have conflicts at a later time.  This means we have:
 - Admin port for Ozone specific S3 admin operations
 - STS port for STS APIs, analogous to AWS' separate STS endpoint
@@ -82,7 +82,7 @@ subset of its capabilities.  The restrictions are outlined below:
 - The only supported prefix in ResourceArn is `arn:aws:s3:::` - all others will be rejected.  **Note**: a ResourceArn 
 of `*` is supported as well.
 - The only supported Condition operator is `StringEquals` - all others will be rejected.
-- The only supported Condition attribute is `s3:prefix` - all others will be rejected.
+- The only supported Condition key is `s3:prefix` - all others will be rejected.
 - Only one Condition operator per Statement is supported - a Statement with more than one Condition will be rejected.
 - The only supported Effect is `Allow` - all others will be rejected.
 - If a (currently) unsupported S3 action is requested, such as `s3:GetAccelerateConfiguration`, it will be silently ignored.
@@ -146,8 +146,8 @@ credential will have the permissions comprising the intersection of the role per
 
 In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in the OzoneManager RocksDB will be created
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
-will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.  The
-input parameter for the command-line utility will be the accessKeyId of the temporary token - this value is returned in
+will be created to run every 3 hours to delete revoked tokens that have been expired.  The
+input parameter for the command-line utility will be the `accessKeyId` and `sessionToken` of the temporary token - these values are returned in
 plain text as a result of the AssumeRole call (mentioned above).  In this way, specific STS tokens can be revoked as opposed 
 to all tokens.  Furthermore, AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
 
