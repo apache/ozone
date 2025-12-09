@@ -27,7 +27,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,19 +76,11 @@ public class PendingDeletionEndpoint {
 
   private Response handleDataNodeMetrics() {
     DataNodeMetricsService.MetricCollectionStatus status = dataNodeMetricsService.getTaskStatus();
-    if (status == DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED) {
-      CompletableFuture.runAsync(dataNodeMetricsService::startTask);
-      return Response.accepted(DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS)
-          .build()
-      ).build();
-    } else if (status == DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED) {
+    CompletableFuture.runAsync(dataNodeMetricsService::startTask);
+    if (status == DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED) {
       return Response.ok(dataNodeMetricsService.getCollectedMetrics()).build();
     } else {
-      return Response.accepted(DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(status)
-          .build()
-      ).build();
+      return Response.accepted(dataNodeMetricsService.getCollectedMetrics()).build();
     }
   }
 

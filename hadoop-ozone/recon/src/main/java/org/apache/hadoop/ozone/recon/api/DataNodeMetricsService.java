@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 
@@ -71,30 +73,43 @@ public class DataNodeMetricsService {
   private Long totalPendingDeletion = 0L;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
   private final ReconNodeManager reconNodeManager;
-  private final int threadCount;
   private final int httpRequestTimeout;
   private final int httpConnectionTimeout;
   private final int httpSocketTimeout;
   private final boolean httpsEnabled;
+  private final int minimumApiDelay;
   private int totalNodesQueried;
   private int totalNodesFailed;
+  private long lastCollectionEndTime;
 
   @Inject
   public DataNodeMetricsService(OzoneStorageContainerManager reconSCM, OzoneConfiguration conf) {
     reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
-    threadCount = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
+    int threadCount = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
         OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
     httpRequestTimeout = conf.getInt(OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT, OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT);
     httpConnectionTimeout = conf.getInt(OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT,
         OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT);
     httpSocketTimeout = conf.getInt(OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT, OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT);
     httpsEnabled = HttpConfig.getHttpPolicy(conf).isHttpsEnabled();
+    lastCollectionEndTime = 0;
     executorService = Executors.newFixedThreadPool(threadCount,
         new ThreadFactoryBuilder().setNameFormat("DataNodeMetricsCollectionTasksThread-%d")
             .build());
+    minimumApiDelay = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
+            OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT);
   }
 
   public void startTask() {
+    if (currentStatus == MetricCollectionStatus.IN_PROGRESS) {
+      LOG.warn("Metrics collection task is already in progress. Skipping new task.");
+      return;
+    }
+    if (lastCollectionEndTime > System.currentTimeMillis() - 1000 * minimumApiDelay) {
+      LOG.info("Skipping metrics collection task due to last collection time being more than {} seconds ago.",
+              minimumApiDelay);
+      return;
+    }
     totalNodesFailed = 0;
     Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
 
@@ -113,6 +128,7 @@ public class DataNodeMetricsService {
     // Add any remaining unfinished tasks as failed entries
     addFailedEntries(dataNodeFutures);
     currentStatus = MetricCollectionStatus.SUCCEEDED;
+    lastCollectionEndTime = System.currentTimeMillis();
     LOG.info("Metrics collection completed. Queried: {}, Failed: {}",
         totalNodesQueried, totalNodesFailed);
   }
@@ -268,26 +284,18 @@ public class DataNodeMetricsService {
   }
 
   public DataNodeMetricsServiceResponse getCollectedMetrics() {
-    if (currentStatus == MetricCollectionStatus.SUCCEEDED) {
-      currentStatus = MetricCollectionStatus.NOT_STARTED;
+    if (currentStatus == MetricCollectionStatus.NOT_STARTED || currentStatus == MetricCollectionStatus.IN_PROGRESS) {
       return DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(MetricCollectionStatus.SUCCEEDED)
-          .setPendingDeletion(pendingDeletionList)
-          .setTotalPendingDeletion(totalPendingDeletion)
-          .setTotalNodesQueries(totalNodesQueried)
-          .setTotalNodeQueryFailures(totalNodesFailed)
-          .build();
-    } else {
-      DataNodeMetricsServiceResponse response = DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(currentStatus)
-          .setTotalNodesQueries(totalNodesQueried)
-          .setTotalNodeQueryFailures(totalNodesFailed)
-          .setTotalPendingDeletion(totalPendingDeletion)
-          .setPendingDeletion(pendingDeletionList)
-          .build();
-      currentStatus = MetricCollectionStatus.NOT_STARTED;
-      return response;
+              .setStatus(MetricCollectionStatus.IN_PROGRESS)
+              .build();
     }
+    return DataNodeMetricsServiceResponse.newBuilder()
+            .setStatus(currentStatus)
+            .setPendingDeletion(pendingDeletionList)
+            .setTotalPendingDeletion(totalPendingDeletion)
+            .setTotalNodesQueries(totalNodesQueried)
+            .setTotalNodeQueryFailures(totalNodesFailed)
+            .build();
   }
 
   public MetricCollectionStatus getTaskStatus() {

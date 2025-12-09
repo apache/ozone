@@ -207,6 +207,10 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.dn.http.socket.timeout";
   public static final int OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT = 30;
 
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY =
+      "ozone.recon.dn.metrics.collection.minimum.api.delay";
+  public static final int OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = 30;
+
   /**
    * Private constructor for utility class.
    */
