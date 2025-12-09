@@ -22,6 +22,7 @@ import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -72,7 +73,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final long blockLength;
   private final int responseDataSize; // Default size is 1 MB
   private final long preReadSize; // Default size is 32 MB
-  private final int readTimeoutMs; // // Default timeout is 10 second
+  private final Duration readTimeout; // // Default timeout is 10 second
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -104,7 +105,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.refreshFunction = refreshFunction;
     this.preReadSize = config.getStreamReadPreReadSize();
     this.responseDataSize = config.getStreamReadResponseDataSize();
-    this.readTimeoutMs = config.getStreamReadTimeoutMs();
+    this.readTimeout = config.getStreamReadTimeout();
   }
 
   @Override
@@ -332,6 +333,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return name;
   }
 
+  public long getPreReadSize() {
+    return preReadSize;
+  }
+
+  public int getResponseDataSize() {
+    return responseDataSize;
+  }
+
+  /** Visible for testing: returns the configured streaming read timeout. */
+  public Duration getReadTimeout() {
+    return readTimeout;
+  }
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
@@ -403,7 +417,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ByteBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll(readTimeoutMs, TimeUnit.SECONDS);
+      // Convert Duration -> int seconds for poll(...)
+      final int timeoutSeconds;
+      if (readTimeout == null || readTimeout.isZero() || readTimeout.isNegative()) {
+        timeoutSeconds = 0;
+      } else {
+        long sec = readTimeout.getSeconds();
+        // Prevent overflow if client config is extremely large
+        timeoutSeconds = sec > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sec;
+      }
+      final ReadBlockResponseProto readBlock = poll(timeoutSeconds, TimeUnit.SECONDS);
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind

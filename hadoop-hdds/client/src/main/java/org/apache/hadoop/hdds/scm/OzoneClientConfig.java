@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -296,11 +297,11 @@ public class OzoneClientConfig {
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",
-      defaultValue = "1000",
-      type = ConfigType.INT,
+      defaultValue = "10s",
+      type = ConfigType.TIME,
       tags = {ConfigTag.CLIENT},
-      description = "Timeout in ms for receiving streaming read responses.")
-  private int streamReadTimeoutMs = 10_000;
+      description = "Timeout for receiving streaming read responses.")
+  private Duration streamReadTimeout = Duration.ofSeconds(10);
 
   @PostConstruct
   public void validate() {
@@ -582,8 +583,8 @@ public class OzoneClientConfig {
     return streamReadResponseDataSize;
   }
 
-  public int getStreamReadTimeoutMs() {
-    return streamReadTimeoutMs;
+  public Duration getStreamReadTimeout() {
+    return streamReadTimeout;
   }
 
   /**
