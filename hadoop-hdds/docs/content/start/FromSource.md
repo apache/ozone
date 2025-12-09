@@ -66,7 +66,7 @@ mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dver
 cp $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-linux-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/2.5.0/protoc-2.5.0-linux-aarch_64.exe
 ```
 
-## ARM-based Apple silicon (Apple M1, M2, M3, M4, M5, etc.)
+## ARM-based Apple silicon (Apple M1, M2, etc.)
 
 ```bash
 # Patch protobuf 2.5.0 - this is needed for Hadoop 2 support
