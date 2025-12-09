@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -184,7 +185,7 @@ public class ContainerOperationClient implements ScmClient {
     // creation state.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created container {} machines {}", containerId,
-              client.getPipeline().getNodes());
+          client.getPipeline().getNodes());
     }
   }
 
@@ -210,7 +211,7 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      ContainerWithPipeline containerWithPipeline = 
+      ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.allocateContainer(replicationConfig, owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
@@ -396,8 +397,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  public Map<DatanodeDetails, ReadContainerResponseProto>
-      readContainerFromAllNodes(long containerID, Pipeline pipeline)
+  public Map<DatanodeDetails, ReadContainerResponseProto> readContainerFromAllNodes(long containerID, Pipeline pipeline)
       throws IOException, InterruptedException {
     XceiverClientManager clientManager = getXceiverClientManager();
     String encodedToken = getEncodedContainerToken(containerID);
@@ -434,8 +434,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<ContainerReplicaInfo>
-      getContainerReplicas(long containerId) throws IOException {
+  public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
             ClientVersion.CURRENT_VERSION);
@@ -548,6 +547,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void transferLeadership(String newLeaderId) throws IOException {
     storageContainerLocationClient.transferLeadership(newLeaderId);
+  }
+
+  @Override
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+    return storageContainerLocationClient.getDeletedBlockSummary();
   }
 
   @Override

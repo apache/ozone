@@ -106,7 +106,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
 
       operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex);
 
       if (operationResult) {
         // Update the modification time when updating ACLs of Bucket.
@@ -122,7 +121,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
               .getModificationTime();
         }
         omBucketInfo = omBucketInfo.toBuilder()
-            .setModificationTime(modificationTime).build();
+            .setUpdateID(transactionLogIndex)
+            .setModificationTime(modificationTime)
+            .build();
 
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(

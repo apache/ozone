@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk.v2;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -970,7 +971,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       for (CompletedPart part : parts) {
         xml.append("  <Part>\n");
         xml.append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n");
-        xml.append("    <ETag>").append(part.eTag()).append("</ETag>\n");
+        xml.append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n");
         xml.append("  </Part>\n");
       }
       xml.append("</CompleteMultipartUpload>");
@@ -1142,11 +1143,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             RequestBody.fromByteBuffer(bb));
 
         assertEquals(DatatypeConverter.printHexBinary(
-            calculateDigest(fileInputStream, 0, partSize)).toLowerCase(), partResponse.eTag());
+            calculateDigest(fileInputStream, 0, partSize)).toLowerCase(), stripQuotes(partResponse.eTag()));
 
         CompletedPart part = CompletedPart.builder()
             .partNumber(partNumber)
-            .eTag(partResponse.eTag())
+            .eTag(stripQuotes(partResponse.eTag()))
             .build();
         completedParts.add(part);
 
@@ -1643,7 +1644,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
         CompletedMultipartUpload completedUpload = CompletedMultipartUpload.builder()
             .parts(
-                CompletedPart.builder().partNumber(1).eTag(uploadPartResponse.eTag()).build()
+                CompletedPart.builder().partNumber(1).eTag(stripQuotes(uploadPartResponse.eTag())).build()
             ).build();
 
 

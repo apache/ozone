@@ -194,9 +194,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   public void format(String cid) throws IOException {
-    Preconditions.checkNotNull(cid, "clusterID cannot be null while " +
-        "formatting Volume");
-    this.clusterID = cid;
+    this.clusterID = Objects.requireNonNull(cid, "clusterID == null");
     initialize();
   }
 
@@ -343,12 +341,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   private void writeVersionFile() throws IOException {
-    Preconditions.checkNotNull(this.storageID,
-        "StorageID cannot be null in Version File");
-    Preconditions.checkNotNull(this.clusterID,
-        "ClusterID cannot be null in Version File");
-    Preconditions.checkNotNull(this.datanodeUuid,
-        "DatanodeUUID cannot be null in Version File");
+    Objects.requireNonNull(storageID, "storageID == null");
+    Objects.requireNonNull(clusterID, "clusterID == null");
+    Objects.requireNonNull(datanodeUuid, "datanodeUuid == null");
     Preconditions.checkArgument(this.cTime > 0,
         "Creation Time should be positive");
     Preconditions.checkArgument(this.layoutVersion ==
@@ -489,6 +484,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       builder.setCapacity(usage.getCapacity())
           .setRemaining(usage.getAvailable())
           .setScmUsed(usage.getUsedSpace());
+      getVolumeUsage().ifPresent(vu -> builder.setReserved(vu.getReservedInBytes()));
     }
 
     return builder;

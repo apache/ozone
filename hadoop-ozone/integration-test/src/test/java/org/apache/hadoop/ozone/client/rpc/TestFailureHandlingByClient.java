@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +49,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -95,13 +96,6 @@ public class TestFailureHandlingByClient {
   private String keyString;
   private final List<DatanodeDetails> restartDataNodes = new ArrayList<>();
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -169,9 +163,6 @@ public class TestFailureHandlingByClient {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -461,6 +452,9 @@ public class TestFailureHandlingByClient {
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
     restartDataNodes.add(datanodes.get(0));
+
+    HddsDatanodeService hddsDatanode = cluster.getHddsDatanode(datanodes.get(0));
+    GenericTestUtils.waitFor(hddsDatanode::isStopped, 1000, 30000);
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));

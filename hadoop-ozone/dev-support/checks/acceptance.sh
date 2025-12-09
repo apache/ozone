@@ -39,8 +39,12 @@ DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 export COMPOSE_PARALLEL_LIMIT=1
 
 if [ ! -d "$DIST_DIR" ]; then
-    echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh" -Pcoverage
+  echo "Error: distribution dir not found: $DIST_DIR"
+  echo "Please build Ozone first."
+  if [[ "${CI:-}" == "true" ]]; then
+    ls -la "${OZONE_ROOT}/hadoop-ozone/dist/target"
+  fi
+  exit 1
 fi
 
 create_aws_dir

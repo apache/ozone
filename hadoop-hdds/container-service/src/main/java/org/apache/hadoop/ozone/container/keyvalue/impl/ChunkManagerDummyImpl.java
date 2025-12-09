@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
-import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -45,7 +45,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     ContainerData containerData = container.getContainerData();

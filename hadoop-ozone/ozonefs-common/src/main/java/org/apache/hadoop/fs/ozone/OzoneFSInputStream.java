@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.VectoredReadUtils;
 
@@ -172,6 +173,13 @@ public class OzoneFSInputStream extends FSInputStream
     if (!buf.hasRemaining()) {
       return 0;
     }
+    if (inputStream instanceof ExtendedInputStream) {
+      final int remainingBeforeRead = buf.remaining();
+      if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
+        return remainingBeforeRead - buf.remaining();
+      }
+    }
+
     long oldPos = this.getPos();
     int bytesRead;
     try {

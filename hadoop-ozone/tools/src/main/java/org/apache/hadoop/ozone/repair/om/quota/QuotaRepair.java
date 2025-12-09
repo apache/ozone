@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.util.Collection;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
@@ -44,7 +44,7 @@ import picocli.CommandLine;
         QuotaStatus.class,
         QuotaTrigger.class,
     },
-    description = "Operational tool to repair quota in OM DB.")
+    description = "Operational tool to repair quota in OM DB. OM should be running for this tool.")
 public class QuotaRepair extends AbstractSubcommand {
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(

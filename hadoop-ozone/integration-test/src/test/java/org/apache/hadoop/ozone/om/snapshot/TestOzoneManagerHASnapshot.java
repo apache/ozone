@@ -410,7 +410,7 @@ public class TestOzoneManagerHASnapshot {
 
     String tableKey = SnapshotInfo.getTableKey(volName, buckName, snapName);
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(cluster.getOMLeader(), tableKey);
-    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("Snapshot directory doesn't exist");
