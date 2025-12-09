@@ -26,32 +26,32 @@ import java.util.concurrent.TimeUnit;
 @ConfigGroup(prefix = "test.scm.client")
 public class SimpleConfiguration extends SimpleConfigurationParent {
 
-  @Config(key = "address",
+  @Config(key = "test.scm.client.address",
       defaultValue = "localhost",
       description = "Client address (To test string injection).",
       tags = ConfigTag.MANAGEMENT)
   private String clientAddress;
 
-  @Config(key = "bind.host",
+  @Config(key = "test.scm.client.bind.host",
       defaultValue = "0.0.0.0",
       description = "Bind host(To test string injection).",
       tags = ConfigTag.MANAGEMENT)
   private String bindHost;
 
-  @Config(key = "compression.enabled",
+  @Config(key = "test.scm.client.compression.enabled",
       defaultValue = "true",
       reconfigurable = true,
       description = "Compression enabled. (Just to test boolean flag)",
       tags = ConfigTag.MANAGEMENT)
   private boolean compressionEnabled;
 
-  @Config(key = "port",
+  @Config(key = "test.scm.client.port",
       defaultValue = "9878",
       description = "Port number config (To test int injection)",
       tags = ConfigTag.MANAGEMENT)
   private int port;
 
-  @Config(key = "wait",
+  @Config(key = "test.scm.client.wait",
       type = ConfigType.TIME,
       timeUnit = TimeUnit.SECONDS,
       defaultValue = "30m",
@@ -60,7 +60,7 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
       tags = ConfigTag.MANAGEMENT)
   private long waitTime;
 
-  @Config(key = "duration",
+  @Config(key = "test.scm.client.duration",
       type = ConfigType.TIME,
       timeUnit = TimeUnit.MINUTES,
       defaultValue = "1h",
@@ -68,14 +68,14 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
       tags = ConfigTag.MANAGEMENT)
   private Duration duration;
 
-  @Config(key = "class",
+  @Config(key = "test.scm.client.class",
       type = ConfigType.CLASS,
       defaultValue = "java.lang.Object",
       description = "",
       tags = ConfigTag.OZONE)
   private Class<?> myClass = Object.class;
 
-  @Config(key = "threshold",
+  @Config(key = "test.scm.client.threshold",
       type = ConfigType.DOUBLE,
       defaultValue = "10",
       description = "Threshold (To test DOUBLE config type)",

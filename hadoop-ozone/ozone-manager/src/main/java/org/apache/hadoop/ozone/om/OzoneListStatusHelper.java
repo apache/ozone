@@ -84,7 +84,7 @@ public class OzoneListStatusHelper {
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();

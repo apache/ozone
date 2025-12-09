@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * This class is used for storing Ranger Sync request args.
@@ -59,7 +59,7 @@ public class OmRangerSyncArgs {
     }
 
     public OmRangerSyncArgs build() {
-      Preconditions.checkNotNull(newServiceVersion);
+      Objects.requireNonNull(newServiceVersion, "newServiceVersion == null");
       return new OmRangerSyncArgs(newServiceVersion);
     }
   }

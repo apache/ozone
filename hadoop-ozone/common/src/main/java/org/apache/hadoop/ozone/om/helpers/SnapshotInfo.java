@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -384,7 +383,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     }
 
     public SnapshotInfo build() {
-      Preconditions.checkNotNull(name);
+      Objects.requireNonNull(name, "name == null");
       return new SnapshotInfo(this);
     }
   }
@@ -537,8 +536,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    * Get the name of the checkpoint directory.
    */
   public static String getCheckpointDirName(UUID snapshotId, int version) {
-    Objects.requireNonNull(snapshotId,
-        "SnapshotId is needed to create checkpoint directory");
+    Objects.requireNonNull(snapshotId, "SnapshotId is needed to create checkpoint directory");
     if (version == 0) {
       return OM_SNAPSHOT_SEPARATOR + snapshotId;
     }

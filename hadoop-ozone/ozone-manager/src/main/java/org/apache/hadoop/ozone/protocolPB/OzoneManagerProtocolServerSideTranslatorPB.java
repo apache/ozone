@@ -48,7 +48,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
+import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
+import org.apache.ratis.proto.RaftProtos.ServerRpcProto;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.server.RaftServer.Division;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +64,11 @@ import org.slf4j.LoggerFactory;
 public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
+  // same as hadoop ipc config defaults
+  public static final String MAXIMUM_RESPONSE_LENGTH = "ipc.maximum.response.length";
+  public static final int MAXIMUM_RESPONSE_LENGTH_DEFAULT = 134217728;
 
+  private final int maxResponseLength;
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
@@ -92,6 +101,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
+    maxResponseLength = ozoneManager.getConfiguration()
+        .getInt(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
   }
 
   /**
@@ -115,6 +126,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     OMResponse response = dispatcher.processRequest(validatedRequest,
         this::processRequest, request.getCmdType(), request.getTraceID());
 
+    logLargeResponseIfNeeded(response);
+
     return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
         () -> requestValidations.validateResponse(request, response));
   }
@@ -136,6 +149,26 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
     }
     return response;
+  }
+
+  /**
+   * Logs a warning if the OMResponse size exceeds half of the IPC maximum
+   * response size threshold.
+   *
+   * @param response The OMResponse to check
+   */
+  @VisibleForTesting
+  public void logLargeResponseIfNeeded(OMResponse response) {
+    try {
+      long warnThreshold = maxResponseLength / 2;
+      long respSize = response.getSerializedSize();
+      if (respSize > warnThreshold) {
+        LOG.warn("Large OMResponse detected: cmd={} size={}B threshold={}B ",
+            response.getCmdType(), respSize, warnThreshold);
+      }
+    } catch (Exception e) {
+      LOG.info("Failed to log response size", e);
+    }
   }
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
@@ -184,6 +217,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
+    // Read from leader or followers using linearizable read
+    if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
+        allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    } 
     // Get current OM's role
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     // === 1. Follower linearizable read ===
@@ -209,6 +250,47 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     } else {
       throw createLeaderErrorException(raftServerStatus);
     }
+  }
+
+  boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLogLimit, long leaseTimeMsLimit) {
+    final DivisionInfo divisionInfo = ratisDivision.getInfo();
+    final FollowerInfoProto followerInfo = divisionInfo.getRoleInfoProto().getFollowerInfo();
+    if (followerInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Not a follower. ");
+      return false; // not follower
+    }
+    final ServerRpcProto leaderInfo = followerInfo.getLeaderInfo();
+    if (leaderInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: No Leader ");
+      return false; // no leader
+    }
+
+    if (leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+      LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
+      return false; // lease time expired
+    }
+
+    final RaftPeerId leaderId = divisionInfo.getLeaderId();
+    Long leaderCommit = null;
+    if (leaderId != null) {
+      for (CommitInfoProto i : ratisDivision.getCommitInfos()) {
+        if (i.getServer().getId().equals(leaderId.toByteString())) {
+          leaderCommit = i.getCommitIndex();
+        }
+      }
+    }
+    if (leaderCommit == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Leader Commit not exists. ");
+      return false;
+    }
+
+    boolean ret = divisionInfo.getLastAppliedIndex() + leaseLogLimit >= leaderCommit;
+    if (!ret) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailLog();
+      LOG.debug("FollowerRead Local Lease not allowed: Index Lag exceeds limit. ");
+    }
+    return ret;
   }
 
   private ServiceException createLeaderErrorException(
