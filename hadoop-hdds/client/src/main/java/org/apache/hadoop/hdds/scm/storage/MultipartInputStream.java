@@ -82,6 +82,10 @@ public class MultipartInputStream extends ExtendedInputStream {
     this.length = streamLength;
   }
 
+  public boolean isStreamBlockInputStream() {
+    return isStreamBlockInputStream;
+  }
+
   @Override
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
