@@ -36,6 +36,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +47,8 @@ import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.SecurityUtil;
@@ -205,6 +208,11 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       LOG.info("Download completed for '{}'. Total size: {} KB",
           targetFile.getName(), totalBytesRead / (1024));
     }
+  }
+
+  @Override
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
+    return new InodeMetadataRocksDBCheckpoint(untarredDbDir);
   }
 
   /**

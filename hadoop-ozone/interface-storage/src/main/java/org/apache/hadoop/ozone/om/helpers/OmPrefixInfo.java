@@ -162,7 +162,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     @Override
     protected void validate() {
       super.validate();
-      Preconditions.checkNotNull(name);
+      Objects.requireNonNull(name, "name == null");
     }
 
     @Override
