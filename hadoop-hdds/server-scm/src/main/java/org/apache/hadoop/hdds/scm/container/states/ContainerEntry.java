@@ -33,11 +33,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private final Map<DatanodeID, ContainerReplica> replicasMap = new HashMap<>();
+  private final Map<DatanodeID, ContainerReplica> replicasMap;
   private Set<ContainerReplica> replicas = Collections.emptySet();
 
   ContainerEntry(ContainerInfo info) {
     this.info = info;
+
+    // add +2 for extra replicas during re-replication
+    final int initialSize = info.getReplicationConfig().getRequiredNodes() + 2;
+    replicasMap = new HashMap<>(initialSize, 1);
   }
 
   public ContainerInfo getInfo() {
@@ -58,7 +62,11 @@ public class ContainerEntry {
 
   private <T> T copyAndUpdate(Function<Map<DatanodeID, ContainerReplica>, T> update) {
     T result = update.apply(replicasMap);
-    replicas = Collections.unmodifiableSet(new HashSet<>(replicasMap.values()));
+
+    Set<ContainerReplica> set = new HashSet<>(replicasMap.size(), 1);
+    set.addAll(replicasMap.values());
+    replicas = Collections.unmodifiableSet(set);
+
     return result;
   }
 }
