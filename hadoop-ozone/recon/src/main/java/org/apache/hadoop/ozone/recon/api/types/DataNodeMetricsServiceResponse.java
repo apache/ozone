@@ -36,8 +36,8 @@ public class DataNodeMetricsServiceResponse {
   private Long totalPendingDeletion;
   @JsonProperty("pendingDeletionPerDataNode")
   private List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode;
-  @JsonProperty("totalNodesQueries")
-  private int totalNodesQueries;
+  @JsonProperty("totalNodesQueried")
+  private int totalNodesQueried;
   @JsonProperty("totalNodeQueriesFailed")
   private long totalNodeQueryFailures;
 
@@ -45,7 +45,7 @@ public class DataNodeMetricsServiceResponse {
     this.status = builder.status;
     this.totalPendingDeletion = builder.totalPendingDeletion;
     this.pendingDeletionPerDataNode = builder.pendingDeletion;
-    this.totalNodesQueries = builder.totalNodesQueries;
+    this.totalNodesQueried = builder.totalNodesQueried;
     this.totalNodeQueryFailures = builder.totalNodeQueryFailures;
   }
 
@@ -53,7 +53,7 @@ public class DataNodeMetricsServiceResponse {
     this.status = DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED;
     this.totalPendingDeletion = 0L;
     this.pendingDeletionPerDataNode = null;
-    this.totalNodesQueries = 0;
+    this.totalNodesQueried = 0;
     this.totalNodeQueryFailures = 0;
   }
 
@@ -69,8 +69,8 @@ public class DataNodeMetricsServiceResponse {
     return pendingDeletionPerDataNode;
   }
 
-  public int getTotalNodesQueries() {
-    return totalNodesQueries;
+  public int getTotalNodesQueried() {
+    return totalNodesQueried;
   }
 
   public long getTotalNodeQueryFailures() {
@@ -95,7 +95,7 @@ public class DataNodeMetricsServiceResponse {
     private DataNodeMetricsService.MetricCollectionStatus status;
     private Long totalPendingDeletion;
     private List<DatanodePendingDeletionMetrics> pendingDeletion;
-    private int totalNodesQueries;
+    private int totalNodesQueried;
     private long totalNodeQueryFailures;
 
     public Builder setStatus(DataNodeMetricsService.MetricCollectionStatus status) {
@@ -113,8 +113,8 @@ public class DataNodeMetricsServiceResponse {
       return this;
     }
 
-    public Builder setTotalNodesQueries(int totalNodesQueries) {
-      this.totalNodesQueries = totalNodesQueries;
+    public Builder setTotalNodesQueried(int totalNodesQueried) {
+      this.totalNodesQueried = totalNodesQueried;
       return this;
     }
 

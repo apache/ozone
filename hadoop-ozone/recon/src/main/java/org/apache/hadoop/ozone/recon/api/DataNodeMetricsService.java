@@ -95,7 +95,7 @@ public class DataNodeMetricsService {
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
   }
 
-  public void startTask() {
+  public synchronized void startTask() {
     if (currentStatus == MetricCollectionStatus.IN_PROGRESS) {
       LOG.warn("Metrics collection task is already in progress. Skipping new task.");
       return;
@@ -273,7 +273,7 @@ public class DataNodeMetricsService {
     }
   }
 
-  public DataNodeMetricsServiceResponse getCollectedMetrics() {
+  public synchronized DataNodeMetricsServiceResponse getCollectedMetrics() {
     if (currentStatus == MetricCollectionStatus.NOT_STARTED || currentStatus == MetricCollectionStatus.IN_PROGRESS) {
       return DataNodeMetricsServiceResponse.newBuilder()
               .setStatus(MetricCollectionStatus.IN_PROGRESS)
@@ -283,7 +283,7 @@ public class DataNodeMetricsService {
             .setStatus(currentStatus)
             .setPendingDeletion(pendingDeletionList)
             .setTotalPendingDeletion(totalPendingDeletion)
-            .setTotalNodesQueries(totalNodesQueried)
+            .setTotalNodesQueried(totalNodesQueried)
             .setTotalNodeQueryFailures(totalNodesFailed)
             .build();
   }

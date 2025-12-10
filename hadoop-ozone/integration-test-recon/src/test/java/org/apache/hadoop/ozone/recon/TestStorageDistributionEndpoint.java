@@ -266,7 +266,7 @@ public class TestStorageDistributionEndpoint {
         assertNotNull(pendingDeletion);
         assertEquals(30, pendingDeletion.getTotalPendingDeletion());
         assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
-        assertEquals(pendingDeletion.getTotalNodesQueries(), pendingDeletion.getPendingDeletionPerDataNode().size());
+        assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
         assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
         pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
           assertEquals(10, dn.getPendingBlockSize());
