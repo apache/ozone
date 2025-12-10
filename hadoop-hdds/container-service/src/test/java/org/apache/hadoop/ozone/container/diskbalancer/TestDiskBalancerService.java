@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -256,6 +258,27 @@ public class TestDiskBalancerService {
 
     // data precision loss due to double data involved in calculation
     assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(immutableVolumes)) <= 1);
+
+    // Test getDiskBalancerInfo() behavior with inProgressContainers check
+    // Set operational state to RUNNING
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 1,
+        false, DiskBalancerVersion.DEFAULT_VERSION);
+    svc.refresh(info);
+
+    // When inProgressContainers is empty, bytesToMove should be 0
+    assertTrue(svc.getInProgressContainers().isEmpty());
+    DiskBalancerInfo diskBalancerInfo = svc.getDiskBalancerInfo();
+    assertEquals(0, diskBalancerInfo.getBytesToMove(),
+        "bytesToMove should be 0 when no containers are in progress");
+
+    // When inProgressContainers is not empty, bytesToMove should match expected value
+    svc.getInProgressContainers().add(ContainerID.valueOf(1L));
+    assertFalse(svc.getInProgressContainers().isEmpty());
+    diskBalancerInfo = svc.getDiskBalancerInfo();
+    // data precision loss due to double data involved in calculation
+    assertTrue(Math.abs(expectedBytesToMove - diskBalancerInfo.getBytesToMove()) <= 1,
+        "bytesToMove should match expected value when containers are in progress");
   }
 
   @Test
@@ -323,5 +346,40 @@ public class TestDiskBalancerService {
   private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
     String schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  public static Stream<Arguments> thresholdValidationTestCases() {
+    return Stream.of(
+        // Invalid values that should throw IllegalArgumentException
+        Arguments.arguments(0.0, true, null),
+        Arguments.arguments(100.0, true, null),
+        Arguments.arguments(-1.0, true, null),
+        Arguments.arguments(-0.001, true, null),
+        Arguments.arguments(100.001, true, null),
+        // Valid boundary values that should be accepted
+        Arguments.arguments(0.001, false, 0.001),
+        Arguments.arguments(99.999, false, 99.999),
+        // Valid middle values that should be accepted
+        Arguments.arguments(50.5, false, 50.5),
+        Arguments.arguments(99.0, false, 99.0)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("thresholdValidationTestCases")
+  public void testDiskBalancerConfigurationThresholdValidation(double threshold,
+      boolean shouldThrowException, Double expectedThreshold) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+
+    if (shouldThrowException) {
+      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+          () -> config.setThreshold(threshold));
+      assertEquals("Threshold must be a percentage(double) in the range 0 to 100 both exclusive.",
+          exception.getMessage());
+    } else {
+      // Valid threshold should be accepted
+      config.setThreshold(threshold);
+      assertEquals(expectedThreshold, config.getThreshold(), 0.0001);
+    }
   }
 }
