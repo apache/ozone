@@ -168,8 +168,7 @@ class PipelineStateMap {
    * @return List of pipelines which have the specified replication type
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
-    Preconditions
-        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
 
     List<Pipeline> pipelines = new ArrayList<>();
     for (Pipeline pipeline : pipelineMap.values()) {
@@ -257,10 +256,8 @@ class PipelineStateMap {
       Collection<PipelineID> excludePipelines) {
     Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
     Objects.requireNonNull(state, "Pipeline state cannot be null");
-    Preconditions
-        .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
-    Preconditions
-        .checkNotNull(excludePipelines, "Pipeline exclude list cannot be null");
+    Objects.requireNonNull(excludeDns, "Datanode exclude list cannot be null");
+    Objects.requireNonNull(excludePipelines, "Pipeline exclude list cannot be null");
 
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {

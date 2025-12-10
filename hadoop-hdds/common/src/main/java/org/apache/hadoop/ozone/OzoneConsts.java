@@ -564,6 +564,7 @@ public final class OzoneConsts {
    * the OMDBCheckpoint functions.
    */
   public static final String OM_SNAPSHOT_SEPARATOR = "-";
+  public static final String HARDLINK_SEPARATOR = "\t";
 
   private OzoneConsts() {
     // Never Constructed
