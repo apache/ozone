@@ -85,6 +85,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
+  // Health state of the container (determined by ReplicationManager)
+  private ContainerHealthState healthState;
+  // Timestamp when health state was last updated
+  private Instant healthStateUpdateTime;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -99,6 +103,9 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
+    healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    healthStateUpdateTime = b.healthStateUpdateTime != null
+        ? b.healthStateUpdateTime : clock.instant();
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -118,8 +125,19 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
-        .setSequenceId(info.getSequenceId())
-        .build();
+        .setSequenceId(info.getSequenceId());
+
+    // Set health state if present, otherwise default to HEALTHY
+    if (info.hasHealthState()) {
+      HddsProtos.ContainerHealthState protoState = info.getHealthState();
+      ContainerHealthState healthState = ContainerHealthState.fromValue((short) protoState.getNumber());
+      builder.setHealthState(healthState);
+    }
+
+    // Set health state update time if present
+    if (info.hasHealthStateUpdateTime()) {
+      builder.setHealthStateUpdateTime(Instant.ofEpochMilli(info.getHealthStateUpdateTime()));
+    }
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
@@ -243,6 +261,35 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     lastUsed = clock.instant();
   }
 
+  /**
+   * Get the health state of the container.
+   *
+   * @return ContainerHealthState
+   */
+  public ContainerHealthState getHealthState() {
+    return healthState;
+  }
+
+  /**
+   * Set the health state of the container.
+   * Updates both the health state and the update timestamp.
+   *
+   * @param newHealthState The new health state
+   */
+  public void setHealthState(ContainerHealthState newHealthState) {
+    this.healthState = newHealthState;
+    this.healthStateUpdateTime = clock.instant();
+  }
+
+  /**
+   * Get the timestamp when health state was last updated.
+   *
+   * @return Instant of last update
+   */
+  public Instant getHealthStateUpdateTime() {
+    return healthStateUpdateTime;
+  }
+
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -270,6 +317,21 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
     }
+
+    // Set health state
+    if (healthState != null) {
+      HddsProtos.ContainerHealthState protoHealthState =
+          HddsProtos.ContainerHealthState.valueOf((int) healthState.getValue());
+      if (protoHealthState != null) {
+        builder.setHealthState(protoHealthState);
+      }
+    }
+
+    // Set health state update time
+    if (healthStateUpdateTime != null) {
+      builder.setHealthStateUpdateTime(healthStateUpdateTime.toEpochMilli());
+    }
+
     return builder.build();
   }
 
@@ -371,6 +433,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
+    private ContainerHealthState healthState;
+    private Instant healthStateUpdateTime;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -420,6 +484,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setSequenceId(long sequenceID) {
       this.sequenceId = sequenceID;
+      return this;
+    }
+
+    public Builder setHealthState(ContainerHealthState healthState) {
+      this.healthState = healthState;
+      return this;
+    }
+
+    public Builder setHealthStateUpdateTime(Instant healthStateUpdateTime) {
+      this.healthStateUpdateTime = healthStateUpdateTime;
       return this;
     }
 
