@@ -55,6 +55,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private final boolean enableFileSystemPaths;
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxIterators;
+  private final int maxWorkers;
+  private final int maxKeysInMemory;
 
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
@@ -62,7 +65,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  reconOMMetadataManager,
                                  OzoneConfiguration
                                  ozoneConfiguration,
-                                 long nsSummaryFlushToDBMaxThreshold) {
+                                 long nsSummaryFlushToDBMaxThreshold,
+                                 int maxIterators,
+                                 int maxWorkers,
+                                 int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     // true if FileSystemPaths enabled
@@ -70,6 +76,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
             OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,

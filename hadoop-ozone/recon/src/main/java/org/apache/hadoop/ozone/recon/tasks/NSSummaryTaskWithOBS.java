@@ -49,14 +49,23 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskWithOBS.class);
 
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxIterators;
+  private final int maxWorkers;
+  private final int maxKeysInMemory;
 
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      long nsSummaryFlushToDBMaxThreshold) {
+      long nsSummaryFlushToDBMaxThreshold,
+      int maxIterators,
+      int maxWorkers,
+      int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {

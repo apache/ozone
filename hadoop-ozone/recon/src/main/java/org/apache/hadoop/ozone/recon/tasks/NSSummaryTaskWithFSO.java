@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,10 +30,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -40,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +56,24 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxIterators;
+  private final int maxWorkers;
+  private final int maxKeysInMemory;
 
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
                               reconOMMetadataManager,
-                              long nsSummaryFlushToDBMaxThreshold) {
+                              long nsSummaryFlushToDBMaxThreshold,
+                              int maxIterators,
+                              int maxWorkers,
+                              int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   // We listen to updates from FSO-enabled FileTable, DirTable, DeletedTable and DeletedDirTable
@@ -225,44 +238,20 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      Table<String, OmDirectoryInfo> dirTable =
-          omMetadataManager.getDirectoryTable();
-      try (TableIterator<String,
-              ? extends Table.KeyValue<String, OmDirectoryInfo>>
-                dirTableIter = dirTable.iterator()) {
-        while (dirTableIter.hasNext()) {
-          Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
-          OmDirectoryInfo directoryInfo = kv.getValue();
-          handlePutDirEvent(directoryInfo, nsSummaryMap);
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
-            }
-          }
-        }
+      // Step 1: Process dirTable in parallel (establishes directory hierarchy)
+      Map<Long, NSSummary> dirSummaryMap = processDirTableInParallel(omMetadataManager);
+      if (dirSummaryMap == null) {
+        return false;
+      }
+      nsSummaryMap.putAll(dirSummaryMap);
+
+      // Step 2: Process fileTable in parallel (large table) and merge into base map
+      if (!processFileTableInParallel(omMetadataManager, nsSummaryMap)) {
+        return false;
       }
 
-      // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getFileTable();
-
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-              keyTableIter = keyTable.iterator()) {
-        while (keyTableIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-          OmKeyInfo keyInfo = kv.getValue();
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
-            }
-          }
-        }
-      }
-
-    } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-              ioEx);
+    } catch (Exception ex) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB.", ex);
       return false;
     }
     // flush and commit left out keys at end
@@ -272,5 +261,161 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
+  }
+
+  /**
+   * Process dirTable in parallel using per-worker maps.
+   * Returns the aggregated map of NSSummary objects.
+   */
+  private Map<Long, NSSummary> processDirTableInParallel(OMMetadataManager omMetadataManager) {
+    Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
+    
+    // Per-worker maps for lockless updates
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    
+    // Divide threshold by worker count so each worker flushes independently
+    final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
+    
+    // Lock for coordinating DB flush operations only
+    Object flushLock = new Object();
+
+    Function<Table.KeyValue<String, OmDirectoryInfo>, Void> kvOperation = kv -> {
+      // Get this worker's private map
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(
+          Thread.currentThread().getId(), k -> new HashMap<>());
+      
+      try {
+        // Call with allowDbRead=false for reprocess (no DB reads)
+        handlePutDirEvent(kv.getValue(), workerMap, false);
+        
+        // Flush this worker's map when it reaches threshold
+        if (workerMap.size() >= perWorkerThreshold) {
+          synchronized (flushLock) {
+            if (!flushAndCommitNSToDB(workerMap)) {
+              throw new IOException("Failed to flush NSSummary map to DB");
+            }
+          }
+        }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+      return null;
+    };
+    
+    try (ParallelTableIteratorOperation<String, OmDirectoryInfo> parallelIter = 
+        new ParallelTableIteratorOperation<>(omMetadataManager, dirTable, StringCodec.get(),
+            maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
+      parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-dirTable", null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to process dirTable in parallel", ex);
+      return null;
+    }
+    
+    // Merge all worker maps into a single map to return
+    return mergeWorkerMaps(allWorkerMaps.values());
+  }
+
+  /**
+   * Process fileTable in parallel using per-worker maps and merge into base map.
+   */
+  private boolean processFileTableInParallel(OMMetadataManager omMetadataManager,
+                                             Map<Long, NSSummary> baseMap) {
+    Table<String, OmKeyInfo> fileTable = omMetadataManager.getFileTable();
+    
+    // Per-worker maps for lockless updates
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    
+    // Divide threshold by worker count so each worker flushes independently
+    final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
+    
+    // Lock for coordinating DB flush operations only
+    Object flushLock = new Object();
+    
+    Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+      // Get this worker's private map
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(
+          Thread.currentThread().getId(), k -> new HashMap<>());
+      
+      try {
+        // Call with allowDbRead=false for reprocess (no DB reads)
+        handlePutKeyEvent(kv.getValue(), workerMap, false);
+        
+        // Flush this worker's map when it reaches threshold
+        if (workerMap.size() >= perWorkerThreshold) {
+          synchronized (flushLock) {
+            if (!flushAndCommitNSToDB(workerMap)) {
+               throw new IOException("Failed to flush NSSummary map to DB");
+            }
+          }
+        }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+      return null;
+    };
+    
+    try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter = 
+        new ParallelTableIteratorOperation<>(omMetadataManager, fileTable, StringCodec.get(),
+            maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
+      parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-fileTable", null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to process fileTable in parallel", ex);
+      return false;
+    }
+    
+    // Merge all worker maps into base map
+    mergeWorkerMapsIntoBase(allWorkerMaps.values(), baseMap);
+    return true;
+  }
+
+  /**
+   * Merge collection of worker maps into a single new map.
+   */
+  private Map<Long, NSSummary> mergeWorkerMaps(Collection<Map<Long, NSSummary>> workerMaps) {
+    Map<Long, NSSummary> mergedMap = new HashMap<>();
+    mergeWorkerMapsIntoBase(workerMaps, mergedMap);
+    return mergedMap;
+  }
+
+  /**
+   * Merge worker maps into base map, combining NSSummary values.
+   */
+  private void mergeWorkerMapsIntoBase(Collection<Map<Long, NSSummary>> workerMaps,
+                                          Map<Long, NSSummary> baseMap) {
+    for (Map<Long, NSSummary> workerMap : workerMaps) {
+      for (Map.Entry<Long, NSSummary> entry : workerMap.entrySet()) {
+        Long parentId = entry.getKey();
+        NSSummary workerSummary = entry.getValue();
+        
+        // Get or create in base map
+        NSSummary baseSummary = baseMap.computeIfAbsent(parentId, k -> new NSSummary());
+        
+        // Merge worker's data into base
+        baseSummary.setNumOfFiles(baseSummary.getNumOfFiles() + workerSummary.getNumOfFiles());
+        baseSummary.setSizeOfFiles(baseSummary.getSizeOfFiles() + workerSummary.getSizeOfFiles());
+        baseSummary.setReplicatedSizeOfFiles(
+            baseSummary.getReplicatedSizeOfFiles() + workerSummary.getReplicatedSizeOfFiles());
+        
+        // Merge file size buckets
+        int[] baseBucket = baseSummary.getFileSizeBucket();
+        int[] workerBucket = workerSummary.getFileSizeBucket();
+        for (int i = 0; i < baseBucket.length; i++) {
+          baseBucket[i] += workerBucket[i];
+        }
+        baseSummary.setFileSizeBucket(baseBucket);
+        
+        // Merge child directory sets
+        baseSummary.getChildDir().addAll(workerSummary.getChildDir());
+        
+        // Note: dirName and parentId should be consistent across workers for same ID
+        if ((baseSummary.getDirName() == null || baseSummary.getDirName().isEmpty()) && 
+            (workerSummary.getDirName() != null && !workerSummary.getDirName().isEmpty())) {
+          baseSummary.setDirName(workerSummary.getDirName());
+        }
+        if (baseSummary.getParentId() == 0 && workerSummary.getParentId() != 0) {
+          baseSummary.setParentId(workerSummary.getParentId());
+        }
+      }
+    }
   }
 }
