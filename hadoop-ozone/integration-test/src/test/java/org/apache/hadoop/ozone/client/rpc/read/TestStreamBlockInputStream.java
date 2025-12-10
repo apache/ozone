@@ -313,14 +313,15 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     XceiverClientFactory xceiverClientFactory = Mockito.mock(XceiverClientFactory.class);
     Function<BlockID, BlockLocationInfo> refreshFunction = b -> null;
     // Create a StreamBlockInputStream instance
-    StreamBlockInputStream sbis = new StreamBlockInputStream(
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
         blockID, length, pipeline, token,
-        xceiverClientFactory, refreshFunction, clientConfig);
+        xceiverClientFactory, refreshFunction, clientConfig)) {
 
-    // Assert
-    assertEquals(64L << 20, sbis.getPreReadSize());
-    assertEquals(2 << 20, sbis.getResponseDataSize());
-    assertEquals(Duration.ofSeconds(5), sbis.getReadTimeout());
+      // Assert: fields should match config values
+      assertEquals(64L << 20, sbis.getPreReadSize());
+      assertEquals(2 << 20, sbis.getResponseDataSize());
+      assertEquals(Duration.ofSeconds(5), sbis.getReadTimeout());
+    }
   }
 
 }
