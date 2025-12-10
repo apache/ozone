@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
@@ -8,6 +25,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 
+/**
+ * Assessment result for whether a datanode has sufficient space for container placement.
+ *
+ * Tracks data and metadata volume requirements separately and provides debugging
+ * information about volumes with insufficient space.
+ */
 public class SCMDatanodeCapacityInfo {
 
   private final DatanodeDetails datanodeDetails;
@@ -15,7 +38,7 @@ public class SCMDatanodeCapacityInfo {
   private final VolumeInfo metaVolumeInfo;
 
   SCMDatanodeCapacityInfo(
-      DatanodeDetails datanodeDetails,long requiredDataSize, long requiredMetadataSize) {
+      DatanodeDetails datanodeDetails, long requiredDataSize, long requiredMetadataSize) {
     this.datanodeDetails = datanodeDetails;
     this.dataVolumeInfo = new VolumeInfo(requiredDataSize);
     this.metaVolumeInfo = new VolumeInfo(requiredMetadataSize);
@@ -25,6 +48,7 @@ public class SCMDatanodeCapacityInfo {
     return datanodeDetails;
   }
 
+  /** @return true if datanode has sufficient space for both data and metadata */
   public boolean hasEnoughSpace() {
     return dataVolumeInfo.hasEnoughSpace() && metaVolumeInfo.hasEnoughSpace();
   }
@@ -58,7 +82,7 @@ public class SCMDatanodeCapacityInfo {
   }
 
   public void addFullMetaVolume(MetadataStorageReportProto report) {
-    this.dataVolumeInfo.addFullVolume(new FullVolume(report.getStorageLocation(), report.getRemaining()));
+    this.metaVolumeInfo.addFullVolume(new FullVolume(report.getStorageLocation(), report.getRemaining()));
   }
 
   /**
@@ -89,6 +113,7 @@ public class SCMDatanodeCapacityInfo {
         '}';
   }
 
+  /** Volume with insufficient space. Used for debugging. */
   static class FullVolume {
     private final String identifier;
     private final long availableSpace;
@@ -104,6 +129,7 @@ public class SCMDatanodeCapacityInfo {
     }
   }
 
+  /** Tracks space requirements and insufficient volumes for one storage type. */
   static class VolumeInfo {
 
     private final long requiredSpace;
@@ -146,7 +172,7 @@ public class SCMDatanodeCapacityInfo {
             .map(FullVolume::toString)
             .collect(Collectors.joining(", "));
 
-        sb.append(", fullVolumes=[").append(volumeList).append("]");
+        sb.append(", fullVolumes=[").append(volumeList).append(']');
       }
 
       sb.append('}');
