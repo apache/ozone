@@ -393,7 +393,7 @@ public final class ServerUtils {
     case SCM:
       return "scm";
     case DATANODE:
-      return "datanode";
+      return "dn";
     case RECON:
       return "recon";
     default:
@@ -411,10 +411,6 @@ public final class ServerUtils {
    * eg: /data/metadata/om.ratis.snapshot
    *     /data/metadata/scm.ratis.snapshot
    *
-   * <p>For backward compatibility during upgrades, this method checks for
-   * existing snapshot data in old locations before using the new component-specific
-   * location. See {@link #findExistingRatisSnapshotDirectory} for details on old locations.
-   *
    * @param conf Configuration source
    * @param nodeType Type of the node component
    * @return Path to the component-specific ratis snapshot directory
@@ -425,55 +421,10 @@ public final class ServerUtils {
         HddsConfigKeys.OZONE_METADATA_DIRS);
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
     
-    // Check for existing snapshot data from old versions for backward compatibility
-    String existingSnapshotDir = findExistingRatisSnapshotDirectory(metaDirPath, nodeType);
-    if (existingSnapshotDir != null) {
-      return existingSnapshotDir;
-    }
-    
-    // Use new component-specific location for new installations
+    // Use component-specific location
     String componentName = getComponentName(nodeType);
     return Paths.get(metaDirPath.getPath(),
         componentName + ".ratis." + OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR).toString();
-  }
-
-  /**
-   * Checks for existing Ratis snapshot directories from previous versions for backward
-   * compatibility during upgrades.
-   *
-   * <p>Note: These are Ratis consensus protocol snapshots (used for HA).
-   *
-   * <p>Older versions of Ozone used different directory structures:
-   * <ul>
-   *   <li>Some versions: Ratis snapshot directory inside Ratis storage directory {@code <ratisDir>/snapshot}</li>
-   *   <li>Versions up to 2.0.0: Shared {@code <ozone.metadata.dirs>/snapshot} (OM, SCM)</li>
-   * </ul>
-   *
-   * @param metaDirPath The ozone metadata directory path
-   * @param nodeType Type of the node component
-   * @return Path to existing old Ratis snapshot directory if found, null otherwise
-   */
-  private static String findExistingRatisSnapshotDirectory(File metaDirPath, HddsProtos.NodeType nodeType) {
-    // Check snapshot directory inside old Ratis directories first (nested structure)
-    // This handles cases where snapshots were stored inside the Ratis storage directory.
-    // For SCM: checks /scm-ha/snapshot then /ratis/snapshot
-    // For OM: checks /ratis/snapshot
-
-    String[] oldRatisDirs = getOldRatisDirectoryNames(nodeType);
-    for (String ratisDirName : oldRatisDirs) {
-      File oldRatisDir = new File(metaDirPath, ratisDirName);
-      if (oldRatisDir.exists() && oldRatisDir.isDirectory()) {
-        File snapshotInRatisDir = new File(oldRatisDir, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-        if (isNonEmptyDirectory(snapshotInRatisDir)) {
-          LOG.info("Found existing Ratis snapshot directory at old location inside {} dir: {}. " +
-                  "Using it for backward compatibility during upgrade.",
-              ratisDirName, snapshotInRatisDir.getPath());
-          return snapshotInRatisDir.getPath();
-        }
-      }
-    }
-
-    return null;
   }
 
   /**

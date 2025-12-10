@@ -289,7 +289,7 @@ public class TestServerUtils {
       // Verify Ratis directories use flat naming pattern (component.ratis)
       assertEquals(new File(metaDir, "scm.ratis").getPath(), scmRatisDir);
       assertEquals(new File(metaDir, "om.ratis").getPath(), omRatisDir);
-      assertEquals(new File(metaDir, "datanode.ratis").getPath(), dnRatisDir);
+      assertEquals(new File(metaDir, "dn.ratis").getPath(), dnRatisDir);
 
       // Verify all Ratis directories are different
       assertNotEquals(scmRatisDir, omRatisDir);
@@ -337,6 +337,50 @@ public class TestServerUtils {
   }
 
   /**
+   * Test backward compatibility: SCM-specific /scm-ha directory should be preferred
+   * over shared /ratis directory when both exist and are non-empty.
+   * OM and DATANODE should continue using /ratis even when /scm-ha exists.
+   */
+  @Test
+  public void testBackwardCompatibilityWithScmHaDirectory() throws IOException {
+    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
+    final File oldScmHaDir = new File(metaDir, "scm-ha");
+    final File oldSharedRatisDir = new File(metaDir, "ratis");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
+
+    try {
+      // Create both scm-ha and ratis directories with files
+      assertTrue(oldScmHaDir.mkdirs());
+      File scmHaTestFile = new File(oldScmHaDir, "scm-ha-file");
+      assertTrue(scmHaTestFile.createNewFile());
+
+      assertTrue(oldSharedRatisDir.mkdirs());
+      File ratisTestFile = new File(oldSharedRatisDir, "ratis-file");
+      assertTrue(ratisTestFile.createNewFile());
+
+      // SCM should prefer scm-ha over ratis
+      String scmRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.SCM);
+      assertEquals(oldScmHaDir.getPath(), scmRatisDir);
+      assertNotEquals(oldSharedRatisDir.getPath(), scmRatisDir);
+
+      // OM and DATANODE should still use ratis even when scm-ha exists
+      String omRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.OM);
+      String dnRatisDir = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.DATANODE);
+      assertEquals(oldSharedRatisDir.getPath(), omRatisDir);
+      assertEquals(oldSharedRatisDir.getPath(), dnRatisDir);
+
+      // Test that empty scm-ha directory is ignored (SCM should fall back to ratis)
+      FileUtils.deleteQuietly(scmHaTestFile);
+      String scmRatisDirWithEmptyScmHa = ServerUtils.getDefaultRatisDirectory(conf, HddsProtos.NodeType.SCM);
+      assertEquals(oldSharedRatisDir.getPath(), scmRatisDirWithEmptyScmHa);
+
+    } finally {
+      FileUtils.deleteQuietly(metaDir);
+    }
+  }
+
+  /**
    * Test that SCM and OM colocated on the same host with only
    * ozone.metadata.dirs configured get separate Ratis snapshot directories.
    */
@@ -364,110 +408,6 @@ public class TestServerUtils {
 
       // Verify the base metadata dir exists
       assertTrue(metaDir.exists());
-
-    } finally {
-      FileUtils.deleteQuietly(metaDir);
-    }
-  }
-
-  /**
-   * Test backward compatibility: snapshot directory inside old shared /ratis directory
-   * should be used when it exists and is non-empty (nested structure).
-   * Note: This tests OM and SCM backward compatibility. SCM checks /ratis/snapshot
-   * after checking /scm-ha/snapshot (which is tested separately).
-   */
-  @Test
-  public void testBackwardCompatibilityWithSnapshotInOldRatisDir() throws IOException {
-    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
-    final File oldRatisDir = new File(metaDir, "ratis");
-    final File snapshotInRatisDir = new File(oldRatisDir, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
-
-    try {
-      // Create old nested structure: /ratis/snapshot with some files
-      assertTrue(snapshotInRatisDir.mkdirs());
-      File testFile = new File(snapshotInRatisDir, "snapshot-file");
-      assertTrue(testFile.createNewFile());
-
-      // Test that OM uses the old nested location
-      String omSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.OM);
-      assertEquals(snapshotInRatisDir.getPath(), omSnapshotDir);
-
-      // Test that SCM also uses /ratis/snapshot when /scm-ha/snapshot doesn't exist
-      String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.SCM);
-      assertEquals(snapshotInRatisDir.getPath(), scmSnapshotDir);
-
-    } finally {
-      FileUtils.deleteQuietly(metaDir);
-    }
-  }
-
-  /**
-   * Test backward compatibility: SCM-specific old location /scm-ha/snapshot
-   * should be checked before shared /ratis/snapshot.
-   */
-  @Test
-  public void testBackwardCompatibilityWithSCMSpecificOldLocation() throws IOException {
-    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
-    final File oldScmHaDir = new File(metaDir, "scm-ha");
-    final File snapshotInScmHaDir = new File(oldScmHaDir, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-    final File oldRatisDir = new File(metaDir, "ratis");
-    final File snapshotInRatisDir = new File(oldRatisDir, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
-
-    try {
-      // Create both old locations with files
-      assertTrue(snapshotInScmHaDir.mkdirs());
-      File scmSnapshotFile = new File(snapshotInScmHaDir, "scm-snapshot");
-      assertTrue(scmSnapshotFile.createNewFile());
-
-      assertTrue(snapshotInRatisDir.mkdirs());
-      File ratisSnapshotFile = new File(snapshotInRatisDir, "ratis-snapshot");
-      assertTrue(ratisSnapshotFile.createNewFile());
-
-      // SCM should prefer scm-ha/snapshot over ratis/snapshot
-      String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.SCM);
-      assertEquals(snapshotInScmHaDir.getPath(), scmSnapshotDir);
-
-    } finally {
-      FileUtils.deleteQuietly(metaDir);
-    }
-  }
-
-  /**
-   * Test that old shared standalone /snapshot directory is NOT used to avoid conflicts.
-   * Instead, each component should use its own component-specific directory.
-   * This prevents conflicts when both OM and SCM try to use the same directory during upgrades.
-   */
-  @Test
-  public void testBackwardCompatibilityWithOldSharedStandaloneSnapshotDir() throws IOException {
-    final File metaDir = new File(folder.toFile(), "upgradeMetaDir");
-    final File oldSharedSnapshotDir = new File(metaDir, OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR);
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
-
-    try {
-      // Create old shared standalone snapshot directory with some files
-      // This simulates an upgrade scenario from version 2.0.0
-      assertTrue(oldSharedSnapshotDir.mkdirs());
-      File testFile = new File(oldSharedSnapshotDir, "snapshot-file");
-      assertTrue(testFile.createNewFile());
-
-      // Test that OM and SCM use component-specific directories, NOT the shared one
-      String scmSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.SCM);
-      String omSnapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, HddsProtos.NodeType.OM);
-
-      // Both OM and SCM should use component-specific locations, not the shared one
-      // This prevents conflicts when both components try to use the same directory
-      assertEquals(new File(metaDir, "scm.ratis.snapshot").getPath(), scmSnapshotDir);
-      assertEquals(new File(metaDir, "om.ratis.snapshot").getPath(), omSnapshotDir);
-      
-      // Verify they are different from each other and from the old shared location
-      assertNotEquals(scmSnapshotDir, omSnapshotDir);
-      assertNotEquals(oldSharedSnapshotDir.getPath(), scmSnapshotDir);
-      assertNotEquals(oldSharedSnapshotDir.getPath(), omSnapshotDir);
 
     } finally {
       FileUtils.deleteQuietly(metaDir);
