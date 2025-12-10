@@ -15,31 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.signature;
-
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.time.format.DateTimeFormatter;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
 /**
- * Parser to request auth parser for http request.
+ * This package contains the AWS STS (Security Token Service) compatible API for S3 Gateway.
  */
-public interface SignatureProcessor {
-
-  String CONTENT_TYPE = "content-type";
-
-  String CONTENT_MD5 = "content-md5";
-
-  String AWS4_SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
-
-  String HOST_HEADER = "Host";
-
-  DateTimeFormatter DATE_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd");
-
-  /**
-   * API to return string to sign.
-   */
-  SignatureInfo parseSignature() throws OS3Exception, IOException, NoSuchAlgorithmException;
-}
+package org.apache.hadoop.ozone.s3sts;
