@@ -38,7 +38,7 @@ import java.util.Set;
  *                ContainerHealthState.EMPTY));
  * </pre>
  */
-public class HealthStateFilter {
+public final class HealthStateFilter {
 
   private final Set<ContainerHealthState> states;
 
