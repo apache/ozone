@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
@@ -65,8 +66,8 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "container-key-mapping",
     aliases = "ckm",
-    description = "Map full key paths that use the specified containers. " +
-        "Note: Currently processes FSO layout buckets.")
+    description = "Maps full key paths that use the specified containers. " +
+        "Note: A container can have both FSO and OBS keys. Currently this tool processes only FSO keys")
 public class ContainerToKeyMapping extends AbstractSubcommand implements Callable<Void> {
   private static final String DIRTREE_DB_NAME = "omdirtree.db";
   private static final String DIRTREE_TABLE_NAME = "dirTreeTable";
@@ -89,19 +90,17 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private ColumnFamilyHandle directoryCFHandle;
   private ColumnFamilyHandle fileCFHandle;
   private DBStore dirTreeDbStore;
-  private org.apache.hadoop.hdds.utils.db.Table<Long, String> dirTreeTable;
+  private Table<Long, String> dirTreeTable;
 
+  // TODO: Add support to OBS keys (HDDS-14118)
   @Override
   public Void call() throws Exception {
     String dbPath = parent.getDbPath();
     // Parse container IDs
-    Set<Long> containerIDs = new HashSet<>();
-    if (!StringUtils.isEmpty(containers)) {
-      containerIDs = Arrays.stream(containers.split(","))
-          .map(String::trim)
-          .map(Long::parseLong)
-          .collect(Collectors.toSet());
-    }
+    Set<Long> containerIDs = Arrays.stream(containers.split(","))
+        .map(String::trim)
+        .map(Long::parseLong)
+        .collect(Collectors.toSet());
 
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
@@ -120,7 +119,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       openDirTreeDB(dbPath);
       retrieve(writer, containerIDs);
     } catch (RocksDBException e) {
-      System.err.println("Failed to open RocksDB: " + e);
+      err().println("Failed to open RocksDB: " + e);
       throw e;
     } finally {
       closeDirTreeDB(dbPath);
@@ -158,13 +157,13 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  public void retrieve(PrintWriter writer, Set<Long> containerIds) {
+  private void retrieve(PrintWriter writer, Set<Long> containerIds) {
     // Build dir tree
     Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
     try {
       prepareDirIdTree(bucketVolMap);
     } catch (Exception e) {
-      System.err.println("Exception occurred reading directory Table, " + e);
+      err().println("Exception occurred reading directory Table, " + e);
       return;
     }
 
@@ -207,7 +206,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         fileIterator.get().next();
       }
     } catch (Exception e) {
-      System.err.println("Exception occurred reading file Table, " + e);
+      err().println("Exception occurred reading file Table, " + e);
       return;
     }
     jsonOutput(writer, containerToKeysMap);
@@ -337,7 +336,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       writer.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
       writer.flush();
     } catch (Exception e) {
-      System.err.println("Error writing JSON output: " + e.getMessage());
+      err().println("Error writing JSON output: " + e.getMessage());
     }
   }
 }
