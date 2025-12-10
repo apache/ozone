@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclReques
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3CleanupRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
@@ -199,6 +200,8 @@ public final class OzoneManagerRatisUtils {
       return new S3RevokeSecretRequest(omRequest);
     case RevokeSTSToken:
       return new S3RevokeSTSTokenRequest(omRequest);
+    case CleanupRevokedSTSTokens:
+      return new S3CleanupRevokedSTSTokensRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
     case PurgeDirectories:

@@ -344,6 +344,7 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case CleanupRevokedSTSTokens:
     case UnknownCommand:
       return false;
     case EchoRPC:
