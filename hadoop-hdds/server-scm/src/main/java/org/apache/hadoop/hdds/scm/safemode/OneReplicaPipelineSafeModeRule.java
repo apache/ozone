@@ -146,7 +146,6 @@ public class OneReplicaPipelineSafeModeRule extends
     return currentReportedPipelineCount;
   }
 
-  @VisibleForTesting
   public Set<PipelineID> getReportedPipelineIDSet() {
     return reportedPipelineIDSet;
   }

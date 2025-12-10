@@ -342,7 +342,6 @@ public final class Pipeline {
     nodeStatus.put(dn, System.currentTimeMillis());
   }
 
-  @VisibleForTesting
   public List<DatanodeDetails> removeAllFromNodeStatus() {
     Iterator<DatanodeDetails> iterator = nodeStatus.keySet().iterator();
     List<DatanodeDetails> keys = new ArrayList<>();
@@ -356,7 +355,6 @@ public final class Pipeline {
     return keys;
   }
 
-  @VisibleForTesting
   public void setInNodeStatus(List<DatanodeDetails> dd) {
     nodeStatus.put(dd.get(0), Time.now());
   }
