@@ -45,7 +45,7 @@ public class S3STSEnabledEndpointRequestFilter implements ContainerRequestFilter
         OZONE_S3G_STS_HTTP_ENABLED_KEY, false);
     if (!isSTSEnabled) {
       String errorMessage = "S3 STS endpoint is disabled.";
-      String errorCode = "AccessDenied";
+      String errorCode = "NotImplemented";
       String xmlError = "<ErrorResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">" +
           "<Error>" +
           "<Type>Sender</Type>" +
@@ -55,7 +55,7 @@ public class S3STSEnabledEndpointRequestFilter implements ContainerRequestFilter
           "<RequestId>" + requestContext.getHeaderString("x-amz-request-id") + "</RequestId>" +
           "</ErrorResponse>";
 
-      requestContext.abortWith(Response.status(Response.Status.BAD_REQUEST)
+      requestContext.abortWith(Response.status(Response.Status.NOT_IMPLEMENTED)
           .entity(xmlError)
           .type(MediaType.APPLICATION_XML_TYPE)
           .build());
