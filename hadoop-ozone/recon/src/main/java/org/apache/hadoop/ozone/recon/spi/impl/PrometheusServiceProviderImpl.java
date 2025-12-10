@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -49,7 +50,6 @@ public class PrometheusServiceProviderImpl
     implements MetricsServiceProvider {
 
   public static final String PROMETHEUS_INSTANT_QUERY_API = "query";
-  public static final String PROMETHEUS_RANGED_QUERY_API = "query_range";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PrometheusServiceProviderImpl.class);
@@ -123,17 +123,9 @@ public class PrometheusServiceProviderImpl
     return getMetrics(PROMETHEUS_INSTANT_QUERY_API, queryString);
   }
 
-  /**
-   * Returns a list of {@link Metric} for the given ranged query.
-   *
-   * @param queryString query string with metric name, start time, end time,
-   *                    step and other filters.
-   * @return List of Json map of metrics response.
-   * @throws Exception exception
-   */
   @Override
-  public List<Metric> getMetricsRanged(String queryString) throws Exception {
-    return getMetrics(PROMETHEUS_RANGED_QUERY_API, queryString);
+  public List<Map<String, Object>> getMetrics(String queryString) throws Exception {
+    return Collections.emptyList();
   }
 
   /**

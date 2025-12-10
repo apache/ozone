@@ -3513,32 +3513,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.dn.http.request.timeout</name>
-    <value>60</value>
-    <tag>OZONE, RECON, DN</tag>
-    <description>
-      Timeout for the request submitted directly to datanode metrics.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.dn.http.connection.timeout</name>
-    <value>10</value>
-    <tag>OZONE, RECON, DN</tag>
-    <description>
-      The maximum time allowed for a client to establish
-      the initial physical connection (TCP handshake) with the dn.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.dn.http.socket.timeout</name>
-    <value>30</value>
-    <tag>OZONE, RECON, DN</tag>
-    <description>
-      The maximum time of inactivity allowed between any two consecutive data packets
-      when exchanging data with a server, after the connection is established.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
     <value>30</value>
     <tag>OZONE, RECON, DN</tag>

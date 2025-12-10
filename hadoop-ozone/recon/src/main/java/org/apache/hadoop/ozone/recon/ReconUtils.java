@@ -27,8 +27,6 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
@@ -850,47 +848,30 @@ public class ReconUtils {
     return pathBuilder.toString();
   }
 
-  public static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
-    ObjectMapper objectMapper = new ObjectMapper();
-    if (jsonResponse == null || jsonResponse.isEmpty()) {
-      log.warn("Empty or null JSON response for service: {}", serviceName);
-      return -1L;
+  public static Map<String, Object> getMetricsData(List<Map<String, Object>> metrics, String beanName) {
+    if (metrics == null || StringUtils.isEmpty(beanName)) {
+      return null;
     }
-
-    try {
-      JsonNode root = objectMapper.readTree(jsonResponse);
-      if (root == null) {
-        log.warn("Failed to parse JSON response for service: {}", serviceName);
-        return -1L;
+    for (Map<String, Object> item :metrics) {
+      if (item.get("name").equals(beanName)) {
+        return item;
       }
-
-      JsonNode beans = root.get("beans");
-      if (beans == null || !beans.isArray()) {
-        log.warn("No 'beans' array found in JSON response for service: {}", serviceName);
-        return -1L;
-      }
-
-      // Find the bean matching the service name
-      for (JsonNode bean : beans) {
-        String beanName = bean.path("name").asText("");
-        if (beanName.contains(serviceName)) {
-          // Extract and return the metric value from the bean
-          return extractMetrics(bean, keyName);
-        }
-      }
-
-      log.warn("Service '{}' not found in JMX beans", serviceName);
-      return -1L;
-    } catch (IOException e) {
-      log.error("Failed to parse JSON response for service: {}", serviceName, e);
-      return -1L;
-    } catch (Exception e) {
-      log.error("Unexpected error parsing metrics for service: {}", serviceName, e);
-      return -1L;
     }
+    return null;
   }
 
-  private static long extractMetrics(JsonNode beanNode, String keyName) {
-    return beanNode.path(keyName).asLong(0L);
+  public static long extractMetricValue(Map<String, Object> metrics, String keyName) {
+    if (metrics == null || StringUtils.isEmpty(keyName)) {
+      return  -1;
+    }
+    Object value = metrics.get(keyName);
+    if (value instanceof Long) {
+      return (long) value;
+    }
+    if (value instanceof Integer) {
+      Integer intValue = (Integer) value;
+      return intValue.longValue();
+    }
+    return -1;
   }
 }

@@ -195,21 +195,9 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.dn.metrics.collection.thread.count";
   public static final int OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT = 10;
 
-  public static final String OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT =
-      "ozone.recon.dn.http.request.timeout";
-  public static final int OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT = 60;
-
-  public static final String OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT =
-      "ozone.recon.dn.http.connection.timeout";
-  public static final int OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT = 10;
-
-  public static final String OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT =
-      "ozone.recon.dn.http.socket.timeout";
-  public static final int OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT = 30;
-
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY =
       "ozone.recon.dn.metrics.collection.minimum.api.delay";
-  public static final int OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = 30;
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = "30s";
 
   /**
    * Private constructor for utility class.

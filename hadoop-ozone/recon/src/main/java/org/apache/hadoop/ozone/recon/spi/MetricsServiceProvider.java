@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.spi;
 
 import java.net.HttpURLConnection;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
 
 /**
@@ -48,12 +49,12 @@ public interface MetricsServiceProvider {
   List<Metric> getMetricsInstant(String queryString) throws Exception;
 
   /**
-   * Returns a list of {@link Metric} for the given ranged query.
+   * Returns a list of {@link Map<String, Object>} for the given query.
    *
    * @param queryString query string with metric name, start time, end time,
    *                    step and other filters.
    * @return List of Json map of metrics response.
    * @throws Exception exception
    */
-  List<Metric> getMetricsRanged(String queryString) throws Exception;
+  List<Map<String, Object>> getMetrics(String queryString) throws Exception;
 }

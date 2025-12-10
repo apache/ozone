@@ -17,12 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
@@ -48,6 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -69,35 +64,35 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsService {
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
   private final ExecutorService executorService;
+  private final ReconNodeManager reconNodeManager;
+  private final boolean httpsEnabled;
+  private final int minimumApiDelay;
+  private final MetricsServiceProviderFactory metricsServiceProviderFactory;
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
   private Long totalPendingDeletion = 0L;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
-  private final ReconNodeManager reconNodeManager;
-  private final int httpRequestTimeout;
-  private final int httpConnectionTimeout;
-  private final int httpSocketTimeout;
-  private final boolean httpsEnabled;
-  private final int minimumApiDelay;
   private int totalNodesQueried;
   private int totalNodesFailed;
   private long lastCollectionEndTime;
+  private static final int REQUEST_TIMEOUT = 60000;
 
   @Inject
-  public DataNodeMetricsService(OzoneStorageContainerManager reconSCM, OzoneConfiguration conf) {
+  public DataNodeMetricsService(
+          OzoneStorageContainerManager reconSCM,
+          OzoneConfiguration config,
+          MetricsServiceProviderFactory metricsServiceProviderFactory) {
     reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
-    int threadCount = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
+    int threadCount = config.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
         OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
-    httpRequestTimeout = conf.getInt(OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT, OZONE_RECON_DN_HTTP_REQUEST_TIMEOUT_DEFAULT);
-    httpConnectionTimeout = conf.getInt(OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT,
-        OZONE_RECON_DN_HTTP_CONNECTION_TIMEOUT_DEFAULT);
-    httpSocketTimeout = conf.getInt(OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT, OZONE_RECON_DN_HTTP_SOCKET_TIMEOUT_DEFAULT);
-    httpsEnabled = HttpConfig.getHttpPolicy(conf).isHttpsEnabled();
+    minimumApiDelay = (int) config.getTimeDuration(OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
+            OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT, TimeUnit.MILLISECONDS);
+
+    httpsEnabled = HttpConfig.getHttpPolicy(config).isHttpsEnabled();
     lastCollectionEndTime = 0;
     executorService = Executors.newFixedThreadPool(threadCount,
         new ThreadFactoryBuilder().setNameFormat("DataNodeMetricsCollectionTasksThread-%d")
             .build());
-    minimumApiDelay = conf.getInt(OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
-            OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT);
+    this.metricsServiceProviderFactory = metricsServiceProviderFactory;
   }
 
   public void startTask() {
@@ -105,9 +100,9 @@ public class DataNodeMetricsService {
       LOG.warn("Metrics collection task is already in progress. Skipping new task.");
       return;
     }
-    if (lastCollectionEndTime > System.currentTimeMillis() - 1000 * minimumApiDelay) {
+    if (lastCollectionEndTime > System.currentTimeMillis() -  minimumApiDelay) {
       LOG.info("Skipping metrics collection task due to last collection time being more than {} seconds ago.",
-              minimumApiDelay);
+              minimumApiDelay / 1000);
       return;
     }
     totalNodesFailed = 0;
@@ -149,13 +144,8 @@ public class DataNodeMetricsService {
       Set<DatanodeDetails> nodes) {
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
     for (DatanodeDetails node : nodes) {
-      DataNodeMetricsCollectionTask task = DataNodeMetricsCollectionTask.newBuilder()
-          .setNodeDetails(node)
-          .setHttpConnectionTimeout(httpConnectionTimeout)
-          .setHttpSocketTimeout(httpSocketTimeout)
-          .setHttpRequestTimeout(httpRequestTimeout)
-          .setHttpsEnabled(httpsEnabled)
-          .build();
+      DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
+              node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
           node.getHostName(), node.getUuidString(), -1L);
       futures.put(key, executorService.submit(task));
@@ -175,7 +165,7 @@ public class DataNodeMetricsService {
       Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
       int nodeCount) {
     // Calculate timeout: half of total request timeout for all nodes
-    long maximumTaskRunningTimeMs = (long) httpRequestTimeout * 1000 * nodeCount / 2;
+    long maximumTaskRunningTimeMs = (long) REQUEST_TIMEOUT * nodeCount / 2;
     long startTime = System.currentTimeMillis();
     long pollIntervalMs = 200;
     while (!futures.isEmpty()) {
@@ -222,7 +212,7 @@ public class DataNodeMetricsService {
   private void processCompletedTask(DatanodePendingDeletionMetrics key,
                                     Future<DatanodePendingDeletionMetrics> future) {
     try {
-      DatanodePendingDeletionMetrics result = future.get(httpRequestTimeout, TimeUnit.SECONDS);
+      DatanodePendingDeletionMetrics result = future.get(REQUEST_TIMEOUT, TimeUnit.SECONDS);
       if (result.getPendingBlockSize() < 0) {
         totalNodesFailed += 1;
       } else {
