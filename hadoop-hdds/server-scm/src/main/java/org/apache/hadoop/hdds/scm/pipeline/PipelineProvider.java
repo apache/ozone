@@ -92,8 +92,7 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
         .filter(dn -> SCMCommonPlacementPolicy
-            .checkSpace(dn, metadataSizeRequired, dataSizeRequired, conf)
-            .hasEnoughSpace())
+            .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired, conf))
         .limit(nodesRequired)
         .collect(Collectors.toList());
 

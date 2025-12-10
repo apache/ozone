@@ -1,0 +1,157 @@
+package org.apache.hadoop.hdds.scm;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+
+public class SCMDatanodeCapacityInfo {
+
+  private final DatanodeDetails datanodeDetails;
+  private final VolumeInfo dataVolumeInfo;
+  private final VolumeInfo metaVolumeInfo;
+
+  SCMDatanodeCapacityInfo(
+      DatanodeDetails datanodeDetails,long requiredDataSize, long requiredMetadataSize) {
+    this.datanodeDetails = datanodeDetails;
+    this.dataVolumeInfo = new VolumeInfo(requiredDataSize);
+    this.metaVolumeInfo = new VolumeInfo(requiredMetadataSize);
+  }
+
+  public DatanodeDetails getDatanodeDetails() {
+    return datanodeDetails;
+  }
+
+  public boolean hasEnoughSpace() {
+    return dataVolumeInfo.hasEnoughSpace() && metaVolumeInfo.hasEnoughSpace();
+  }
+
+  public boolean hasEnoughDataSpace() {
+    return dataVolumeInfo.hasEnoughSpace();
+  }
+
+  public void markEnoughSpaceFoundForData() {
+    this.dataVolumeInfo.markEnoughSpaceFound();
+  }
+
+  public void updateMostAvailableSpaceForData(long mostSpaceAvailable) {
+    this.dataVolumeInfo.updateMostAvailableSpace(mostSpaceAvailable);
+  }
+
+  public void addFullDataVolume(StorageReportProto report, long usableSpace) {
+    this.dataVolumeInfo.addFullVolume(new FullVolume(report.getStorageUuid(), usableSpace));
+  }
+
+  public boolean hasEnoughMetaSpace() {
+    return metaVolumeInfo.hasEnoughSpace();
+  }
+
+  public void markEnoughSpaceFoundForMeta() {
+    this.metaVolumeInfo.markEnoughSpaceFound();
+  }
+
+  public void updateMostAvailableSpaceForMeta(long mostSpaceAvailable) {
+    this.metaVolumeInfo.updateMostAvailableSpace(mostSpaceAvailable);
+  }
+
+  public void addFullMetaVolume(MetadataStorageReportProto report) {
+    this.dataVolumeInfo.addFullVolume(new FullVolume(report.getStorageLocation(), report.getRemaining()));
+  }
+
+  /**
+   * Gets a formatted message for logging capacity check failures.
+   * @return human-readable message explaining why this datanode was rejected
+   */
+  public String getInsufficientSpaceMessage() {
+    if (hasEnoughSpace()) {
+      return String.format("Datanode %s has sufficient space (data: %d bytes required, metadata: %d bytes required)",
+          datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, metaVolumeInfo.requiredSpace);
+    }
+
+    if (!hasEnoughDataSpace()) {
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for data. %s",
+          datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, this);
+    } else {
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for metadata. %s",
+          datanodeDetails.getUuidString(), metaVolumeInfo.requiredSpace, this);
+    }
+  }
+
+  @Override
+  public String toString() {
+    return "SCMDatanodeCapacityInfo{" +
+        "datanode=" + datanodeDetails.getUuidString() +
+        ", data=" + dataVolumeInfo +
+        ", metadata=" + metaVolumeInfo +
+        '}';
+  }
+
+  static class FullVolume {
+    private final String identifier;
+    private final long availableSpace;
+
+    FullVolume(String identifier, long availableSpace) {
+      this.identifier = identifier;
+      this.availableSpace = availableSpace;
+    }
+
+    @Override
+    public String toString() {
+      return identifier + ":" + availableSpace;
+    }
+  }
+
+  static class VolumeInfo {
+
+    private final long requiredSpace;
+
+    private final List<FullVolume> fullVolumes = new ArrayList<>();
+    private long mostAvailableSpace = Long.MIN_VALUE;
+    private boolean hasEnoughSpace = false;
+
+    VolumeInfo(long requiredSpace) {
+      this.requiredSpace = requiredSpace;
+    }
+
+    public void addFullVolume(FullVolume volume) {
+      fullVolumes.add(volume);
+    }
+
+    public void updateMostAvailableSpace(long space) {
+      mostAvailableSpace = Math.max(mostAvailableSpace, space);
+    }
+
+    public void markEnoughSpaceFound() {
+      this.hasEnoughSpace = true;
+    }
+
+    public boolean hasEnoughSpace() {
+      return requiredSpace <= 0 || hasEnoughSpace;
+    }
+
+    public List<FullVolume> getFullVolumes() {
+      return Collections.unmodifiableList(fullVolumes);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("{required=").append(requiredSpace);
+
+      if (!hasEnoughSpace()) {
+        String volumeList = fullVolumes.stream()
+            .map(FullVolume::toString)
+            .collect(Collectors.joining(", "));
+
+        sb.append(", fullVolumes=[").append(volumeList).append("]");
+      }
+
+      sb.append('}');
+      return sb.toString();
+    }
+  }
+
+}
