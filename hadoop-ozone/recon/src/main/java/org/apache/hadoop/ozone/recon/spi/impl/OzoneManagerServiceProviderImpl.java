@@ -750,11 +750,11 @@ public class OzoneManagerServiceProviderImpl
               fullSnapshotReconTaskUpdater.updateDetails();
               // Update the current OM metadata manager in task controller
               reconTaskController.updateOMMetadataManager(omMetadataManager);
-              
+
               // Pass on DB update events to tasks that are listening.
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
-              
+
               // Check if task reinitialization is needed due to buffer overflow or task failures
               boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
               boolean tasksFailed = reconTaskController.hasTasksFailed();
