@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -46,10 +47,11 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,12 +71,14 @@ public class ClusterStateEndpoint {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private GlobalStatsDao globalStatsDao;
+  private ReconGlobalStatsManager reconGlobalStatsManager;
   private OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        GlobalStatsDao globalStatsDao,
+                       ReconGlobalStatsManager reconGlobalStatsManager,
                        ContainerHealthSchemaManager
                            containerHealthSchemaManager,
                        OzoneConfiguration ozoneConfiguration) {
@@ -84,6 +88,7 @@ public class ClusterStateEndpoint {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.globalStatsDao = globalStatsDao;
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.ozoneConfiguration = ozoneConfiguration;
   }
@@ -119,51 +124,63 @@ public class ClusterStateEndpoint {
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
 
     SCMNodeStat stats = nodeManager.getStats();
-    DatanodeStorageReport storageReport =
-        new DatanodeStorageReport(stats.getCapacity().get(),
-            stats.getScmUsed().get(), stats.getRemaining().get(),
-            stats.getCommitted().get());
+
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(stats.getCapacity().get())
+        .setCommitted(stats.getCommitted().get())
+        .setUsed(stats.getScmUsed().get())
+        .setMinimumFreeSpace(stats.getFreeSpaceToSpare().get())
+        .setRemaining(stats.getRemaining().get())
+        .build();
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
-    GlobalStats volumeRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(VOLUME_TABLE));
-    GlobalStats bucketRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(BUCKET_TABLE));
-    // Keys from OBJECT_STORE buckets.
-    GlobalStats keyRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
-    // Keys from FILE_SYSTEM_OPTIMIZED buckets
-    GlobalStats fileRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
-    // Keys from the DeletedTable
-    GlobalStats deletedKeyRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(DELETED_TABLE));
-    // Directories from the DeletedDirectoryTable
-    GlobalStats deletedDirRecord = globalStatsDao.findById(
-        OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
-
-    if (volumeRecord != null) {
-      builder.setVolumes(volumeRecord.getValue());
-    }
-    if (bucketRecord != null) {
-      builder.setBuckets(bucketRecord.getValue());
-    }
-
     Long totalKeys = 0L;
     Long keysPendingDeletion = 0L;
     Long deletedDirs = 0L;
+    
+    try {
+      // Read from RocksDB instead of SQL
+      GlobalStatsValue volumeRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(VOLUME_TABLE));
+      GlobalStatsValue bucketRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(BUCKET_TABLE));
+      // Keys from OBJECT_STORE buckets.
+      GlobalStatsValue keyRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
+      // Keys from FILE_SYSTEM_OPTIMIZED buckets
+      GlobalStatsValue fileRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
+      // Keys from the DeletedTable
+      GlobalStatsValue deletedKeyRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(DELETED_TABLE));
+      // Directories from the DeletedDirectoryTable
+      GlobalStatsValue deletedDirRecord = reconGlobalStatsManager.getGlobalStatsValue(
+          OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
 
-    if (keyRecord != null) {
-      totalKeys += keyRecord.getValue();
-    }
-    if (fileRecord != null) {
-      totalKeys += fileRecord.getValue();
-    }
-    if (deletedKeyRecord != null) {
-      keysPendingDeletion += deletedKeyRecord.getValue();
-    }
-    if (deletedDirRecord != null) {
-      deletedDirs += deletedDirRecord.getValue();
+      if (volumeRecord != null) {
+        builder.setVolumes(volumeRecord.getValue());
+      }
+      if (bucketRecord != null) {
+        builder.setBuckets(bucketRecord.getValue());
+      }
+
+      if (keyRecord != null) {
+        totalKeys += keyRecord.getValue();
+      }
+      if (fileRecord != null) {
+        totalKeys += fileRecord.getValue();
+      }
+      if (deletedKeyRecord != null) {
+        keysPendingDeletion += deletedKeyRecord.getValue();
+      }
+      if (deletedDirRecord != null) {
+        deletedDirs += deletedDirRecord.getValue();
+      }
+    } catch (IOException e) {
+      LOG.error("Error retrieving global stats from RocksDB", e);
+      // Set defaults if error occurred
+      builder.setVolumes(0L);
+      builder.setBuckets(0L);
     }
 
     builder.setKeys(totalKeys);

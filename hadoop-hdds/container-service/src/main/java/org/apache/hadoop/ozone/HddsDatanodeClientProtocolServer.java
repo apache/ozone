@@ -44,8 +44,8 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.VersionInfo;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,9 +106,11 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
       DiskBalancerProtocol diskBalancerProtocol)
       throws IOException {
     InetSocketAddress rpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
-    // Add reconfigureProtocolService.
+    // Set protocol engines for all protocols before creating the server.
     RPC.setProtocolEngine(
         configuration, ReconfigureProtocolDatanodePB.class, ProtobufRpcEngine.class);
+    RPC.setProtocolEngine(
+        configuration, DiskBalancerProtocolPB.class, ProtobufRpcEngine.class);
 
     final int handlerCount = conf.getInt(HDDS_DATANODE_HANDLER_COUNT_KEY,
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);

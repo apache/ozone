@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -48,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
@@ -82,7 +82,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "fso-tree",
     description = "Identify and repair a disconnected FSO tree by marking unreferenced (orphaned) entries for " +
-        "deletion. OM should be stopped while this tool is run."
+        "deletion. OM should be stopped for this tool."
 )
 public class FSORepairTool extends RepairTool {
   private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
@@ -135,8 +135,8 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
     private DBStore tempDB;
-    private TypedTable<String, byte[]> reachableTable;
-    private TypedTable<String, byte[]> unreachableTable;
+    private Table<String, byte[]> reachableTable;
+    private Table<String, byte[]> unreachableTable;
     private final ReportStatistics reachableStats;
     private final ReportStatistics unreachableStats;
     private final ReportStatistics unreferencedStats;
@@ -420,7 +420,7 @@ public class FSORepairTool extends RepairTool {
 
               info("Deleting unreferenced file " + fileKey);
               if (!isDryRun()) {
-                markFileForDeletion(fileKey, fileInfo);
+                markFileForDeletion(bucket, fileKey, fileInfo);
               }
             }
           } else {
@@ -433,12 +433,12 @@ public class FSORepairTool extends RepairTool {
       }
     }
 
-    protected void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
+    protected void markFileForDeletion(OmBucketInfo bucketInfo, String fileKey, OmKeyInfo fileInfo) throws IOException {
       try (BatchOperation batch = store.initBatchOperation()) {
         fileTable.deleteWithBatch(batch, fileKey);
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
-        RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketInfo.getObjectID(),
             fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
@@ -622,7 +622,9 @@ public class FSORepairTool extends RepairTool {
           "not exist or is not a RocksDB directory.", dbPath));
     }
     // Load RocksDB and tables needed.
-    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
+    OmReadOnlyLock omReadOnlyLock = new OmReadOnlyLock();
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1,
+        omReadOnlyLock);
   }
 
   /**

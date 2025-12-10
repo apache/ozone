@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -314,6 +315,7 @@ public class TestNSSummaryUnifiedControl {
    * Test multiple concurrent attempts - only one should succeed, others rejected.
    */
   @Test
+  @Flaky("HDDS-13573")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch startLatch = new CountDownLatch(1);

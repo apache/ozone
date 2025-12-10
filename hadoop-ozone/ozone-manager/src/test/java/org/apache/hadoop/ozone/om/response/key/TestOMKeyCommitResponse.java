@@ -116,7 +116,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   public void testAddToDBBatchOnOverwrite() throws Exception {
     OmKeyInfo omKeyInfo = getOmKeyInfo();
     keysToDelete =
-            OmUtils.prepareKeyForDelete(omKeyInfo, 100);
+            OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(), omKeyInfo, 100);
     assertNotNull(keysToDelete);
     testAddToDBBatch();
 
@@ -153,7 +153,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     if (null != deleteKeys) {
       deleteKeys.getOmKeyInfoList().stream().forEach(e -> deleteKeyMap.put(
           omMetadataManager.getOzoneDeletePathKey(e.getObjectID(), ozoneKey),
-          new RepeatedOmKeyInfo(e)));
+          new RepeatedOmKeyInfo(e, omBucketInfo.getObjectID())));
     }
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
         omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo, null, null);

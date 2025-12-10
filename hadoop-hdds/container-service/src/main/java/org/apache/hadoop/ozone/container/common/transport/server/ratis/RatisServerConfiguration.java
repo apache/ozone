@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.ratis.server")
 public class RatisServerConfiguration {
 
-  @Config(key = "num.snapshots.retained",
+  @Config(key = "hdds.ratis.server.num.snapshots.retained",
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {ConfigTag.STORAGE},

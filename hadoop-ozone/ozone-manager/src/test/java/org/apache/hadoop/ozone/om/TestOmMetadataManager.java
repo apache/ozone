@@ -91,7 +91,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -703,7 +702,6 @@ public class TestOmMetadataManager {
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
         keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -821,7 +819,6 @@ public class TestOmMetadataManager {
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
         keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -900,7 +897,6 @@ public class TestOmMetadataManager {
 
       if (bucketLayout.isFileSystemOptimized()) {
         keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {
@@ -933,7 +929,6 @@ public class TestOmMetadataManager {
 
       if (bucketLayout.isFileSystemOptimized()) {
         keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {

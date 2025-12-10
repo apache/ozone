@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -433,7 +434,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
@@ -458,7 +459,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath,  "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
@@ -657,8 +658,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigBlockDeleteThreadMax(String value) {
-    getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
-
     DeleteBlocksCommandHandler handler =
         (DeleteBlocksCommandHandler) getDatanodeStateMachine()
             .getCommandDispatcher().getDeleteBlocksCommandHandler();
@@ -669,25 +668,20 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private String reconfigDeletingServiceWorkers(String value) {
     Preconditions.checkArgument(Integer.parseInt(value) >= 0,
         OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
     return value;
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
-    getConf().set(REPLICATION_STREAMS_LIMIT_KEY, value);
-
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
   }
 
   private String reconfigBlockDeletingServiceInterval(String value) {
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
     return value;
   }
 
   private String reconfigBlockDeletingServiceTimeout(String value) {
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
     return value;
   }
 

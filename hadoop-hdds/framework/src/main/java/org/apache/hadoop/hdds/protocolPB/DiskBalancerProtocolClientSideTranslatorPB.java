@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.protocolPB;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -37,12 +37,12 @@ import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.UpdateDi
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.ProtocolMetaInterface;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RpcClientUtil;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtocolMetaInterface;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -163,7 +163,7 @@ public class DiskBalancerProtocolClientSideTranslatorPB
   @Override
   public void updateDiskBalancerConfiguration(DiskBalancerConfigurationProto config)
       throws IOException {
-    Preconditions.checkNotNull(config, "DiskBalancer configuration is required");
+    Objects.requireNonNull(config, "DiskBalancer configuration is required");
     UpdateDiskBalancerConfigurationRequestProto request =
         UpdateDiskBalancerConfigurationRequestProto.newBuilder()
             .setConfig(config)

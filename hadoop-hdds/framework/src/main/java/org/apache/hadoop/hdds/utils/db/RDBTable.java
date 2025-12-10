@@ -248,12 +248,24 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws RocksDatabaseException, CodecException {
-    try (KeyValueIterator<byte[], byte[]> iter = iterator(prefix);
-         RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
+    CodecBuffer prefixBuffer = prefix == null || prefix.length == 0 ? null :
+        CodecBufferCodec.get(true).fromPersistedFormat(prefix);
+    KeyValueIterator<CodecBuffer, CodecBuffer> iter;
+    try {
+      iter = iterator(prefixBuffer, KeyValueIterator.Type.KEY_AND_VALUE);
+    } catch (RocksDatabaseException e) {
+      if (prefixBuffer != null) {
+        prefixBuffer.close();
+      }
+      throw e;
+    }
+    try (RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
-        final KeyValue<byte[], byte[]> entry = iter.next();
+        final KeyValue<CodecBuffer, CodecBuffer> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
       }
+    } finally {
+      iter.close();
     }
   }
 

@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -56,8 +57,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
 
-  private static final String NAME = "HealthyPipelineSafeModeRule";
-
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
@@ -71,7 +70,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
       ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
-    super(manager, NAME, eventQueue);
+    super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
@@ -131,7 +130,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized void process(Pipeline pipeline) {
-    Preconditions.checkNotNull(pipeline);
+    Objects.requireNonNull(pipeline, "pipeline == null");
 
     // When SCM is in safe mode for long time, already registered
     // datanode can send pipeline report again, or SCMPipelineManager will

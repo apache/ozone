@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -62,13 +61,6 @@ public class TestCommitInRatis {
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void startCluster(OzoneConfiguration conf) throws Exception {
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 60000,
@@ -106,9 +98,6 @@ public class TestCommitInRatis {
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   private void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {

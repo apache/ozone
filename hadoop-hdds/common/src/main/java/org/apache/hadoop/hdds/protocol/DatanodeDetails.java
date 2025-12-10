@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DA
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
@@ -960,7 +959,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      * @return DatanodeDetails
      */
     public DatanodeDetails build() {
-      Preconditions.checkNotNull(id);
+      Objects.requireNonNull(id, "id == null");
       if (networkLocation == null || networkLocation.getString().isEmpty()) {
         networkLocation = NetConstants.BYTE_STRING_DEFAULT_RACK;
       }

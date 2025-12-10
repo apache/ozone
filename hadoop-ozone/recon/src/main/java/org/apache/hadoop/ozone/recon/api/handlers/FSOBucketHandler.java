@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -115,48 +114,9 @@ public class FSOBucketHandler extends BucketHandler {
   @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {
-    Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
-
-    long totalDU = 0L;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
-
-      String seekPrefix = OM_KEY_PREFIX +
-          volumeId +
-          OM_KEY_PREFIX +
-          bucketId +
-          OM_KEY_PREFIX +
-          parentId +
-          OM_KEY_PREFIX;
-      iterator.seek(seekPrefix);
-      // handle direct keys
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String dbKey = kv.getKey();
-        // since the RocksDB is ordered, seek until the prefix isn't matched
-        if (!dbKey.startsWith(seekPrefix)) {
-          break;
-        }
-        OmKeyInfo keyInfo = kv.getValue();
-        if (keyInfo != null) {
-          totalDU += keyInfo.getReplicatedSize();
-        }
-      }
-    }
-
-    // handle nested keys (DFS)
     NSSummary nsSummary = getReconNamespaceSummaryManager()
-            .getNSSummary(parentId);
-    // empty bucket
-    if (nsSummary == null) {
-      return 0;
-    }
-
-    Set<Long> subDirIds = nsSummary.getChildDir();
-    for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
-    }
-    return totalDU;
+        .getNSSummary(parentId);
+    return nsSummary != null ? nsSummary.getReplicatedSizeOfFiles() : 0L;
   }
 
   /**
