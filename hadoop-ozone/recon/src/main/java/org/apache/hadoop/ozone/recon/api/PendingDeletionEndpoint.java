@@ -81,8 +81,10 @@ public class PendingDeletionEndpoint {
       CompletableFuture.runAsync(dataNodeMetricsService::startTask);
     }
     DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
-    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS) {
-      return Response.accepted(response).build();
+    if (response.getStatus() != DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED) {
+      return Response.accepted(DataNodeMetricsServiceResponse.newBuilder()
+          .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS).build())
+          .build();
     } else {
       return Response.ok(response).build();
     }
