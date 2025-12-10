@@ -302,18 +302,17 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
 
     // Sanity check
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
-
+    // Create a dummy BlockID for the test
     BlockID blockID = new BlockID(1L, 1L);
     long length = 1024L;
-
-    // 💡 Pipeline 用 mock 就可以，不需要真的建一個
+    // Use Mockito to create a mock Pipeline instance.
     Pipeline pipeline = Mockito.mock(Pipeline.class);
 
     Token<OzoneBlockTokenIdentifier> token = null;
+    // Mock XceiverClientFactory since StreamBlockInputStream requires it in the constructor
     XceiverClientFactory xceiverClientFactory = Mockito.mock(XceiverClientFactory.class);
     Function<BlockID, BlockLocationInfo> refreshFunction = b -> null;
-
-    // Act
+    // Create a StreamBlockInputStream instance
     StreamBlockInputStream sbis = new StreamBlockInputStream(
         blockID, length, pipeline, token,
         xceiverClientFactory, refreshFunction, clientConfig);
