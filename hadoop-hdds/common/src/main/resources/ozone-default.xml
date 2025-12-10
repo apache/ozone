@@ -3514,7 +3514,7 @@
   </property>
   <property>
     <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
-    <value>30</value>
+    <value>30s</value>
     <tag>OZONE, RECON, DN</tag>
     <description>
       Minimum delay in API to start a new task for Jmx collection.

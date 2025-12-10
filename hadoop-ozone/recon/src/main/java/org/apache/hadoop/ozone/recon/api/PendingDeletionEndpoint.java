@@ -56,7 +56,7 @@ public class PendingDeletionEndpoint {
 
   @GET
   public Response getPendingDeletionByComponent(@QueryParam("component") String component) {
-    if (component.isEmpty()) {
+    if (component == null || component.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("component query parameter is required").build();
     }
