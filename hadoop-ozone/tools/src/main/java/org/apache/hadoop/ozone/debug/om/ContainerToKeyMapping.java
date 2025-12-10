@@ -91,10 +91,14 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private ColumnFamilyHandle fileCFHandle;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
+  // Cache volume IDs to avoid repeated lookups
+  private final Map<String, Long> volumeCache = new HashMap<>();
 
   // TODO: Add support to OBS keys (HDDS-14118)
   @Override
   public Void call() throws Exception {
+    err().println("Note: A container can have both FSO and OBS keys. Currently this tool processes only FSO keys");
+    
     String dbPath = parent.getDbPath();
     // Parse container IDs
     Set<Long> containerIDs = Arrays.stream(containers.split(","))
@@ -224,7 +228,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         String volumeName = bucketInfo.getVolumeName();
 
         // Get volume ID from volume table
-        long volumeId = getVolumeId(volumeName);
+        Long volumeId = getVolumeId(volumeName);
+        if (volumeId == null) {
+          bucketIterator.get().next();
+          continue;
+        }
 
         bucketVolMap.put(bucketInfo.getObjectID(), Pair.of(volumeId, bucketInfo.getBucketName()));
         bucketVolMap.putIfAbsent(volumeId, Pair.of(null, volumeName));
@@ -293,16 +301,22 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     return Pair.of(parentId, val.substring(0, hashIdx));
   }
 
-  private long getVolumeId(String volumeName) throws Exception {
+  private Long getVolumeId(String volumeName) throws Exception {
+    if (volumeCache.containsKey(volumeName)) {
+      return volumeCache.get(volumeName);
+    }
+    
     String volumeKey = OM_KEY_PREFIX + volumeName;
     byte[] keyBytes = OMDBDefinition.VOLUME_TABLE_DEF.getKeyCodec().toPersistedFormat(volumeKey);
     byte[] valueBytes = rocksDB.get().get(volumeCFHandle, keyBytes);
     
     if (valueBytes != null) {
       OmVolumeArgs volumeArgs = OMDBDefinition.VOLUME_TABLE_DEF.getValueCodec().fromPersistedFormat(valueBytes);
-      return volumeArgs.getObjectID();
+      Long volumeId = volumeArgs.getObjectID();
+      volumeCache.put(volumeName, volumeId);
+      return volumeId;
     }
-    return volumeName.hashCode();
+    return null;
   }
 
   private void addToDirTree(Long objectId, Long parentId, String name) throws IOException {
