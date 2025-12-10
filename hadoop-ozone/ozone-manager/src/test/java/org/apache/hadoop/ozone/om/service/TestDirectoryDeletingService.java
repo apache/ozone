@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -63,7 +64,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
@@ -241,7 +241,6 @@ public class TestDirectoryDeletingService {
   }
 
   @Test
-  @DisplayName("DirectoryDeletingService batches PurgeDirectories by Ratis byte limit (via submitRequest spy)")
   void testPurgeDirectoriesBatching() throws Exception {
     final int ratisLimitBytes = 2304;
 
@@ -308,6 +307,109 @@ public class TestDirectoryDeletingService {
 
       assertThat(payloadBytes).as("Batch size should respect Ratis byte limit").isLessThanOrEqualTo(ratisLimitBytes);
     }
+
+    org.apache.commons.io.FileUtils.deleteDirectory(testDir);
+  }
+
+  @Test
+  void testDeleteRangeFieldsPropagatedToRatis() throws Exception {
+    final int ratisLimitBytes = 4096;
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    File testDir = Files.createTempDirectory("testDeleteRange").toFile();
+    ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
+    conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, ratisLimitBytes, StorageUnit.BYTES);
+    conf.setQuietMode(false);
+
+    OmTestManagers managers = new OmTestManagers(conf);
+    om = managers.getOzoneManager();
+    KeyManager km = managers.getKeyManager();
+
+    DirectoryDeletingService real = km.getDirDeletingService();
+    DirectoryDeletingService dds = Mockito.spy(real);
+
+    List<OzoneManagerProtocolProtos.OMRequest> captured = new ArrayList<>();
+    Mockito.doAnswer(inv -> {
+      OzoneManagerProtocolProtos.OMRequest req = inv.getArgument(0);
+      captured.add(req);
+      return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
+          .setStatus(OzoneManagerProtocolProtos.Status.OK)
+          .build();
+    }).when(dds).submitRequest(Mockito.any(OzoneManagerProtocolProtos.OMRequest.class));
+
+    final long volumeId = 1L, bucketId = 2L;
+    String prefix = "/vol1/buck1/dir1/";
+
+    HddsProtos.KeyValue dirRange1 = HddsProtos.KeyValue.newBuilder()
+        .setKey(prefix + "subdir1")
+        .setValue(prefix + "subdir3")
+        .build();
+    HddsProtos.KeyValue dirRange2 = HddsProtos.KeyValue.newBuilder()
+        .setKey(prefix + "subdir4")
+        .setValue("zzzz")
+        .build();
+
+    HddsProtos.KeyValue fileRange1 = HddsProtos.KeyValue.newBuilder()
+        .setKey(prefix + "file1")
+        .setValue(prefix + "file3")
+        .build();
+
+    OzoneManagerProtocolProtos.PurgePathRequest purgePath = OzoneManagerProtocolProtos.PurgePathRequest.newBuilder()
+        .setVolumeId(volumeId)
+        .setBucketId(bucketId)
+        .setDeletedDir(prefix + "deletedDir")
+        .addDeleteRangeSubDirs(dirRange1)
+        .addDeleteRangeSubDirs(dirRange2)
+        .addDeleteRangeSubFiles(fileRange1)
+        .build();
+
+    List<OzoneManagerProtocolProtos.PurgePathRequest> purgeList = java.util.Collections.singletonList(purgePath);
+
+    org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId vbId =
+        new org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId(volumeId, bucketId);
+    OzoneManagerProtocolProtos.BucketNameInfo bni =
+        OzoneManagerProtocolProtos.BucketNameInfo.newBuilder()
+            .setVolumeId(volumeId)
+            .setBucketId(bucketId)
+            .setVolumeName("v")
+            .setBucketName("b")
+            .build();
+    Map<org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId, OzoneManagerProtocolProtos.BucketNameInfo>
+        bucketNameInfoMap = new HashMap<>();
+    bucketNameInfoMap.put(vbId, bni);
+
+    dds.optimizeDirDeletesAndSubmitRequest(
+        0L, 0L, 0L,
+        new ArrayList<>(), purgeList,
+        null, Time.monotonicNow(),
+        km,
+        kv -> true, kv -> true,
+        bucketNameInfoMap,
+        null, 1L,
+        new AtomicInteger(Integer.MAX_VALUE));
+
+    // Exactly one PurgeDirectories OMRequest expected
+    assertThat(captured).hasSize(1);
+    OzoneManagerProtocolProtos.OMRequest omReq = captured.get(0);
+    assertThat(omReq.getCmdType()).isEqualTo(OzoneManagerProtocolProtos.Type.PurgeDirectories);
+
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeReq = omReq.getPurgeDirectoriesRequest();
+    assertThat(purgeReq.getDeletedPathCount()).isEqualTo(1);
+    OzoneManagerProtocolProtos.PurgePathRequest path = purgeReq.getDeletedPath(0);
+
+    // Verify dir ranges
+    assertThat(path.getDeleteRangeSubDirsCount()).isEqualTo(2);
+    assertThat(path.getDeleteRangeSubDirs(0).getKey()).isEqualTo(dirRange1.getKey());
+    assertThat(path.getDeleteRangeSubDirs(0).getValue()).isEqualTo(dirRange1.getValue());
+    assertThat(path.getDeleteRangeSubDirs(1).getKey()).isEqualTo(dirRange2.getKey());
+    assertThat(path.getDeleteRangeSubDirs(1).getValue()).isEqualTo(dirRange2.getValue());
+
+    // Verify file ranges
+    assertThat(path.getDeleteRangeSubFilesCount()).isEqualTo(1);
+    assertThat(path.getDeleteRangeSubFiles(0).getKey()).isEqualTo(fileRange1.getKey());
+    assertThat(path.getDeleteRangeSubFiles(0).getValue()).isEqualTo(fileRange1.getValue());
 
     org.apache.commons.io.FileUtils.deleteDirectory(testDir);
   }

@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Used in {@link org.apache.hadoop.ozone.om.service.DirectoryDeletingService}
@@ -29,11 +32,33 @@ public class DeleteKeysResult {
   private List<OmKeyInfo> keysToDelete;
   private boolean processedKeys;
   private List<ExclusiveRange> keyRanges;
+  private static final Logger LOG = LoggerFactory.getLogger(DeleteKeysResult.class);
 
   public DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
     this.keysToDelete = keysToDelete;
     this.processedKeys = processedKeys;
     this.keyRanges = keyRanges;
+    validateNonOverlappingRanges();
+  }
+
+  private void validateNonOverlappingRanges() {
+    if (keyRanges == null || keyRanges.size() <= 1) {
+      return;
+    }
+    String lastEnd = null;
+    for (ExclusiveRange range : keyRanges) {
+      if (range == null || range.getStartKey() == null || range.getExclusiveEndKey() == null) {
+        continue;
+      }
+      if (lastEnd != null && range.getStartKey().compareTo(lastEnd) < 0) {
+        LOG.warn(
+            "Overlapping or unsorted delete ranges detected. " + "Clearing keyRanges to avoid incorrect deleteRange. " +
+                "previousEnd={}, currentStart={}", lastEnd, range.getStartKey());
+        keyRanges = Collections.emptyList();
+        return;
+      }
+      lastEnd = range.getExclusiveEndKey();
+    }
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
