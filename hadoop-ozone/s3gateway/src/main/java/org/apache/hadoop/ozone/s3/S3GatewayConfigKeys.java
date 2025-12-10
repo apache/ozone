@@ -49,26 +49,12 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY =
       "ozone.s3g.webadmin.https-address";
 
-  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
-      "ozone.s3g.sts.http.enabled";
-  public static final String OZONE_S3G_STS_HTTP_BIND_HOST_KEY =
-      "ozone.s3g.sts.http-bind-host";
-  public static final String OZONE_S3G_STS_HTTPS_BIND_HOST_KEY =
-      "ozone.s3g.sts.https-bind-host";
-  public static final String OZONE_S3G_STS_HTTP_ADDRESS_KEY =
-      "ozone.s3g.sts.http-address";
-  public static final String OZONE_S3G_STS_HTTPS_ADDRESS_KEY =
-      "ozone.s3g.sts.https-address";
-
   public static final String OZONE_S3G_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_S3G_HTTP_BIND_PORT_DEFAULT = 9878;
   public static final int OZONE_S3G_HTTPS_BIND_PORT_DEFAULT = 9879;
 
   public static final int OZONE_S3G_WEBADMIN_HTTP_BIND_PORT_DEFAULT = 19878;
   public static final int OZONE_S3G_WEBADMIN_HTTPS_BIND_PORT_DEFAULT = 19879;
-
-  public static final int OZONE_S3G_STS_HTTP_BIND_PORT_DEFAULT = 9880;
-  public static final int OZONE_S3G_STS_HTTPS_BIND_PORT_DEFAULT = 9881;
 
   public static final String OZONE_S3G_DOMAIN_NAME = "ozone.s3g.domain.name";
 

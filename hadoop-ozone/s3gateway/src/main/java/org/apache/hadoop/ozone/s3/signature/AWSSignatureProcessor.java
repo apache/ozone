@@ -111,7 +111,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private String getPayloadHash(Map<String, String> headers, SignatureInfo signatureInfo)
       throws OS3Exception, NoSuchAlgorithmException, IOException {
     if (signatureInfo.getVersion() == Version.V2) {
-      return "";
+      throw S3_AUTHINFO_CREATION_ERROR;
     }
     if (signatureInfo.getService().equals("s3")) {
       if (!signatureInfo.isSignPayload()) {
