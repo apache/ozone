@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,14 +27,13 @@ import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
  * can be extended for other OzFS optimizations in future.
  */
+// TODO: support Auditable interface
 @Immutable
 public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPrefixInfo> {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
@@ -85,7 +83,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   /**
    * Builder for OmPrefixInfo.
    */
-  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> implements Auditable {
+  public static class Builder extends WithObjectID.Builder<OmPrefixInfo> {
     private String name;
     private final AclListBuilder acls;
 
@@ -167,14 +165,6 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     @Override
     protected OmPrefixInfo buildObject() {
       return new OmPrefixInfo(this);
-    }
-
-    @Override
-    public Map<String, String> toAuditMap() {
-      Map<String, String> auditMap = new LinkedHashMap<>();
-      auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
-      auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
-      return auditMap;
     }
   }
 

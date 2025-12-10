@@ -237,7 +237,7 @@ public class PrefixManagerImpl implements PrefixManager {
     // or bucket default ACLs.
     boolean newPrefix = prefixInfo == null;
     OmPrefixInfo.Builder prefixInfoBuilder = newPrefix
-        ? new OmPrefixInfo.Builder().setName(ozoneObj.getPath())
+        ? OmPrefixInfo.newBuilder().setName(ozoneObj.getPath())
         : prefixInfo.toBuilder();
 
     if (newPrefix && transactionLogIndex > 0) {
@@ -328,7 +328,7 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo prefixInfo, long transactionLogIndex) throws IOException {
     boolean newPrefix = prefixInfo == null;
     OmPrefixInfo.Builder prefixInfoBuilder = newPrefix
-        ? new OmPrefixInfo.Builder().setName(ozoneObj.getPath())
+        ? OmPrefixInfo.newBuilder().setName(ozoneObj.getPath())
         : prefixInfo.toBuilder();
 
     if (newPrefix && transactionLogIndex > 0) {
