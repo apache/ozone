@@ -236,10 +236,9 @@ public class DataNodeMetricsService {
   }
 
   public synchronized DataNodeMetricsServiceResponse getCollectedMetrics() {
-    if (currentStatus == MetricCollectionStatus.NOT_STARTED || 
-        currentStatus == MetricCollectionStatus.IN_PROGRESS) {
+    if (currentStatus != MetricCollectionStatus.SUCCEEDED) {
       return DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(MetricCollectionStatus.IN_PROGRESS)
+          .setStatus(currentStatus)
           .build();
     }
     return DataNodeMetricsServiceResponse.newBuilder()

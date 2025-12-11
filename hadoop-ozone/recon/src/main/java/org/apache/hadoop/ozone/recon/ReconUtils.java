@@ -853,7 +853,7 @@ public class ReconUtils {
       return null;
     }
     for (Map<String, Object> item :metrics) {
-      if (item.get("name").equals(beanName)) {
+      if (beanName.equals(item.get("name"))) {
         return item;
       }
     }

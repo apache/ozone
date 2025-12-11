@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.recon.metrics.Metric;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
 
 /**
- * Implementation of the Prometheus Metrics Service provider.
+ * Implementation of the Jmx Metrics Service provider.
  */
 @Singleton
 public class JmxServiceProviderImpl implements MetricsServiceProvider {
