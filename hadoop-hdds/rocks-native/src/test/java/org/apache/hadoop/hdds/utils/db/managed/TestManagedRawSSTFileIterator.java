@@ -87,7 +87,9 @@ class TestManagedRawSSTFileIterator {
             Named.of("Value starting & ending with a number & containing null character & new line character",
                 "%1$dvalue\n\0%1$d")),
         Arguments.of(Named.of("Key ending with a number & containing a null character", "key\0%1$d"),
-            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")));
+            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")))
+        .flatMap(i -> Stream.of(Arguments.of(i.get()[0], i.get()[1], true),
+            Arguments.of(i.get()[0], i.get()[1], false)));
   }
 
   @BeforeAll
@@ -97,7 +99,7 @@ class TestManagedRawSSTFileIterator {
 
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
-  public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat) throws Exception {
+  public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat, boolean keyOnly) throws Exception {
     TreeMap<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
         i -> Pair.of(String.format(keyFormat, i), i % 2),
         i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
@@ -117,15 +119,15 @@ class TestManagedRawSSTFileIterator {
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
           Optional<ManagedSlice> lowerBound = keyStart.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           Optional<ManagedSlice> upperBound = keyEnd.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
-          try (ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator
-                   = reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null))) {
+          try (ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator =
+                   reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null), keyOnly)) {
             while (iterator.hasNext()) {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
               String key = StringUtils.bytes2String(r.getKey());
               Pair<String, Integer> recordKey = Pair.of(key, r.getType());
               assertThat(expectedKeys).containsKey(recordKey);
-              assertEquals(Optional.ofNullable(expectedKeys.get(recordKey)).orElse(""),
-                  StringUtils.bytes2String(r.getValue()));
+              assertEquals(keyOnly ? null : Optional.ofNullable(expectedKeys.get(recordKey)).orElse(""),
+                  Optional.ofNullable(r.getValue()).map(StringUtils::bytes2String).orElse(null));
               expectedKeys.remove(recordKey);
             }
             assertEquals(0, expectedKeys.size());

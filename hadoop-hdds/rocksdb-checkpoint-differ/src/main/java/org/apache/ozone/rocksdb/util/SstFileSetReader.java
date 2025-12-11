@@ -30,8 +30,9 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.function.Function;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
@@ -81,8 +82,8 @@ public class SstFileSetReader {
     return estimatedTotalKeys;
   }
 
-  public ClosableIterator<String> getKeyStream(String lowerBound,
-                                     String upperBound) throws RocksDBException {
+  public ClosableIterator<String> getKeyStream(String lowerBound, String upperBound)
+      throws RocksDBException, CodecException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       private ManagedOptions options;
@@ -93,18 +94,18 @@ public class SstFileSetReader {
       private ManagedSlice upperBoundSlice;
 
       @Override
-      protected void init() {
+      protected void init() throws CodecException {
         this.options = new ManagedOptions();
         this.readOptions = new ManagedReadOptions();
         if (Objects.nonNull(lowerBound)) {
           this.lowerBoundSLice = new ManagedSlice(
-              StringUtils.string2Bytes(lowerBound));
+              StringCodec.get().toPersistedFormat(lowerBound));
           readOptions.setIterateLowerBound(lowerBoundSLice);
         }
 
         if (Objects.nonNull(upperBound)) {
           this.upperBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(upperBound));
+              StringCodec.get().toPersistedFormat(upperBound));
           readOptions.setIterateUpperBound(upperBoundSlice);
         }
       }
@@ -131,7 +132,7 @@ public class SstFileSetReader {
   }
 
   public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
@@ -139,22 +140,22 @@ public class SstFileSetReader {
       private ManagedSlice upperBoundSlice;
 
       @Override
-      protected void init() {
+      protected void init() throws CodecException {
         this.options = new ManagedOptions();
         if (Objects.nonNull(lowerBound)) {
           this.lowerBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(lowerBound));
+              StringCodec.get().toPersistedFormat(lowerBound));
         }
         if (Objects.nonNull(upperBound)) {
           this.upperBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(upperBound));
+              StringCodec.get().toPersistedFormat(upperBound));
         }
       }
 
       @Override
       protected ClosableIterator<String> getKeyIteratorForFile(String file) {
         return new ManagedRawSstFileIterator(file, options, lowerBoundSlice, upperBoundSlice,
-            keyValue -> StringUtils.bytes2String(keyValue.getKey()));
+            keyValue -> StringCodec.get().fromPersistedFormat(keyValue.getKey()), true);
       }
 
       @Override
@@ -206,9 +207,9 @@ public class SstFileSetReader {
     private static final int READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
     ManagedRawSstFileIterator(String path, ManagedOptions options, ManagedSlice lowerBound, ManagedSlice upperBound,
-                              Function<ManagedRawSSTFileIterator.KeyValue, String> keyValueFunction) {
+                              Function<ManagedRawSSTFileIterator.KeyValue, String> keyValueFunction, boolean keyOnly) {
       this.fileReader = new ManagedRawSSTFileReader<>(options, path, READ_AHEAD_SIZE);
-      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound);
+      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, keyOnly);
     }
 
     @Override
@@ -295,13 +296,13 @@ public class SstFileSetReader {
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
     private final PriorityQueue<HeapEntry<T>> minHeap;
 
-    private MultipleSstFileIterator(Collection<Path> sstFiles) {
+    private MultipleSstFileIterator(Collection<Path> sstFiles) throws CodecException {
       this.minHeap = new PriorityQueue<>();
       init();
       initMinHeap(sstFiles);
     }
 
-    protected abstract void init();
+    protected abstract void init() throws CodecException;
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
 

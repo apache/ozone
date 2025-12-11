@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1645,7 +1646,7 @@ public class TestRocksDBCheckpointDiffer {
     when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
     try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
         ManagedRawSSTFileReader.class, (mock, context) -> {
-          when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+          when(mock.newIterator(any(), any(), any(), anyBoolean())).thenReturn(mockedRawSSTFileItr);
           doNothing().when(mock).close();
         })) {
       rocksDBCheckpointDiffer.pruneSstFileValues();
