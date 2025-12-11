@@ -31,10 +31,13 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
   // Native address of pointer to the object.
   private final long nativeHandle;
   private final Function<KeyValue, T> transformer;
+  private final boolean keyOnly;
 
-  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer) {
+  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer, boolean keyOnly) {
     this.nativeHandle = nativeHandle;
     this.transformer = transformer;
+    this.keyOnly = keyOnly;
+
   }
 
   private native boolean hasNext(long handle);
@@ -63,7 +66,7 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
     KeyValue keyValue = new KeyValue(this.getKey(nativeHandle),
         UnsignedLong.fromLongBits(this.getSequenceNumber(this.nativeHandle)),
         this.getType(nativeHandle),
-        this.getValue(nativeHandle));
+        keyOnly ? null : this.getValue(nativeHandle));
     this.next(nativeHandle);
     return this.transformer.apply(keyValue);
   }
@@ -106,7 +109,7 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
     }
 
     public byte[] getValue() {
-      return Arrays.copyOf(value, value.length);
+      return value == null ? null : Arrays.copyOf(value, value.length);
     }
 
     @Override

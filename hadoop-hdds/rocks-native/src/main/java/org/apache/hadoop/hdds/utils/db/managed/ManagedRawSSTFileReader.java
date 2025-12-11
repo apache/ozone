@@ -63,7 +63,7 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
 
   public ManagedRawSSTFileIterator<T> newIterator(
       Function<ManagedRawSSTFileIterator.KeyValue, T> transformerFunction,
-      ManagedSlice fromSlice, ManagedSlice toSlice) {
+      ManagedSlice fromSlice, ManagedSlice toSlice, boolean keyOnly) {
     long fromNativeHandle = fromSlice == null ? 0 : fromSlice.getNativeHandle();
     long toNativeHandle = toSlice == null ? 0 : toSlice.getNativeHandle();
     LOG.info("Iterating SST file: {} with native lib. " +
@@ -71,7 +71,7 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
     return new ManagedRawSSTFileIterator<>(
         newIterator(this.nativeHandle, fromSlice != null,
             fromNativeHandle, toSlice != null, toNativeHandle),
-        transformerFunction);
+        transformerFunction, keyOnly);
   }
 
   private native long newRawSSTFileReader(long optionsHandle, String filePath, int readSize);

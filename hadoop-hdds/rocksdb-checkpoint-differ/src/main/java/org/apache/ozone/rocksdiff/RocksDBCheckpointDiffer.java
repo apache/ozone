@@ -1368,7 +1368,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
              options, sstFilePath, SST_READ_AHEAD_SIZE);
          ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null);
+             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, true);
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
       sstFileWriter.open(prunedFilePath);
       while (itr.hasNext()) {

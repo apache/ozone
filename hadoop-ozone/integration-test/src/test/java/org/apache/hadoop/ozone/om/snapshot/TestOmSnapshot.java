@@ -2520,7 +2520,7 @@ public abstract class TestOmSnapshot {
                   try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
                           managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
                        ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
-                           keyValue -> keyValue.getValue(), null, null)) {
+                           keyValue -> keyValue.getValue(), null, null, false)) {
                     while (itr.hasNext()) {
                       assertEquals(0, itr.next().length);
                     }
