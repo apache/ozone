@@ -541,6 +541,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         // ensure binary search works correctly on a later basis.
         for (int version = smallestExistingVersion; version <= maxVersion; version++) {
           Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, version);
+          LOG.info("Deleting snapshot checkpoint directory for snapshot {} version {} at path: {}", snapshotId,
+              version, path);
           deleteDirectory(path);
         }
       }
