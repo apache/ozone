@@ -375,12 +375,12 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data with empty versions
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(mock(OmSnapshotLocalData.class));
+    OmSnapshotLocalData fromSnapshotLocalDataMock = mock(OmSnapshotLocalData.class);
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(UUID.randomUUID(), 1);
 
-    when(fromSnapshotLocalData.get().getSnapshotId()).thenReturn(snapshotId);
-    when(fromSnapshotLocalData.get().getVersionSstFileInfos()).thenReturn(Collections.emptyMap());
-
+    when(fromSnapshotLocalDataMock.getSnapshotId()).thenReturn(snapshotId);
+    when(fromSnapshotLocalDataMock.getVersionSstFileInfos()).thenReturn(Collections.emptyMap());
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(fromSnapshotLocalDataMock);
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
     when(snapProvider.getSnapshotLocalData()).thenReturn(toSnapshotLocalData);
     when(localDataManager.getOmSnapshotLocalData(any(UUID.class), any(UUID.class))).thenReturn(snapProvider);
