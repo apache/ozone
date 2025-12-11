@@ -243,7 +243,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
     omKeyInfo.appendNewBlocks(allocatedLocationList, false);
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
-    omKeyInfo.addAcl(acls.get(0));
+    omKeyInfo = omKeyInfo.toBuilder().addAcl(acls.get(0)).build();
 
     String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
