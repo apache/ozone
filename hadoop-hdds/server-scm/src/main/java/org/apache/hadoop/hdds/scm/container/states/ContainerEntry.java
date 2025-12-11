@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -33,15 +33,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private final Map<DatanodeID, ContainerReplica> replicasMap;
+  private final Map<DatanodeID, ContainerReplica> replicasMap = new TreeMap<>();
   private Set<ContainerReplica> replicas = Collections.emptySet();
 
   ContainerEntry(ContainerInfo info) {
     this.info = info;
-
-    // add +2 for extra replicas during re-replication
-    final int initialSize = info.getReplicationConfig().getRequiredNodes() + 2;
-    replicasMap = new HashMap<>(initialSize, 1);
   }
 
   public ContainerInfo getInfo() {
