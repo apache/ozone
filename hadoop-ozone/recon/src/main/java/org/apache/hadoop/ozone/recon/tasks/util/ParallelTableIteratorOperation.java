@@ -235,7 +235,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                   synchronized (logLock) {
                     if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
                       long cnt = keyCounter.get();
-                      LOG.debug("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
+                      LOG.info("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
                       prevLogCounter.set(cnt);
                     }
                   }

@@ -285,8 +285,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Thread.currentThread().getId(), k -> new HashMap<>());
       
       try {
-        // Call with allowDbRead=false for reprocess (no DB reads)
-        handlePutDirEvent(kv.getValue(), workerMap, false);
+        // Use reprocess-specific method (no DB reads)
+        handlePutDirEventReprocess(kv.getValue(), workerMap);
         
         // Flush this worker's map when it reaches threshold
         if (workerMap.size() >= perWorkerThreshold) {
@@ -337,8 +337,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Thread.currentThread().getId(), k -> new HashMap<>());
       
       try {
-        // Call with allowDbRead=false for reprocess (no DB reads)
-        handlePutKeyEvent(kv.getValue(), workerMap, false);
+        // Use reprocess-specific method (no DB reads)
+        handlePutKeyEventReprocess(kv.getValue(), workerMap);
         
         // Flush this worker's map when it reaches threshold
         if (workerMap.size() >= perWorkerThreshold) {
