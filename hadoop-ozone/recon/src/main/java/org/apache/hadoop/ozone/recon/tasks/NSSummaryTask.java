@@ -120,9 +120,9 @@ public class NSSummaryTask implements ReconOmTask {
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
         nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
-    this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
+    this.nsSummaryTaskWithLegacy =
+        new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, reconOMMetadataManager, ozoneConfiguration,
+            nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold,
         maxIterators, maxWorkers, maxKeysInMemory);
