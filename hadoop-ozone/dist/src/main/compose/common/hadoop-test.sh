@@ -27,6 +27,7 @@ export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_com
 if [[ -z "${HADOOP_TEST_IMAGES}" ]]; then
   # hadoop2 image is only available from Docker Hub
   HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} apache/hadoop:${hadoop2.version}"
+  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:3.3.6"
   HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:${hadoop.version}${docker.hadoop.image.flavor}"
 fi
 

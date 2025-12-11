@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -906,23 +905,17 @@ public final class ContainerProtocolCalls  {
     return datanodeToResponseMap;
   }
 
-  /**
-   * Calls the container protocol to read a chunk.
-   *
-   * @param xceiverClient  client to perform call
-   * @param offset         offset where block starts
-   * @param blockID        ID of the block
-   * @param token          a token for this block (may be null)
-   * @throws IOException if there is an I/O error while performing the call
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public static void readBlock(
-      XceiverClientSpi xceiverClient, long offset, BlockID blockID, Token<? extends TokenIdentifier> token,
-      Map<DatanodeDetails, Integer> replicaIndexes, StreamingReaderSpi streamObserver)
-      throws IOException, InterruptedException {
-    final ReadBlockRequestProto.Builder readBlockRequest =
-        ReadBlockRequestProto.newBuilder()
-            .setOffset(offset);
+  public static ContainerCommandRequestProto buildReadBlockCommandProto(
+      BlockID blockID, long offset, long length, int responseDataSize,
+      Token<? extends TokenIdentifier> token, Pipeline pipeline)
+      throws IOException {
+    final DatanodeDetails datanode = pipeline.getClosestNode();
+    final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());
+    final ReadBlockRequestProto.Builder readBlockRequest = ReadBlockRequestProto.newBuilder()
+        .setOffset(offset)
+        .setLength(length)
+        .setResponseDataSize(responseDataSize)
+        .setBlockID(datanodeBlockID);
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
             .setContainerID(blockID.getContainerID());
@@ -930,23 +923,18 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
-        replicaIndexes, streamObserver);
+    return builder.setDatanodeUuid(datanode.getUuidString())
+        .setReadBlock(readBlockRequest)
+        .build();
   }
 
-  private static void readBlock(XceiverClientSpi xceiverClient,
-      BlockID blockID, ContainerCommandRequestProto.Builder builder, ReadBlockRequestProto.Builder readBlockBuilder,
-      DatanodeDetails datanode, Map<DatanodeDetails, Integer> replicaIndexes,
-      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
-    final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
-    int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
+  static DatanodeBlockID getDatanodeBlockID(BlockID blockID, DatanodeDetails datanode,
+      Map<DatanodeDetails, Integer> replicaIndexes) {
+    final DatanodeBlockID.Builder b = blockID.getDatanodeBlockIDProtobufBuilder();
+    final int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
     if (replicaIndex > 0) {
-      datanodeBlockID.setReplicaIndex(replicaIndex);
+      b.setReplicaIndex(replicaIndex);
     }
-    readBlockBuilder.setBlockID(datanodeBlockID);
-    final ContainerCommandRequestProto request = builder
-        .setDatanodeUuid(datanode.getUuidString())
-        .setReadBlock(readBlockBuilder).build();
-    xceiverClient.streamRead(request, streamObserver);
+    return b.build();
   }
 }

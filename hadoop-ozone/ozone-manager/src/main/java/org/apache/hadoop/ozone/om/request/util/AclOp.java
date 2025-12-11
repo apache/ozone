@@ -15,18 +15,16 @@
  * limitations under the License.
  */
 
-package com.google.protobuf;
+package org.apache.hadoop.ozone.om.request.util;
 
-/** Utilities for protobuf v2. */
-public final class Proto2Utils {
-  /**
-   * Similar to {@link ByteString#copyFrom(byte[])} except that this method does not copy.
-   * This method is safe only if the content of the array remains unchanged.
-   * Otherwise, it violates the immutability of {@link ByteString}.
-   */
-  public static ByteString unsafeByteString(byte[] array) {
-    return array != null && array.length > 0 ? new LiteralByteString(array) : ByteString.EMPTY;
-  }
+import java.util.List;
+import java.util.function.BiPredicate;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 
-  private Proto2Utils() { }
+/**
+ * ACL operation.
+ */
+public interface AclOp extends BiPredicate<List<OzoneAcl>, AclListBuilder> {
+  // just a shortcut to avoid having to repeat long list of generic parameters
 }

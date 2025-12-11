@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -219,7 +219,7 @@ public final class HddsClientUtils {
    */
   public static <T> void checkNotNull(T... references) {
     for (T ref: references) {
-      Preconditions.checkNotNull(ref);
+      Objects.requireNonNull(ref, "ref == null");
     }
   }
 

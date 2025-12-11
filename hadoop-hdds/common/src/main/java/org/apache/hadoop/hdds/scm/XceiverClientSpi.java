@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -144,12 +145,15 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
-  public void streamRead(ContainerCommandRequestProto request,
-      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
+  public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
 
-  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+  public void streamRead(ContainerCommandRequestProto request, StreamingReadResponse streamObserver) {
+    throw new UnsupportedOperationException("Stream read is not supported");
+  }
+
+  public void completeStreamRead() {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
 

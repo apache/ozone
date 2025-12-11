@@ -18,7 +18,6 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -127,8 +126,7 @@ public final class CompactionFileInfo extends SstFileInfo {
     private boolean pruned = false;
 
     public Builder(String fileName) {
-      Preconditions.checkNotNull(fileName, "FileName is required parameter.");
-      this.fileName = fileName;
+      this.fileName = Objects.requireNonNull(fileName, "FileName is required parameter.");
     }
 
     public Builder setStartRange(String startRange) {

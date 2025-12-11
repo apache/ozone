@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -119,7 +119,7 @@ public class TestReconWithOzoneManagerHA {
     String expectedUrl = "http://" +
         (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
     assertEquals(expectedUrl, snapshotUrl);
     // Write some data
