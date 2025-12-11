@@ -109,8 +109,6 @@ public class IncrementalContainerReportHandler
           getLogger().warn("Container not found: {}", detailsForLogging);
         } catch (NodeNotFoundException ex) {
           getLogger().error("{}: {}", ex, detailsForLogging);
-        } catch (ContainerReplicaNotFoundException e) {
-          getLogger().warn("Container replica not found: {}", detailsForLogging, e);
         } catch (SCMException ex) {
           if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
             getLogger().info("SCM_NOT_LEADER: Failed to process {}", detailsForLogging);
