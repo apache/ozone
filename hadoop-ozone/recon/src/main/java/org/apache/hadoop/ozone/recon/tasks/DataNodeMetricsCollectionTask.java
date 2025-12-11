@@ -43,6 +43,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private final boolean httpsEnabled;
   private final MetricsServiceProvider metricsServiceProvider;
   private static final String BEAN_NAME = "Hadoop:service=HddsDatanode,name=BlockDeletingService";
+  private static final String METRICS_KEY = "TotalPendingBlockBytes";
 
   public DataNodeMetricsCollectionTask(DatanodeDetails nodeDetails, boolean httpsEnabled,
                                        MetricsServiceProviderFactory factory) {
@@ -61,7 +62,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
             nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
       }
       Map<String, Object> deletionMetrics = ReconUtils.getMetricsData(metrics, BEAN_NAME);
-      long pendingBlockSize = ReconUtils.extractMetricValue(deletionMetrics, "TotalPendingBlockBytes");
+      long pendingBlockSize = ReconUtils.extractMetricValue(deletionMetrics, METRICS_KEY);
 
       return new DatanodePendingDeletionMetrics(
           nodeDetails.getHostName(), nodeDetails.getUuidString(), pendingBlockSize);

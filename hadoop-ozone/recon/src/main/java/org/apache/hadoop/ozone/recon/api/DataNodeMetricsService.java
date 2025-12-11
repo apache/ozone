@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
@@ -29,12 +27,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -49,261 +47,217 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.tasks.DataNodeMetricsCollectionTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-/**
- * The DataNodeMetricsService class is responsible for collecting and managing
- * metrics related to datanodes in an Ozone Recon environment. Specifically,
- * it gathers metrics about pending block deletions from the datanodes and
- * provides aggregated results.
- * This service tracks the status of metric collection tasks and provides
- * an interface to query the state and results of these tasks.
- * The metrics collection process involves communicating with each datanode,
- * fetching their pending deletion metrics, and aggregating the data.
- */
 
+/**
+ * Service for collecting and managing DataNode pending deletion metrics.
+ * Collects metrics asynchronously from all datanodes and provides aggregated results.
+ */
 @Singleton
 public class DataNodeMetricsService {
+  
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
-  private final ExecutorService executorService;
+  private static final int MAX_POOL_SIZE = 500;
+  private static final int KEEP_ALIVE_TIME = 60;
+  private static final int QUEUE_CAPACITY = 500;
+  private static final int POLL_INTERVAL_MS = 200;
+
+  private final ThreadPoolExecutor executorService;
   private final ReconNodeManager reconNodeManager;
   private final boolean httpsEnabled;
-  private final int minimumApiDelay;
+  private final int minimumApiDelayMs;
   private final MetricsServiceProviderFactory metricsServiceProviderFactory;
+  
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
-  private Long totalPendingDeletion = 0L;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
+  private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
   private int totalNodesFailed;
   private long lastCollectionEndTime;
-  private static final int REQUEST_TIMEOUT = 60000;
 
   @Inject
   public DataNodeMetricsService(
-          OzoneStorageContainerManager reconSCM,
-          OzoneConfiguration config,
-          MetricsServiceProviderFactory metricsServiceProviderFactory) {
-    reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
-    int threadCount = config.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
-        OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
-    minimumApiDelay = (int) config.getTimeDuration(OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
-            OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT, TimeUnit.MILLISECONDS);
-
-    httpsEnabled = HttpConfig.getHttpPolicy(config).isHttpsEnabled();
-    lastCollectionEndTime = 0;
-    executorService = Executors.newFixedThreadPool(threadCount,
-        new ThreadFactoryBuilder().setNameFormat("DataNodeMetricsCollectionTasksThread-%d")
-            .build());
+      OzoneStorageContainerManager reconSCM,
+      OzoneConfiguration config,
+      MetricsServiceProviderFactory metricsServiceProviderFactory) {
+    
+    this.reconNodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
+    this.httpsEnabled = HttpConfig.getHttpPolicy(config).isHttpsEnabled();
+    this.minimumApiDelayMs = (int) config.getTimeDuration(
+        OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
+        OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT,
+        TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
+    this.lastCollectionEndTime = 0;
+    
+    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
+    this.executorService = new ThreadPoolExecutor(
+        corePoolSize, MAX_POOL_SIZE,
+        KEEP_ALIVE_TIME, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(QUEUE_CAPACITY),
+        new ThreadFactoryBuilder()
+            .setNameFormat("DataNodeMetricsCollector-%d")
+            .build());
   }
 
+  /**
+   * Starts the metrics collection task if not already running and rate limit allows.
+   */
   public synchronized void startTask() {
+    // Check if already running
     if (currentStatus == MetricCollectionStatus.IN_PROGRESS) {
-      LOG.warn("Metrics collection task is already in progress. Skipping new task.");
+      LOG.warn("Metrics collection already in progress, skipping");
       return;
     }
-    if (lastCollectionEndTime > System.currentTimeMillis() -  minimumApiDelay) {
-      LOG.info("Skipping metrics collection task due to last collection time being more than {} seconds ago.",
-              minimumApiDelay / 1000);
+    
+    // Check rate limit
+    if (System.currentTimeMillis() - lastCollectionEndTime < minimumApiDelayMs) {
+      LOG.info("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
       return;
     }
-    totalNodesFailed = 0;
-    Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
 
+    Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
     if (nodes.isEmpty()) {
-      LOG.warn("No datanodes found to query for metrics collection");
-      initializeTaskState(0);
+      LOG.warn("No datanodes found to query");
+      resetState();
       currentStatus = MetricCollectionStatus.SUCCEEDED;
       return;
     }
 
-    LOG.info("Starting metrics collection task for {} datanodes", nodes.size());
-    initializeTaskState(nodes.size());
-    Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> dataNodeFutures =
-        submitMetricsCollectionTasks(nodes);
-    collectMetricsWithTimeout(dataNodeFutures, nodes.size());
-    // Add any remaining unfinished tasks as failed entries
-    addFailedEntries(dataNodeFutures);
-    currentStatus = MetricCollectionStatus.SUCCEEDED;
-    lastCollectionEndTime = System.currentTimeMillis();
-    LOG.info("Metrics collection completed. Queried: {}, Failed: {}",
-        totalNodesQueried, totalNodesFailed);
-  }
-
-  /**
-   * Initializes the state for a new metrics collection task.
-   */
-  private void initializeTaskState(int nodeCount) {
-    pendingDeletionList = new ArrayList<>(nodeCount);
-    totalPendingDeletion = 0L;
+    // Set status immediately before starting async collection
     currentStatus = MetricCollectionStatus.IN_PROGRESS;
+    LOG.info("Starting metrics collection for {} datanodes", nodes.size());
+    
+    // Run collection asynchronously so status can be queried
+    CompletableFuture.runAsync(() -> collectMetrics(nodes), executorService)
+        .exceptionally(throwable -> {
+          LOG.error("Metrics collection failed", throwable);
+          synchronized (this) {
+            currentStatus = MetricCollectionStatus.SUCCEEDED;
+          }
+          return null;
+        });
   }
 
   /**
-   * Submits metrics collection tasks for all datanodes.
+   * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
-  private Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> submitMetricsCollectionTasks(
-      Set<DatanodeDetails> nodes) {
-    Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
+  private void collectMetrics(Set<DatanodeDetails> nodes) {
+    // Initialize state
+    List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
+    long totalPending = 0L;
+    int failed = 0;
+
+    // Submit all collection tasks
+    Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures =
+        new HashMap<>();
     for (DatanodeDetails node : nodes) {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
-              node, httpsEnabled, metricsServiceProviderFactory);
+          node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
           node.getHostName(), node.getUuidString(), -1L);
       futures.put(key, executorService.submit(task));
     }
+    
+    int totalQueried = futures.size();
+    LOG.debug("Submitted {} collection tasks", totalQueried);
 
-    totalNodesQueried = futures.size();
-    LOG.debug("Submitted {} metrics collection tasks", totalNodesQueried);
-
-    return futures;
-  }
-
-  /**
-   * Collects metrics from completed tasks with a global timeout.
-   * Uses iterator to safely remove entries while iterating.
-   */
-  private void collectMetricsWithTimeout(
-      Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
-      int nodeCount) {
-    // Calculate timeout: half of total request timeout for all nodes
-    long maximumTaskRunningTimeMs = (long) REQUEST_TIMEOUT * nodeCount / 2;
-    long startTime = System.currentTimeMillis();
-    long pollIntervalMs = 200;
+    // Poll for completed tasks, process them immediately, wait for all (no timeout)
     while (!futures.isEmpty()) {
-      if (hasTimedOut(startTime, maximumTaskRunningTimeMs)) {
-        LOG.warn("Stopping metrics collection task due to timeout. " +
-            "Remaining tasks: {}", futures.size());
-        break;
+      Iterator<Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>>> 
+          iterator = futures.entrySet().iterator();
+      
+      boolean processedAny = false;
+      while (iterator.hasNext()) {
+        Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> entry = 
+            iterator.next();
+        
+        // Check if this task is done
+        if (entry.getValue().isDone()) {
+          try {
+            DatanodePendingDeletionMetrics result = entry.getValue().get();
+            if (result.getPendingBlockSize() < 0) {
+              failed++;
+            } else {
+              totalPending += result.getPendingBlockSize();
+            }
+            results.add(result);
+            LOG.debug("Processed result from {}", entry.getKey().getHostName());
+          } catch (ExecutionException | InterruptedException e) {
+            String errorType = e instanceof InterruptedException ? "interrupted" : "execution failed";
+            LOG.error("Task {} for datanode {} [{}]: {}",
+                errorType, entry.getKey().getHostName(), entry.getKey().getDatanodeUuid(), e.getMessage());
+            failed++;
+            results.add(entry.getKey());
+            if (e instanceof InterruptedException) {
+              Thread.currentThread().interrupt();
+              break; // Exit if interrupted
+            }
+          }
+          iterator.remove();
+          processedAny = true;
+        }
       }
-      processCompletedTasks(futures);
-      sleepBetweenPolls(pollIntervalMs);
-    }
-  }
-
-  /**
-   * Checks if the task has exceeded the maximum allowed running time.
-   */
-  private boolean hasTimedOut(long startTime, long maximumTaskRunningTimeMs) {
-    return (System.currentTimeMillis() - startTime) > maximumTaskRunningTimeMs;
-  }
-
-  /**
-   * Processes all completed tasks and removes them from the futures map.
-   * Uses iterator to avoid ConcurrentModificationException.
-   */
-  private void processCompletedTasks(
-      Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures) {
-    Iterator<Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>>>
-        iterator = futures.entrySet().iterator();
-
-    while (iterator.hasNext()) {
-      Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> entry =
-          iterator.next();
-
-      if (entry.getValue().isDone()) {
-        processCompletedTask(entry.getKey(), entry.getValue());
-        iterator.remove();
+      
+      // Sleep before next poll only if there are remaining futures and we didn't process any
+      if (!futures.isEmpty()) {
+        if (!processedAny) {
+          try {
+            Thread.sleep(POLL_INTERVAL_MS);
+          } catch (InterruptedException e) {
+            LOG.warn("Collection polling interrupted");
+            Thread.currentThread().interrupt();
+            break;
+          }
+        }
       }
     }
-  }
 
-  /**
-   * Processes a single completed task and updates the metrics.
-   */
-  private void processCompletedTask(DatanodePendingDeletionMetrics key,
-                                    Future<DatanodePendingDeletionMetrics> future) {
-    try {
-      DatanodePendingDeletionMetrics result = future.get(REQUEST_TIMEOUT, TimeUnit.SECONDS);
-      if (result.getPendingBlockSize() < 0) {
-        totalNodesFailed += 1;
-      } else {
-        totalPendingDeletion += result.getPendingBlockSize();
-      }
-      pendingDeletionList.add(result);
-    } catch (ExecutionException | InterruptedException | TimeoutException e) {
-      logTaskFailure(key, e);
-      totalNodesFailed += 1;
-      // Add the key with -1 indicating failure
-      pendingDeletionList.add(key);
+    // Update shared state atomically
+    synchronized (this) {
+      pendingDeletionList = results;
+      totalPendingDeletion = totalPending;
+      totalNodesQueried = totalQueried;
+      totalNodesFailed = failed;
+      currentStatus = MetricCollectionStatus.SUCCEEDED;
+      lastCollectionEndTime = System.currentTimeMillis();
     }
+    
+    LOG.info("Metrics collection completed. Queried: {}, Failed: {}", totalQueried, failed);
   }
 
   /**
-   * Logs appropriate error message based on exception type.
+   * Resets the collection state.
    */
-  private void logTaskFailure(DatanodePendingDeletionMetrics key, Exception e) {
-    String errorType = getErrorType(e);
-    LOG.error("Task {} for datanode {} [{}]: {}",
-        errorType, key.getHostName(), key.getDatanodeUuid(), e.getMessage());
-  }
-
-  /**
-   * Returns a human-readable error type description.
-   */
-  private String getErrorType(Exception e) {
-    if (e instanceof ExecutionException) {
-      return "execution failed";
-    } else if (e instanceof InterruptedException) {
-      return "interrupted";
-    } else if (e instanceof TimeoutException) {
-      return "timed out";
-    }
-    return "failed";
-  }
-
-  /**
-   * Adds all remaining unfinished tasks as failed entries.
-   */
-  private void addFailedEntries(
-      Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures) {
-    for (DatanodePendingDeletionMetrics key : futures.keySet()) {
-      pendingDeletionList.add(key);
-      totalNodesFailed++;
-    }
-  }
-
-  /**
-   * Sleeps for the specified interval, handling interruptions gracefully.
-   */
-  private void sleepBetweenPolls(long intervalMs) {
-    try {
-      Thread.sleep(intervalMs);
-    } catch (InterruptedException e) {
-      LOG.warn("Polling sleep interrupted: {}", e.getMessage());
-      Thread.currentThread().interrupt(); // Restore interrupt status
-    }
+  private void resetState() {
+    pendingDeletionList = new ArrayList<>();
+    totalPendingDeletion = 0L;
+    totalNodesQueried = 0;
+    totalNodesFailed = 0;
   }
 
   public synchronized DataNodeMetricsServiceResponse getCollectedMetrics() {
-    if (currentStatus == MetricCollectionStatus.NOT_STARTED || currentStatus == MetricCollectionStatus.IN_PROGRESS) {
+    if (currentStatus == MetricCollectionStatus.NOT_STARTED || 
+        currentStatus == MetricCollectionStatus.IN_PROGRESS) {
       return DataNodeMetricsServiceResponse.newBuilder()
-              .setStatus(MetricCollectionStatus.IN_PROGRESS)
-              .build();
+          .setStatus(MetricCollectionStatus.IN_PROGRESS)
+          .build();
     }
     return DataNodeMetricsServiceResponse.newBuilder()
-            .setStatus(currentStatus)
-            .setPendingDeletion(pendingDeletionList)
-            .setTotalPendingDeletion(totalPendingDeletion)
-            .setTotalNodesQueried(totalNodesQueried)
-            .setTotalNodeQueryFailures(totalNodesFailed)
-            .build();
+        .setStatus(currentStatus)
+        .setPendingDeletion(pendingDeletionList)
+        .setTotalPendingDeletion(totalPendingDeletion)
+        .setTotalNodesQueried(totalNodesQueried)
+        .setTotalNodeQueryFailures(totalNodesFailed)
+        .build();
   }
 
   public MetricCollectionStatus getTaskStatus() {
     return currentStatus;
   }
 
-  /**
-   * Enum representing the status of a metric collection task.
-   * This enum is used to describe the various stages in the lifecycle of
-   * a metric collection operation.
-   */
-  public enum MetricCollectionStatus {
-    SUCCEEDED, IN_PROGRESS, NOT_STARTED
-  }
-
   @PreDestroy
   public void shutdown() {
-    LOG.info("Shutting down DataNodeMetricsService executor...");
+    LOG.info("Shutting down DataNodeMetricsService");
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
@@ -313,5 +267,12 @@ public class DataNodeMetricsService {
       executorService.shutdownNow();
       Thread.currentThread().interrupt();
     }
+  }
+
+  /**
+   * Status of metric collection task.
+   */
+  public enum MetricCollectionStatus {
+    NOT_STARTED, IN_PROGRESS, SUCCEEDED
   }
 }

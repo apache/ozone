@@ -3505,14 +3505,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.dn.metrics.collection.thread.count</name>
-    <value>10</value>
-    <tag>OZONE, RECON, DN</tag>
-    <description>
-      The number of threads running to get metrics from jmx endpoint.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
     <value>30s</value>
     <tag>OZONE, RECON, DN</tag>

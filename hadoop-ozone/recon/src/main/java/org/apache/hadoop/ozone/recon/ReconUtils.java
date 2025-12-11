@@ -865,12 +865,15 @@ public class ReconUtils {
       return  -1;
     }
     Object value = metrics.get(keyName);
-    if (value instanceof Long) {
-      return (long) value;
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
     }
-    if (value instanceof Integer) {
-      Integer intValue = (Integer) value;
-      return intValue.longValue();
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException e) {
+        // Not a number string, fall through to return -1
+      }
     }
     return -1;
   }
