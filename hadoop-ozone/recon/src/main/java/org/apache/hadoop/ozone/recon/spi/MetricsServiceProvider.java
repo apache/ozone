@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.net.HttpURLConnection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
 
 /**
@@ -57,12 +56,5 @@ public interface MetricsServiceProvider {
    * @return List of Json map of metrics response.
    * @throws Exception exception
    */
-  CompletableFuture<List<Map<String, Object>>> getMetricsAsync(String endpoint, String queryString);
-
-  /**
-   * Shuts down the service provider and releases any system resources or
-   * connections held by it. This method is typically used to clean up
-   * and terminate the service provider's operation.
-   */
-  void shutdown();
+  List<Map<String, Object>> getMetrics(String queryString) throws Exception;
 }

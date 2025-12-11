@@ -70,10 +70,11 @@ public class MetricsServiceProviderFactory {
 
   /**
    * Returns the configured MetricsServiceProvider implementation for Jmx.
+   * @param endpoint
    * @return MetricsServiceProvider instance for Jmx
    */
-  public MetricsServiceProvider getJmxMetricsServiceProvider() {
-    return new JmxServiceProviderImpl();
+  public MetricsServiceProvider getJmxMetricsServiceProvider(String endpoint) {
+    return new JmxServiceProviderImpl(configuration, reconUtils, endpoint);
   }
 
   /**

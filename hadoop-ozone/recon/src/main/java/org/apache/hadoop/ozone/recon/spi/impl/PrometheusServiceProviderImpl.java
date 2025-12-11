@@ -26,10 +26,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
@@ -46,7 +46,8 @@ import org.slf4j.LoggerFactory;
  * Implementation of the Prometheus Metrics Service provider.
  */
 @Singleton
-public class PrometheusServiceProviderImpl implements MetricsServiceProvider {
+public class PrometheusServiceProviderImpl
+    implements MetricsServiceProvider {
 
   public static final String PROMETHEUS_INSTANT_QUERY_API = "query";
 
@@ -123,13 +124,8 @@ public class PrometheusServiceProviderImpl implements MetricsServiceProvider {
   }
 
   @Override
-  public CompletableFuture<List<Map<String, Object>>> getMetricsAsync(String endpoint, String queryString) {
-    return null;
-  }
-
-  @Override
-  public void shutdown() {
-
+  public List<Map<String, Object>> getMetrics(String queryString) throws Exception {
+    return Collections.emptyList();
   }
 
   /**

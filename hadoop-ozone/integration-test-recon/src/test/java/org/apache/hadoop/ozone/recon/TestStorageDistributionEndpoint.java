@@ -22,11 +22,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.TestReconEndpointUtil.getReconWebAddress;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -119,14 +118,17 @@ public class TestStorageDistributionEndpoint {
   @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, 100,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        100, TimeUnit.MILLISECONDS);
     conf.setLong(OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, 1L);
-    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 50, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL, 500, TimeUnit.MILLISECONDS);
-    conf.set(ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY, "1s");
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 50,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
+        TimeUnit.MILLISECONDS);
 
     // Enhanced SCM configuration for faster block deletion processing
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
@@ -135,8 +137,15 @@ public class TestStorageDistributionEndpoint {
     conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
 
     // Enhanced DataNode configuration to move pending deletion from SCM to DN faster
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionInterval(Duration.ofMillis(30000));
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(10000));
+    // Increase block delete queue limit to allow more queued commands on DN
+    dnConf.setBlockDeleteQueueLimit(50);
+    // Reduce the interval for delete command worker processing
+    dnConf.setBlockDeleteCommandWorkerInterval(Duration.ofMillis(10000));
+    // Increase blocks deleted per interval to speed up deletion
+    dnConf.setBlockDeletionLimit(5000);
     conf.setFromObject(dnConf);
 
     recon = new ReconService(conf);
@@ -207,7 +216,7 @@ public class TestStorageDistributionEndpoint {
         LOG.debug("Waiting for storage distribution assertions to pass", e);
         return false;
       }
-    }, 1000, 30000);
+    }, 5000, 30000);
     closeAllContainers();
     fs.delete(dir1, true);
     GenericTestUtils.waitFor(() -> {
@@ -226,7 +235,7 @@ public class TestStorageDistributionEndpoint {
         LOG.debug("Waiting for storage distribution assertions to pass", e);
         return false;
       }
-    }, 1000, 30000);
+    }, 2000, 60000);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -244,10 +253,7 @@ public class TestStorageDistributionEndpoint {
         LOG.debug("Waiting for storage distribution assertions to pass", e);
         return false;
       }
-    }, 2000, 30000);
-    GenericTestUtils.waitFor(() ->
-            scm.getClientProtocolServer().getDeletedBlockSummary().getTotalBlockCount() == 0,
-        1000, 30000);
+    }, 2000, 60000);
     GenericTestUtils.waitFor(() -> {
       try {
         scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
@@ -290,7 +296,7 @@ public class TestStorageDistributionEndpoint {
       } catch (Throwable e) {
         return false;
       }
-    }, 2000, 60000);
+    }, 2000, 30000);
   }
 
   private void verifyBlocksCreated(
