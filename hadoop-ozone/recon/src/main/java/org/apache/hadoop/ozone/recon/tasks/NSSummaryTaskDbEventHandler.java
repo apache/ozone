@@ -84,8 +84,7 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap) throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -182,10 +181,11 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
-  protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
-                                      Map<Long, NSSummary> nsSummaryMap)
-      throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+  protected void handleDeleteKeyEvent(
+      OmKeyInfo keyInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      long parentObjectId
+  ) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
