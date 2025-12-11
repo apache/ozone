@@ -17,14 +17,17 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -37,6 +40,7 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -71,12 +75,13 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
       "abcdefghijklmnopqrstuvwxyz/+";
   private static final int CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH = CHARS_FOR_SECRET_ACCESS_KEYS.length();
-  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
-
   public static final String STS_TOKEN_PREFIX = "ASIA";
 
-  public S3AssumeRoleRequest(OMRequest omRequest) {
+  private final Clock clock;
+
+  public S3AssumeRoleRequest(OMRequest omRequest, Clock clock) {
     super(omRequest);
+    this.clock = clock;
   }
 
   @Override
@@ -127,7 +132,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       final String assumedRoleId = roleId + ":" + roleSessionName;
 
       // Calculate expiration of session token
-      final long expirationEpochSeconds = Instant.now().plusSeconds(durationSeconds).getEpochSecond();
+      final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
 
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
           .setAccessKeyId(tempAccessKeyId)
@@ -201,7 +206,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
     return ozoneManager.getSTSTokenSecretManager().createSTSTokenString(
         tempAccessKeyId, originalAccessKeyId, roleArn, assumeRoleRequest.getDurationSeconds(), secretAccessKey,
-        sessionPolicy, CLOCK);
+        sessionPolicy, clock);
   }
 
   /**
@@ -209,10 +214,31 @@ public class S3AssumeRoleRequest extends OMClientRequest {
    * to IAccessAuthorizer.generateAssumeRoleSessionPolicy() which is currently only implemented
    * by RangerOzoneAuthorizer.
    */
-  private String getSessionPolicy(OzoneManager ozoneManager, String originalAccessKeyId, String awsIamPolicy,
+  @VisibleForTesting
+  String getSessionPolicy(OzoneManager ozoneManager, String originalAccessKeyId, String awsIamPolicy,
       String hostName, InetAddress remoteIp, UserGroupInformation ugi, String targetRoleName) throws IOException {
-    // TODO sts - implement in a future PR
-    return null;
+
+    final String volumeName;
+    if (ozoneManager.isS3MultiTenancyEnabled()) {
+      final Optional<String> tenantOpt = ozoneManager.getMultiTenantManager()
+          .getTenantForAccessID(originalAccessKeyId);
+      if (tenantOpt.isPresent()) {
+        volumeName = ozoneManager.getMultiTenantManager()
+            .getTenantVolumeName(tenantOpt.get());
+      } else {
+        volumeName = HddsClientUtils.getDefaultS3VolumeName(ozoneManager.getConfiguration());
+      }
+    } else {
+      volumeName = HddsClientUtils.getDefaultS3VolumeName(ozoneManager.getConfiguration());
+    }
+
+    final Set<OzoneGrant> grants = StringUtils.isBlank(awsIamPolicy) ?
+        null :
+        IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER);
+
+    return ozoneManager.getAccessAuthorizer().generateAssumeRoleSessionPolicy(
+        new org.apache.hadoop.ozone.security.acl.AssumeRoleRequest(
+            hostName, remoteIp, ugi, targetRoleName, grants));
   }
 
   /**

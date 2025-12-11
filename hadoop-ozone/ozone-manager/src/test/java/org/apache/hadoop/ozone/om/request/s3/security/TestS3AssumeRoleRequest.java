@@ -17,21 +17,32 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -43,9 +54,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.STSTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /**
  * Unit tests for S3AssumeRoleRequest.
@@ -55,13 +73,32 @@ public class TestS3AssumeRoleRequest {
   private static final String ROLE_ARN_1 = "arn:aws:iam::123456789012:role/MyRole1";
   private static final String SESSION_NAME = "testSessionName";
   private static final String ORIGINAL_ACCESS_KEY_ID = "origAccessKeyId";
+  private static final String TARGET_ROLE_NAME = "targetRole";
+  private static final String SESSION_POLICY_VALUE = "session-policy";
+  private static final String AWS_IAM_POLICY = "{\n" +
+      "  \"Statement\": [{\n" +
+      "    \"Effect\": \"Allow\",\n" +
+      "    \"Action\": \"s3:*\",\n" +
+      "    \"Resource\": \"arn:aws:s3:::*/*\"\n" +
+      "  }]\n" +
+      "}";
+
+  private static final TestClock CLOCK = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+  private static final String OM_HOST = "om-host";
+  private static final InetAddress LOOPBACK_IP = InetAddress.getLoopbackAddress();
+  private static final Set<OzoneGrant> EMPTY_GRANTS = Collections.singleton(new OzoneGrant(emptySet(), emptySet()));
 
   private OzoneManager ozoneManager;
   private ExecutionContext context;
+  private IAccessAuthorizer accessAuthorizer;
 
   @BeforeEach
   public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class);
+
+    final OzoneConfiguration configuration = new OzoneConfiguration();
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
 
     final SecretKeySignerClient secretKeyClient = mock(SecretKeySignerClient.class);
     final ManagedSecretKey managedSecretKey = mock(ManagedSecretKey.class);
@@ -80,6 +117,13 @@ public class TestS3AssumeRoleRequest {
     when(ozoneManager.getOmRpcServerAddr()).thenReturn(
         new InetSocketAddress("localhost", 9876));
     when(ozoneManager.getSTSTokenSecretManager()).thenReturn(stsTokenSecretManager);
+
+    accessAuthorizer = mock(IAccessAuthorizer.class);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(accessAuthorizer);
+    when(accessAuthorizer.generateAssumeRoleSessionPolicy(any(
+        org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class)))
+        .thenReturn(SESSION_POLICY_VALUE);
+
     context = ExecutionContext.of(1L, null);
   }
 
@@ -93,7 +137,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(899)  // less than 900
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -112,7 +156,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(43201)  // more than 43200
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -131,7 +175,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(43200)  // exactly max
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -149,7 +193,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(900)  // exactly min
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -169,7 +213,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(3600)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -189,8 +233,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(durationSeconds)
         ).build();
 
-    final long before = Instant.now().getEpochSecond();
-    final OMClientResponse clientResponse = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse clientResponse = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = clientResponse.getOMResponse();
 
@@ -214,10 +257,9 @@ public class TestS3AssumeRoleRequest {
     final int expectedAssumedRoleIdLength = 4 + 16 + 1 + SESSION_NAME.length(); // 4 for AROA, 16 chars, 1 for ":"
     assertThat(assumeRoleResponse.getAssumedRoleId().length()).isEqualTo(expectedAssumedRoleIdLength);
 
-    // Expiration around now + durationSeconds (allow small skew)
-    final long after = Instant.now().getEpochSecond();
+    // Verify expiration added durationSeconds
     final long expirationEpochSeconds = assumeRoleResponse.getExpirationEpochSeconds();
-    assertThat(expirationEpochSeconds).isBetween(before + durationSeconds - 1, after + durationSeconds + 1);
+    assertThat(expirationEpochSeconds).isEqualTo(CLOCK.instant().getEpochSecond() + durationSeconds);
   }
 
   @Test
@@ -250,9 +292,9 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(3600)
         ).build();
 
-    final OMClientResponse response1 = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response1 = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
-    final OMClientResponse response2 = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response2 = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
 
     final AssumeRoleResponse assumeRoleResponse1 = response1.getOMResponse().getAssumeRoleResponse();
@@ -281,7 +323,7 @@ public class TestS3AssumeRoleRequest {
                 .setDurationSeconds(3600)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(response.getOMResponse().getMessage()).isEqualTo("RoleSessionName is required");
@@ -296,7 +338,7 @@ public class TestS3AssumeRoleRequest {
                 .setRoleSessionName("T")   // Less than 2 characters
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -315,7 +357,7 @@ public class TestS3AssumeRoleRequest {
                 .setRoleSessionName(tooLongRoleSessionName)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -334,7 +376,7 @@ public class TestS3AssumeRoleRequest {
                 .setRoleSessionName(roleSessionName)  // exactly max length
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -351,7 +393,7 @@ public class TestS3AssumeRoleRequest {
                 .setRoleSessionName("TT")   // exactly min length
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
@@ -371,9 +413,112 @@ public class TestS3AssumeRoleRequest {
                 .setAwsIamSessionPolicy(sessionPolicy)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest)
+    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
         .validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
+  }
+
+  @Test
+  public void testGetSessionPolicyUsesDefaultVolumeWhenMultiTenantDisabled() throws Exception {
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
+
+    // Ensure s3v default volume was captured in the method invocation
+    final org.apache.hadoop.ozone.security.acl.AssumeRoleRequest capturedAssumeRoleRequest =
+        captureAssumeRoleRequest("s3v", "userNameA");
+
+    assertThat(capturedAssumeRoleRequest.getHost()).isEqualTo(OM_HOST);
+    assertThat(capturedAssumeRoleRequest.getIp()).isEqualTo(LOOPBACK_IP);
+    assertThat(capturedAssumeRoleRequest.getTargetRoleName()).isEqualTo(TARGET_ROLE_NAME);
+    assertThat(capturedAssumeRoleRequest.getGrants()).isEqualTo(EMPTY_GRANTS);
+  }
+
+  @Test
+  public void testGetSessionPolicyResolvesIamPolicyWithTenantVolume() throws Exception {
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(true);
+
+    final OMMultiTenantManager multiTenantManager = mock(OMMultiTenantManager.class);
+    when(ozoneManager.getMultiTenantManager()).thenReturn(multiTenantManager);
+    when(multiTenantManager.getTenantForAccessID(ORIGINAL_ACCESS_KEY_ID)).thenReturn(Optional.of("tenant-a"));
+    when(multiTenantManager.getTenantVolumeName("tenant-a")).thenReturn("tenant-a-volume");
+
+    // Ensure "tenant-a-volume" was captured in the method invocation
+    final org.apache.hadoop.ozone.security.acl.AssumeRoleRequest capturedAssumeRoleRequest =
+        captureAssumeRoleRequest("tenant-a-volume", "userNameA");
+
+    assertThat(capturedAssumeRoleRequest.getHost()).isEqualTo(OM_HOST);
+    assertThat(capturedAssumeRoleRequest.getIp()).isEqualTo(LOOPBACK_IP);
+    assertThat(capturedAssumeRoleRequest.getTargetRoleName()).isEqualTo(TARGET_ROLE_NAME);
+    assertThat(capturedAssumeRoleRequest.getGrants()).isEqualTo(EMPTY_GRANTS);
+  }
+
+  @Test
+  public void testGetSessionPolicyFallsBackToDefaultVolumeWhenTenantMissing() throws Exception {
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(true);
+
+    final OMMultiTenantManager multiTenantManager = mock(OMMultiTenantManager.class);
+    when(ozoneManager.getMultiTenantManager()).thenReturn(multiTenantManager);
+    when(multiTenantManager.getTenantForAccessID(ORIGINAL_ACCESS_KEY_ID)).thenReturn(Optional.empty());
+
+    // Ensure s3v default volume was captured in the method invocation since tenant was missing
+    final org.apache.hadoop.ozone.security.acl.AssumeRoleRequest capturedAssumeRoleRequest =
+        captureAssumeRoleRequest("s3v", "userNameB");
+
+    verify(multiTenantManager, never()).getTenantVolumeName(any());
+    assertThat(capturedAssumeRoleRequest.getHost()).isEqualTo(OM_HOST);
+    assertThat(capturedAssumeRoleRequest.getIp()).isEqualTo(LOOPBACK_IP);
+    assertThat(capturedAssumeRoleRequest.getTargetRoleName()).isEqualTo(TARGET_ROLE_NAME);
+    assertThat(capturedAssumeRoleRequest.getGrants()).isEqualTo(EMPTY_GRANTS);
+  }
+
+  @Test
+  public void testGetSessionPolicyWithBlankAwsPolicyCapturesNullGrants() throws Exception {
+    when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
+
+    final String awsIamPolicy = null;
+    try (MockedStatic<IamSessionPolicyResolver> resolverMock = mockStatic(IamSessionPolicyResolver.class)) {
+      final String result = new S3AssumeRoleRequest(baseOmRequestBuilder().build(), CLOCK)
+          .getSessionPolicy(
+              ozoneManager, ORIGINAL_ACCESS_KEY_ID, awsIamPolicy, OM_HOST, LOOPBACK_IP,
+              UserGroupInformation.createRemoteUser("userNameC"), TARGET_ROLE_NAME);
+
+      assertThat(result).isEqualTo(SESSION_POLICY_VALUE);
+
+      // Ensure IamSessionPolicyResolver was never invoked since awsIamPolicy is null
+      resolverMock.verifyNoInteractions();
+    }
+
+    final ArgumentCaptor<org.apache.hadoop.ozone.security.acl.AssumeRoleRequest> captor =
+        ArgumentCaptor.forClass(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class);
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(captor.capture());
+
+    final org.apache.hadoop.ozone.security.acl.AssumeRoleRequest capturedAssumeRoleRequest = captor.getValue();
+    assertThat(capturedAssumeRoleRequest.getHost()).isEqualTo(OM_HOST);
+    assertThat(capturedAssumeRoleRequest.getIp()).isEqualTo(LOOPBACK_IP);
+    assertThat(capturedAssumeRoleRequest.getTargetRoleName()).isEqualTo(TARGET_ROLE_NAME);
+    assertThat(capturedAssumeRoleRequest.getGrants()).isNull();
+  }
+
+  private org.apache.hadoop.ozone.security.acl.AssumeRoleRequest captureAssumeRoleRequest(String volumeName,
+      String userName) throws Exception {
+    try (MockedStatic<IamSessionPolicyResolver> resolverMock = mockStatic(IamSessionPolicyResolver.class)) {
+      resolverMock.when(() -> IamSessionPolicyResolver.resolve(
+              AWS_IAM_POLICY, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER))
+          .thenReturn(EMPTY_GRANTS);
+
+      final String result = new S3AssumeRoleRequest(baseOmRequestBuilder().build(), CLOCK)
+          .getSessionPolicy(
+              ozoneManager, ORIGINAL_ACCESS_KEY_ID, AWS_IAM_POLICY, OM_HOST, LOOPBACK_IP,
+              UserGroupInformation.createRemoteUser(userName), TARGET_ROLE_NAME);
+
+      assertThat(result).isEqualTo(SESSION_POLICY_VALUE);
+      resolverMock.verify(() -> IamSessionPolicyResolver.resolve(
+          AWS_IAM_POLICY, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER));
+    }
+
+    final ArgumentCaptor<org.apache.hadoop.ozone.security.acl.AssumeRoleRequest> captor =
+        ArgumentCaptor.forClass(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class);
+    verify(accessAuthorizer).generateAssumeRoleSessionPolicy(captor.capture());
+    return captor.getValue();
   }
 
   private static OMRequest.Builder baseOmRequestBuilder() {
