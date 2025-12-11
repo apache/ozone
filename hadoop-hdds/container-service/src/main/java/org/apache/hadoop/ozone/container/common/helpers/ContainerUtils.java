@@ -35,12 +35,14 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -166,13 +168,32 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
-      throws IOException {
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(
+      File path, ConfigurationSource conf) throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
+    } catch (EmptyDatanodeIdFileException e) {
+      LOG.warn("Datanode ID file is empty. Recovering from VERSION file.", e);
+      // Get the datanode UUID from the VERSION file
+      String dataNodeDir = conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
+      if (dataNodeDir == null || dataNodeDir.isEmpty()) {
+        throw new IOException("hdds.datanode.dir is not configured.", e);
+      }
+      File versionFile = new File(dataNodeDir, "hdds/VERSION");
+      Properties props = DatanodeVersionFile.readFrom(versionFile);
+      String dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
+
+      // Create a new DatanodeDetails with the UUID
+      DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
+      builder.setUuid(UUID.fromString(dnUuid));
+      DatanodeDetails datanodeDetails = builder.build();
+
+      // Write the recovered Datanode ID to the datanode.id file
+      DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
+      return datanodeDetails;
     } catch (IOException e) {
       LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);

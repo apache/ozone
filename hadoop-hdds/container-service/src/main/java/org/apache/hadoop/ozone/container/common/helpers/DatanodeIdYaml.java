@@ -87,6 +87,11 @@ public final class DatanodeIdYaml {
         throw new IOException("Unable to parse yaml file.", e);
       }
 
+      if (datanodeDetailsYaml == null) {
+        throw new EmptyDatanodeIdFileException(
+            "Datanode ID file is empty: " + path.getAbsolutePath());
+      }
+
       DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
       builder.setUuid(UUID.fromString(datanodeDetailsYaml.getUuid()))
           .setIpAddress(datanodeDetailsYaml.getIpAddress())
