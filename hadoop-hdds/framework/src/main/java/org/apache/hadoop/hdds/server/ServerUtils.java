@@ -333,7 +333,7 @@ public final class ServerUtils {
     
     // Use new component-specific location for new installations
     String componentName = getComponentName(nodeType);
-    return (new File(metaDirPath, componentName + ".ratis")).getPath();
+    return Paths.get(metaDirPath.getPath(), componentName + ".ratis").toString();
   }
 
   /**
