@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.recon.sql.db")
 public class ReconSqlDbConfig {
 
-  @Config(key = "driver",
+  @Config(key = "ozone.recon.sql.db.driver",
       type = ConfigType.STRING,
       defaultValue = "org.apache.derby.jdbc.EmbeddedDriver",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -38,7 +38,7 @@ public class ReconSqlDbConfig {
   )
   private String driverClass;
 
-  @Config(key = "jdbc.url",
+  @Config(key = "ozone.recon.sql.db.jdbc.url",
       type = ConfigType.STRING,
       defaultValue = "jdbc:derby:${ozone.recon.db.dir}/ozone_recon_derby.db",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -46,7 +46,7 @@ public class ReconSqlDbConfig {
   )
   private String jdbcUrl;
 
-  @Config(key = "username",
+  @Config(key = "ozone.recon.sql.db.username",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -54,7 +54,7 @@ public class ReconSqlDbConfig {
   )
   private String username;
 
-  @Config(key = "password",
+  @Config(key = "ozone.recon.sql.db.password",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -62,7 +62,7 @@ public class ReconSqlDbConfig {
   )
   private String password;
 
-  @Config(key = "auto.commit",
+  @Config(key = "ozone.recon.sql.db.auto.commit",
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -71,7 +71,7 @@ public class ReconSqlDbConfig {
   )
   private boolean autoCommit;
 
-  @Config(key = "conn.timeout",
+  @Config(key = "ozone.recon.sql.db.conn.timeout",
       type = ConfigType.TIME,
       defaultValue = "30000ms",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -80,7 +80,7 @@ public class ReconSqlDbConfig {
   )
   private long connectionTimeout;
 
-  @Config(key = "conn.max.active",
+  @Config(key = "ozone.recon.sql.db.conn.max.active",
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -88,7 +88,7 @@ public class ReconSqlDbConfig {
   )
   private int maxActiveConnections;
 
-  @Config(key = "conn.max.age",
+  @Config(key = "ozone.recon.sql.db.conn.max.age",
       type = ConfigType.TIME, timeUnit = SECONDS,
       defaultValue = "1800s",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -96,7 +96,7 @@ public class ReconSqlDbConfig {
   )
   private long connectionMaxAge;
 
-  @Config(key = "conn.idle.max.age",
+  @Config(key = "ozone.recon.sql.db.conn.idle.max.age",
       type = ConfigType.TIME, timeUnit = SECONDS,
       defaultValue = "3600s",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -104,7 +104,7 @@ public class ReconSqlDbConfig {
   )
   private long connectionIdleMaxAge;
 
-  @Config(key = "conn.idle.test.period",
+  @Config(key = "ozone.recon.sql.db.conn.idle.test.period",
       type = ConfigType.TIME, timeUnit = SECONDS,
       defaultValue = "60s",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -112,7 +112,7 @@ public class ReconSqlDbConfig {
   )
   private long connectionIdleTestPeriod;
 
-  @Config(key = "conn.idle.test",
+  @Config(key = "ozone.recon.sql.db.conn.idle.test",
       type = ConfigType.STRING,
       defaultValue = "SELECT 1",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
@@ -121,7 +121,7 @@ public class ReconSqlDbConfig {
   )
   private String idleTestQuery;
 
-  @Config(key = "jooq.dialect",
+  @Config(key = "ozone.recon.sql.db.jooq.dialect",
       type = ConfigType.STRING,
       defaultValue = "DERBY",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
