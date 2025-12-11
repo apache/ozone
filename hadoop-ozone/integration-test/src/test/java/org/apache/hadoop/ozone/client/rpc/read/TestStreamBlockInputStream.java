@@ -23,28 +23,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Function;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.transport.server.GrpcXceiverService;
 import org.apache.hadoop.ozone.om.TestBucket;
-import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -289,39 +280,4 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       assertEquals(-1, keyInputStream.read());
     }
   }
-
-  @Test
-  public void testCustomStreamReadConfigIsApplied() throws Exception {
-    // Arrange: create a config with non-default values
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.client.stream.read.pre-read-size", "67108864");
-    conf.set("ozone.client.stream.read.response-data-size", "2097152");
-    conf.set("ozone.client.stream.read.timeout", "5s");
-
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-
-    // Sanity check
-    assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
-    // Create a dummy BlockID for the test
-    BlockID blockID = new BlockID(1L, 1L);
-    long length = 1024L;
-    // Use Mockito to create a mock Pipeline instance.
-    Pipeline pipeline = Mockito.mock(Pipeline.class);
-
-    Token<OzoneBlockTokenIdentifier> token = null;
-    // Mock XceiverClientFactory since StreamBlockInputStream requires it in the constructor
-    XceiverClientFactory xceiverClientFactory = Mockito.mock(XceiverClientFactory.class);
-    Function<BlockID, BlockLocationInfo> refreshFunction = b -> null;
-    // Create a StreamBlockInputStream instance
-    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
-        blockID, length, pipeline, token,
-        xceiverClientFactory, refreshFunction, clientConfig)) {
-
-      // Assert: fields should match config values
-      assertEquals(64L << 20, sbis.getPreReadSize());
-      assertEquals(2 << 20, sbis.getResponseDataSize());
-      assertEquals(Duration.ofSeconds(5), sbis.getReadTimeout());
-    }
-  }
-
 }

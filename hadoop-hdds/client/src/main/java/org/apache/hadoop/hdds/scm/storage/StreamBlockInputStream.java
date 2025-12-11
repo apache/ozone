@@ -71,9 +71,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
   private final long blockLength;
-  private final int responseDataSize; // Default size is 1 MB
-  private final long preReadSize; // Default size is 32 MB
-  private final Duration readTimeout; // // Default timeout is 10 second
+  private final int responseDataSize;
+  private final long preReadSize;
+  private final Duration readTimeout;
+  private final long readTimeoutNanos;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -106,6 +107,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.preReadSize = config.getStreamReadPreReadSize();
     this.responseDataSize = config.getStreamReadResponseDataSize();
     this.readTimeout = config.getStreamReadTimeout();
+    this.readTimeoutNanos = readTimeout.toNanos();
   }
 
   @Override
@@ -369,8 +371,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
     }
 
-    ReadBlockResponseProto poll(int timeout, TimeUnit timeoutUnit) throws IOException {
-      final long timeoutNanos = timeoutUnit.toNanos(timeout);
+    ReadBlockResponseProto poll() throws IOException {
+      final long timeoutNanos = readTimeoutNanos;
       final long startTime = System.nanoTime();
       final long pollTimeoutNanos = Math.min(timeoutNanos / 10, 100_000_000);
 
@@ -394,7 +396,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         final long elapsedNanos = System.nanoTime() - startTime;
         if (elapsedNanos >= timeoutNanos) {
           setFailedAndThrow(new TimeoutIOException(
-              "Timed out " + timeout + " " + timeoutUnit + " waiting for response"));
+              "Timed out waiting for response after " + readTimeout));
           return null;
         }
       }
@@ -417,16 +419,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ByteBuffer readFromQueue() throws IOException {
-      // Convert Duration -> int seconds for poll(...)
-      final int timeoutSeconds;
-      if (readTimeout == null || readTimeout.isZero() || readTimeout.isNegative()) {
-        timeoutSeconds = 0;
-      } else {
-        long sec = readTimeout.getSeconds();
-        // Prevent overflow if client config is extremely large
-        timeoutSeconds = sec > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sec;
-      }
-      final ReadBlockResponseProto readBlock = poll(timeoutSeconds, TimeUnit.SECONDS);
+      final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind

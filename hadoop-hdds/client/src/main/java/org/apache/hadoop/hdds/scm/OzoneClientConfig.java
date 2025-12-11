@@ -357,6 +357,33 @@ public class OzoneClientConfig {
       }
       // Note: ozone.fs.hsync.enabled is enforced by OzoneFSUtils#canEnableHsync, not here
     }
+    // Validate streaming read configurations.
+    // Ensure pre-read size is non-negative. If it's invalid, reset to a sane default.
+    if (streamReadPreReadSize < 0) {
+      LOG.warn("Invalid ozone.client.stream.read.pre-read-size = {}. " +
+              "Resetting to default 32MB.",
+          streamReadPreReadSize);
+      streamReadPreReadSize = 32L << 20; // 32MB
+    }
+
+    // Ensure response data size is positive.
+    if (streamReadResponseDataSize <= 0) {
+      LOG.warn("Invalid ozone.client.stream.read.response-data-size = {}. " +
+              "Resetting to default 1MB.",
+          streamReadResponseDataSize);
+      streamReadResponseDataSize = 1 << 20; // 1MB
+    }
+
+    // Ensure stream read timeout is a positive duration.
+    Duration defaultTimeout = Duration.ofSeconds(10);
+    if (streamReadTimeout == null
+        || streamReadTimeout.isZero()
+        || streamReadTimeout.isNegative()) {
+      LOG.warn("Invalid ozone.client.stream.read.timeout = {}. " +
+              "Resetting to default {}.",
+          streamReadTimeout, defaultTimeout);
+      streamReadTimeout = defaultTimeout;
+    }
   }
 
   public long getStreamBufferFlushSize() {
@@ -585,6 +612,18 @@ public class OzoneClientConfig {
 
   public Duration getStreamReadTimeout() {
     return streamReadTimeout;
+  }
+
+  public void setStreamReadPreReadSize(long streamReadPreReadSize) {
+    this.streamReadPreReadSize = streamReadPreReadSize;
+  }
+
+  public void setStreamReadResponseDataSize(int streamReadResponseDataSize) {
+    this.streamReadResponseDataSize = streamReadResponseDataSize;
+  }
+
+  public void setStreamReadTimeout(Duration streamReadTimeout) {
+    this.streamReadTimeout = streamReadTimeout;
   }
 
   /**
