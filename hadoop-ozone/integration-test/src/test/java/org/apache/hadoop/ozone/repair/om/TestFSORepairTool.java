@@ -191,7 +191,7 @@ public class TestFSORepairTool {
   void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    int exitCode = execute(null, dryRun, "-v", "/vol1", "-b", "bucket1");
+    int exitCode = execute(dbPath, dryRun, "-v", "/vol1", "-b", "bucket1");
     assertEquals(0, exitCode, err.getOutput());
 
     String cliOutput = out.getOutput();
@@ -381,16 +381,14 @@ public class TestFSORepairTool {
   }
 
   private int repair(String... args) {
-    return execute(null, false, args);
+    return execute(dbPath, false, args);
   }
 
   private int dryRun(String... args) {
-    return execute(null, true, args);
+    return execute(dbPath, true, args);
   }
 
-  private int execute(String customDbPath, boolean dryRun, String... args) {
-    String effectiveDbPath = customDbPath != null ? customDbPath : dbPath;
-
+  private int execute(String effectiveDbPath, boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", effectiveDbPath));
     if (dryRun) {
       argList.add("--dry-run");
