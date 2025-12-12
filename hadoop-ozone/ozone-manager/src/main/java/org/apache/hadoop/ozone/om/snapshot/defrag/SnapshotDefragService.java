@@ -354,8 +354,6 @@ public class SnapshotDefragService extends BackgroundService
           deltaEntriesCount++;
         }
       }
-    } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error while reading sst files.", e);
     }
     // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
     return Pair.of(fileToBeIngested, deltaEntriesCount != 0);
