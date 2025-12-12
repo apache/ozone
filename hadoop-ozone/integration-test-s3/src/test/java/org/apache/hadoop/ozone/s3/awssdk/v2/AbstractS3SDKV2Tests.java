@@ -81,6 +81,10 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -385,7 +389,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testPutObjectTagging() {
+  public void testPutAndGetObjectTagging() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     final String content = "test content";
@@ -406,48 +410,15 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         .key(keyName)
         .tagging(Tagging.builder().tagSet(tags).build()));
 
-    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
+    GetObjectTaggingResponse getResponse = s3Client.getObjectTagging(b -> b
         .bucket(bucketName)
         .key(keyName));
 
-    assertEquals(tags.size(), response.tagSet().size());
-    Map<String, String> tagMap = response.tagSet().stream()
+    assertEquals(tags.size(), getResponse.tagSet().size());
+    Map<String, String> tagMap = getResponse.tagSet().stream()
         .collect(Collectors.toMap(Tag::key, Tag::value));
     assertEquals("test", tagMap.get("env"));
     assertEquals("ozone", tagMap.get("project"));
-  }
-
-  @Test
-  public void testGetObjectTagging() {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final String content = "test content";
-    s3Client.createBucket(b -> b.bucket(bucketName));
-
-    s3Client.putObject(b -> b
-            .bucket(bucketName)
-            .key(keyName),
-        RequestBody.fromString(content));
-
-    List<Tag> tags = Arrays.asList(
-        Tag.builder().key("department").value("engineering").build(),
-        Tag.builder().key("status").value("active").build()
-    );
-
-    s3Client.putObjectTagging(b -> b
-        .bucket(bucketName)
-        .key(keyName)
-        .tagging(Tagging.builder().tagSet(tags).build()));
-
-    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
-        .bucket(bucketName)
-        .key(keyName));
-
-    assertEquals(tags.size(), response.tagSet().size());
-    Map<String, String> retrievedTags = response.tagSet().stream()
-        .collect(Collectors.toMap(Tag::key, Tag::value));
-    assertEquals("engineering", retrievedTags.get("department"));
-    assertEquals("active", retrievedTags.get("status"));
   }
 
   @Test
@@ -484,6 +455,146 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         .bucket(bucketName)
         .key(keyName));
     assertTrue(afterDelete.tagSet().isEmpty());
+  }
+
+  @Test
+  public void testPutObjectTaggingExceedsLimit() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    List<Tag> tags = new ArrayList<>();
+    for (int i = 1; i <= 11; i++) {
+      tags.add(Tag.builder().key("key" + i).value("value" + i).build());
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(tags).build())));
+    assertEquals(400, exception.statusCode());
+  }
+
+  @Test
+  public void testPutObjectTaggingReplacesExistingTags() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    List<Tag> initialTags = Arrays.asList(
+        Tag.builder().key("tag1").value("value1").build(),
+        Tag.builder().key("tag2").value("value2").build()
+    );
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(initialTags).build()));
+
+    List<Tag> replacementTags = Arrays.asList(
+        Tag.builder().key("tag3").value("value3").build()
+    );
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(replacementTags).build()));
+
+    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertEquals(1, response.tagSet().size());
+    Map<String, String> tagMap = response.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals("value3", tagMap.get("tag3"));
+    assertFalse(tagMap.containsKey("tag1"));
+    assertFalse(tagMap.containsKey("tag2"));
+  }
+
+  private static String repeatChar(char c, int count) {
+    StringBuilder sb = new StringBuilder(count);
+    for (int i = 0; i < count; i++) {
+      sb.append(c);
+    }
+    return sb.toString();
+  }
+
+  private static Stream<Arguments> invalidTagConstraintsProvider() {
+    return Stream.of(
+        Arguments.of(
+            Arrays.asList(Tag.builder().key(repeatChar('a', 129)).value("value").build()),
+            400
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("valid-key").value(repeatChar('b', 257)).build()),
+            400
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("t$ag@#invalid").value("value").build()),
+            400
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("aws:test").value("value").build()),
+            400
+        )
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTagConstraintsProvider")
+  public void testPutObjectTaggingInvalidConstraints(List<Tag> invalidTags, int expectedStatusCode) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    S3Exception exception = assertThrows(S3Exception.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(invalidTags).build())));
+    assertEquals(expectedStatusCode, exception.statusCode());
+  }
+
+  @Test
+  public void testPutAndGetObjectTaggingOnNonExistentObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("env").value("test").build()
+    );
+
+    NoSuchKeyException exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(tags).build())));
+    assertEquals(404, exception.statusCode());
+
+    exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.getObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)));
+    assertEquals(404, exception.statusCode());
+  }
+
+  @Test
+  public void testDeleteObjectTaggingOnNonExistentObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    NoSuchKeyException exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.deleteObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)));
+    assertEquals(404, exception.statusCode());
   }
 
   @Test
