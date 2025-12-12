@@ -161,7 +161,8 @@ public final class OmRatisCheckpointInstaller {
 
   /**
    * Installs checkpoint from leader OM.
-   * Re-initializes OM state if checkpoint index > current applied index.
+   * Re-initializes OM state if checkpoint index is greater than current
+   * applied index.
    *
    * @param ctx OzoneManager context
    * @param leaderId leader OM node ID
