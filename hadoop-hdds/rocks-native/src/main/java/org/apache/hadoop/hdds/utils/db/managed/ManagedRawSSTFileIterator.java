@@ -115,10 +115,10 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
     @Override
     public String toString() {
       return "KeyValue{" +
-          "key=" + StringUtils.bytes2String(key) +
+          "key=" + (key == null ? null : StringUtils.bytes2String(key)) +
           ", sequence=" + sequence +
           ", type=" + type +
-          ", value=" + StringUtils.bytes2String(value) +
+          ", value=" + (value == null ? null : StringUtils.bytes2String(value)) +
           '}';
     }
   }
