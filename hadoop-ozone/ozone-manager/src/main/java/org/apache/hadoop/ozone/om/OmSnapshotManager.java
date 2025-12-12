@@ -59,7 +59,6 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.Nonnull;
 import java.io.File;
@@ -239,30 +238,6 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
-
-    // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
-    //  pluggable.
-    RemovalListener<String, OmSnapshot> removalListener = notification -> {
-      try {
-        final String snapshotTableKey = notification.getKey();
-        final OmSnapshot omSnapshot = notification.getValue();
-        if (omSnapshot != null) {
-          // close snapshot's rocksdb on eviction
-          LOG.debug("Closing OmSnapshot '{}' due to {}",
-              snapshotTableKey, notification.getCause());
-          omSnapshot.close();
-        } else {
-          // Cache value would never be null in RemovalListener.
-
-          // When a soft reference is GC'ed by the JVM, this RemovalListener
-          // would be called. But the cache value should still exist at that
-          // point. Thus in-theory this condition won't be triggered by JVM GC
-          throw new IllegalStateException("Unexpected: OmSnapshot is null");
-        }
-      } catch (IOException e) {
-        LOG.error("Failed to close OmSnapshot: {}", notification.getKey(), e);
-      }
-    };
 
     // Init snapshot cache
     long cacheCleanupServiceInterval = ozoneManager.getConfiguration()
@@ -531,6 +506,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         // ensure binary search works correctly on a later basis.
         for (int version = smallestExistingVersion; version <= maxVersion; version++) {
           Path path = OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), snapshotId, version);
+          LOG.info("Deleting snapshot checkpoint directory for snapshot {} version {} at path: {}", snapshotId,
+              version, path);
           deleteDirectory(path);
         }
       }

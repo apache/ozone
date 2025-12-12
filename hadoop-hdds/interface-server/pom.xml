@@ -28,7 +28,6 @@
   <properties>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
-    <protobuf.version>${protobuf2.version}</protobuf.version>
     <!-- only generated code in this module -->
     <spotbugs.skip>true</spotbugs.skip>
   </properties>

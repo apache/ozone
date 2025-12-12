@@ -46,7 +46,7 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
 
   @Override
   public void seekToLast() {
-
+    this.seek(this.values.lastKey());
   }
 
   @Override

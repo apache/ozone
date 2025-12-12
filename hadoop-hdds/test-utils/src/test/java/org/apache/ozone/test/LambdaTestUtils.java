@@ -18,6 +18,7 @@
 package org.apache.ozone.test;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.util.Time;
@@ -104,7 +105,7 @@ public final class LambdaTestUtils {
       throws Exception {
     Preconditions.checkArgument(timeoutMillis >= 0,
         "timeoutMillis must be >= 0");
-    Preconditions.checkNotNull(timeoutHandler);
+    Objects.requireNonNull(timeoutHandler, "timeoutHandler == null");
 
     final long endTime = Time.monotonicNow() + timeoutMillis;
     Throwable ex = null;

@@ -65,6 +65,7 @@ public final class OzoneConsts {
   public static final String OZONE_ACL_CREATE = "c";
   public static final String OZONE_ACL_READ_ACL = "x";
   public static final String OZONE_ACL_WRITE_ACL = "y";
+  public static final String OZONE_ACL_ASSUME_ROLE = "m";
 
   public static final String OZONE_DATE_FORMAT =
       "EEE, dd MMM yyyy HH:mm:ss zzz";
@@ -563,6 +564,7 @@ public final class OzoneConsts {
    * the OMDBCheckpoint functions.
    */
   public static final String OM_SNAPSHOT_SEPARATOR = "-";
+  public static final String HARDLINK_SEPARATOR = "\t";
 
   private OzoneConsts() {
     // Never Constructed

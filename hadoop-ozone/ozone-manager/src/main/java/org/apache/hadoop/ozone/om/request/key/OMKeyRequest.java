@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -61,7 +62,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -323,7 +324,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         });
     long generateEDEKTime = monotonicNow() - generateEDEKStartTime;
     LOG.debug("generateEDEK takes {} ms", generateEDEKTime);
-    Preconditions.checkNotNull(edek);
+    Objects.requireNonNull(edek, "edek == null");
     return edek;
   }
 
@@ -1045,7 +1046,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
           = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
       objectID = omPathInfoFSO.getLeafNodeObjectId();
       builder.setParentObjectID(omPathInfoFSO.getLastKnownParentId());
-      builder.setFileName(omPathInfoFSO.getLeafNodeName());
     }
     builder.setObjectID(objectID);
     return builder.build();
@@ -1075,7 +1075,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // initiate multipart upload. If we have not found any such, we throw
     // error no such multipart upload.
     String uploadID = args.getMultipartUploadID();
-    Preconditions.checkNotNull(uploadID);
+    Objects.requireNonNull(uploadID, "uploadID == null");
     String multipartKey = "";
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO

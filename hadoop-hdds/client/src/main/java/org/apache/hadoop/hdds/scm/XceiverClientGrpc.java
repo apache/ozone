@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -37,6 +36,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -112,8 +113,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
       ClientTrustManager trustManager) {
     super();
-    Preconditions.checkNotNull(pipeline);
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(pipeline, "pipeline == null");
+    Objects.requireNonNull(config, "config == null");
     setTimeout(config.getTimeDuration(OzoneConfigKeys.
         OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
         .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
@@ -386,11 +387,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private List<DatanodeDetails> sortDatanodes(ContainerCommandRequestProto request) throws IOException {
+    return sortDatanodes(getRequestBlockID(request), request.getCmdType());
+  }
+
+  List<DatanodeDetails> sortDatanodes(DatanodeBlockID blockID, ContainerProtos.Type cmdType) throws IOException {
     List<DatanodeDetails> datanodeList = null;
-    DatanodeBlockID blockID = getRequestBlockID(request);
 
     if (blockID != null) {
-      if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
+      if (cmdType != ContainerProtos.Type.ReadChunk) {
         datanodeList = pipeline.getNodes();
         int getBlockDNLeaderIndex = datanodeList.indexOf(pipeline.getLeaderNode());
         if (getBlockDNLeaderIndex > 0) {
@@ -503,7 +507,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       reply.setResponse(CompletableFuture.completedFuture(responseProto));
       return reply;
     } else {
-      Objects.requireNonNull(ioException);
+      Objects.requireNonNull(ioException, "ioException == null");
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
@@ -516,23 +520,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
-  /**
-   * Starts a streaming read operation, intended to read entire blocks from the datanodes. This method expects a
-   * {@link StreamingReaderSpi} to be passed in, which will be used to receive the streamed data from the datanode.
-   * Upon successfully starting the streaming read, a {@link StreamingReadResponse} is set into the pass StreamObserver,
-   * which contains information about the datanode used for the read, and the request observer that can be used to
-   * manage the stream (e.g., to cancel it if needed). A semaphore is acquired to limit the number of concurrent
-   * streaming reads so upon successful return of this method, the caller must ensure to call
-   * {@link #completeStreamRead(StreamingReadResponse)} to release the semaphore once the streaming read is complete.
-   * @param request The container command request to initiate the streaming read.
-   * @param streamObserver The observer that will handle the streamed responses.=
-   * @throws IOException
-   * @throws InterruptedException
-   */
   @Override
   public void streamRead(ContainerCommandRequestProto request,
-      StreamingReaderSpi streamObserver) throws IOException, InterruptedException {
-    List<DatanodeDetails> datanodeList = sortDatanodes(request);
+      StreamingReadResponse streamObserver) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("->{}, send onNext request {}",
+          streamObserver, TextFormat.shortDebugString(request.getReadBlock()));
+    }
+    streamObserver.getRequestObserver().onNext(request);
+  }
+
+  @Override
+  public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
+    final List<DatanodeDetails> datanodeList = sortDatanodes(null, ContainerProtos.Type.ReadBlock);
     IOException lastException = null;
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -542,21 +542,20 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         if (stub == null) {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command {} on datanode {}", processForDebug(request), dn);
-        }
+        LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
         StreamObserver<ContainerCommandRequestProto> requestObserver = stub
             .withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(streamObserver);
         streamObserver.setStreamingReadResponse(new StreamingReadResponse(dn,
             (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver));
-        requestObserver.onNext(request);
-        requestObserver.onCompleted();
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
         semaphore.release();
         lastException = e;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted initStreamRead to " + dn + " for " + blockID, e);
       }
     }
     if (lastException != null) {
@@ -572,7 +571,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * needed.
    */
   @Override
-  public void completeStreamRead(StreamingReadResponse streamingReadResponse) {
+  public void completeStreamRead() {
     semaphore.release();
   }
 
