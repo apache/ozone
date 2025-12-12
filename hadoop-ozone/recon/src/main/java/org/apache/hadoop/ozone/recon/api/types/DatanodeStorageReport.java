@@ -32,6 +32,7 @@ public final class DatanodeStorageReport {
   private long remaining;
   private long committed;
   private long minimumFreeSpace;
+  private long reserved;
 
   public DatanodeStorageReport() {
   }
@@ -44,6 +45,8 @@ public final class DatanodeStorageReport {
     this.remaining = builder.remaining;
     this.committed = builder.committed;
     this.minimumFreeSpace = builder.minimumFreeSpace;
+    this.reserved = builder.reserved;
+    builder.validate();
   }
 
   public String getDatanodeUuid() {
@@ -74,6 +77,10 @@ public final class DatanodeStorageReport {
     return minimumFreeSpace;
   }
 
+  public long getReserved() {
+    return reserved;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -89,6 +96,7 @@ public final class DatanodeStorageReport {
     private long remaining = 0;
     private long committed = 0;
     private long minimumFreeSpace = 0;
+    private long reserved = 0;
 
     private static final Logger LOG =
         LoggerFactory.getLogger(Builder.class);
@@ -131,6 +139,11 @@ public final class DatanodeStorageReport {
       return this;
     }
 
+    public Builder setReserved(long reserved) {
+      this.reserved = reserved;
+      return this;
+    }
+
     public void validate() {
       Objects.requireNonNull(hostName, "hostName cannot be null");
 
@@ -146,6 +159,15 @@ public final class DatanodeStorageReport {
       if (committed < 0) {
         throw new IllegalArgumentException("committed cannot be negative");
       }
+
+      if (minimumFreeSpace < 0) {
+        throw new IllegalArgumentException("minimumFreeSpace cannot be negative");
+      }
+
+      if (reserved < 0) {
+        throw new IllegalArgumentException("reserved cannot be negative");
+      }
+
       // Logical consistency checks
       if (used + remaining > capacity) {
         LOG.warn("Inconsistent storage report for {}: used({}) + remaining({}) > capacity({})",
