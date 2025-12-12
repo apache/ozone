@@ -60,7 +60,6 @@ class TestManagedRawSSTFileIterator {
   private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
     File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
-    file.delete();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
