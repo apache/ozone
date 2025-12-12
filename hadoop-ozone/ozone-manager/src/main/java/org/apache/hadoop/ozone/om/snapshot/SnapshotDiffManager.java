@@ -1081,16 +1081,12 @@ public class SnapshotDiffManager implements AutoCloseable {
           throw new RuntimeException(e);
         }
       }
-    } catch (RocksDBException rocksDBException) {
-      // TODO: [SNAPSHOT] Gracefully handle exception
-      //  e.g. when input files do not exist
-      throw new RuntimeException(rocksDBException);
     }
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
       SstFileSetReader sstFileReader
-  ) throws RocksDBException, IOException {
+  ) throws IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
       // TODO: [SNAPSHOT] HDDS-8202: Change it to custom snapshot exception.
