@@ -56,33 +56,106 @@ public final class OmRatisCheckpointInstaller {
    * without exposing private methods/fields.
    */
   public interface Context {
+    /**
+     * Stops background services and pauses the state machine.
+     *
+     * @throws Exception if stopping services fails
+     */
     void stopBackgroundServicesAndPause() throws Exception;
 
+    /**
+     * Starts background services.
+     *
+     * @throws Exception if starting services fails
+     */
     void startBackgroundServices() throws Exception;
 
+    /**
+     * Gets the last applied term and index.
+     *
+     * @return last applied TermIndex
+     */
     TermIndex getLastAppliedTermIndex();
 
+    /**
+     * Gets the current DB location.
+     *
+     * @return current DB directory
+     */
     File getCurrentDbLocation();
 
+    /**
+     * Stops the RPC server.
+     */
     void stopRpcServer();
 
+    /**
+     * Stops the metadata manager.
+     *
+     * @throws Exception if stopping metadata manager fails
+     */
     void stopMetadataManager() throws Exception;
 
+    /**
+     * Closes the snapshot manager.
+     */
     void closeSnapshotManager();
 
+    /**
+     * Reloads OM state with new checkpoint.
+     *
+     * @throws Exception if reloading state fails
+     */
     void reloadOMState() throws Exception;
 
+    /**
+     * Sets transaction info.
+     *
+     * @param info transaction info to set
+     */
     void setTransactionInfo(TransactionInfo info);
 
+    /**
+     * Unpauses the state machine.
+     *
+     * @param index transaction index
+     * @param term term number
+     */
     void unpauseStateMachine(long index, long term);
 
+    /**
+     * Restarts the RPC server.
+     *
+     * @throws Exception if restarting RPC server fails
+     */
     void restartRpcServer() throws Exception;
 
+    /**
+     * Audits checkpoint installation.
+     *
+     * @param leaderId leader OM node ID
+     * @param term term number
+     * @param index transaction index
+     */
     void auditCheckpointInstall(String leaderId, long term, long index);
 
+    /**
+     * Exits the system.
+     *
+     * @param code exit code
+     * @param msg exit message
+     * @param e exception that caused exit
+     * @param log logger for logging
+     * @throws IOException if exit operation fails
+     */
     void exitSystem(int code, String msg, Exception e, Logger log)
         throws IOException;
 
+    /**
+     * Gets the Ratis log directory name.
+     *
+     * @return Ratis log directory name, or null if not set
+     */
     String getRatisLogDirName();
   }
 
