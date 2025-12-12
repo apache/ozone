@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff.helper;
 
-import org.apache.hadoop.hdds.protocol.proto.OmServerProtocolProtos.SnapDiffObjectInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.SnapDiffObjectInfo;
 
 /**
  * Represents information about an object in a snapshot difference.
