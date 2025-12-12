@@ -34,11 +34,11 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator.KeyValue;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator.KeyValue;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
@@ -158,7 +158,7 @@ public class SstFileSetReader {
       @Override
       protected ClosableIterator<String> getKeyIteratorForFile(String file) {
         return new ManagedRawSstFileIterator(file, options, lowerBoundSlice, upperBoundSlice,
-            keyValue -> StringCodec.get().fromPersistedFormat(keyValue.getKey()), KEY_ONLY);
+            keyValue -> StringCodec.get().fromCodecBuffer(keyValue.getKey()), KEY_ONLY);
       }
 
       @Override
@@ -205,13 +205,13 @@ public class SstFileSetReader {
   }
 
   private static class ManagedRawSstFileIterator implements ClosableIterator<String> {
-    private final ManagedRawSSTFileReader<String> fileReader;
+    private final ManagedRawSSTFileReader fileReader;
     private final ManagedRawSSTFileIterator<String> fileReaderIterator;
     private static final int READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
     ManagedRawSstFileIterator(String path, ManagedOptions options, ManagedSlice lowerBound, ManagedSlice upperBound,
                               Function<KeyValue, String> keyValueFunction, IteratorType type) {
-      this.fileReader = new ManagedRawSSTFileReader<>(options, path, READ_AHEAD_SIZE);
+      this.fileReader = new ManagedRawSSTFileReader(options, path, READ_AHEAD_SIZE);
       this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, type);
     }
 

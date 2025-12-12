@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +39,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -110,7 +113,7 @@ class TestManagedRawSSTFileIterator {
         (v1, v2) -> v2, TreeMap::new));
     File file = createSSTFileWithKeys(keys);
     try (ManagedOptions options = new ManagedOptions();
-         ManagedRawSSTFileReader<ManagedRawSSTFileIterator.KeyValue> reader = new ManagedRawSSTFileReader<>(
+         ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(
              options, file.getAbsolutePath(), 2 * 1024 * 1024)) {
       List<Optional<String>> testBounds = TestUtils.getTestingBounds(keys.keySet().stream()
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
@@ -130,10 +133,10 @@ class TestManagedRawSSTFileIterator {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
               assertTrue(expectedKeyItr.hasNext());
               Map.Entry<Pair<String, Integer>, String> expectedKey = expectedKeyItr.next();
-              String key = r.getKey() == null ? null : StringUtils.bytes2String(r.getKey());
+              String key = r.getKey() == null ? null : StringCodec.get().fromCodecBuffer(r.getKey());
               assertEquals(type.readKey() ? expectedKey.getKey().getKey() : null, key);
               assertEquals(type.readValue() ? expectedKey.getValue() : null,
-                  type.readValue() ? StringUtils.bytes2String(r.getValue()) : r.getValue());
+                  type.readValue() ? StringCodec.get().fromCodecBuffer(r.getValue()) : r.getValue());
               expectedKeyItr.remove();
             }
             assertEquals(0, expectedKeys.size());

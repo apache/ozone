@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -48,6 +50,21 @@ public class TestCodecBufferCodec {
     try (CodecBuffer codecBuffer = codecBufferCodec.fromPersistedFormat(bytes)) {
       String value = StringCodec.get().fromCodecBuffer(codecBuffer);
       assertEquals(testString, value);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"0,true", "0,false", "1,true", "1,false", "10,true", "10,false"})
+  public void testCodecBufferAllocateByteArray(int length, boolean direct) throws CodecException {
+    byte[] arr = new byte[length];
+    Codec<CodecBuffer> codec = CodecBufferCodec.get(direct);
+    for (int i = 0; i < length; i++) {
+      arr[i] = (byte)i;
+    }
+    try (CodecBuffer codecBuffer = codec.fromPersistedFormat(arr)) {
+      assertEquals(length, codecBuffer.asReadOnlyByteBuffer().remaining());
+      assertEquals(direct || length == 0, codecBuffer.asReadOnlyByteBuffer().isDirect());
+      assertArrayEquals(arr, codecBuffer.getArray());
     }
   }
 }

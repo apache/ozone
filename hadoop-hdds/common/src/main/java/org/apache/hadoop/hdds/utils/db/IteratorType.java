@@ -38,11 +38,11 @@ public enum IteratorType {
    */
   KEY_AND_VALUE;
 
-  public boolean readKey() {
+  boolean readKey() {
     return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
   }
 
-  public boolean readValue() {
+  boolean readValue() {
     return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
   }
 }
