@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
@@ -141,28 +142,35 @@ public final class S3SecurityUtil {
   /**
    * Returns true if the STS token's temporary access key ID is present in the revoked STS token table.
    */
-  private static boolean isRevokedStsTempAccessKeyId(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager) {
+  private static boolean isRevokedStsTempAccessKeyId(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+      throws OMException {
     try {
       final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
       if (metadataManager == null) {
-        return false;
+        final String msg = "Could not determine STS revocation: metadataManager is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
       }
 
       final Table<String, String> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
       if (revokedStsTokenTable == null) {
-        return false;
+        final String msg = "Could not determine STS revocation: revokedStsTokenTable is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
       }
 
       final String tempAccessKeyId = stsTokenIdentifier.getTempAccessKeyId();
       if (tempAccessKeyId == null || tempAccessKeyId.isEmpty()) {
-        return false;
+        final String msg = "Could not determine STS revocation: tempAccessKeyId in STSTokenIdentifier is null/empty";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
       }
 
       return revokedStsTokenTable.getIfExist(tempAccessKeyId) != null;
     } catch (Exception e) {
-      // Any DB or codec problem is treated as best-effort failure.
-      LOG.warn("Failed to check STS token revocation state: {}", e.getMessage());
-      return false;
+      final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
+      LOG.warn(msg, e);
+      throw new OMException(msg, e, INTERNAL_ERROR);
     }
   }
 }
