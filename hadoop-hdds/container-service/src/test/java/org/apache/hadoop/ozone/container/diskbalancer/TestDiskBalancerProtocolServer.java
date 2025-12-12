@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
@@ -44,8 +44,8 @@ import org.junit.jupiter.api.Test;
  * Unit tests for {@link DiskBalancerProtocolServer}.
  */
 class TestDiskBalancerProtocolServer {
-
-  private static final int CLIENT_VERSION = 1;
+  private static final GetDiskBalancerInfoRequestProto REQUEST_WITH_OLD_CLIENT_VERSION
+      = GetDiskBalancerInfoRequestProto.newBuilder().setClientVersion(1).build();
   private static final double TEST_THRESHOLD = 10.0;
   private static final long TEST_BANDWIDTH = 20L;
   private static final int TEST_THREADS = 5;
@@ -103,8 +103,7 @@ class TestDiskBalancerProtocolServer {
   @Test
   void testGetDiskBalancerInfoReport() throws IOException {
     // Test REPORT type - should only return volume density
-    DatanodeDiskBalancerInfoProto report = server.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.REPORT, CLIENT_VERSION);
+    DatanodeDiskBalancerInfoProto report = server.getDiskBalancerInfo(REQUEST_WITH_OLD_CLIENT_VERSION);
     
     assertNotNull(report);
     assertNotNull(report.getNode());
@@ -121,9 +120,7 @@ class TestDiskBalancerProtocolServer {
     diskBalancerInfo.setBalancedBytes(500000);
     
     // Test STATUS type - should return full status information
-    DatanodeDiskBalancerInfoProto status = server.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.STATUS, CLIENT_VERSION);
-    
+    DatanodeDiskBalancerInfoProto status = server.getDiskBalancerInfo(REQUEST_WITH_OLD_CLIENT_VERSION);
     assertNotNull(status);
     assertNotNull(status.getNode());
     assertEquals(DiskBalancerRunningStatus.RUNNING, status.getRunningStatus());

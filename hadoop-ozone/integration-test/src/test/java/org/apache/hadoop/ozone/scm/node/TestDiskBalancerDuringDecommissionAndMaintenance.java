@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
@@ -53,7 +52,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -121,8 +119,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     for (DatanodeDetails dn : allDatanodes) {
       GenericTestUtils.waitFor(() -> {
         try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-          DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-              DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+          DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
           return status.getRunningStatus() == DiskBalancerRunningStatus.STOPPED;
         } catch (IOException e) {
           return false;
@@ -215,13 +212,11 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Get diskBalancer report from IN_SERVICE nodes only
     List<DatanodeDiskBalancerInfoProto> reportProtoList = queryAllInServiceDatanodes(
-        (proxy, dn) -> proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION));
+        (proxy, dn) -> proxy.getDiskBalancerInfo());
 
     // Get diskBalancer status from IN_SERVICE nodes only
     List<DatanodeDiskBalancerInfoProto> statusProtoList = queryAllInServiceDatanodes(
-        (proxy, dn) -> proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION));
+        (proxy, dn) -> proxy.getDiskBalancerInfo());
 
     // Verify that decommissioning and maintenance DN is not included
     // in DiskBalancer report and status (since we only queried IN_SERVICE nodes)
@@ -261,11 +256,9 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Verify that recommissioned DN is included in DiskBalancer report and status
     reportProtoList = queryAllInServiceDatanodes(
-        (proxy, dn) -> proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION));
+        (proxy, dn) -> proxy.getDiskBalancerInfo());
     statusProtoList = queryAllInServiceDatanodes(
-        (proxy, dn) -> proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION));
+        (proxy, dn) -> proxy.getDiskBalancerInfo());
 
     boolean isRecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
@@ -310,8 +303,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify diskBalancer is running
     GenericTestUtils.waitFor(() -> {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         return status != null && status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING;
       } catch (IOException e) {
         return false;
@@ -330,8 +322,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Verify status is PAUSED
     try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-          DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
       assertEquals(DiskBalancerRunningStatus.PAUSED, status.getRunningStatus());
     }
 
@@ -348,8 +339,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Verify status is STOPPED
     try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-          DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
       assertEquals(DiskBalancerRunningStatus.STOPPED, status.getRunningStatus());
     }
 
@@ -361,8 +351,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
       GenericTestUtils.waitFor(() -> {
         try {
-          DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-              DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+          DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
           return status.getRunningStatus() == DiskBalancerRunningStatus.STOPPED;
         } catch (IOException e) {
           return false;
@@ -382,8 +371,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify diskBalancer is in stopped state initially
     GenericTestUtils.waitFor(() -> {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         return status != null && status.getRunningStatus() == DiskBalancerRunningStatus.STOPPED;
       } catch (IOException e) {
         return false;
@@ -423,8 +411,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
       }
       // Also check if status is PAUSED
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         return status.getRunningStatus() == DiskBalancerRunningStatus.PAUSED;
       } catch (IOException e) {
         return false;
@@ -433,8 +420,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Verify status is PAUSED
     try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-          DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
       assertEquals(DiskBalancerRunningStatus.PAUSED, status.getRunningStatus());
     }
 
@@ -445,8 +431,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify it automatically restarts (since it was explicitly started)
     GenericTestUtils.waitFor(() -> {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         return status != null && status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING;
       } catch (IOException e) {
         return false;
