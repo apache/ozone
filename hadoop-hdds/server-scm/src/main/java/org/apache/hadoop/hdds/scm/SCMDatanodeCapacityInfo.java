@@ -44,10 +44,6 @@ public class SCMDatanodeCapacityInfo {
     this.metaVolumeInfo = new VolumeInfo(requiredMetadataSize);
   }
 
-  public DatanodeDetails getDatanodeDetails() {
-    return datanodeDetails;
-  }
-
   /** @return true if datanode has sufficient space for both data and metadata */
   public boolean hasEnoughSpace() {
     return dataVolumeInfo.hasEnoughSpace() && metaVolumeInfo.hasEnoughSpace();
@@ -96,11 +92,11 @@ public class SCMDatanodeCapacityInfo {
     }
 
     if (!hasEnoughDataSpace()) {
-      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for data. %s",
-          datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, this);
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for data. data=%s, metadata=%s",
+          datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, dataVolumeInfo, metaVolumeInfo);
     } else {
-      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for metadata. %s",
-          datanodeDetails.getUuidString(), metaVolumeInfo.requiredSpace, this);
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for metadata. data=%s, metadata=%s",
+          datanodeDetails.getUuidString(), metaVolumeInfo.requiredSpace, dataVolumeInfo, metaVolumeInfo);
     }
   }
 
@@ -114,7 +110,7 @@ public class SCMDatanodeCapacityInfo {
   }
 
   /** Volume with insufficient space. Used for debugging. */
-  static class FullVolume {
+  private static class FullVolume {
     private final String identifier;
     private final long availableSpace;
 
@@ -130,7 +126,7 @@ public class SCMDatanodeCapacityInfo {
   }
 
   /** Tracks space requirements and insufficient volumes for one storage type. */
-  static class VolumeInfo {
+  private static class VolumeInfo {
 
     private final long requiredSpace;
 

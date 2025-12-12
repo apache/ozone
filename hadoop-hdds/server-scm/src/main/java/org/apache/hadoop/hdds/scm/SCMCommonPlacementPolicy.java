@@ -348,6 +348,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
 
     if (!capacityInfo.hasEnoughDataSpace()) {
+      // bail out early if no data volumes
       return capacityInfo;
     }
 

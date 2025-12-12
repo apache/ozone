@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
-import org.apache.hadoop.hdds.scm.SCMDatanodeCapacityInfo;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -643,9 +642,7 @@ public class PipelineManagerImpl implements PipelineManager {
         node = nodeManager.getDatanodeInfo(node);
       }
 
-      SCMDatanodeCapacityInfo result = SCMCommonPlacementPolicy
-          .checkSpace(node, 0, containerSize, null);
-      if (!result.hasEnoughSpace()) {
+      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
         return false;
       }
     }
