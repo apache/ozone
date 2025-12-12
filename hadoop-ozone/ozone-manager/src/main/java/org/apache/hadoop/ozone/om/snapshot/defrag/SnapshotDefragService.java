@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
@@ -223,11 +224,13 @@ public class SnapshotDefragService extends BackgroundService
       boolean needsDefrag = writableOmSnapshotLocalDataProvider.needsDefrag();
       OmSnapshotLocalData localData = writableOmSnapshotLocalDataProvider.getSnapshotLocalData();
       if (!needsDefrag) {
-        OmSnapshotLocalData previousLocalData = writableOmSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
+        Optional<OmSnapshotLocalData> previousLocalData =
+            writableOmSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
         LOG.debug("Skipping defragmentation since snapshot has already been defragmented: id : {}(version: {}=>{}) " +
                 "previousId: {}(version: {})", snapshotInfo.getSnapshotId(), localData.getVersion(),
             localData.getVersionSstFileInfos().get(localData.getVersion()).getPreviousSnapshotVersion(),
-            snapshotInfo.getPathPreviousSnapshotId(), previousLocalData.getVersion());
+            snapshotInfo.getPathPreviousSnapshotId(),
+            previousLocalData.map(OmSnapshotLocalData::getVersion).orElse(null));
       } else {
         LOG.debug("Snapshot {} needsDefragmentation field value: true", snapshotInfo.getSnapshotId());
       }
@@ -511,6 +514,7 @@ public class SnapshotDefragService extends BackgroundService
         deleteDirectory(nextVersionPath);
       }
       // Move the checkpoint directory to the next version directory.
+      LOG.info("Moving checkpoint directory {} to {}", checkpointPath, nextVersionPath);
       Files.move(checkpointPath, nextVersionPath);
       RocksDBCheckpoint dbCheckpoint = new RocksDBCheckpoint(nextVersionPath);
       // Add a new version to the local data file.
@@ -596,6 +600,8 @@ public class SnapshotDefragService extends BackgroundService
     if (!needsDefragVersionPair.getLeft()) {
       return false;
     }
+    LOG.info("Defragmenting snapshot: {} (ID: {})", snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
+    long start = Time.monotonicNow();
     // Create a checkpoint of the previous snapshot or the current snapshot if it is the first snapshot in the chain.
     SnapshotInfo checkpointSnapshotInfo = snapshotInfo.getPathPreviousSnapshotId() == null ? snapshotInfo :
         SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, snapshotInfo.getPathPreviousSnapshotId());
@@ -609,8 +615,12 @@ public class SnapshotDefragService extends BackgroundService
           snapshotInfo.getBucketName());
       // If first snapshot in the chain perform full defragmentation.
       if (snapshotInfo.getPathPreviousSnapshotId() == null) {
+        LOG.info("Performing full defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
+            snapshotInfo.getSnapshotId());
         performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       } else {
+        LOG.info("Performing incremental defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
+            snapshotInfo.getSnapshotId());
         performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
             checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
       }
@@ -629,6 +639,8 @@ public class SnapshotDefragService extends BackgroundService
       } finally {
         snapshotContentLocks.releaseLock();
       }
+      LOG.info("Completed defragmentation for snapshot: {} (ID: {}) in {} ms", snapshotInfo.getTableKey(),
+          snapshotInfo.getSnapshotId(), Time.monotonicNow() - start);
     } finally {
       if (checkpointMetadataManager != null) {
         checkpointMetadataManager.close();
