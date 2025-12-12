@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import java.net.InetAddress;
-import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -26,7 +25,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 /**
  * This class encapsulates information required for Ozone ACLs.
  * */
-public class RequestContext {
+public final class RequestContext {
   private final String host;
   private final InetAddress ip;
   private final UserGroupInformation clientUgi;
@@ -66,7 +65,7 @@ public class RequestContext {
   /**
    * Builder class for @{@link RequestContext}.
    */
-  public static class Builder {
+  public static final class Builder {
     private String host;
     private InetAddress ip;
     private UserGroupInformation clientUgi;
@@ -82,6 +81,10 @@ public class RequestContext {
 
     private boolean recursiveAccessCheck;
     private String sessionPolicy;
+
+    private Builder() {
+
+    }
 
     public Builder setHost(String bHost) {
       this.host = bHost;
