@@ -283,6 +283,7 @@ public class NSSummaryTaskDbEventHandler {
     curNSSummary.setDirName(dirName);
     curNSSummary.setParentId(parentObjectId);
     nsSummaryMap.put(objectId, curNSSummary);
+    LOG.info("Set dir metadata: objectId={}, dirName={}, parentId={}", objectId, dirName, parentObjectId);
 
     // Get or create the parent's NSSummary (no DB reads during reprocess)
     NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);

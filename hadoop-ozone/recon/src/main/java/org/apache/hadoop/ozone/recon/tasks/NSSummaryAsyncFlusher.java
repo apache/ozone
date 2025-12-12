@@ -44,8 +44,8 @@ public class NSSummaryAsyncFlusher implements Closeable {
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final String taskName;
   
-  // Poison pill to signal shutdown
-  private static final Map<Long, NSSummary> POISON_PILL = new HashMap<>();
+  // Sentinel value to signal shutdown
+  private static final Map<Long, NSSummary> SHUTDOWN_SIGNAL = new HashMap<>();
   
   public NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                 String taskName,
@@ -66,6 +66,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
    */
   public void submitForFlush(Map<Long, NSSummary> workerMap) throws InterruptedException {
     flushQueue.put(workerMap);
+    LOG.debug("{}: Submitted map with {} entries, queue size now {}", taskName, workerMap.size(), flushQueue.size());
   }
   
   /**
@@ -80,13 +81,15 @@ public class NSSummaryAsyncFlusher implements Closeable {
           continue;  // Timeout, check running flag
         }
         
-        if (workerMap == POISON_PILL) {
+        if (workerMap == SHUTDOWN_SIGNAL) {
           LOG.info("{}: Received shutdown signal", taskName);
           break;
         }
         
         // Process this batch
+        LOG.debug("{}: Background thread processing batch with {} entries", taskName, workerMap.size());
         flushWithPropagation(workerMap);
+        LOG.debug("{}: Background thread finished batch", taskName);
         
       } catch (InterruptedException e) {
         LOG.info("{}: Flusher thread interrupted", taskName);
@@ -104,6 +107,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
    * Flush worker map with propagation to ancestors.
    */
   private void flushWithPropagation(Map<Long, NSSummary> workerMap) throws IOException {
+    LOG.debug("{}: Flush starting with {} entries", taskName, workerMap.size());
     Map<Long, NSSummary> mergedMap = new HashMap<>();
     
     // For each immediate parent in worker map
@@ -111,40 +115,43 @@ public class NSSummaryAsyncFlusher implements Closeable {
       long immediateParentId = entry.getKey();
       NSSummary delta = entry.getValue();
       
-      // Read immediate parent from DB or merged map
-      NSSummary parent = mergedMap.get(immediateParentId);
-      if (parent == null) {
-        parent = reconNamespaceSummaryManager.getNSSummary(immediateParentId);
-        if (parent == null) {
-          parent = new NSSummary();
+      // Get actual parent (check merged map first, then DB)
+      NSSummary actualParent = mergedMap.get(immediateParentId);
+      if (actualParent == null) {
+        actualParent = reconNamespaceSummaryManager.getNSSummary(immediateParentId);
+      }
+      
+      if (actualParent == null) {
+        // Parent doesn't exist in DB yet - use delta as base (has metadata like dirName, parentId)
+        actualParent = delta;
+      } else {
+        // Parent exists in DB - merge delta into it
+        actualParent.setNumOfFiles(actualParent.getNumOfFiles() + delta.getNumOfFiles());
+        actualParent.setSizeOfFiles(actualParent.getSizeOfFiles() + delta.getSizeOfFiles());
+        actualParent.setReplicatedSizeOfFiles(actualParent.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
+        
+        // Merge file size buckets
+        int[] actualBucket = actualParent.getFileSizeBucket();
+        int[] deltaBucket = delta.getFileSizeBucket();
+        for (int i = 0; i < actualBucket.length; i++) {
+          actualBucket[i] += deltaBucket[i];
         }
+        actualParent.setFileSizeBucket(actualBucket);
+        
+        // Merge child dirs
+        actualParent.getChildDir().addAll(delta.getChildDir());
       }
-      
-      // Apply delta to immediate parent
-      parent.setNumOfFiles(parent.getNumOfFiles() + delta.getNumOfFiles());
-      parent.setSizeOfFiles(parent.getSizeOfFiles() + delta.getSizeOfFiles());
-      parent.setReplicatedSizeOfFiles(parent.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
-      
-      // Merge file size buckets
-      int[] parentBucket = parent.getFileSizeBucket();
-      int[] deltaBucket = delta.getFileSizeBucket();
-      for (int i = 0; i < parentBucket.length; i++) {
-        parentBucket[i] += deltaBucket[i];
-      }
-      parent.setFileSizeBucket(parentBucket);
-      
-      // Merge child dirs
-      parent.getChildDir().addAll(delta.getChildDir());
 
       // Store updated ACTUAL parent in merged map
-      mergedMap.put(immediateParentId, parent);
+      mergedMap.put(immediateParentId, actualParent);
       
       // Propagate delta to ancestors (grandparent, great-grandparent, etc.)
-      propagateDeltaToAncestors(parent.getParentId(), delta, mergedMap);
+      propagateDeltaToAncestors(actualParent.getParentId(), delta, mergedMap);
     }
     
     // Write merged map to DB (simple batch write, no more R-M-W needed)
     writeToDb(mergedMap);
+    LOG.debug("{}: Flush completed, wrote {} entries", taskName, mergedMap.size());
   }
   
   /**
@@ -191,7 +198,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
             rdbBatchOperation, entry.getKey(), entry.getValue());
       }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
-      LOG.debug("{}: Flushed {} entries to DB", taskName, mergedMap.size());
+      LOG.debug("{}: Wrote {} entries to DB", taskName, mergedMap.size());
     } catch (IOException e) {
       LOG.error("{}: Failed to flush to DB", taskName, e);
       throw e;
@@ -201,11 +208,23 @@ public class NSSummaryAsyncFlusher implements Closeable {
   @Override
   public void close() throws IOException {
     LOG.info("{}: Shutting down async flusher", taskName);
+    
+    // Wait for queue to drain before shutting down
+    long waitStart = System.currentTimeMillis();
+    while (!flushQueue.isEmpty() && (System.currentTimeMillis() - waitStart) < 10000) {
+      try {
+        Thread.sleep(100);  // Give background thread time to process
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    
     running.set(false);
     
     try {
-      // Send poison pill
-      flushQueue.offer(POISON_PILL, 5, TimeUnit.SECONDS);
+      // Send shutdown signal
+      flushQueue.offer(SHUTDOWN_SIGNAL, 5, TimeUnit.SECONDS);
       
       // Wait for background thread to finish
       backgroundFlusher.join(30000);  // 30 second timeout
@@ -216,13 +235,23 @@ public class NSSummaryAsyncFlusher implements Closeable {
       }
       
       // Flush any remaining items
-      LOG.info("{}: Draining remaining {} items from queue", taskName, flushQueue.size());
+      int remainingCount = flushQueue.size();
+      LOG.info("{}: Draining remaining {} items from queue", taskName, remainingCount);
       Map<Long, NSSummary> remaining;
+      int processed = 0;
       while ((remaining = flushQueue.poll()) != null) {
-        if (remaining != POISON_PILL) {
-          flushWithPropagation(remaining);
+        if (remaining != SHUTDOWN_SIGNAL) {
+          try {
+            LOG.info("{}: Draining item {} with {} entries", taskName, ++processed, remaining.size());
+            flushWithPropagation(remaining);
+            LOG.info("{}: Successfully flushed item {}", taskName, processed);
+          } catch (Exception e) {
+            LOG.error("{}: Error flushing item {} during drain", taskName, processed, e);
+            // Continue draining other items
+          }
         }
       }
+      LOG.info("{}: Finished draining, processed {} of {} items", taskName, processed, remainingCount);
       
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
