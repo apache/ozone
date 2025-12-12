@@ -102,6 +102,7 @@ public abstract class ExtendedInputStream extends InputStream
     switch (StringUtils.toLowerCase(capability)) {
     case StreamCapabilities.READBYTEBUFFER:
     case StreamCapabilities.UNBUFFER:
+    case StreamCapabilities.VECTOREDIO:
       return true;
     default:
       return false;

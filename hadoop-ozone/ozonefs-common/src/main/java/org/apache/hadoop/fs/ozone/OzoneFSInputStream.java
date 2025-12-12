@@ -22,16 +22,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
+import java.util.List;
+import java.util.function.IntFunction;
 import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.VectoredReadUtils;
 
 /**
  * The input stream for Ozone file system.
@@ -165,7 +169,7 @@ public class OzoneFSInputStream extends FSInputStream
    * @throws IOException if there is some error performing the read
    */
   @Override
-  public int read(long position, ByteBuffer buf) throws IOException {
+  public synchronized int read(long position, ByteBuffer buf) throws IOException {
     if (!buf.hasRemaining()) {
       return 0;
     }
@@ -197,7 +201,7 @@ public class OzoneFSInputStream extends FSInputStream
    * @throws EOFException if end of file reached before reading fully
    */
   @Override
-  public void readFully(long position, ByteBuffer buf) throws IOException {
+  public synchronized void readFully(long position, ByteBuffer buf) throws IOException {
     int bytesRead;
     for (int readCount = 0; buf.hasRemaining(); readCount += bytesRead) {
       bytesRead = this.read(position + (long)readCount, buf);
@@ -206,5 +210,45 @@ public class OzoneFSInputStream extends FSInputStream
         throw new EOFException("End of file reached before reading fully.");
       }
     }
+  }
+
+  /**
+   * Implements vectored read by reading each range asynchronously.
+   * This allows clients to read multiple byte ranges from the same file
+   * in a single call, potentially improving performance by enabling
+   * parallel reads and reducing round-trip overhead.
+   *
+   * @param ranges list of file ranges to read
+   * @param allocate function to allocate ByteBuffer for each range
+   * @throws IOException if there is an error performing the reads
+   * @apiNote This method is synchronized to prevent race conditions from
+   *          concurrent readVectored() calls on the same stream instance.
+   */
+  @Override
+  public synchronized void readVectored(List<? extends FileRange> ranges,
+                           IntFunction<ByteBuffer> allocate) throws IOException {
+    TracingUtil.executeInNewSpan("OzoneFSInputStream.readVectored", () -> {
+      // Save the initial position
+      final long initialPosition = getPos();
+
+      // Use common vectored read implementation
+      VectoredReadUtils.performVectoredRead(
+          ranges,
+          allocate,
+          (offset, buffer) -> {
+            // readFully is synchronized and uses positioned reads
+            // which automatically preserve stream position
+            readFully(offset, buffer);
+            if (statistics != null) {
+              statistics.incrementBytesRead(buffer.remaining());
+            }
+          }
+      );
+
+      // Restore position before returning from method
+      seek(initialPosition);
+
+      return null;
+    });
   }
 }
