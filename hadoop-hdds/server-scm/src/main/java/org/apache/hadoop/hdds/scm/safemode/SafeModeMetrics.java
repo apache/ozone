@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
@@ -52,7 +53,8 @@ public class SafeModeMetrics {
   private @Metric MutableCounterLong
       currentPipelinesWithAtleastOneReplicaReportedCount;
 
-  @Metric private MutableGaugeLong scmInSafeMode;
+  @Metric("Metric will be set to 1 if SCM is in SafeMode, otherwise 0") 
+  private MutableGaugeInt scmInSafeMode;
   
   @Metric private MutableGaugeLong numRequiredDatanodesThreshold;
   @Metric private MutableCounterLong currentRegisteredDatanodesCount;
@@ -142,6 +144,10 @@ public class SafeModeMetrics {
   
   MutableCounterLong getCurrentRegisteredDatanodesCount() {
     return currentRegisteredDatanodesCount;
+  }
+
+  MutableGaugeInt getScmInSafeMode() {
+    return scmInSafeMode;
   }
 
   public void unRegister() {
