@@ -1184,7 +1184,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
     return new OzoneFileStatusIterator<>(f,
-        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat : new LocatedFileStatus(stat, null),
+        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat :
+            new LocatedFileStatus(stat, stat.isFile() ? new BlockLocation[0] : null),
         false);
   }
 
