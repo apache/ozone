@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import java.io.IOException;
 
 /**
- * Exception thrown when a Datanode ID file is empty
+ * Exception thrown when a Datanode ID file is empty.
  */
 public class EmptyDatanodeIdFileException extends IOException {
   public EmptyDatanodeIdFileException(String message) {
