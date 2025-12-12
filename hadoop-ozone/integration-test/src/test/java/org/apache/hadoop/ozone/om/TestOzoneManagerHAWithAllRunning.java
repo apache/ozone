@@ -743,8 +743,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneBucket linkedBucket = linkBucket(srcBucket);
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
-    // As by default create will add some default acls in RpcClient.
-    List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
+    // choose from src's ACLs to avoid trying to remove OzoneAcl#LINK_BUCKET_DEFAULT_ACL
+    List<OzoneAcl> acls = getObjectStore().getAcl(srcObj);
     assertFalse(acls.isEmpty());
     // Remove an existing acl.
     boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));

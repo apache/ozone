@@ -21,11 +21,11 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -70,8 +70,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
    * @return true if the volume upgrade succeeded, false otherwise.
    */
   public static boolean upgradeVolume(StorageVolume volume, String clusterID) {
-    Preconditions.checkNotNull(clusterID, "Cannot upgrade volume with null " +
-        "cluster ID");
+    Objects.requireNonNull(clusterID, "clusterID == null");
     File hddsVolumeDir = volume.getStorageDir();
     File clusterIDDir = new File(hddsVolumeDir, clusterID);
     File[] storageDirs = volume.getStorageDir().listFiles(File::isDirectory);
