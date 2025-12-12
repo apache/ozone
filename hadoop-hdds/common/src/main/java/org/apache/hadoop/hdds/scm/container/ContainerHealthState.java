@@ -354,7 +354,6 @@ public enum ContainerHealthState {
     return state != null ? state : HEALTHY;
   }
 
-
   /**
    * Find the best matching named constant for a set of individual states.
    * First tries to find an exact combination match.

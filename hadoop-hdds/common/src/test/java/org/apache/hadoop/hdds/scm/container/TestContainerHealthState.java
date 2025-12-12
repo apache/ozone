@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING_UNDER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MIS_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_UNHEALTHY;

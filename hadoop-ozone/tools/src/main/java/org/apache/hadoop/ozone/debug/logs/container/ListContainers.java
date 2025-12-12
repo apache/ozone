@@ -27,7 +27,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;

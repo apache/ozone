@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.debug.logs.container.utils;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 
 /**
  * Constants used for ContainerDatanodeDatabase.

@@ -92,7 +92,6 @@ public class ReplicationManagerReport {
     increment(stat.toString());
   }
 
-
   public void setComplete() {
     reportTimeStamp = System.currentTimeMillis();
   }
@@ -130,7 +129,6 @@ public class ReplicationManagerReport {
     }
     return result;
   }
-
 
   /**
    * Get the stat for the given LifeCycleState. If there is no stat available
@@ -210,7 +208,6 @@ public class ReplicationManagerReport {
     containerSample.put(stat, sample);
   }
 
-
   private void increment(String stat) {
     getStatAndEnsurePresent(stat).increment();
   }
@@ -233,7 +230,6 @@ public class ReplicationManagerReport {
     }
     return adder;
   }
-
 
   private Map<String, LongAdder> createStatsMap() {
     Map<String, LongAdder> map = new HashMap<>();
