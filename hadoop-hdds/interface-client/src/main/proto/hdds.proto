@@ -254,37 +254,6 @@ enum LifeCycleEvent {
     CLEANUP = 6;
 }
 
-/**
- * Container health state using simple short values.
- *
- * Individual states use values 0-99.
- * Combination states use values 100+.
- */
-enum ContainerHealthState {
-    // Individual states (0-99)
-    CONTAINER_HEALTHY = 0;
-    CONTAINER_UNDER_REPLICATED = 1;
-    CONTAINER_MIS_REPLICATED = 2;
-    CONTAINER_OVER_REPLICATED = 3;
-    CONTAINER_MISSING = 4;
-    CONTAINER_UNHEALTHY = 5;
-    CONTAINER_EMPTY = 6;
-    CONTAINER_OPEN_UNHEALTHY = 7;
-    CONTAINER_QUASI_CLOSED_STUCK = 8;
-    CONTAINER_OPEN_WITHOUT_PIPELINE = 9;
-    CONTAINER_REPLICA_MISMATCH = 10;
-
-    // Common combinations (100+)
-    CONTAINER_MISSING_EMPTY = 100;
-    CONTAINER_UNDER_REPLICATED_MIS_REPLICATED = 101;
-    CONTAINER_UNDER_REPLICATED_EMPTY = 102;
-    CONTAINER_OVER_REPLICATED_MIS_REPLICATED = 103;
-    CONTAINER_UNDER_REPLICATED_MIS_REPLICATED_EMPTY = 104;
-    CONTAINER_UNHEALTHY_UNDER_REPLICATED = 105;
-    CONTAINER_OPEN_UNHEALTHY_WITHOUT_PIPELINE = 106;
-    CONTAINER_REPLICA_MISMATCH_UNDER_REPLICATED = 107;
-}
-
 message ContainerInfoProto {
     // Replace int64 with ContainerID message
     required int64 containerID = 1;
@@ -299,10 +268,6 @@ message ContainerInfoProto {
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
-    // Health state of the container (default CONTAINER_HEALTHY = 0)
-    optional ContainerHealthState healthState = 13 [default = CONTAINER_HEALTHY];
-    // Timestamp when health state was last updated (epoch milliseconds)
-    optional int64 healthStateUpdateTime = 14;
 }
 
 message ContainerWithPipeline {

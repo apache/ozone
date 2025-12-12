@@ -20,21 +20,19 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING_EMPTY;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING_UNDER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MIS_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_UNHEALTHY;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_UNHEALTHY_WITHOUT_PIPELINE;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_WITHOUT_PIPELINE;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OVER_REPLICATED;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OVER_REPLICATED_MIS_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.REPLICA_MISMATCH;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.REPLICA_MISMATCH_UNDER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED_EMPTY;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED_MIS_REPLICATED;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED_MIS_REPLICATED_EMPTY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNHEALTHY_OVER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNHEALTHY_UNDER_REPLICATED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -86,7 +84,7 @@ public class TestContainerHealthState {
     ContainerHealthState[] individualStates = {
         HEALTHY, UNDER_REPLICATED, MIS_REPLICATED, OVER_REPLICATED,
         MISSING, UNHEALTHY, EMPTY, OPEN_UNHEALTHY,
-        QUASI_CLOSED_STUCK, OPEN_WITHOUT_PIPELINE, REPLICA_MISMATCH
+        QUASI_CLOSED_STUCK, OPEN_WITHOUT_PIPELINE
     };
 
     for (ContainerHealthState state : individualStates) {
@@ -103,58 +101,65 @@ public class TestContainerHealthState {
 
   @Test
   public void testCombinationStateProperties() {
-    // Test MISSING_EMPTY combination
-    assertEquals(100, MISSING_EMPTY.getValue());
-    assertFalse(MISSING_EMPTY.isIndividual());
-    assertTrue(MISSING_EMPTY.isCombination());
-    assertFalse(MISSING_EMPTY.isHealthy());
-    assertEquals(2, MISSING_EMPTY.getHealthIssueCount());
-    assertEquals("Missing and empty", MISSING_EMPTY.getDescription());
+    // Test UNHEALTHY_UNDER_REPLICATED combination
+    assertEquals(100, UNHEALTHY_UNDER_REPLICATED.getValue());
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.isIndividual());
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.isCombination());
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.isHealthy());
+    assertEquals(2, UNHEALTHY_UNDER_REPLICATED.getHealthIssueCount());
+    assertEquals("Inconsistent states with insufficient replicas", UNHEALTHY_UNDER_REPLICATED.getDescription());
 
     // Verify it contains the correct individual states
-    assertTrue(MISSING_EMPTY.contains(MISSING));
-    assertTrue(MISSING_EMPTY.contains(EMPTY));
-    assertFalse(MISSING_EMPTY.contains(UNDER_REPLICATED));
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.contains(UNHEALTHY));
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.contains(UNDER_REPLICATED));
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.contains(MISSING));
   }
 
   @Test
-  public void testUnderReplicatedMisReplicatedCombination() {
-    assertEquals(101, UNDER_REPLICATED_MIS_REPLICATED.getValue());
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED.isCombination());
-    assertEquals(2, UNDER_REPLICATED_MIS_REPLICATED.getHealthIssueCount());
+  public void testUnhealthyOverReplicatedCombination() {
+    assertEquals(101, UNHEALTHY_OVER_REPLICATED.getValue());
+    assertTrue(UNHEALTHY_OVER_REPLICATED.isCombination());
+    assertEquals(2, UNHEALTHY_OVER_REPLICATED.getHealthIssueCount());
 
     // Verify components
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED.contains(UNDER_REPLICATED));
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED.contains(MIS_REPLICATED));
-    assertFalse(UNDER_REPLICATED_MIS_REPLICATED.contains(EMPTY));
+    assertTrue(UNHEALTHY_OVER_REPLICATED.contains(UNHEALTHY));
+    assertTrue(UNHEALTHY_OVER_REPLICATED.contains(OVER_REPLICATED));
+    assertFalse(UNHEALTHY_OVER_REPLICATED.contains(UNDER_REPLICATED));
   }
 
   @Test
-  public void testTripleCombinationState() {
-    // Test UNDER_REPLICATED_MIS_REPLICATED_EMPTY (3 individual states)
-    assertEquals(104, UNDER_REPLICATED_MIS_REPLICATED_EMPTY.getValue());
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.isCombination());
-    assertEquals(3, UNDER_REPLICATED_MIS_REPLICATED_EMPTY.getHealthIssueCount());
-
-    // Verify all three components
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.contains(UNDER_REPLICATED));
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.contains(MIS_REPLICATED));
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.contains(EMPTY));
-    assertFalse(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.contains(MISSING));
+  public void testCombinationStateValuesAreUnique() {
+    // Verify all combination states have unique values in the 100+ range
+    assertEquals(100, UNHEALTHY_UNDER_REPLICATED.getValue());
+    assertEquals(101, UNHEALTHY_OVER_REPLICATED.getValue());
+    assertEquals(102, MISSING_UNDER_REPLICATED.getValue());
+    assertEquals(103, QUASI_CLOSED_STUCK_UNDER_REPLICATED.getValue());
+    assertEquals(104, QUASI_CLOSED_STUCK_OVER_REPLICATED.getValue());
+    
+    // Verify they are recognized as combinations
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.isCombination());
+    assertTrue(UNHEALTHY_OVER_REPLICATED.isCombination());
+    assertTrue(MISSING_UNDER_REPLICATED.isCombination());
+    assertTrue(QUASI_CLOSED_STUCK_UNDER_REPLICATED.isCombination());
+    assertTrue(QUASI_CLOSED_STUCK_OVER_REPLICATED.isCombination());
+    
+    // Verify they each have exactly 2 component states
+    assertEquals(2, UNHEALTHY_UNDER_REPLICATED.getHealthIssueCount());
+    assertEquals(2, UNHEALTHY_OVER_REPLICATED.getHealthIssueCount());
+    assertEquals(2, MISSING_UNDER_REPLICATED.getHealthIssueCount());
+    assertEquals(2, QUASI_CLOSED_STUCK_UNDER_REPLICATED.getHealthIssueCount());
+    assertEquals(2, QUASI_CLOSED_STUCK_OVER_REPLICATED.getHealthIssueCount());
   }
 
   @Test
   public void testAllCombinationStatesHaveCorrectRange() {
     // Combination states should have values 100+
     ContainerHealthState[] combinationStates = {
-        MISSING_EMPTY,
-        UNDER_REPLICATED_MIS_REPLICATED,
-        UNDER_REPLICATED_EMPTY,
-        OVER_REPLICATED_MIS_REPLICATED,
-        UNDER_REPLICATED_MIS_REPLICATED_EMPTY,
         UNHEALTHY_UNDER_REPLICATED,
-        OPEN_UNHEALTHY_WITHOUT_PIPELINE,
-        REPLICA_MISMATCH_UNDER_REPLICATED
+        UNHEALTHY_OVER_REPLICATED,
+        MISSING_UNDER_REPLICATED,
+        QUASI_CLOSED_STUCK_UNDER_REPLICATED,
+        QUASI_CLOSED_STUCK_OVER_REPLICATED
     };
 
     for (ContainerHealthState state : combinationStates) {
@@ -176,74 +181,74 @@ public class TestContainerHealthState {
     assertFalse(UNDER_REPLICATED.contains(MIS_REPLICATED));
 
     // Combination contains its components
-    assertTrue(UNDER_REPLICATED_EMPTY.contains(UNDER_REPLICATED));
-    assertTrue(UNDER_REPLICATED_EMPTY.contains(EMPTY));
-    assertFalse(UNDER_REPLICATED_EMPTY.contains(MISSING));
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.contains(UNHEALTHY));
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.contains(UNDER_REPLICATED));
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.contains(MISSING));
   }
 
   @Test
   public void testContainsThrowsOnCombination() {
     // contains() should only accept individual states
     assertThrows(IllegalArgumentException.class, () -> {
-      UNDER_REPLICATED_EMPTY.contains(MISSING_EMPTY);
+      UNHEALTHY_UNDER_REPLICATED.contains(UNHEALTHY_OVER_REPLICATED);
     });
   }
 
   @Test
   public void testContainsAll() {
-    Set<ContainerHealthState> states = EnumSet.of(UNDER_REPLICATED, EMPTY);
+    Set<ContainerHealthState> states = EnumSet.of(UNHEALTHY, UNDER_REPLICATED);
 
     // Exact match
-    assertTrue(UNDER_REPLICATED_EMPTY.containsAll(states));
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.containsAll(states));
 
-    // Superset
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.containsAll(states));
-
-    // Subset
+    // Subset - individual state doesn't contain all
+    assertFalse(UNHEALTHY.containsAll(states));
     assertFalse(UNDER_REPLICATED.containsAll(states));
 
     // No overlap
     Set<ContainerHealthState> noOverlap = EnumSet.of(MISSING, OVER_REPLICATED);
-    assertFalse(UNDER_REPLICATED_EMPTY.containsAll(noOverlap));
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.containsAll(noOverlap));
   }
 
   @Test
   public void testContainsAny() {
-    Set<ContainerHealthState> states = EnumSet.of(UNDER_REPLICATED, MISSING);
+    Set<ContainerHealthState> states = EnumSet.of(UNHEALTHY, MISSING);
+
+    // Partial overlap - UNHEALTHY_UNDER_REPLICATED contains UNHEALTHY
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.containsAny(states));
 
     // Full overlap
-    assertTrue(UNDER_REPLICATED_EMPTY.containsAny(states));
-
-    // Partial overlap
-    assertTrue(UNDER_REPLICATED_MIS_REPLICATED.containsAny(states));
+    Set<ContainerHealthState> bothStates = EnumSet.of(UNHEALTHY, UNDER_REPLICATED);
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.containsAny(bothStates));
 
     // No overlap
-    Set<ContainerHealthState> noOverlap = EnumSet.of(MISSING, OVER_REPLICATED);
-    assertFalse(UNDER_REPLICATED_EMPTY.containsAny(noOverlap));
+    Set<ContainerHealthState> noOverlap = EnumSet.of(MISSING, EMPTY);
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.containsAny(noOverlap));
   }
 
   @Test
   public void testContainsAllWithCombinations() {
     // containsAll should flatten combinations
-    Set<ContainerHealthState> states = EnumSet.of(MISSING_EMPTY);
+    Set<ContainerHealthState> states = EnumSet.of(UNHEALTHY_UNDER_REPLICATED);
 
-    // UNDER_REPLICATED_MIS_REPLICATED_EMPTY doesn't contain MISSING
-    assertFalse(UNDER_REPLICATED_MIS_REPLICATED_EMPTY.containsAll(states));
+    // UNHEALTHY_UNDER_REPLICATED contains itself (flattens to UNHEALTHY + UNDER_REPLICATED)
+    assertTrue(UNHEALTHY_UNDER_REPLICATED.containsAll(states));
 
-    // MISSING_EMPTY contains itself
-    assertTrue(MISSING_EMPTY.containsAll(states));
+    // UNHEALTHY_OVER_REPLICATED doesn't contain UNDER_REPLICATED
+    assertFalse(UNHEALTHY_OVER_REPLICATED.containsAll(states));
   }
 
   @Test
   public void testContainsAnyWithCombinations() {
     // containsAny should flatten combinations
-    Set<ContainerHealthState> states = EnumSet.of(MISSING_EMPTY);
+    Set<ContainerHealthState> states = EnumSet.of(UNHEALTHY_UNDER_REPLICATED);
 
-    // UNDER_REPLICATED_EMPTY has EMPTY which overlaps with MISSING_EMPTY
-    assertTrue(UNDER_REPLICATED_EMPTY.containsAny(states));
+    // UNHEALTHY_OVER_REPLICATED has UNHEALTHY which overlaps with UNHEALTHY_UNDER_REPLICATED
+    assertTrue(UNHEALTHY_OVER_REPLICATED.containsAny(states));
 
-    // OVER_REPLICATED_MIS_REPLICATED has no overlap
-    assertFalse(OVER_REPLICATED_MIS_REPLICATED.containsAny(states));
+    // Individual MISSING has no overlap
+    Set<ContainerHealthState> noOverlap = EnumSet.of(MISSING);
+    assertFalse(UNHEALTHY_UNDER_REPLICATED.containsAny(noOverlap));
   }
 
   // ========== Get Individual States Tests ==========
@@ -256,23 +261,22 @@ public class TestContainerHealthState {
     assertTrue(healthyStates.contains(HEALTHY));
 
     // Combination returns its components
-    Set<ContainerHealthState> missingEmptyStates = MISSING_EMPTY.getIndividualStates();
-    assertEquals(2, missingEmptyStates.size());
-    assertTrue(missingEmptyStates.contains(MISSING));
-    assertTrue(missingEmptyStates.contains(EMPTY));
+    Set<ContainerHealthState> missingUnderStates = MISSING_UNDER_REPLICATED.getIndividualStates();
+    assertEquals(2, missingUnderStates.size());
+    assertTrue(missingUnderStates.contains(MISSING));
+    assertTrue(missingUnderStates.contains(UNDER_REPLICATED));
 
-    // Triple combination
-    Set<ContainerHealthState> tripleStates =
-        UNDER_REPLICATED_MIS_REPLICATED_EMPTY.getIndividualStates();
-    assertEquals(3, tripleStates.size());
-    assertTrue(tripleStates.contains(UNDER_REPLICATED));
-    assertTrue(tripleStates.contains(MIS_REPLICATED));
-    assertTrue(tripleStates.contains(EMPTY));
+    // Another combination
+    Set<ContainerHealthState> quasiStuckOverStates =
+        QUASI_CLOSED_STUCK_OVER_REPLICATED.getIndividualStates();
+    assertEquals(2, quasiStuckOverStates.size());
+    assertTrue(quasiStuckOverStates.contains(QUASI_CLOSED_STUCK));
+    assertTrue(quasiStuckOverStates.contains(OVER_REPLICATED));
   }
 
   @Test
   public void testGetIndividualStatesReturnsImmutableCopy() {
-    Set<ContainerHealthState> states = UNDER_REPLICATED_EMPTY.getIndividualStates();
+    Set<ContainerHealthState> states = UNHEALTHY_UNDER_REPLICATED.getIndividualStates();
 
     // Should throw when trying to modify
     assertThrows(UnsupportedOperationException.class, () -> {
@@ -294,25 +298,20 @@ public class TestContainerHealthState {
     assertEquals(OPEN_UNHEALTHY, ContainerHealthState.fromValue((short) 7));
     assertEquals(QUASI_CLOSED_STUCK, ContainerHealthState.fromValue((short) 8));
     assertEquals(OPEN_WITHOUT_PIPELINE, ContainerHealthState.fromValue((short) 9));
-    assertEquals(REPLICA_MISMATCH, ContainerHealthState.fromValue((short) 10));
   }
 
   @Test
   public void testFromValueCombinationStates() {
-    assertEquals(MISSING_EMPTY, ContainerHealthState.fromValue((short) 100));
-    assertEquals(UNDER_REPLICATED_MIS_REPLICATED,
-        ContainerHealthState.fromValue((short) 101));
-    assertEquals(UNDER_REPLICATED_EMPTY, ContainerHealthState.fromValue((short) 102));
-    assertEquals(OVER_REPLICATED_MIS_REPLICATED,
-        ContainerHealthState.fromValue((short) 103));
-    assertEquals(UNDER_REPLICATED_MIS_REPLICATED_EMPTY,
-        ContainerHealthState.fromValue((short) 104));
     assertEquals(UNHEALTHY_UNDER_REPLICATED,
-        ContainerHealthState.fromValue((short) 105));
-    assertEquals(OPEN_UNHEALTHY_WITHOUT_PIPELINE,
-        ContainerHealthState.fromValue((short) 106));
-    assertEquals(REPLICA_MISMATCH_UNDER_REPLICATED,
-        ContainerHealthState.fromValue((short) 107));
+        ContainerHealthState.fromValue((short) 100));
+    assertEquals(UNHEALTHY_OVER_REPLICATED,
+        ContainerHealthState.fromValue((short) 101));
+    assertEquals(MISSING_UNDER_REPLICATED,
+        ContainerHealthState.fromValue((short) 102));
+    assertEquals(QUASI_CLOSED_STUCK_UNDER_REPLICATED,
+        ContainerHealthState.fromValue((short) 103));
+    assertEquals(QUASI_CLOSED_STUCK_OVER_REPLICATED,
+        ContainerHealthState.fromValue((short) 104));
   }
 
   @Test
@@ -321,93 +320,6 @@ public class TestContainerHealthState {
     assertEquals(HEALTHY, ContainerHealthState.fromValue((short) 999));
     assertEquals(HEALTHY, ContainerHealthState.fromValue((short) -1));
     assertEquals(HEALTHY, ContainerHealthState.fromValue((short) 200));
-  }
-
-  // ========== FromReplicationManagerStates Tests ==========
-
-  @Test
-  public void testFromReplicationManagerStatesEmpty() {
-    Set<ReplicationManagerReport.HealthState> emptySet = new HashSet<>();
-    assertEquals(HEALTHY, ContainerHealthState.fromReplicationManagerStates(emptySet));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesNull() {
-    assertEquals(HEALTHY, ContainerHealthState.fromReplicationManagerStates(null));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesSingleState() {
-    Set<ReplicationManagerReport.HealthState> singleState =
-        EnumSet.of(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    assertEquals(UNDER_REPLICATED,
-        ContainerHealthState.fromReplicationManagerStates(singleState));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesExactCombinationMatch() {
-    // MISSING + EMPTY should match MISSING_EMPTY
-    Set<ReplicationManagerReport.HealthState> missingEmpty = EnumSet.of(
-        ReplicationManagerReport.HealthState.MISSING,
-        ReplicationManagerReport.HealthState.EMPTY
-    );
-    assertEquals(MISSING_EMPTY,
-        ContainerHealthState.fromReplicationManagerStates(missingEmpty));
-
-    // UNDER_REPLICATED + MIS_REPLICATED should match
-    Set<ReplicationManagerReport.HealthState> underMis = EnumSet.of(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ReplicationManagerReport.HealthState.MIS_REPLICATED
-    );
-    assertEquals(UNDER_REPLICATED_MIS_REPLICATED,
-        ContainerHealthState.fromReplicationManagerStates(underMis));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesNoExactMatch() {
-    // UNDER_REPLICATED + OVER_REPLICATED has no exact combination
-    // Should return most critical: UNDER_REPLICATED
-    Set<ReplicationManagerReport.HealthState> underOver = EnumSet.of(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ReplicationManagerReport.HealthState.OVER_REPLICATED
-    );
-    assertEquals(UNDER_REPLICATED,
-        ContainerHealthState.fromReplicationManagerStates(underOver));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesTripleCombination() {
-    Set<ReplicationManagerReport.HealthState> triple = EnumSet.of(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ReplicationManagerReport.HealthState.MIS_REPLICATED,
-        ReplicationManagerReport.HealthState.EMPTY
-    );
-    assertEquals(UNDER_REPLICATED_MIS_REPLICATED_EMPTY,
-        ContainerHealthState.fromReplicationManagerStates(triple));
-  }
-
-  @Test
-  public void testFromReplicationManagerStatesPriority() {
-    // When no exact match, should return most critical by priority
-    // Priority: MISSING > OPEN_WITHOUT_PIPELINE > QUASI_CLOSED_STUCK >
-    //           UNDER_REPLICATED > UNHEALTHY > OPEN_UNHEALTHY >
-    //           MIS_REPLICATED > OVER_REPLICATED > EMPTY
-
-    // Test MISSING takes priority over everything
-    Set<ReplicationManagerReport.HealthState> withMissing = EnumSet.of(
-        ReplicationManagerReport.HealthState.MISSING,
-        ReplicationManagerReport.HealthState.OVER_REPLICATED
-    );
-    assertEquals(MISSING,
-        ContainerHealthState.fromReplicationManagerStates(withMissing));
-
-    // Test UNDER_REPLICATED > MIS_REPLICATED
-    Set<ReplicationManagerReport.HealthState> underOver = EnumSet.of(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED,
-        ReplicationManagerReport.HealthState.OVER_REPLICATED
-    );
-    assertEquals(MIS_REPLICATED,
-        ContainerHealthState.fromReplicationManagerStates(underOver));
   }
 
   // ========== FindBestMatch Tests ==========
@@ -426,12 +338,12 @@ public class TestContainerHealthState {
 
   @Test
   public void testFindBestMatchExactCombination() {
-    Set<ContainerHealthState> missingEmpty = EnumSet.of(MISSING, EMPTY);
-    assertEquals(MISSING_EMPTY, ContainerHealthState.findBestMatch(missingEmpty));
+    Set<ContainerHealthState> missingUnder = EnumSet.of(MISSING, UNDER_REPLICATED);
+    assertEquals(MISSING_UNDER_REPLICATED, ContainerHealthState.findBestMatch(missingUnder));
 
-    Set<ContainerHealthState> underMis = EnumSet.of(UNDER_REPLICATED, MIS_REPLICATED);
-    assertEquals(UNDER_REPLICATED_MIS_REPLICATED,
-        ContainerHealthState.findBestMatch(underMis));
+    Set<ContainerHealthState> unhealthyUnder = EnumSet.of(UNHEALTHY, UNDER_REPLICATED);
+    assertEquals(UNHEALTHY_UNDER_REPLICATED,
+        ContainerHealthState.findBestMatch(unhealthyUnder));
   }
 
   @Test
@@ -452,9 +364,10 @@ public class TestContainerHealthState {
   @Test
   public void testCombine() {
     // combine() is an alias for findBestMatch()
-    Set<ContainerHealthState> states = EnumSet.of(MISSING, EMPTY);
-    assertEquals(MISSING_EMPTY, ContainerHealthState.combine(states));
+    Set<ContainerHealthState> states = EnumSet.of(UNHEALTHY, UNDER_REPLICATED);
+    assertEquals(UNHEALTHY_UNDER_REPLICATED, ContainerHealthState.combine(states));
 
+    // No exact match - returns most critical
     Set<ContainerHealthState> noMatch = EnumSet.of(MISSING, OVER_REPLICATED);
     assertEquals(MISSING, ContainerHealthState.combine(noMatch));
   }
@@ -474,16 +387,15 @@ public class TestContainerHealthState {
 
   @Test
   public void testToStringCombination() {
-    String str = MISSING_EMPTY.toString();
-    assertTrue(str.startsWith("MISSING_EMPTY ["));
+    String str = MISSING_UNDER_REPLICATED.toString();
+    assertTrue(str.startsWith("MISSING_UNDER_REPLICATED ["));
     assertTrue(str.contains("MISSING"));
-    assertTrue(str.contains("EMPTY"));
+    assertTrue(str.contains("UNDER_REPLICATED"));
     assertTrue(str.endsWith("]"));
 
-    String tripleStr = UNDER_REPLICATED_MIS_REPLICATED_EMPTY.toString();
-    assertTrue(tripleStr.contains("UNDER_REPLICATED"));
-    assertTrue(tripleStr.contains("MIS_REPLICATED"));
-    assertTrue(tripleStr.contains("EMPTY"));
+    String quasiStr = QUASI_CLOSED_STUCK_UNDER_REPLICATED.toString();
+    assertTrue(quasiStr.contains("QUASI_CLOSED_STUCK"));
+    assertTrue(quasiStr.contains("UNDER_REPLICATED"));
   }
 
   // ========== Edge Cases and Error Handling ==========
@@ -492,7 +404,7 @@ public class TestContainerHealthState {
   public void testHealthyStateIsSpecial() {
     assertTrue(HEALTHY.isHealthy());
     assertFalse(UNDER_REPLICATED.isHealthy());
-    assertFalse(MISSING_EMPTY.isHealthy());
+    assertFalse(MISSING_UNDER_REPLICATED.isHealthy());
 
     // Only HEALTHY has health issue count of 1 and contains only itself
     assertEquals(1, HEALTHY.getHealthIssueCount());
@@ -511,27 +423,27 @@ public class TestContainerHealthState {
 
   @Test
   public void testIndividualStateCountMatchesDocumentation() {
-    // Should have 11 individual states (0-10)
+    // Should have 10 individual states (0-9)
     long individualCount = java.util.Arrays.stream(ContainerHealthState.values())
         .filter(ContainerHealthState::isIndividual)
         .count();
-    assertEquals(11, individualCount, "Expected 11 individual states");
+    assertEquals(10, individualCount, "Expected 10 individual states");
   }
 
   @Test
   public void testCombinationStateCountMatchesDocumentation() {
-    // Should have 8 combination states (100-107)
+    // Should have 5 combination states (100-104)
     long combinationCount = java.util.Arrays.stream(ContainerHealthState.values())
         .filter(ContainerHealthState::isCombination)
         .count();
-    assertEquals(8, combinationCount, "Expected 8 combination states");
+    assertEquals(5, combinationCount, "Expected 5 combination states");
   }
 
   @Test
   public void testNoGapsInIndividualStateValues() {
-    // Individual states should be sequential: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    // Individual states should be sequential: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     Set<Short> expectedValues = new HashSet<>();
-    for (short i = 0; i <= 10; i++) {
+    for (short i = 0; i <= 9; i++) {
       expectedValues.add(i);
     }
 
@@ -543,14 +455,14 @@ public class TestContainerHealthState {
     }
 
     assertEquals(expectedValues, actualValues,
-        "Individual states should have values 0-10 with no gaps");
+        "Individual states should have values 0-9 with no gaps");
   }
 
   @Test
   public void testNoGapsInCombinationStateValues() {
-    // Combination states should be sequential: 100, 101, 102, 103, 104, 105, 106, 107
+    // Combination states should be sequential: 100, 101, 102, 103, 104
     Set<Short> expectedValues = new HashSet<>();
-    for (short i = 100; i <= 107; i++) {
+    for (short i = 100; i <= 104; i++) {
       expectedValues.add(i);
     }
 
@@ -562,6 +474,6 @@ public class TestContainerHealthState {
     }
 
     assertEquals(expectedValues, actualValues,
-        "Combination states should have values 100-107 with no gaps");
+        "Combination states should have values 100-104 with no gaps");
   }
 }

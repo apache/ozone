@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -86,8 +87,8 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertFalse(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -109,8 +110,8 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertFalse(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -135,8 +136,8 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertFalse(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -159,8 +160,8 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertFalse(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -180,9 +181,9 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertTrue(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1, report.getStat(ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(1, report.getStat(ContainerHealthState.MISSING));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -230,9 +231,9 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertTrue(handler.handle(request));
-    assertEquals(1, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(1, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.MISSING));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }
@@ -256,9 +257,9 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertTrue(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(1, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.MISSING));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(1, queue.overReplicatedQueueSize());
   }
@@ -292,9 +293,9 @@ public class TestQuasiClosedStuckReplicationCheck {
         .build();
 
     assertTrue(handler.handle(request));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(1, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.MISSING));
     assertEquals(0, queue.underReplicatedQueueSize());
     assertEquals(0, queue.overReplicatedQueueSize());
   }

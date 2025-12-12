@@ -127,18 +127,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setReplicationConfig(config)
         .setSequenceId(info.getSequenceId());
 
-    // Set health state if present, otherwise default to HEALTHY
-    if (info.hasHealthState()) {
-      HddsProtos.ContainerHealthState protoState = info.getHealthState();
-      ContainerHealthState healthState = ContainerHealthState.fromValue((short) protoState.getNumber());
-      builder.setHealthState(healthState);
-    }
-
-    // Set health state update time if present
-    if (info.hasHealthStateUpdateTime()) {
-      builder.setHealthStateUpdateTime(Instant.ofEpochMilli(info.getHealthStateUpdateTime()));
-    }
-
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
     }
@@ -316,20 +304,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
-    }
-
-    // Set health state
-    if (healthState != null) {
-      HddsProtos.ContainerHealthState protoHealthState =
-          HddsProtos.ContainerHealthState.valueOf((int) healthState.getValue());
-      if (protoHealthState != null) {
-        builder.setHealthState(protoHealthState);
-      }
-    }
-
-    // Set health state update time
-    if (healthStateUpdateTime != null) {
-      builder.setHealthStateUpdateTime(healthStateUpdateTime.toEpochMilli());
     }
 
     return builder.build();

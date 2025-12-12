@@ -880,47 +880,17 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
-      }
-
-      // Update container health state based on findings from health check handlers
-      // Determine which health states apply to this specific container
-      Set<ReplicationManagerReport.HealthState> newHealthStates =
-          getHealthStatesForContainer(containerID, report);
-
-      // Convert RM health states to ContainerHealthState and update
-      ContainerHealthState newContainerHealthState =
-          ContainerHealthState.fromReplicationManagerStates(newHealthStates);
-
-      // Only update if health state changed
-      if (containerInfo.getHealthState() == null ||
-          !containerInfo.getHealthState().equals(newContainerHealthState)) {
-        containerInfo.setHealthState(newContainerHealthState);
-        LOG.debug("Updated health state for container {} to {}",
-            containerID, newContainerHealthState);
+        // If no handler processed the container, it passed all health checks
+        // and should be marked as HEALTHY. Update if:
+        // - Never been set (null), OR  
+        // - Currently in non-HEALTHY state (was unhealthy but now fixed)
+        if (!ContainerHealthState.HEALTHY.equals(containerInfo.getHealthState())) {
+          containerInfo.setHealthState(ContainerHealthState.HEALTHY);
+        }
       }
 
       return handled;
     }
-  }
-
-  /**
-   * Determine which health states apply to a specific container by checking
-   * if it appears in the samples for each health state.
-   */
-  private Set<ReplicationManagerReport.HealthState> getHealthStatesForContainer(
-      ContainerID containerID, ReplicationManagerReport report) {
-    Set<ReplicationManagerReport.HealthState> containerHealthStates = new HashSet<>();
-
-    // Check each health state to see if this container is in its sample
-    for (ReplicationManagerReport.HealthState healthState :
-        ReplicationManagerReport.HealthState.values()) {
-      List<ContainerID> sample = report.getSample(healthState);
-      if (sample != null && sample.contains(containerID)) {
-        containerHealthStates.add(healthState);
-      }
-    }
-
-    return containerHealthStates;
   }
 
   /**

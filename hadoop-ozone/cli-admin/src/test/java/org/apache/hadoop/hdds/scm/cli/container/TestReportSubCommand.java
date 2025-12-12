@@ -33,6 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
@@ -83,8 +84,8 @@ public class TestReportSubCommand {
       assertTrue(m.find());
     }
 
-    for (ReplicationManagerReport.HealthState state :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState state :
+        ContainerHealthState.values()) {
       p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
@@ -131,8 +132,8 @@ public class TestReportSubCommand {
     }
 
     counter = SEED;
-    for (ReplicationManagerReport.HealthState state :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState state :
+        ContainerHealthState.values()) {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -161,8 +162,8 @@ public class TestReportSubCommand {
 
     // Add samples
     counter = SEED;
-    for (ReplicationManagerReport.HealthState state
-        : ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState state
+        : ContainerHealthState.values()) {
       for (int i = 0; i < counter; i++) {
         report.incrementAndSample(state, ContainerID.valueOf(i));
       }

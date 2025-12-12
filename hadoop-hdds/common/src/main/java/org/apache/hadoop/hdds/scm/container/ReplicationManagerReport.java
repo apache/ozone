@@ -80,17 +80,18 @@ public class ReplicationManagerReport {
     return sampleLimit;
   }
 
-  public void increment(HealthState stat) {
-    increment(stat.toString());
+  public void increment(ContainerHealthState stat) {
+    increment(stat.name());
+  }
+
+  public void incrementAndSample(ContainerHealthState stat, ContainerID container) {
+    incrementAndSample(stat.name(), container);
   }
 
   public void increment(HddsProtos.LifeCycleState stat) {
     increment(stat.toString());
   }
 
-  public void incrementAndSample(HealthState stat, ContainerID container) {
-    incrementAndSample(stat.toString(), container);
-  }
 
   public void setComplete() {
     reportTimeStamp = System.currentTimeMillis();
@@ -130,6 +131,7 @@ public class ReplicationManagerReport {
     return result;
   }
 
+
   /**
    * Get the stat for the given LifeCycleState. If there is no stat available
    * for that stat -1 is returned.
@@ -141,13 +143,27 @@ public class ReplicationManagerReport {
   }
 
   /**
-   * Get the stat for the given HealthState. If there is no stat available
+   * Get the stat for the given ContainerHealthState. If there is no stat available
    * for that stat -1 is returned.
    * @param stat The requested stat.
    * @return The stat value or -1 if it is not present
    */
-  public long getStat(HealthState stat) {
-    return getStat(stat.toString());
+  public long getStat(ContainerHealthState stat) {
+    return getStat(stat.name());
+  }
+
+  public List<ContainerID> getSample(ContainerHealthState stat) {
+    return getSample(stat.name());
+  }
+
+  private List<ContainerID> getSample(String stat) {
+    List<ContainerID> list = containerSample.get(stat);
+    if (list == null) {
+      return Collections.emptyList();
+    }
+    synchronized (list) {
+      return new ArrayList<>(list);
+    }
   }
 
   /**
@@ -194,30 +210,9 @@ public class ReplicationManagerReport {
     containerSample.put(stat, sample);
   }
 
-  public List<ContainerID> getSample(HealthState stat) {
-    return getSample(stat.toString());
-  }
-
-  private List<ContainerID> getSample(String stat) {
-    List<ContainerID> list = containerSample.get(stat);
-    if (list == null) {
-      return Collections.emptyList();
-    }
-    synchronized (list) {
-      return new ArrayList<>(list);
-    }
-  }
 
   private void increment(String stat) {
     getStatAndEnsurePresent(stat).increment();
-  }
-
-  private LongAdder getStatAndEnsurePresent(String stat) {
-    LongAdder adder = stats.get(stat);
-    if (adder == null) {
-      throw new IllegalArgumentException("Unexpected stat " + stat);
-    }
-    return adder;
   }
 
   private void incrementAndSample(String stat, ContainerID container) {
@@ -231,13 +226,22 @@ public class ReplicationManagerReport {
     }
   }
 
+  private LongAdder getStatAndEnsurePresent(String stat) {
+    LongAdder adder = stats.get(stat);
+    if (adder == null) {
+      throw new IllegalArgumentException("Unexpected stat " + stat);
+    }
+    return adder;
+  }
+
+
   private Map<String, LongAdder> createStatsMap() {
     Map<String, LongAdder> map = new HashMap<>();
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
       map.put(s.toString(), new LongAdder());
     }
-    for (HealthState s : HealthState.values()) {
-      map.put(s.toString(), new LongAdder());
+    for (ContainerHealthState s : ContainerHealthState.values()) {
+      map.put(s.name(), new LongAdder());
     }
     return map;
   }
@@ -267,46 +271,4 @@ public class ReplicationManagerReport {
     return proto.build();
   }
 
-  /**
-   * Enum representing various health states a container can be in.
-   */
-  public enum HealthState {
-    UNDER_REPLICATED("Containers with insufficient replicas",
-        "UnderReplicatedContainers"),
-    MIS_REPLICATED("Containers with insufficient racks",
-        "MisReplicatedContainers"),
-    OVER_REPLICATED("Containers with more replicas than required",
-        "OverReplicatedContainers"),
-    MISSING("Containers with no online replicas",
-        "MissingContainers"),
-    UNHEALTHY(
-        "Containers Closed or Quasi_Closed having some replicas in " +
-            "a different state", "UnhealthyContainers"),
-    EMPTY("Containers having no blocks", "EmptyContainers"),
-    OPEN_UNHEALTHY(
-        "Containers open and having replicas with different states",
-        "OpenUnhealthyContainers"),
-    QUASI_CLOSED_STUCK(
-        "Containers QuasiClosed with insufficient datanode origins",
-        "StuckQuasiClosedContainers"),
-    OPEN_WITHOUT_PIPELINE(
-        "Containers in OPEN state without any healthy Pipeline",
-        "OpenContainersWithoutPipeline");
-
-    private String description;
-    private String metricName;
-
-    HealthState(String desc, String name) {
-      this.description = desc;
-      this.metricName = name;
-    }
-
-    public String getMetricName() {
-      return this.metricName;
-    }
-
-    public String getDescription() {
-      return this.description;
-    }
-  }
 }

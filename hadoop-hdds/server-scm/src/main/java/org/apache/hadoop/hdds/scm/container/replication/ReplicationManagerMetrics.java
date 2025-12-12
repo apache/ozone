@@ -25,8 +25,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -102,10 +102,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
           }});
 
   // Setup metric names and descriptions for
-  private static final Map<HealthState, MetricsInfo>
+  private static final Map<ContainerHealthState, MetricsInfo>
       CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(
-          new LinkedHashMap<HealthState, MetricsInfo>() {{
-            for (HealthState s :  HealthState.values()) {
+          new LinkedHashMap<ContainerHealthState, MetricsInfo>() {{
+            for (ContainerHealthState s :  ContainerHealthState.values()) {
               put(s, Interns.info(s.getMetricName(), s.getDescription()));
             }
           }});
@@ -259,7 +259,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         LIFECYCLE_STATE_METRICS.entrySet()) {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }
-    for (Map.Entry<ReplicationManagerReport.HealthState, MetricsInfo> e :
+    for (Map.Entry<ContainerHealthState, MetricsInfo> e :
         CONTAINER_HEALTH_STATE_METRICS.entrySet()) {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }

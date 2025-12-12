@@ -26,16 +26,15 @@ import java.util.Set;
 /**
  * Enum representing container health states.
  *
- * <p>Each health state has a unique short value (2 bytes). This enum provides
- * named constants for:
+ * <p>Each health state has a unique short value (2 bytes), description, and metric name.
+ * This enum provides named constants for:
  * - Individual health states (e.g., UNDER_REPLICATED)
- * - Common combinations (e.g., MISSING_EMPTY)
+ * - Actual combinations that occur in replication handlers
  *
  * <p>Individual states use values 0-99, combinations use values 100+.
- * This allows for easy identification and provides room for thousands of
- * possible combinations.
  *
- * @see ReplicationManagerReport.HealthState
+ * <p>This enum replaces ReplicationManagerReport.HealthState and is used both for
+ * tracking container health in ContainerInfo and for metrics/reporting.
  */
 public enum ContainerHealthState {
 
@@ -44,126 +43,130 @@ public enum ContainerHealthState {
   /**
    * Container is healthy with no issues.
    */
-  HEALTHY((short) 0, "Container is healthy"),
+  HEALTHY((short) 0, 
+      "Container is healthy",
+      "HealthyContainers"),
 
   /**
    * Container has insufficient replicas.
    */
-  UNDER_REPLICATED((short) 1, "Insufficient replicas"),
+  UNDER_REPLICATED((short) 1, 
+      "Containers with insufficient replicas",
+      "UnderReplicatedContainers"),
 
   /**
    * Container violates placement policy.
    */
-  MIS_REPLICATED((short) 2, "Violates placement policy"),
+  MIS_REPLICATED((short) 2, 
+      "Containers with insufficient racks",
+      "MisReplicatedContainers"),
 
   /**
    * Container has excess replicas.
    */
-  OVER_REPLICATED((short) 3, "Excess replicas"),
+  OVER_REPLICATED((short) 3, 
+      "Containers with more replicas than required",
+      "OverReplicatedContainers"),
 
   /**
    * Critical: No online replicas available.
    */
-  MISSING((short) 4, "No online replicas"),
+  MISSING((short) 4, 
+      "Containers with no online replicas",
+      "MissingContainers"),
 
   /**
    * Closed/Quasi-Closed with inconsistent replica states.
    */
-  UNHEALTHY((short) 5, "Replicas in inconsistent states"),
+  UNHEALTHY((short) 5, 
+      "Containers Closed or Quasi_Closed having some replicas in a different state",
+      "UnhealthyContainers"),
 
   /**
    * Container has no blocks (metadata only).
    */
-  EMPTY((short) 6, "No blocks"),
+  EMPTY((short) 6, 
+      "Containers having no blocks",
+      "EmptyContainers"),
 
   /**
    * Open container with inconsistent replica states.
    */
-  OPEN_UNHEALTHY((short) 7, "Open with inconsistent replica states"),
+  OPEN_UNHEALTHY((short) 7, 
+      "Containers open and having replicas with different states",
+      "OpenUnhealthyContainers"),
 
   /**
    * Container stuck in QUASI_CLOSED state.
    */
-  QUASI_CLOSED_STUCK((short) 8, "Stuck in quasi-closed state"),
+  QUASI_CLOSED_STUCK((short) 8, 
+      "Containers QuasiClosed with insufficient datanode origins",
+      "StuckQuasiClosedContainers"),
 
   /**
    * Open container without healthy pipeline.
    */
-  OPEN_WITHOUT_PIPELINE((short) 9, "Open without healthy pipeline"),
+  OPEN_WITHOUT_PIPELINE((short) 9, 
+      "Containers in OPEN state without any healthy Pipeline",
+      "OpenContainersWithoutPipeline"),
 
-  /**
-   * Data checksum mismatch across replicas (Recon-specific).
-   */
-  REPLICA_MISMATCH((short) 10, "Data checksum mismatch"),
-
-  // ========== Common Combinations (100+) ==========
-
-  /**
-   * Container is missing AND empty.
-   * Common when a container was never written to and all replicas are lost.
-   */
-  MISSING_EMPTY((short) 100, "Missing and empty", MISSING, EMPTY),
-
-  /**
-   * Container is under-replicated AND mis-replicated.
-   * Common when replicas are lost and remaining ones violate placement.
-   */
-  UNDER_REPLICATED_MIS_REPLICATED((short) 101,
-      "Insufficient replicas with placement violation",
-      UNDER_REPLICATED, MIS_REPLICATED),
-
-  /**
-   * Container is under-replicated AND empty.
-   * Common for new containers that haven't been fully written.
-   */
-  UNDER_REPLICATED_EMPTY((short) 102,
-      "Insufficient replicas and empty",
-      UNDER_REPLICATED, EMPTY),
-
-  /**
-   * Container is over-replicated AND mis-replicated.
-   * Common after rebalancing when replicas land on wrong racks.
-   */
-  OVER_REPLICATED_MIS_REPLICATED((short) 103,
-      "Excess replicas with placement violation",
-      OVER_REPLICATED, MIS_REPLICATED),
-
-  /**
-   * Container is under-replicated, mis-replicated, AND empty.
-   * Critical combination for new containers with placement issues.
-   */
-  UNDER_REPLICATED_MIS_REPLICATED_EMPTY((short) 104,
-      "Insufficient replicas, placement violation, and empty",
-      UNDER_REPLICATED, MIS_REPLICATED, EMPTY),
+  // ========== Actual Combinations Found in Code (100+) ==========
 
   /**
    * Container is unhealthy AND under-replicated.
-   * Common when replica state mismatch occurs during under-replication.
+   * Occurs in RatisUnhealthyReplicationCheckHandler when container has only
+   * unhealthy replicas and needs more replicas.
    */
-  UNHEALTHY_UNDER_REPLICATED((short) 105,
+  UNHEALTHY_UNDER_REPLICATED((short) 100,
       "Inconsistent states with insufficient replicas",
+      "UnhealthyUnderReplicatedContainers",
       UNHEALTHY, UNDER_REPLICATED),
 
   /**
-   * Open container is unhealthy AND without pipeline.
-   * Critical: Open container can't be written to.
+   * Container is unhealthy AND over-replicated.
+   * Occurs in RatisUnhealthyReplicationCheckHandler when container has only
+   * unhealthy replicas and has too many replicas.
    */
-  OPEN_UNHEALTHY_WITHOUT_PIPELINE((short) 106,
-      "Open with inconsistent states and no pipeline",
-      OPEN_UNHEALTHY, OPEN_WITHOUT_PIPELINE),
+  UNHEALTHY_OVER_REPLICATED((short) 101,
+      "Inconsistent states with excess replicas",
+      "UnhealthyOverReplicatedContainers",
+      UNHEALTHY, OVER_REPLICATED),
 
   /**
-   * Container has replica mismatch AND is under-replicated.
-   * Data integrity issue with insufficient redundancy.
+   * Container is missing AND under-replicated.
+   * Occurs in ECReplicationCheckHandler when EC container is unrecoverable (missing)
+   * and also has unreplicated offline indexes needing replication.
    */
-  REPLICA_MISMATCH_UNDER_REPLICATED((short) 107,
-      "Data mismatch with insufficient replicas",
-      REPLICA_MISMATCH, UNDER_REPLICATED);
+  MISSING_UNDER_REPLICATED((short) 102,
+      "No online replicas with offline indexes needing replication",
+      "MissingUnderReplicatedContainers",
+      MISSING, UNDER_REPLICATED),
+
+  /**
+   * Container is quasi-closed-stuck AND under-replicated.
+   * Occurs in QuasiClosedStuckReplicationCheck when container is stuck in QUASI_CLOSED
+   * and also needs more replicas.
+   */
+  QUASI_CLOSED_STUCK_UNDER_REPLICATED((short) 103,
+      "Stuck in quasi-closed state with insufficient replicas",
+      "QuasiClosedStuckUnderReplicatedContainers",
+      QUASI_CLOSED_STUCK, UNDER_REPLICATED),
+
+  /**
+   * Container is quasi-closed-stuck AND over-replicated.
+   * Occurs in QuasiClosedStuckReplicationCheck when container is stuck in QUASI_CLOSED
+   * and also has excess replicas.
+   */
+  QUASI_CLOSED_STUCK_OVER_REPLICATED((short) 104,
+      "Stuck in quasi-closed state with excess replicas",
+      "QuasiClosedStuckOverReplicatedContainers",
+      QUASI_CLOSED_STUCK, OVER_REPLICATED);
 
   // ========== Enum Fields ==========
 
   private final short value;
   private final String description;
+  private final String metricName;
   private final Set<ContainerHealthState> individualStates;
 
   // Static lookup map for efficient fromValue()
@@ -176,18 +179,23 @@ public enum ContainerHealthState {
   }
 
   // Individual states constructor
-  ContainerHealthState(short value, String description) {
+  ContainerHealthState(short value, String description, String metricName) {
     this.value = value;
     this.description = description;
-    this.individualStates = EnumSet.of(this);
+    this.metricName = metricName;
+    // Initialize with HashSet to avoid enum initialization issues
+    this.individualStates = new HashSet<>();
+    this.individualStates.add(this);
   }
 
   // Combination states constructor
-  ContainerHealthState(short value, String description,
+  ContainerHealthState(short value, String description, String metricName,
                        ContainerHealthState... components) {
     this.value = value;
     this.description = description;
-    this.individualStates = EnumSet.noneOf(ContainerHealthState.class);
+    this.metricName = metricName;
+    // Initialize with HashSet to avoid enum initialization issues
+    this.individualStates = new HashSet<>();
     for (ContainerHealthState component : components) {
       if (component.isIndividual()) {
         this.individualStates.add(component);
@@ -204,6 +212,16 @@ public enum ContainerHealthState {
 
   public String getDescription() {
     return description;
+  }
+
+  /**
+   * Get the metric name for this health state.
+   * Used for metrics reporting in ReplicationManager.
+   *
+   * @return Metric name string
+   */
+  public String getMetricName() {
+    return metricName;
   }
 
   /**
@@ -336,62 +354,6 @@ public enum ContainerHealthState {
     return state != null ? state : HEALTHY;
   }
 
-  /**
-   * Create health state from ReplicationManager health states.
-   * Tries to find a matching named constant (individual or combination).
-   * If no exact match exists, returns the most critical individual state.
-   *
-   * @param healthStates Set of RM health states
-   * @return ContainerHealthState representing the state(s)
-   */
-  public static ContainerHealthState fromReplicationManagerStates(
-      Set<ReplicationManagerReport.HealthState> healthStates) {
-
-    if (healthStates == null || healthStates.isEmpty()) {
-      return HEALTHY;
-    }
-
-    // Build set of ContainerHealthState equivalents
-    Set<ContainerHealthState> containerStates = EnumSet.noneOf(ContainerHealthState.class);
-
-    for (ReplicationManagerReport.HealthState rmState : healthStates) {
-      switch (rmState) {
-      case UNDER_REPLICATED:
-        containerStates.add(UNDER_REPLICATED);
-        break;
-      case MIS_REPLICATED:
-        containerStates.add(MIS_REPLICATED);
-        break;
-      case OVER_REPLICATED:
-        containerStates.add(OVER_REPLICATED);
-        break;
-      case MISSING:
-        containerStates.add(MISSING);
-        break;
-      case UNHEALTHY:
-        containerStates.add(UNHEALTHY);
-        break;
-      case EMPTY:
-        containerStates.add(EMPTY);
-        break;
-      case OPEN_UNHEALTHY:
-        containerStates.add(OPEN_UNHEALTHY);
-        break;
-      case QUASI_CLOSED_STUCK:
-        containerStates.add(QUASI_CLOSED_STUCK);
-        break;
-      case OPEN_WITHOUT_PIPELINE:
-        containerStates.add(OPEN_WITHOUT_PIPELINE);
-        break;
-      default:
-        // Unknown state, ignore
-        break;
-      }
-    }
-
-    // Try to find exact match in named constants
-    return findBestMatch(containerStates);
-  }
 
   /**
    * Find the best matching named constant for a set of individual states.
@@ -412,16 +374,35 @@ public enum ContainerHealthState {
     }
 
     // Try to find exact combination match
-    for (ContainerHealthState state : values()) {
-      if (state.isCombination() && state.individualStates.equals(states)) {
-        return state;
-      }
+    // Check for UNHEALTHY + UNDER_REPLICATED
+    if (states.contains(UNHEALTHY) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
+      return UNHEALTHY_UNDER_REPLICATED;
+    }
+
+    // Check for UNHEALTHY + OVER_REPLICATED
+    if (states.contains(UNHEALTHY) && states.contains(OVER_REPLICATED) && states.size() == 2) {
+      return UNHEALTHY_OVER_REPLICATED;
+    }
+
+    // Check for MISSING + UNDER_REPLICATED
+    if (states.contains(MISSING) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
+      return MISSING_UNDER_REPLICATED;
+    }
+
+    // Check for QUASI_CLOSED_STUCK + UNDER_REPLICATED
+    if (states.contains(QUASI_CLOSED_STUCK) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
+      return QUASI_CLOSED_STUCK_UNDER_REPLICATED;
+    }
+
+    // Check for QUASI_CLOSED_STUCK + OVER_REPLICATED
+    if (states.contains(QUASI_CLOSED_STUCK) && states.contains(OVER_REPLICATED) && states.size() == 2) {
+      return QUASI_CLOSED_STUCK_OVER_REPLICATED;
     }
 
     // No exact match - return most critical individual state by priority
     // Priority: MISSING > OPEN_WITHOUT_PIPELINE > QUASI_CLOSED_STUCK >
     //          UNDER_REPLICATED > UNHEALTHY > OPEN_UNHEALTHY >
-    //          MIS_REPLICATED > OVER_REPLICATED > EMPTY > REPLICA_MISMATCH
+    //          MIS_REPLICATED > OVER_REPLICATED > EMPTY
     if (states.contains(MISSING)) {
       return MISSING;
     }
@@ -448,9 +429,6 @@ public enum ContainerHealthState {
     }
     if (states.contains(EMPTY)) {
       return EMPTY;
-    }
-    if (states.contains(REPLICA_MISMATCH)) {
-      return REPLICA_MISMATCH;
     }
 
     return HEALTHY;

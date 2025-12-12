@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +55,8 @@ public class TestReplicationManagerMetrics {
       }
     }
     // The ordinal starts from 0, so each state will have a value of its ordinal
-    for (ReplicationManagerReport.HealthState s :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState s :
+        ContainerHealthState.values()) {
       for (int i = 0; i < s.ordinal(); i++) {
         report.increment(s);
       }
@@ -85,8 +86,8 @@ public class TestReplicationManagerMetrics {
 
   @Test
   public void testHealthStateMetricsPresent() {
-    for (ReplicationManagerReport.HealthState s :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState s :
+        ContainerHealthState.values()) {
       assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
   }

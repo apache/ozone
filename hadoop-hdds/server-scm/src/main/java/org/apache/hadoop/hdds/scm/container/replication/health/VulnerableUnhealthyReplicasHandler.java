@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -83,7 +84,9 @@ public class VulnerableUnhealthyReplicasHandler extends AbstractCheck {
     if (!vulnerableUnhealthy.isEmpty()) {
       LOG.info("Found vulnerable UNHEALTHY replicas {} for container {}.", vulnerableUnhealthy, container);
       ReplicationManagerReport report = request.getReport();
-      report.incrementAndSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED, container.containerID());
+      ContainerHealthState healthState = ContainerHealthState.UNDER_REPLICATED;
+      report.incrementAndSample(healthState, container.containerID());
+      container.setHealthState(healthState);
       if (!request.isReadOnly()) {
         ContainerHealthResult.UnderReplicatedHealthResult underRepResult =
             replicaCount.toUnderHealthResult();

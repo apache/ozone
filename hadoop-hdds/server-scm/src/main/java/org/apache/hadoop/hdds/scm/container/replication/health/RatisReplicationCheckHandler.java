@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -116,13 +117,14 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           underHealth.isUnrecoverable(), underHealth.hasHealthyReplicas());
 
       if (underHealth.isUnrecoverable()) {
-        report.incrementAndSample(ReplicationManagerReport.HealthState.MISSING,
-            container.containerID());
+        ContainerHealthState healthState = ContainerHealthState.MISSING;
+        report.incrementAndSample(healthState, container.containerID());
+        container.setHealthState(healthState);
         return true;
       }
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          container.containerID());
+      ContainerHealthState healthState = ContainerHealthState.UNDER_REPLICATED;
+      report.incrementAndSample(healthState, container.containerID());
+      container.setHealthState(healthState);
 
       if (!underHealth.isReplicatedOkAfterPending() &&
           underHealth.hasHealthyReplicas()) {
@@ -140,9 +142,9 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     */
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.OVER_REPLICATED,
-          container.containerID());
+      ContainerHealthState healthState = ContainerHealthState.OVER_REPLICATED;
+      report.incrementAndSample(healthState, container.containerID());
+      container.setHealthState(healthState);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending() &&
@@ -170,9 +172,9 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
 
     if (health.getHealthState() ==
         ContainerHealthResult.HealthState.MIS_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.MIS_REPLICATED,
-          container.containerID());
+      ContainerHealthState healthState = ContainerHealthState.MIS_REPLICATED;
+      report.incrementAndSample(healthState, container.containerID());
+      container.setHealthState(healthState);
       ContainerHealthResult.MisReplicatedHealthResult misRepHealth
           = ((ContainerHealthResult.MisReplicatedHealthResult) health);
       if (!misRepHealth.isReplicatedOkAfterPending()) {

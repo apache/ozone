@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -133,7 +134,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -162,7 +163,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -189,7 +190,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -221,7 +222,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -250,7 +251,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -276,11 +277,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        ContainerHealthState.MISSING));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY));
   }
 
   @Test
@@ -309,11 +310,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        ContainerHealthState.MISSING));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY));
   }
 
   @Test
@@ -351,9 +352,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        ContainerHealthState.MISSING));
   }
 
   @Test
@@ -397,9 +398,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        ContainerHealthState.MISSING));
   }
 
   /**
@@ -439,7 +440,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
   }
 
   /**
@@ -498,7 +499,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
   }
 
   @Test
@@ -531,7 +532,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
   }
 
   @Test
@@ -555,7 +556,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
   }
 
   @Test
@@ -580,9 +581,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
   }
 
   @Test
@@ -611,11 +612,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        ContainerHealthState.MIS_REPLICATED));
   }
 
   @Test
@@ -647,11 +648,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        ContainerHealthState.MIS_REPLICATED));
   }
 
   @Test
@@ -684,9 +685,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.OVER_REPLICATED));
   }
 
 }
