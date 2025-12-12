@@ -215,16 +215,6 @@ public final class OmKeyInfo extends WithParentObjectId
     return toBuilder().setMetadata(metadataCopy).build();
   }
 
-  /**
-   * Returns a new {@link OmKeyInfo} with metadata replaced by the provided
-   * map.
-   * @param metadata the metadata to set
-   * @return a new {@link OmKeyInfo}
-   */
-  public OmKeyInfo withMetadata(Map<String, String> metadata) {
-    return toBuilder().setMetadata(metadata).build();
-  }
-
   public boolean isDeletedKeyCommitted() {
     return Boolean.parseBoolean(getMetadata().get(COMMITTED_KEY_DELETED_FLAG));
   }
