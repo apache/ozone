@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.request.util;
 
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import java.util.List;
+import java.util.function.BiPredicate;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 
 /**
- * Test OmSnapshot for FSO bucket type when native lib is disabled.
+ * ACL operation.
  */
-public class TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets extends TestOmSnapshot {
-
-  public TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, true);
-  }
+public interface AclOp extends BiPredicate<List<OzoneAcl>, AclListBuilder> {
+  // just a shortcut to avoid having to repeat long list of generic parameters
 }

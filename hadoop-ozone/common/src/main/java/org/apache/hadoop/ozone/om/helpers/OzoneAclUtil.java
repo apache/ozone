@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -150,6 +151,11 @@ public final class OzoneAclUtil {
     return false;
   }
 
+  public static boolean inheritDefaultAcls(AclListBuilder acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acls::add, parentAcls, scope);
+  }
+
   /**
    * Helper function to inherit default ACL with given {@code scope} for child object.
    * @param acls child object ACL list
@@ -158,6 +164,11 @@ public final class OzoneAclUtil {
    * @return true if any ACL was inherited from parent, false otherwise
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acl -> addAcl(acls, acl), parentAcls, scope);
+  }
+
+  private static boolean inheritDefaultAcls(Predicate<OzoneAcl> op,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     if (parentAcls != null && !parentAcls.isEmpty()) {
       Stream<OzoneAcl> aclStream = parentAcls.stream()
@@ -168,10 +179,11 @@ public final class OzoneAclUtil {
       }
 
       List<OzoneAcl> inheritedAcls = aclStream.collect(Collectors.toList());
-      if (!inheritedAcls.isEmpty()) {
-        inheritedAcls.forEach(acl -> addAcl(acls, acl));
-        return true;
+      boolean changed = false;
+      for (OzoneAcl acl : inheritedAcls) {
+        changed |= op.test(acl);
       }
+      return changed;
     }
 
     return false;

@@ -15,16 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
 /**
- * Test OmSnapshot for FSO bucket type when native lib is disabled.
+ * Package to define utility classes for tasks.
  */
-public class TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets extends TestOmSnapshot {
+package org.apache.hadoop.ozone.recon.tasks.util;
 
-  public TestOmSnapshotFsoWithoutNativeLibWithLinkedBuckets() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, true, true);
-  }
-}
+
+
+
+
