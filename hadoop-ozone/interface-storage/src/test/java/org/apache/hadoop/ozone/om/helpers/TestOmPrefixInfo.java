@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -147,8 +148,8 @@ public class TestOmPrefixInfo {
         IAccessAuthorizer.ACLIdentityType.USER,
         username, IAccessAuthorizer.ACLType.WRITE,
         ACCESS);
-    omPrefixInfo = new OmPrefixInfo.Builder(omPrefixInfo)
-        .addMetadata("key", "value")
+    omPrefixInfo = omPrefixInfo.toBuilder()
+        .addAllMetadata(singletonMap("key", "value"))
         .build();
     OzoneManagerStorageProtos.PersistedPrefixInfo pi =
         omPrefixInfo.getProtobuf();

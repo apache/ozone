@@ -15,26 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
-
 /**
- * Create and commit batch operation for one DB.
+ * Helper classes for computing the delta between two snapshots.
  */
-public interface BatchOperationHandler {
-
-  /**
-   * Initialize an atomic batch operation which can hold multiple PUT/DELETE
-   * operations and committed later in one step.
-   *
-   * @return BatchOperation holder which can be used to add or commit batch
-   * operations.
-   */
-  BatchOperation initBatchOperation();
-
-  /**
-   * Commit the batch operations.
-   *
-   * @param operation which contains all the required batch operation.
-   */
-  void commitBatchOperation(BatchOperation operation) throws RocksDatabaseException;
-}
+package org.apache.hadoop.ozone.om.snapshot.diff.helper;

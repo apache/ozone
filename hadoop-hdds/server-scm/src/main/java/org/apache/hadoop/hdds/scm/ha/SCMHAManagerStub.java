@@ -96,7 +96,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public void close() {
-    IOUtils.closeQuietly(transactionBuffer);
+    IOUtils.closeQuietly(transactionBuffer::close);
   }
 
   /**
@@ -141,7 +141,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
   }
 
   @Override
-  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+  public boolean removeSCM(RemoveSCMRequest request) {
     return false;
   }
 
@@ -273,12 +273,12 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public boolean addSCM(AddSCMRequest request) throws IOException {
+    public boolean addSCM(AddSCMRequest request) {
       return false;
     }
 
     @Override
-    public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+    public boolean removeSCM(RemoveSCMRequest request) {
       return false;
     }
 
