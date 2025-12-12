@@ -31,6 +31,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.MinHeapMergeIterator;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
@@ -55,7 +57,7 @@ public class SstFileSetReader {
     this.sstFiles = sstFiles;
   }
 
-  public long getEstimatedTotalKeys() throws RocksDBException {
+  public long getEstimatedTotalKeys() throws RocksDatabaseException {
     if (estimatedTotalKeys != -1) {
       return estimatedTotalKeys;
     }
@@ -71,6 +73,8 @@ public class SstFileSetReader {
           try (ManagedSstFileReader fileReader = new ManagedSstFileReader(options)) {
             fileReader.open(sstFile.toAbsolutePath().toString());
             estimatedSize += fileReader.getTableProperties().getNumEntries();
+          } catch (RocksDBException e) {
+            throw new RocksDatabaseException("Failed to open SST file: " + sstFile, e);
           }
         }
       }
@@ -80,8 +84,7 @@ public class SstFileSetReader {
     return estimatedTotalKeys;
   }
 
-  public ClosableIterator<String> getKeyStream(String lowerBound,
-                                     String upperBound) throws RocksDBException {
+  public ClosableIterator<String> getKeyStream(String lowerBound, String upperBound) {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       private ManagedOptions options;
@@ -109,7 +112,7 @@ public class SstFileSetReader {
       }
 
       @Override
-      protected ClosableIterator<String> getKeyIteratorForFile(String file) throws RocksDBException {
+      protected ClosableIterator<String> getKeyIteratorForFile(String file) throws RocksDatabaseException {
         return new ManagedSstFileIterator(file, options, readOptions) {
           @Override
           protected String getIteratorValue(ManagedSstFileReaderIterator iterator) {
@@ -129,8 +132,7 @@ public class SstFileSetReader {
     return itr;
   }
 
-  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
-      throws RocksDBException {
+  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound) {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
@@ -171,11 +173,15 @@ public class SstFileSetReader {
     private final ManagedSstFileReaderIterator fileReaderIterator;
 
     ManagedSstFileIterator(String path, ManagedOptions options, ManagedReadOptions readOptions)
-        throws RocksDBException {
-      this.fileReader = new ManagedSstFileReader(options);
-      this.fileReader.open(path);
-      this.fileReaderIterator = ManagedSstFileReaderIterator.managed(fileReader.newIterator(readOptions));
-      fileReaderIterator.get().seekToFirst();
+        throws RocksDatabaseException {
+      try {
+        this.fileReader = new ManagedSstFileReader(options);
+        this.fileReader.open(path);
+        this.fileReaderIterator = ManagedSstFileReaderIterator.managed(fileReader.newIterator(readOptions));
+        fileReaderIterator.get().seekToFirst();
+      } catch (RocksDBException e) {
+        throw new RocksDatabaseException("Failed to open SST file: " + path, e);
+      }
     }
 
     @Override
@@ -246,10 +252,10 @@ public class SstFileSetReader {
 
     protected abstract void init();
 
-    protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
+    protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws IOException;
 
     @Override
-    protected ClosableIterator<T> getIterator(int idx) throws RocksDBException, IOException {
+    protected ClosableIterator<T> getIterator(int idx) throws IOException {
       return getKeyIteratorForFile(sstFiles.get(idx).toString());
     }
 

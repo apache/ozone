@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.util.ClosableIterator;
-import org.apache.ozone.rocksdb.util.MinHeapMergeIterator;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 

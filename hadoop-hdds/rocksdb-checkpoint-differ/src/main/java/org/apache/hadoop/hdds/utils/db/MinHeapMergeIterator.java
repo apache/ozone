@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdb.util;
+package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
 import java.io.Closeable;
@@ -31,9 +31,7 @@ import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.util.ClosableIterator;
-import org.rocksdb.RocksDBException;
 
 /**
  * An abstract class that provides functionality to merge elements from multiple sorted iterators
@@ -60,9 +58,9 @@ public abstract class MinHeapMergeIterator<K, I extends Iterator<K> & Closeable,
     this.comparator = comparator;
   }
 
-  protected abstract I getIterator(int idx) throws RocksDBException, IOException;
+  protected abstract I getIterator(int idx) throws IOException;
 
-  private boolean initHeap() throws IOException, RocksDBException {
+  private boolean initHeap() throws IOException {
     if (initialized) {
       return false;
     }
@@ -81,7 +79,7 @@ public abstract class MinHeapMergeIterator<K, I extends Iterator<K> & Closeable,
           closeItrAtIndex(idx);
         }
       }
-    } catch (IOException | RocksDBException e) {
+    } catch (IOException e) {
       close();
       throw e;
     }
@@ -94,8 +92,6 @@ public abstract class MinHeapMergeIterator<K, I extends Iterator<K> & Closeable,
       return !minHeap.isEmpty() || initHeap();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
-    } catch (RocksDBException e) {
-      throw new UncheckedIOException(new RocksDatabaseException("Error while initializing iterator ", e));
     }
   }
 
