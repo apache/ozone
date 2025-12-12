@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.StartDiskBalancerRequestProto;
@@ -91,22 +90,8 @@ public class DiskBalancerProtocolClientSideTranslatorPB
         hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf)).getProxy();
   }
 
-  /**
-   * Gets DiskBalancer information from the datanode.
-   * 
-   * @param infoType type of information (REPORT for volume density, STATUS for detailed info)
-   * @param clientVersion the client protocol version for compatibility
-   * @return DiskBalancer information based on the requested type
-   * @throws IOException if the RPC call fails or is denied
-   */
   @Override
-  public DatanodeDiskBalancerInfoProto getDiskBalancerInfo(
-      DatanodeDiskBalancerInfoType infoType, int clientVersion) throws IOException {
-    GetDiskBalancerInfoRequestProto request =
-        GetDiskBalancerInfoRequestProto.newBuilder()
-            .setInfoType(infoType)
-            .setClientVersion(clientVersion)
-            .build();
+  public DatanodeDiskBalancerInfoProto getDiskBalancerInfo(GetDiskBalancerInfoRequestProto request) throws IOException {
     try {
       GetDiskBalancerInfoResponseProto response =
           rpcProxy.getDiskBalancerInfo(NULL_CONTROLLER, request);

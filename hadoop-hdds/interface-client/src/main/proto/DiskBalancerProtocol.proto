@@ -31,19 +31,10 @@ package hadoop.hdds;
 import "hdds.proto";
 
 /**
- * Type of DiskBalancer information to retrieve.
- */
-enum DatanodeDiskBalancerInfoType {
-  REPORT = 1;  // Volume density report (lightweight)
-  STATUS = 2;  // Detailed status with counters and config
-}
-
-/**
  * Request for DiskBalancer information (report or status).
  */
 message GetDiskBalancerInfoRequestProto {
-  required DatanodeDiskBalancerInfoType infoType = 1;
-  required uint32 clientVersion = 2;
+  required uint32 clientVersion = 1;
 }
 
 /**

@@ -25,10 +25,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
-import org.apache.hadoop.ozone.ClientVersion;
 import picocli.CommandLine.Command;
 
 /**
@@ -50,11 +48,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
-      HddsProtos.DatanodeDiskBalancerInfoProto report = 
-          diskBalancerProxy.getDiskBalancerInfo(
-              DatanodeDiskBalancerInfoType.REPORT,
-              ClientVersion.CURRENT_VERSION);
-      
+      final DatanodeDiskBalancerInfoProto report = diskBalancerProxy.getDiskBalancerInfo();
+
       // Only create JSON result object if JSON mode is enabled
       if (getOptions().isJson()) {
         return createReportResult(report);
