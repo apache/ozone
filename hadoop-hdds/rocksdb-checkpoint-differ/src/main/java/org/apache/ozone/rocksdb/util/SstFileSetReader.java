@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdb.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 
 import jakarta.annotation.Nonnull;
 import java.io.Closeable;
@@ -32,9 +33,11 @@ import java.util.PriorityQueue;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
@@ -155,7 +158,7 @@ public class SstFileSetReader {
       @Override
       protected ClosableIterator<String> getKeyIteratorForFile(String file) {
         return new ManagedRawSstFileIterator(file, options, lowerBoundSlice, upperBoundSlice,
-            keyValue -> StringCodec.get().fromPersistedFormat(keyValue.getKey()), true);
+            keyValue -> StringCodec.get().fromPersistedFormat(keyValue.getKey()), KEY_ONLY);
       }
 
       @Override
@@ -207,9 +210,9 @@ public class SstFileSetReader {
     private static final int READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
     ManagedRawSstFileIterator(String path, ManagedOptions options, ManagedSlice lowerBound, ManagedSlice upperBound,
-                              Function<ManagedRawSSTFileIterator.KeyValue, String> keyValueFunction, boolean keyOnly) {
+                              Function<KeyValue, String> keyValueFunction, IteratorType type) {
       this.fileReader = new ManagedRawSSTFileReader<>(options, path, READ_AHEAD_SIZE);
-      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, keyOnly);
+      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, type);
     }
 
     @Override

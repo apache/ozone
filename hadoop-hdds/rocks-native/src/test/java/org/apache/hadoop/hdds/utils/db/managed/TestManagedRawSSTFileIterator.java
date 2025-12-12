@@ -18,13 +18,15 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +39,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -57,6 +60,7 @@ class TestManagedRawSSTFileIterator {
   private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
     File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
+    file.delete();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, managedOptions)) {
@@ -88,8 +92,7 @@ class TestManagedRawSSTFileIterator {
                 "%1$dvalue\n\0%1$d")),
         Arguments.of(Named.of("Key ending with a number & containing a null character", "key\0%1$d"),
             Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")))
-        .flatMap(i -> Stream.of(Arguments.of(i.get()[0], i.get()[1], true),
-            Arguments.of(i.get()[0], i.get()[1], false)));
+        .flatMap(i -> Arrays.stream(IteratorType.values()).map(type -> Arguments.of(i.get()[0], i.get()[1], type)));
   }
 
   @BeforeAll
@@ -99,12 +102,12 @@ class TestManagedRawSSTFileIterator {
 
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
-  public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat, boolean keyOnly) throws Exception {
+  public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat, IteratorType type)
+      throws Exception {
     TreeMap<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
         i -> Pair.of(String.format(keyFormat, i), i % 2),
         i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
-        (v1, v2) -> v2,
-        TreeMap::new));
+        (v1, v2) -> v2, TreeMap::new));
     File file = createSSTFileWithKeys(keys);
     try (ManagedOptions options = new ManagedOptions();
          ManagedRawSSTFileReader<ManagedRawSSTFileIterator.KeyValue> reader = new ManagedRawSSTFileReader<>(
@@ -116,19 +119,22 @@ class TestManagedRawSSTFileIterator {
           Map<Pair<String, Integer>, String> expectedKeys = keys.entrySet().stream()
               .filter(e -> keyStart.map(s -> e.getKey().getKey().compareTo(s) >= 0).orElse(true))
               .filter(e -> keyEnd.map(s -> e.getKey().getKey().compareTo(s) < 0).orElse(true))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, TreeMap::new));
+
           Optional<ManagedSlice> lowerBound = keyStart.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           Optional<ManagedSlice> upperBound = keyEnd.map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           try (ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator =
-                   reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null), keyOnly)) {
+                   reader.newIterator(Function.identity(), lowerBound.orElse(null), upperBound.orElse(null), type)) {
+            Iterator<Map.Entry<Pair<String, Integer>, String>> expectedKeyItr = expectedKeys.entrySet().iterator();
             while (iterator.hasNext()) {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
-              String key = StringUtils.bytes2String(r.getKey());
-              Pair<String, Integer> recordKey = Pair.of(key, r.getType());
-              assertThat(expectedKeys).containsKey(recordKey);
-              assertEquals(keyOnly ? null : Optional.ofNullable(expectedKeys.get(recordKey)).orElse(""),
-                  Optional.ofNullable(r.getValue()).map(StringUtils::bytes2String).orElse(null));
-              expectedKeys.remove(recordKey);
+              assertTrue(expectedKeyItr.hasNext());
+              Map.Entry<Pair<String, Integer>, String> expectedKey = expectedKeyItr.next();
+              String key = r.getKey() == null ? null : StringUtils.bytes2String(r.getKey());
+              assertEquals(type.readKey() ? expectedKey.getKey().getKey() : null, key);
+              assertEquals(type.readValue() ? expectedKey.getValue() : null,
+                  type.readValue() ? StringUtils.bytes2String(r.getValue()) : r.getValue());
+              expectedKeyItr.remove();
             }
             assertEquals(0, expectedKeys.size());
           } finally {
