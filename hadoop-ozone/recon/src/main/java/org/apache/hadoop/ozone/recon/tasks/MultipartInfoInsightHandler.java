@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
@@ -148,17 +150,19 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
    * uploads in the backend.
    */
   @Override
-  public Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator) {
+  public Triple<Long, Long, Long> getTableSizeAndCount(String tableName,
+      OMMetadataManager omMetadataManager) throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    if (iterator != null) {
+    Table<String, OmMultipartKeyInfo> table =
+        (Table<String, OmMultipartKeyInfo>) omMetadataManager.getTable(tableName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
+        Table.KeyValue<String, OmMultipartKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) kv.getValue();
+          OmMultipartKeyInfo multipartKeyInfo = kv.getValue();
           for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
             ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
             unReplicatedSize += omKeyInfo.getDataSize();

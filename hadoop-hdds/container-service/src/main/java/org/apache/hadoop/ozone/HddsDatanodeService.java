@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -428,7 +429,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
@@ -453,7 +454,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath,  "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }

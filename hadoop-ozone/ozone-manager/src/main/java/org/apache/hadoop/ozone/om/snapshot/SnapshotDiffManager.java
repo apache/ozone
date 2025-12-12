@@ -122,6 +122,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
@@ -148,10 +149,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SnapshotDiffManager implements AutoCloseable {
   private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
-  private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
-  private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
-  private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
+      LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
       new EnumMap<>(ImmutableMap.of(DELETE, "1", RENAME, "2", CREATE, "3", MODIFY, "4"));
 
@@ -857,11 +855,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       // JobId is prepended to column families name to make them unique
       // for request.
       fromSnapshotColumnFamily =
-          createColumnFamily(jobId + FROM_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_FROM_SNAP_OBJECT_TABLE_NAME);
       toSnapshotColumnFamily =
-          createColumnFamily(jobId + TO_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_TO_SNAP_OBJECT_TABLE_NAME);
       objectIDsColumnFamily =
-          createColumnFamily(jobId + UNIQUE_IDS_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_UNIQUE_IDS_TABLE_NAME);
 
       // ObjectId to keyName map to keep key info for fromSnapshot.
       // objectIdToKeyNameMap is used to identify what keys were touched

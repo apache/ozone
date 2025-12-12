@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * List of in-flight MPU upoads.
@@ -35,7 +35,7 @@ public class OzoneMultipartUploadList {
       String nextKeyMarker,
       String nextUploadIdMarker,
       boolean isTruncated) {
-    Preconditions.checkNotNull(uploads);
+    Objects.requireNonNull(uploads, "uploads == null");
     this.uploads = uploads;
     this.nextKeyMarker = nextKeyMarker;
     this.nextUploadIdMarker = nextUploadIdMarker;

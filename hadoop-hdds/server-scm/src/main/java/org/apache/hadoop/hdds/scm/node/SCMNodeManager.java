@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
@@ -70,7 +69,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -539,7 +537,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
                                            CommandQueueReportProto queueReport) {
-    Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
+    Objects.requireNonNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
@@ -1387,29 +1385,25 @@ public class SCMNodeManager implements NodeManager {
 
     int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
         .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
-            && !hasContainerWithSpace(dn, blockSize, containerSize))
+            && !hasEnoughCommittedVolumeSpace(dn, blockSize))
         .count();
 
     nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
   }
   
   /**
-   * Check if a datanode has any OPEN container with enough space to accept new blocks.
+   * Check if any volume in the datanode has committed space >= blockSize.
+   *
+   * @return true if any volume has committed space >= blockSize, false otherwise
    */
-  private boolean hasContainerWithSpace(DatanodeInfo dnInfo, long blockSize, long containerSize) {
-    try {
-      Set<ContainerID> containers = getContainers(dnInfo);
-      for (ContainerID containerID : containers) {
-        ContainerInfo containerInfo = scmContext.getScm().getContainerManager().getContainer(containerID);
-        
-        if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN &&
-            containerInfo.getUsedBytes() + blockSize <= containerSize) {
-          return true;
-        }
+  private boolean hasEnoughCommittedVolumeSpace(DatanodeInfo dnInfo, long blockSize) {
+    for (StorageReportProto reportProto : dnInfo.getStorageReports()) {
+      if (reportProto.getCommitted() >= blockSize) {
+        return true;
       }
-    } catch (Exception e) {
-      LOG.debug("Error checking containers for datanode {}: {}", dnInfo.getID(), e.getMessage());
     }
+    LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
+        dnInfo.getID(), blockSize);
     return false;
   }
 
@@ -1598,7 +1592,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
     HashSet<DatanodeDetails> dns = new HashSet<>();
-    Preconditions.checkNotNull(dn);
+    Objects.requireNonNull(dn, "dn == null");
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
