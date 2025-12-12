@@ -352,32 +352,28 @@ public final class ServerUtils {
    */
   private static String findExistingRatisDirectory(File metaDirPath,
       NodeType nodeType) {
-    // Check old Ratis directory locations in order of precedence
-    String[] oldRatisDirs = getOldRatisDirectoryNames(nodeType);
-    for (String dirName : oldRatisDirs) {
-      File oldRatisDir = new File(metaDirPath, dirName);
-      if (isNonEmptyDirectory(oldRatisDir)) {
-        LOG.info("Found existing Ratis directory at old location: {}. " +
+    // Check component-specific old location (SCM used scm-ha in some versions)
+    if ("scm".equals(getComponentName(nodeType))) {
+      File oldScmRatisDir = new File(metaDirPath, "scm-ha");
+      if (isNonEmptyDirectory(oldScmRatisDir)) {
+        LOG.info("Found existing SCM Ratis directory at old location: {}. " +
                 "Using it for backward compatibility during upgrade.",
-            oldRatisDir.getPath());
-        return oldRatisDir.getPath();
+            oldScmRatisDir.getPath());
+        return oldScmRatisDir.getPath();
       }
     }
-    return null;
-  }
 
-  /**
-   * Returns array of old Ratis directory names to check, in order of precedence.
-   *
-   * @param nodeType Type of the node component
-   * @return Array of directory names to check
-   */
-  private static String[] getOldRatisDirectoryNames(NodeType nodeType) {
-    // Component-specific old locations take precedence over shared locations
-    if (nodeType == NodeType.SCM) {
-      return new String[]{"scm-ha", "ratis"};
+    // Check old shared Ratis location (used by version 2.0.0 and earlier)
+    // All components (OM, SCM) shared /data/metadata/ratis
+    File oldSharedRatisDir = new File(metaDirPath, "ratis");
+    if (isNonEmptyDirectory(oldSharedRatisDir)) {
+      LOG.info("Found existing Ratis directory at old shared location: {}. " +
+              "Using it for backward compatibility during upgrade.",
+          oldSharedRatisDir.getPath());
+      return oldSharedRatisDir.getPath();
     }
-    return new String[]{"ratis"};
+
+    return null;
   }
 
   /**
