@@ -235,69 +235,68 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    // We run reprocess in two phases with separate flushers so that directory
+    // skeletons are fully persisted before file updates rely on them.
+    final int queueCapacity = maxWorkers + 10; // small buffer beyond workers
 
-    try {
-      // Step 1: Process dirTable in parallel (establishes directory hierarchy)
-      Map<Long, NSSummary> dirSummaryMap = processDirTableInParallel(omMetadataManager);
-      if (dirSummaryMap == null) {
+    try (NSSummaryAsyncFlusher dirFlusher =
+             new NSSummaryAsyncFlusher(getReconNamespaceSummaryManager(),
+                 "NSSummaryTaskWithFSO-dir", queueCapacity)) {
+      if (!processDirTableInParallel(omMetadataManager, dirFlusher)) {
         return false;
       }
-      nsSummaryMap.putAll(dirSummaryMap);
-
-      // Step 2: Process fileTable in parallel (large table) and merge into base map
-      if (!processFileTableInParallel(omMetadataManager, nsSummaryMap)) {
-        return false;
-      }
-
+      // dirFlusher.close() drains queue and persists skeletons before files stage
     } catch (Exception ex) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB.", ex);
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB (dir phase).", ex);
       return false;
     }
-    // flush and commit left out keys at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      LOG.info("flushAndCommitNSToDB failed during reprocessWithFSO.");
+
+    try (NSSummaryAsyncFlusher fileFlusher =
+             new NSSummaryAsyncFlusher(getReconNamespaceSummaryManager(),
+                 "NSSummaryTaskWithFSO-file", queueCapacity)) {
+      if (!processFileTableInParallel(omMetadataManager, fileFlusher)) {
+        return false;
+      }
+      // fileFlusher.close() drains queue and persists file deltas with propagation
+    } catch (Exception ex) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB (file phase).", ex);
       return false;
     }
+
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
 
   /**
-   * Process dirTable in parallel using per-worker maps.
-   * Returns the aggregated map of NSSummary objects.
+   * Process dirTable in parallel using per-worker maps with async flushing.
    */
-  private Map<Long, NSSummary> processDirTableInParallel(OMMetadataManager omMetadataManager) {
+  private boolean processDirTableInParallel(OMMetadataManager omMetadataManager,
+                                            NSSummaryAsyncFlusher asyncFlusher) {
     Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
     
     // Per-worker maps for lockless updates
     Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
     
-    // Divide threshold by worker count so each worker flushes independently
+    // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
-    
-    // Lock for coordinating DB flush operations only
-    Object flushLock = new Object();
 
     Function<Table.KeyValue<String, OmDirectoryInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(
-          Thread.currentThread().getId(), k -> new HashMap<>());
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
       
       try {
-        // Use reprocess-specific method (no DB reads)
+        // Update immediate parent only, NO DB reads during reprocess
         handlePutDirEventReprocess(kv.getValue(), workerMap);
         
-        // Flush this worker's map when it reaches threshold
+        // Submit to async queue when threshold reached
         if (workerMap.size() >= perWorkerThreshold) {
-          synchronized (flushLock) {
-            if (!flushAndCommitNSToDB(workerMap)) {
-              throw new IOException("Failed to flush NSSummary map to DB");
-            }
-          }
+          asyncFlusher.submitForFlush(workerMap);
+          // Get fresh map for this worker
+          allWorkerMaps.put(threadId, new HashMap<>());
         }
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
       return null;
     };
@@ -308,48 +307,54 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-dirTable", null, null, kvOperation);
     } catch (Exception ex) {
       LOG.error("Unable to process dirTable in parallel", ex);
-      return null;
+      return false;
     }
     
-    // Merge all worker maps into a single map to return
-    return mergeWorkerMaps(allWorkerMaps.values());
+    // Submit any remaining worker maps
+    for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
+      if (!remainingMap.isEmpty()) {
+        try {
+          asyncFlusher.submitForFlush(remainingMap);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   /**
-   * Process fileTable in parallel using per-worker maps and merge into base map.
+   * Process fileTable in parallel using per-worker maps with async flushing.
    */
   private boolean processFileTableInParallel(OMMetadataManager omMetadataManager,
-                                             Map<Long, NSSummary> baseMap) {
+                                             NSSummaryAsyncFlusher asyncFlusher) {
     Table<String, OmKeyInfo> fileTable = omMetadataManager.getFileTable();
     
     // Per-worker maps for lockless updates
     Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
     
-    // Divide threshold by worker count so each worker flushes independently
+    // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
-    
-    // Lock for coordinating DB flush operations only
-    Object flushLock = new Object();
     
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(
-          Thread.currentThread().getId(), k -> new HashMap<>());
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
       
       try {
-        // Use reprocess-specific method (no DB reads)
+        // Update immediate parent only, NO DB reads during reprocess
         handlePutKeyEventReprocess(kv.getValue(), workerMap);
         
-        // Flush this worker's map when it reaches threshold
+        // Submit to async queue when threshold reached
         if (workerMap.size() >= perWorkerThreshold) {
-          synchronized (flushLock) {
-            if (!flushAndCommitNSToDB(workerMap)) {
-               throw new IOException("Failed to flush NSSummary map to DB");
-            }
-          }
+          asyncFlusher.submitForFlush(workerMap);
+          // Get fresh map for this worker
+          allWorkerMaps.put(threadId, new HashMap<>());
         }
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
       return null;
     };
@@ -363,8 +368,17 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return false;
     }
     
-    // Merge all worker maps into base map
-    mergeWorkerMapsIntoBase(allWorkerMaps.values(), baseMap);
+    // Submit any remaining worker maps
+    for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
+      if (!remainingMap.isEmpty()) {
+        try {
+          asyncFlusher.submitForFlush(remainingMap);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return false;
+        }
+      }
+    }
     return true;
   }
 
