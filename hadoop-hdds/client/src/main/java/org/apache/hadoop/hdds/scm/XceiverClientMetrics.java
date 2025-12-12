@@ -22,10 +22,10 @@ import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.BaseMetricsSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.util.PerformanceMetrics;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Storage Container Client Metrics", context = "dfs")
-public class XceiverClientMetrics implements MetricsSource {
+public class XceiverClientMetrics extends BaseMetricsSource {
   public static final String SOURCE_NAME = XceiverClientMetrics.class
       .getSimpleName();
 
@@ -51,10 +51,6 @@ public class XceiverClientMetrics implements MetricsSource {
   private EnumMap<ContainerProtos.Type, MutableCounterLong> pendingOpsArray;
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
-
-  // MetricsRegistry must be kept as instance field because reset() method reuses it
-  @SuppressWarnings("PMD.SingularField")
-  private MetricsRegistry registry;
 
   public XceiverClientMetrics() {
     init();
