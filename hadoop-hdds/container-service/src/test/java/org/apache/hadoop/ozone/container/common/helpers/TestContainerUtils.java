@@ -125,13 +125,13 @@ public class TestContainerUtils {
       // Read should return an empty value if file doesn't exist
       File nonExistFile = new File(tempDir, "non_exist.id");
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile, conf));
 
       // Read should fail if the file is malformed
       File malformedFile = new File(tempDir, "malformed.id");
       createMalformedIDFile(malformedFile);
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile, conf));
 
       // Test upgrade scenario - protobuf file instead of yaml
       File protoFile = new File(tempDir, "valid-proto.id");
@@ -139,7 +139,7 @@ public class TestContainerUtils {
         HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
         proto.writeTo(out);
       }
-      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
+      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile, conf));
 
       id1.setInitialVersion(1);
       assertWriteRead(tempDir, id1);
@@ -152,7 +152,7 @@ public class TestContainerUtils {
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
 
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
 
     assertDetailsEquals(details, read);
     assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
@@ -163,7 +163,7 @@ public class TestContainerUtils {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
     assertEquals(details.getIpAddress(), read.getIpAddress());
     read.validateDatanodeIpAddress();
     assertEquals("127.0.0.1", read.getIpAddress());
