@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
@@ -31,13 +32,12 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
   // Native address of pointer to the object.
   private final long nativeHandle;
   private final Function<KeyValue, T> transformer;
-  private final boolean keyOnly;
+  private final IteratorType type;
 
-  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer, boolean keyOnly) {
+  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer, IteratorType type) {
     this.nativeHandle = nativeHandle;
     this.transformer = transformer;
-    this.keyOnly = keyOnly;
-
+    this.type = type;
   }
 
   private native boolean hasNext(long handle);
@@ -63,10 +63,10 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
       throw new NoSuchElementException();
     }
 
-    KeyValue keyValue = new KeyValue(this.getKey(nativeHandle),
+    KeyValue keyValue = new KeyValue(this.type.readKey() ? this.getKey(nativeHandle) : null,
         UnsignedLong.fromLongBits(this.getSequenceNumber(this.nativeHandle)),
         this.getType(nativeHandle),
-        keyOnly ? null : this.getValue(nativeHandle));
+        this.type.readValue() ? this.getValue(nativeHandle) : null);
     this.next(nativeHandle);
     return this.transformer.apply(keyValue);
   }
@@ -97,7 +97,7 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
     }
 
     public byte[] getKey() {
-      return Arrays.copyOf(key, key.length);
+      return key == null ? null : Arrays.copyOf(key, key.length);
     }
 
     public UnsignedLong getSequence() {
