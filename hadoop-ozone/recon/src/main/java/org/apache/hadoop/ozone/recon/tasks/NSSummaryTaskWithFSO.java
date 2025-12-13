@@ -198,21 +198,21 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
     switch (action) {
     case PUT:
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     case DELETE:
-      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     case UPDATE:
       if (oldKeyInfo != null) {
         // delete first, then put
-        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyInfo.getParentObjectID());
       } else {
         LOG.warn("Update event does not have the old keyInfo for {}.", omdbUpdateEvent.getKey());
       }
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     default:
@@ -251,7 +251,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          handlePutKeyEvent(keyInfo, nsSummaryMap, keyInfo.getParentObjectID());
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;

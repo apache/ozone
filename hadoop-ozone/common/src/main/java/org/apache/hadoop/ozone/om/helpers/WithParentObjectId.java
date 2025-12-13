@@ -17,16 +17,16 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import net.jcip.annotations.Immutable;
+
 /**
  * Object ID with additional parent ID field.
  */
+@Immutable
 public abstract class WithParentObjectId extends WithObjectID {
-  private long parentObjectID;
+  private final long parentObjectID;
 
-  public WithParentObjectId() {
-  }
-
-  public WithParentObjectId(Builder builder) {
+  public WithParentObjectId(Builder<?> builder) {
     super(builder);
     parentObjectID = builder.getParentObjectID();
   }
@@ -56,10 +56,6 @@ public abstract class WithParentObjectId extends WithObjectID {
    */
   public final long getParentObjectID() {
     return parentObjectID;
-  }
-
-  public final void setParentObjectID(long parentObjectID) {
-    this.parentObjectID = parentObjectID;
   }
 
   /** Builder for {@link WithParentObjectId}. */
