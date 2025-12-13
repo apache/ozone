@@ -2144,6 +2144,44 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testOzoneManagerListLocatedStatusForZeroByteFile() throws IOException {
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+
+    // create empty file
+    fs.create(path).close();
+
+    RemoteIterator<LocatedFileStatus> listLocatedStatus = fs.listLocatedStatus(path);
+    int count = 0;
+
+    while (listLocatedStatus.hasNext()) {
+      LocatedFileStatus locatedFileStatus = listLocatedStatus.next();
+      assertEquals(0, locatedFileStatus.getLen());
+      BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
+      assertNotNull(blockLocations);
+      assertEquals(0, blockLocations.length);
+
+      count++;
+    }
+    assertEquals(1, count);
+
+    count = 0;
+    RemoteIterator<FileStatus> listStatus = fs.listStatusIterator(path);
+    while (listStatus.hasNext()) {
+      FileStatus fileStatus = listStatus.next();
+      assertEquals(0, fileStatus.getLen());
+      assertFalse(fileStatus instanceof LocatedFileStatus);
+      count++;
+    }
+    assertEquals(1, count);
+
+    FileStatus[] fileStatuses = fs.listStatus(path.getParent());
+    assertEquals(1, fileStatuses.length);
+    assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  @Test
   void testOzoneManagerFileSystemInterface() throws IOException {
     String dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
 
