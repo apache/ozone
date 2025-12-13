@@ -28,6 +28,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,7 @@ public class TestSTSTokenIdentifier {
   private static final byte[] ENCRYPTION_KEY = new byte[5];
 
   {
-    new SecureRandom().nextBytes(ENCRYPTION_KEY);
+    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
   }
 
   @Test

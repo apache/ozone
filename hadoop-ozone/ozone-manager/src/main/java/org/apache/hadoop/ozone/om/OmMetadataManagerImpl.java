@@ -490,7 +490,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
 
     // temporaryAccessKeyId -> sessionToken
-    s3RevokedStsTokenTable = initializer.get(OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF);
+    // FULL_CACHE keeps revocations in memory as there are not expected to be many revoked tokens
+    s3RevokedStsTokenTable = initializer.get(
+        OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, CacheType.FULL_CACHE);
   }
 
   /**

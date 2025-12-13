@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -1303,18 +1304,29 @@ public class TestOmMetadataManager {
     final String tempAccessKeyId2 = "ASIA904E65QIGL9ON305";
     final String sessionToken2 = "test-session-token-2";
 
-    omMetadataManager.getS3RevokedStsTokenTable()
-        .put(tempAccessKeyId1, sessionToken1);
-    omMetadataManager.getS3RevokedStsTokenTable()
-        .put(tempAccessKeyId2, sessionToken2);
+    final Table<String, String> table = omMetadataManager.getS3RevokedStsTokenTable();
+
+    // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
+    // A put() writes to RocksDB but does not update the table cache, so get() and getIfExist() will return null unless
+    // the cache is updated with addCacheEntry().  getSkipCache() will read the DB instead of the cache.
+    table.put(tempAccessKeyId1, sessionToken1);
+    table.put(tempAccessKeyId2, sessionToken2);
+
+    // Verify the values are persisted in RocksDB.
+    assertEquals(sessionToken1, table.getSkipCache(tempAccessKeyId1));
+    assertEquals(sessionToken2, table.getSkipCache(tempAccessKeyId2));
+
+    // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
+    table.addCacheEntry(tempAccessKeyId1, sessionToken1, 1L);
+    table.addCacheEntry(tempAccessKeyId2, sessionToken2, 1L);
 
     // Verify get and getIfExist return the stored value
-    assertEquals(sessionToken1, omMetadataManager.getS3RevokedStsTokenTable().get(tempAccessKeyId1));
-    assertEquals(sessionToken1, omMetadataManager.getS3RevokedStsTokenTable().getIfExist(tempAccessKeyId1));
-    assertEquals(sessionToken2, omMetadataManager.getS3RevokedStsTokenTable().get(tempAccessKeyId2));
-    assertEquals(sessionToken2, omMetadataManager.getS3RevokedStsTokenTable().getIfExist(tempAccessKeyId2));
+    assertEquals(sessionToken1, table.get(tempAccessKeyId1));
+    assertEquals(sessionToken1, table.getIfExist(tempAccessKeyId1));
+    assertEquals(sessionToken2, table.get(tempAccessKeyId2));
+    assertEquals(sessionToken2, table.getIfExist(tempAccessKeyId2));
 
     // Unknown key should return null for getIfExist
-    assertNull(omMetadataManager.getS3RevokedStsTokenTable().getIfExist("ASIA_UNKNOWN_ACCESS_KEY"));
+    assertNull(table.getIfExist("ASIA_UNKNOWN_ACCESS_KEY"));
   }
 }
