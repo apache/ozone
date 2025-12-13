@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -47,7 +48,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   private final long creationTime;
   private final long modificationTime;
 
-  private final List<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
 
   public OmDirectoryInfo(Builder builder) {
     super(builder);
@@ -71,6 +72,10 @@ public class OmDirectoryInfo extends WithParentObjectId
     return new OmDirectoryInfo.Builder();
   }
 
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
   /**
    * Builder for Directory Info.
    */
@@ -86,6 +91,15 @@ public class OmDirectoryInfo extends WithParentObjectId
     public Builder() {
       //Default values
       this.acls = AclListBuilder.empty();
+    }
+
+    public Builder(OmDirectoryInfo obj) {
+      super(obj);
+      this.name = obj.name;
+      this.owner = obj.owner;
+      this.creationTime = obj.creationTime;
+      this.modificationTime = obj.modificationTime;
+      this.acls = AclListBuilder.of(obj.acls);
     }
 
     @Override
@@ -269,20 +283,6 @@ public class OmDirectoryInfo extends WithParentObjectId
    */
   @Override
   public OmDirectoryInfo copyObject() {
-    OmDirectoryInfo.Builder builder = new Builder()
-            .setName(name)
-            .setOwner(owner)
-            .setCreationTime(creationTime)
-            .setModificationTime(modificationTime)
-            .setAcls(acls)
-            .setParentObjectID(getParentObjectID())
-            .setObjectID(getObjectID())
-            .setUpdateID(getUpdateID());
-
-    if (getMetadata() != null) {
-      builder.addAllMetadata(getMetadata());
-    }
-
-    return builder.build();
+    return toBuilder().build();
   }
 }
