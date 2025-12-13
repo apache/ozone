@@ -376,6 +376,11 @@ public class KeyManagerImpl implements KeyManager {
    */
   public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
     if (isSstFilteringSvcEnabled()) {
+      if (isDefragSvcEnabled()) {
+        LOG.info("SstFilteringService is disabled (despite config intends to enable it) " +
+            "because SnapshotDefragService is enabled. Defrag effectively performs filtering already.");
+        return;
+      }
       long serviceInterval = conf.getTimeDuration(
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
