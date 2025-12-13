@@ -193,6 +193,14 @@ class RDBTable implements Table<byte[], byte[]> {
     db.deleteRange(family, beginKey, endKey);
   }
 
+  void deleteWithBatch(BatchOperation batch, CodecBuffer key) {
+    if (batch instanceof RDBBatchOperation) {
+      ((RDBBatchOperation) batch).delete(family, key);
+    } else {
+      throw new IllegalArgumentException("Unexpected batch class: " + batch.getClass().getSimpleName());
+    }
+  }
+
   @Override
   public void deleteWithBatch(BatchOperation batch, byte[] key) {
     if (batch instanceof RDBBatchOperation) {

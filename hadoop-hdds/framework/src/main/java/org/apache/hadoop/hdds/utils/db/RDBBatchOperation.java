@@ -179,6 +179,47 @@ public class RDBBatchOperation implements BatchOperation {
   }
 
   /**
+   * Delete operation to be applied to a {@link ColumnFamily} batch using the CodecBuffer api.
+   */
+  private final class CodecBufferDeleteOperation extends Operation {
+    private final CodecBuffer key;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private CodecBufferDeleteOperation(CodecBuffer key, Bytes keyBytes) {
+      super(keyBytes);
+      this.key = key;
+    }
+
+    @Override
+    public void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException {
+      family.batchDelete(batch, key.asReadOnlyByteBuffer());
+    }
+
+    @Override
+    public int keyLen() {
+      return key.readableBytes();
+    }
+
+    @Override
+    public int valLen() {
+      return 0;
+    }
+
+    @Override
+    public Op getOpType() {
+      return Op.DELETE;
+    }
+
+    @Override
+    public void close() {
+      if (closed.compareAndSet(false, true)) {
+        key.release();
+      }
+      super.close();
+    }
+  }
+
+  /**
    * Delete operation to be applied to a {@link ColumnFamily} batch.
    */
   private final class DeleteOperation extends Operation {
@@ -538,6 +579,12 @@ public class RDBBatchOperation implements BatchOperation {
         overWriteOpIfExist(keyBytes, new DeleteOperation(key, keyBytes));
       }
 
+      void delete(CodecBuffer key) {
+        delCount++;
+        Bytes keyBytes = new Bytes(key);
+        overWriteOpIfExist(keyBytes, new CodecBufferDeleteOperation(key, keyBytes));
+      }
+
       void deleteRange(byte[] startKey, byte[] endKey) {
         delRangeCount++;
         batchOps.put(opIndex.getAndIncrement(), new DeleteRangeOperation(startKey, endKey));
@@ -578,6 +625,10 @@ public class RDBBatchOperation implements BatchOperation {
     void delete(ColumnFamily family, byte[] key) {
       name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
           .delete(key);
+    }
+
+    void delete(ColumnFamily family, CodecBuffer key) {
+      name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family)).delete(key);
     }
 
     void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
@@ -664,6 +715,10 @@ public class RDBBatchOperation implements BatchOperation {
   }
 
   public void delete(ColumnFamily family, byte[] key) {
+    opCache.delete(family, key);
+  }
+
+  public void delete(ColumnFamily family, CodecBuffer key) {
     opCache.delete(family, key);
   }
 
