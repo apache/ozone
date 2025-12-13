@@ -112,6 +112,10 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL =
+      "hdds.scm.safemode.log.interval";
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
