@@ -73,7 +73,7 @@ public final class OmKeyArgs implements Auditable {
     this.multipartUploadID = b.multipartUploadID;
     this.multipartUploadPartNumber = b.multipartUploadPartNumber;
     this.metadata = b.metadata;
-    this.acls = b.acls;
+    this.acls = b.acls.build();
     this.sortDatanodesInPipeline = b.sortDatanodesInPipeline;
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
@@ -256,7 +256,7 @@ public final class OmKeyArgs implements Auditable {
     private final Map<String, String> metadata = new HashMap<>();
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
-    private List<OzoneAcl> acls;
+    private final AclListBuilder acls = AclListBuilder.empty();
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
@@ -299,7 +299,7 @@ public final class OmKeyArgs implements Auditable {
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      this.acls = listOfAcls;
+      this.acls.addAll(listOfAcls);
       return this;
     }
 

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,7 +53,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     super(builder);
     this.name = builder.name;
     this.owner = builder.owner;
-    this.acls = builder.acls;
+    this.acls = builder.acls.build();
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
   }
@@ -82,11 +81,11 @@ public class OmDirectoryInfo extends WithParentObjectId
     private long creationTime;
     private long modificationTime;
 
-    private final List<OzoneAcl> acls;
+    private final AclListBuilder acls;
 
     public Builder() {
       //Default values
-      this.acls = new LinkedList<>();
+      this.acls = AclListBuilder.empty();
     }
 
     @Override
@@ -128,9 +127,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
-      }
+      this.acls.addAll(listOfAcls);
       return this;
     }
 
