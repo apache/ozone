@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,8 +34,6 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -51,14 +47,6 @@ public class ConfigFileGenerator extends AbstractProcessor {
 
   private static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
   private static final String OUTPUT_FILE_POSTFIX = "-default.xml";
-
-  private static final SimpleTypeVisitor8<Element, Void> GET_PARENT_ELEMENT =
-      new SimpleTypeVisitor8<Element, Void>() {
-        @Override
-        public Element visitDeclared(DeclaredType t, Void aVoid) {
-          return t.asElement();
-        }
-      };
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -98,21 +86,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
         ConfigGroup configGroupAnnotation =
             configurationObject.getAnnotation(ConfigGroup.class);
 
-        TypeElement elementToCheck = configurationObject;
-        while (elementToCheck != null) {
-
-          writeConfigAnnotations(configGroupAnnotation, appender,
-              elementToCheck);
-          if (!elementToCheck.getSuperclass().toString()
-              .equals("java.lang.Object")) {
-            elementToCheck =
-                (TypeElement) elementToCheck.getSuperclass()
-                    .accept(GET_PARENT_ELEMENT, null);
-          } else {
-            elementToCheck = null;
-          }
-        }
-
+        writeConfigAnnotations(configGroupAnnotation, appender, configurationObject);
       }
 
       if (!resourceExists) {
@@ -141,8 +115,13 @@ public class ConfigFileGenerator extends AbstractProcessor {
         if (element.getAnnotation(Config.class) != null) {
 
           Config configAnnotation = element.getAnnotation(Config.class);
-
-          String key = getFullKey(configGroup, configAnnotation);
+          String prefix = configGroup.prefix() + ".";
+          String key = configAnnotation.key();
+          if (!key.startsWith(prefix)) {
+            processingEnv.getMessager().printMessage(Kind.ERROR,
+                prefix + " is not a prefix of " + key,
+                typeElement);
+          }
 
           appender.addConfig(key,
               configAnnotation.defaultValue(),
