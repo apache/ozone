@@ -75,7 +75,7 @@ public class TestObjectTaggingGet {
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
+        null, null, 1, null, null, null, body);
 
 
     ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);

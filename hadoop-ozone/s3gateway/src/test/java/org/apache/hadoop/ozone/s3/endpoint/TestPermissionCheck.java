@@ -277,7 +277,7 @@ public class TestPermissionCheck {
         .build();
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "bucketName", "keyPath", 1024, 0, null, null, null,
+        "bucketName", "keyPath", 1024, null, null, 0, null, null, null,
         new ByteArrayInputStream(new byte[]{})));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
@@ -340,7 +340,7 @@ public class TestPermissionCheck {
     InputStream tagInput = new ByteArrayInputStream(xml.getBytes(UTF_8));
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.put("bucketName", "keyPath", 0, 1,
+        objectEndpoint.put("bucketName", "keyPath", 0, null, null, 1,
             null, "", null, tagInput));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
 

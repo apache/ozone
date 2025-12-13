@@ -96,7 +96,7 @@ public class TestPartUploadWithStream {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, null, null, body);
+        content.length(), null, null, 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -117,7 +117,7 @@ public class TestPartUploadWithStream {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, null, null, body);
+        content.length(), null, null, 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -126,7 +126,7 @@ public class TestPartUploadWithStream {
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, uploadID, null, null, body);
+        content.length(), null, null, 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -138,7 +138,7 @@ public class TestPartUploadWithStream {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
-      rest.put(S3BUCKET, S3KEY, content.length(), 1,
+      rest.put(S3BUCKET, S3KEY, content.length(), null, null, 1,
           "random", null, null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
