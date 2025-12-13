@@ -27,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -104,8 +103,10 @@ public class TestS3SecurityUtil {
     // If the tempAccessKeyId extracted from the session token is null, throws INTERNAL_ERROR
     final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     final Table<String, String> revokedSTSTokenTable = new InMemoryTestTable<>();
-    final STSTokenIdentifier stsTokenIdentifier = spy(createSTSTokenIdentifier());
-    doReturn(null).when(stsTokenIdentifier).getTempAccessKeyId();
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
+        null, "original-access-key-id", "arn:aws:iam::123456789012:role/test-role",
+        CLOCK.instant().plusSeconds(3600), "secret-access-key", "session-policy",
+        ENCRYPTION_KEY);
     validateS3CredentialHelper(
         "session-token-e", metadataManager, revokedSTSTokenTable, false, stsTokenIdentifier,
         INTERNAL_ERROR, "Could not determine STS revocation: tempAccessKeyId in STSTokenIdentifier is null/empty");
@@ -116,8 +117,10 @@ public class TestS3SecurityUtil {
     // If the tempAccessKeyId extracted from the session token is empty, throws INTERNAL_ERROR
     final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     final Table<String, String> revokedSTSTokenTable = new InMemoryTestTable<>();
-    final STSTokenIdentifier stsTokenIdentifier = spy(createSTSTokenIdentifier());
-    doReturn("").when(stsTokenIdentifier).getTempAccessKeyId();
+    final STSTokenIdentifier stsTokenIdentifier = new STSTokenIdentifier(
+        "", "original-access-key-id", "arn:aws:iam::123456789012:role/test-role",
+        CLOCK.instant().plusSeconds(3600), "secret-access-key", "session-policy",
+        ENCRYPTION_KEY);
     validateS3CredentialHelper(
         "session-token-f", metadataManager, revokedSTSTokenTable, false, stsTokenIdentifier,
         INTERNAL_ERROR, "Could not determine STS revocation: tempAccessKeyId in STSTokenIdentifier is null/empty");
