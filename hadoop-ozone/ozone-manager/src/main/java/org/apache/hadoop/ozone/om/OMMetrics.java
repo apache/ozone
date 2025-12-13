@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -26,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -252,6 +254,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong ecBucketCreateTotal;
   private @Metric MutableCounterLong ecBucketCreateFailsTotal;
   private final DBCheckpointMetrics dbCheckpointMetrics;
+  private OMSnapshotDirectoryMetrics snapshotDirectoryMetrics;
 
   public OMMetrics() {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
@@ -266,6 +269,39 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
     return dbCheckpointMetrics;
+  }
+
+  /**
+   * @return an instance of OMSnapshotDirectoryMetrics.
+   * @throws IllegalStateException if the metric is null
+   */
+  public OMSnapshotDirectoryMetrics getSnapshotDirectoryMetrics() throws IllegalStateException {
+    if (snapshotDirectoryMetrics == null) {
+      throw new IllegalStateException(
+          "SnapshotDirectoryMetrics not initialized. Call startSnapshotDirectoryMetrics() first.");
+    }
+    return snapshotDirectoryMetrics;
+  }
+
+  /**
+   * Starts periodic updates for snapshot directory metrics.
+   * Creates the metrics instance if it doesn't exist.
+   *
+   * @param configuration OzoneConfiguration for reading update interval
+   * @param metadataManager OMMetadataManager for accessing snapshot directories
+   */
+  public void startSnapshotDirectoryMetrics(OzoneConfiguration configuration,
+      OMMetadataManager metadataManager) {
+    if (snapshotDirectoryMetrics == null) {
+      snapshotDirectoryMetrics = OMSnapshotDirectoryMetrics.create("OM Metrics", metadataManager);
+    }
+    snapshotDirectoryMetrics.start(configuration);
+  }
+
+  public void stopSnapshotDirectoryMetrics() {
+    if (snapshotDirectoryMetrics != null) {
+      snapshotDirectoryMetrics.stop();
+    }
   }
 
   public void incNumS3BucketCreates() {
