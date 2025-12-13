@@ -89,8 +89,11 @@ public class OmDirectoryInfo extends WithParentObjectId
     private final AclListBuilder acls;
 
     public Builder() {
-      //Default values
-      this.acls = AclListBuilder.empty();
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
     }
 
     public Builder(OmDirectoryInfo obj) {

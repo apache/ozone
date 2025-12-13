@@ -242,7 +242,11 @@ public final class OmKeyArgs implements Auditable {
     private Long expectedDataGeneration = null;
 
     public Builder() {
-      this.acls = AclListBuilder.empty();
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
     }
 
     public Builder(OmKeyArgs obj) {
