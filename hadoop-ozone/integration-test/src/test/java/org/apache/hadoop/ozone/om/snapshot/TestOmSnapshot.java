@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
@@ -2524,7 +2525,7 @@ public abstract class TestOmSnapshot {
                   try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
                           managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
                        ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
-                           keyValue -> keyValue.getValue(), null, null)) {
+                           keyValue -> keyValue.getValue(), null, null, KEY_AND_VALUE)) {
                     while (itr.hasNext()) {
                       assertEquals(0, itr.next().length);
                     }

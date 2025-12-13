@@ -17,7 +17,7 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -29,12 +29,15 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.MinHeapMergeIterator;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
@@ -84,7 +87,7 @@ public class SstFileSetReader {
     return estimatedTotalKeys;
   }
 
-  public ClosableIterator<String> getKeyStream(String lowerBound, String upperBound) {
+  public ClosableIterator<String> getKeyStream(String lowerBound, String upperBound) throws CodecException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       private ManagedOptions options;
@@ -95,18 +98,18 @@ public class SstFileSetReader {
       private ManagedSlice upperBoundSlice;
 
       @Override
-      protected void init() {
+      protected void init() throws CodecException {
         this.options = new ManagedOptions();
         this.readOptions = new ManagedReadOptions();
         if (Objects.nonNull(lowerBound)) {
           this.lowerBoundSLice = new ManagedSlice(
-              StringUtils.string2Bytes(lowerBound));
+              StringCodec.get().toPersistedFormat(lowerBound));
           readOptions.setIterateLowerBound(lowerBoundSLice);
         }
 
         if (Objects.nonNull(upperBound)) {
           this.upperBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(upperBound));
+              StringCodec.get().toPersistedFormat(upperBound));
           readOptions.setIterateUpperBound(upperBoundSlice);
         }
       }
@@ -116,7 +119,7 @@ public class SstFileSetReader {
         return new ManagedSstFileIterator(file, options, readOptions) {
           @Override
           protected String getIteratorValue(ManagedSstFileReaderIterator iterator) {
-            return new String(iterator.get().key(), UTF_8);
+            return StringCodec.get().fromPersistedFormat(iterator.get().key());
           }
         };
       }
@@ -132,7 +135,8 @@ public class SstFileSetReader {
     return itr;
   }
 
-  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound) {
+  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
+      throws CodecException {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
@@ -140,22 +144,22 @@ public class SstFileSetReader {
       private ManagedSlice upperBoundSlice;
 
       @Override
-      protected void init() {
+      protected void init() throws CodecException {
         this.options = new ManagedOptions();
         if (Objects.nonNull(lowerBound)) {
           this.lowerBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(lowerBound));
+              StringCodec.get().toPersistedFormat(lowerBound));
         }
         if (Objects.nonNull(upperBound)) {
           this.upperBoundSlice = new ManagedSlice(
-              StringUtils.string2Bytes(upperBound));
+              StringCodec.get().toPersistedFormat(upperBound));
         }
       }
 
       @Override
       protected ClosableIterator<String> getKeyIteratorForFile(String file) {
         return new ManagedRawSstFileIterator(file, options, lowerBoundSlice, upperBoundSlice,
-            keyValue -> StringUtils.bytes2String(keyValue.getKey()));
+            keyValue -> StringCodec.get().fromPersistedFormat(keyValue.getKey()), KEY_ONLY);
       }
 
       @Override
@@ -211,9 +215,9 @@ public class SstFileSetReader {
     private static final int READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
     ManagedRawSstFileIterator(String path, ManagedOptions options, ManagedSlice lowerBound, ManagedSlice upperBound,
-                              Function<ManagedRawSSTFileIterator.KeyValue, String> keyValueFunction) {
+                              Function<KeyValue, String> keyValueFunction, IteratorType type) {
       this.fileReader = new ManagedRawSSTFileReader<>(options, path, READ_AHEAD_SIZE);
-      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound);
+      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, type);
     }
 
     @Override
@@ -244,13 +248,13 @@ public class SstFileSetReader {
       extends MinHeapMergeIterator<T, ClosableIterator<T>, T> {
     private final List<Path> sstFiles;
 
-    private MultipleSstFileIterator(Collection<Path> sstFiles) {
+    private MultipleSstFileIterator(Collection<Path> sstFiles) throws CodecException {
       super(sstFiles.size(), Comparable::compareTo);
       init();
       this.sstFiles = sstFiles.stream().map(Path::toAbsolutePath).collect(Collectors.toList());
     }
 
-    protected abstract void init();
+    protected abstract void init() throws CodecException;
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws IOException;
 

@@ -17,33 +17,39 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.Map;
-import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
-
 /**
- * In memory test table for String keys.
- * @param <V> Value type.
+ * The iterator type.
  */
-public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
+public enum IteratorType {
 
-  public StringInMemoryTestTable() {
-    super();
+  /**
+   * Neither read key nor value.
+   */
+  NEITHER(0),
+  /**
+   * Read key only.
+   */
+  KEY_ONLY(1),
+  /**
+   * Read value only.
+   */
+  VALUE_ONLY(2),
+  /**
+   * Read both key and value.
+   */
+  KEY_AND_VALUE(3);
+
+  private final int mask;
+
+  IteratorType(int mask) {
+    this.mask = mask;
   }
 
-  public StringInMemoryTestTable(Map<String, V> map) {
-    super(map);
+  public boolean readKey() {
+    return (this.mask & KEY_ONLY.mask) != 0;
   }
 
-  public StringInMemoryTestTable(Map<String, V> map, String name) {
-    super(map, name);
-  }
-
-  public StringInMemoryTestTable(String name) {
-    super(name);
-  }
-
-  @Override
-  public KeyValueIterator<String, V> iterator(String prefix, IteratorType type) {
-    return new MapBackedTableIterator<>(getMap(), prefix);
+  public boolean readValue() {
+    return (this.mask & VALUE_ONLY.mask) != 0;
   }
 }

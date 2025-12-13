@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Function.identity;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -1368,7 +1369,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
              options, sstFilePath, SST_READ_AHEAD_SIZE);
          ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null);
+             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
       sstFileWriter.open(prunedFilePath);
       while (itr.hasNext()) {
