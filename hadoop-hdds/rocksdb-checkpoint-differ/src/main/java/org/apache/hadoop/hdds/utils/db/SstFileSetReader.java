@@ -111,7 +111,7 @@ public class SstFileSetReader {
         return new ManagedSstFileIterator<String>(file, options, readOptions, KEY_ONLY) {
 
           @Override
-          protected String getIteratorValue(CodecBuffer key, CodecBuffer value) {
+          String getIteratorValue(CodecBuffer key, CodecBuffer value) {
             return StringCodec.get().fromCodecBuffer(key);
           }
         };

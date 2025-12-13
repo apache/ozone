@@ -74,14 +74,14 @@ abstract class ManagedSstFileIterator<T> implements ClosableIterator<T> {
   }
 
   @Override
-  public boolean hasNext() {
+  public synchronized boolean hasNext() {
     return fileReaderIterator.get().isValid();
   }
 
-  protected abstract T getIteratorValue(CodecBuffer key, CodecBuffer value);
+  abstract T getIteratorValue(CodecBuffer key, CodecBuffer value);
 
   @Override
-  public T next() {
+  public synchronized T next() {
     T value = getIteratorValue(this.type.readKey() ? keyBuffer.getFromDb() : null,
         this.type.readValue() ? valueBuffer.getFromDb() : null);
     fileReaderIterator.get().next();
