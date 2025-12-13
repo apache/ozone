@@ -43,7 +43,7 @@ public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
   }
 
   @Override
-  public KeyValueIterator<String, V> iterator(String prefix, KeyValueIterator.Type type) {
+  public KeyValueIterator<String, V> iterator(String prefix, IteratorType type) {
     return new MapBackedTableIterator<>(getMap(), prefix);
   }
 }

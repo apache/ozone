@@ -18,23 +18,38 @@
 package org.apache.hadoop.hdds.utils.db;
 
 /**
- * Create and commit batch operation for one DB.
+ * The iterator type.
  */
-public interface BatchOperationHandler {
+public enum IteratorType {
 
   /**
-   * Initialize an atomic batch operation which can hold multiple PUT/DELETE
-   * operations and committed later in one step.
-   *
-   * @return BatchOperation holder which can be used to add or commit batch
-   * operations.
+   * Neither read key nor value.
    */
-  BatchOperation initBatchOperation();
-
+  NEITHER(0),
   /**
-   * Commit the batch operations.
-   *
-   * @param operation which contains all the required batch operation.
+   * Read key only.
    */
-  void commitBatchOperation(BatchOperation operation) throws RocksDatabaseException;
+  KEY_ONLY(1),
+  /**
+   * Read value only.
+   */
+  VALUE_ONLY(2),
+  /**
+   * Read both key and value.
+   */
+  KEY_AND_VALUE(3);
+
+  private final int mask;
+
+  IteratorType(int mask) {
+    this.mask = mask;
+  }
+
+  public boolean readKey() {
+    return (this.mask & KEY_ONLY.mask) != 0;
+  }
+
+  public boolean readValue() {
+    return (this.mask & VALUE_ONLY.mask) != 0;
+  }
 }

@@ -91,7 +91,6 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -354,8 +353,6 @@ public class SnapshotDefragService extends BackgroundService
           deltaEntriesCount++;
         }
       }
-    } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error while reading sst files.", e);
     }
     // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
     return Pair.of(fileToBeIngested, deltaEntriesCount != 0);

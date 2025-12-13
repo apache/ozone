@@ -139,12 +139,6 @@ public class OmDirectoryInfo extends WithParentObjectId
     }
 
     @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
-      return this;
-    }
-
-    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
       return this;
