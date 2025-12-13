@@ -65,9 +65,9 @@ public class ContainerMetrics implements Closeable {
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
+  // MetricsRegistry must be kept as instance field to prevent GC and ensure metrics work correctly
   @SuppressWarnings("PMD.SingularField")
-  private MetricsRegistry registry;
+  private final MetricsRegistry registry;
 
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;

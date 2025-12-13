@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -36,7 +35,6 @@ public final class DeletingServiceMetrics {
 
   public static final String METRICS_SOURCE_NAME =
       DeletingServiceMetrics.class.getSimpleName();
-  private MetricsRegistry registry;
 
   /*
    * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
@@ -122,7 +120,6 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong lastAOSPurgeTransactionId;
 
   private DeletingServiceMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
 
   /**

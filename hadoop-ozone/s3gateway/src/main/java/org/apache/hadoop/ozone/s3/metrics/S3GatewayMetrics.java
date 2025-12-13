@@ -46,9 +46,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   public static final String SOURCE_NAME =
       S3GatewayMetrics.class.getSimpleName();
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
-  @SuppressWarnings("PMD.SingularField")
-  private MetricsRegistry registry;
   private static S3GatewayMetrics instance;
 
   // BucketEndpoint
@@ -286,7 +283,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
    * Private constructor.
    */
   private S3GatewayMetrics(OzoneConfiguration conf) {
-    this.registry = new MetricsRegistry(SOURCE_NAME);
+    MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
     int[] intervals = conf.getInts(S3GatewayConfigKeys
         .OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
     performanceMetrics = PerformanceMetrics.initializeMetrics(
