@@ -372,9 +372,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ReadBlockResponseProto poll() throws IOException {
-      final long timeoutNanos = readTimeoutNanos;
       final long startTime = System.nanoTime();
-      final long pollTimeoutNanos = Math.min(timeoutNanos / 10, 100_000_000);
+      final long pollTimeoutNanos = Math.min(readTimeoutNanos / 10, 100_000_000);
 
       while (true) {
         checkError();
@@ -394,7 +393,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
-        if (elapsedNanos >= timeoutNanos) {
+        if (elapsedNanos >= readTimeoutNanos) {
           setFailedAndThrow(new TimeoutIOException(
               "Timed out waiting for response after " + readTimeout));
           return null;
