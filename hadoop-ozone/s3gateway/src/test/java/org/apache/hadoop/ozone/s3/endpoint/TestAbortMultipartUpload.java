@@ -28,8 +28,6 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,14 +67,9 @@ public class TestAbortMultipartUpload {
 
     assertEquals(204, response.getStatus());
 
-    // test with unknown upload Id.
-    try {
-      rest.delete(bucket, key, "random", null);
-    } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
-      assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
-          ex.getErrorMessage());
-    }
-
+    // test with unknown upload Id - AbortMultipartUpload is idempotent,
+    // so aborting non-existent upload returns 204 No Content (AWS S3 behavior)
+    response = rest.delete(bucket, key, "random", null);
+    assertEquals(204, response.getStatus());
   }
 }
