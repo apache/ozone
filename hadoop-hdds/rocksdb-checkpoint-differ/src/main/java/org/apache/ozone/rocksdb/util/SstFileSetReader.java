@@ -17,7 +17,6 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 
 import java.io.IOException;
@@ -30,12 +29,11 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.MinHeapMergeIterator;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.MinHeapMergeIterator;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
@@ -121,7 +119,7 @@ public class SstFileSetReader {
         return new ManagedSstFileIterator(file, options, readOptions) {
           @Override
           protected String getIteratorValue(ManagedSstFileReaderIterator iterator) {
-            return new String(iterator.get().key(), UTF_8);
+            return StringCodec.get().fromPersistedFormat(iterator.get().key());
           }
         };
       }
@@ -137,7 +135,8 @@ public class SstFileSetReader {
     return itr;
   }
 
-  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound) throws CodecException {
+  public ClosableIterator<String> getKeyStreamWithTombstone(String lowerBound, String upperBound)
+      throws CodecException {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
