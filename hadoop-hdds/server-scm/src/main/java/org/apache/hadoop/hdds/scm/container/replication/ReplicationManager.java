@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -878,7 +879,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
+        // If no handler processed the container, it passed all health checks
+        // and should be marked as HEALTHY. Update if:
+        // - Never been set (null), OR  
+        // - Currently in non-HEALTHY state (was unhealthy but now fixed)
+        if (!ContainerHealthState.HEALTHY.equals(containerInfo.getHealthState())) {
+          containerInfo.setHealthState(ContainerHealthState.HEALTHY);
+        }
       }
+
       return handled;
     }
   }

@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -142,7 +143,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+        ContainerHealthState.QUASI_CLOSED_STUCK));
   }
 
   /**
@@ -284,7 +285,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+        ContainerHealthState.QUASI_CLOSED_STUCK));
   }
 
   /**
@@ -313,7 +314,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+        ContainerHealthState.QUASI_CLOSED_STUCK));
   }
 
   /**

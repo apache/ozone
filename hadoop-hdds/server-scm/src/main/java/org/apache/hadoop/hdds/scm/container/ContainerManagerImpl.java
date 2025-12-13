@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -171,6 +173,46 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public int getContainerStateCount(final LifeCycleState state) {
     return containerStateManager.getContainerCount(state);
+  }
+
+  @Override
+  public List<ContainerInfo> getContainersByHealthState(
+      HealthStateFilter filter) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    List<ContainerInfo> result = new ArrayList<>();
+
+    // Iterate through all containers using a large count
+    List<ContainerInfo> allContainers =
+        containerStateManager.getContainerInfos(ContainerID.MIN, Integer.MAX_VALUE);
+
+    for (ContainerInfo containerInfo : allContainers) {
+      if (containerInfo.getHealthState() != null &&
+          filter.matches(containerInfo.getHealthState())) {
+        result.add(containerInfo);
+      }
+    }
+
+    return result;
+  }
+
+  @Override
+  public Map<ContainerInfo, ContainerHealthState> getContainersWithHealthState(
+      HealthStateFilter filter) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    Map<ContainerInfo, ContainerHealthState> result = new HashMap<>();
+
+    // Iterate through all containers using a large count
+    List<ContainerInfo> allContainers =
+        containerStateManager.getContainerInfos(ContainerID.MIN, Integer.MAX_VALUE);
+
+    for (ContainerInfo containerInfo : allContainers) {
+      ContainerHealthState healthState = containerInfo.getHealthState();
+      if (healthState != null && filter.matches(healthState)) {
+        result.put(containerInfo, healthState);
+      }
+    }
+
+    return result;
   }
 
   @Override

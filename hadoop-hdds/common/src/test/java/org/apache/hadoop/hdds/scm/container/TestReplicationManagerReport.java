@@ -48,20 +48,20 @@ class TestReplicationManagerReport {
 
   @Test
   void testMetricCanBeIncremented() {
-    report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    report.increment(ReplicationManagerReport.HealthState.OVER_REPLICATED);
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.OVER_REPLICATED);
 
     report.increment(HddsProtos.LifeCycleState.OPEN);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
 
     assertEquals(2,
-        report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        report.getStat(ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0,
-        report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        report.getStat(ContainerHealthState.MIS_REPLICATED));
 
     assertEquals(1,
         report.getStat(HddsProtos.LifeCycleState.OPEN));
@@ -77,15 +77,9 @@ class TestReplicationManagerReport {
     report.increment(HddsProtos.LifeCycleState.CLOSED);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
 
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ContainerID.valueOf(1));
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ContainerID.valueOf(2));
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        ContainerID.valueOf(3));
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.OVER_REPLICATED);
     report.setComplete();
 
     String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(report);
@@ -121,37 +115,16 @@ class TestReplicationManagerReport {
 
   @Test
   void testContainerIDsCanBeSampled() {
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ContainerID.valueOf(1));
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        ContainerID.valueOf(2));
-    report.incrementAndSample(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        ContainerID.valueOf(3));
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.UNDER_REPLICATED);
+    report.increment(ContainerHealthState.OVER_REPLICATED);
 
     assertEquals(2,
-        report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        report.getStat(ContainerHealthState.UNDER_REPLICATED));
     assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        report.getStat(ContainerHealthState.OVER_REPLICATED));
     assertEquals(0,
-        report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
-
-    List<ContainerID> sample =
-        report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    assertEquals(ContainerID.valueOf(1), sample.get(0));
-    assertEquals(ContainerID.valueOf(2), sample.get(1));
-    assertEquals(2, sample.size());
-
-    sample =
-        report.getSample(ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    assertEquals(ContainerID.valueOf(3), sample.get(0));
-    assertEquals(1, sample.size());
-
-    sample =
-        report.getSample(ReplicationManagerReport.HealthState.MIS_REPLICATED);
-    assertEquals(0, sample.size());
+        report.getStat(ContainerHealthState.MIS_REPLICATED));
   }
 
   @Test
@@ -173,11 +146,11 @@ class TestReplicationManagerReport {
 
     for (int i = 0; i < expectedSampleSize * 2; i++) {
       testReport.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED,
+          ContainerHealthState.UNDER_REPLICATED,
           ContainerID.valueOf(i));
     }
     List<ContainerID> sample =
-        testReport.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+        testReport.getSample(ContainerHealthState.UNDER_REPLICATED);
     assertEquals(expectedSampleSize, sample.size());
     for (int i = 0; i < expectedSampleSize; i++) {
       assertEquals(ContainerID.valueOf(i), sample.get(i));
@@ -191,14 +164,13 @@ class TestReplicationManagerReport {
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
       report.setStat(s.toString(), rand.nextInt(Integer.MAX_VALUE));
     }
-    for (ReplicationManagerReport.HealthState s :
-        ReplicationManagerReport.HealthState.values()) {
-      report.setStat(s.toString(), rand.nextInt(Integer.MAX_VALUE));
+    for (ContainerHealthState s : ContainerHealthState.values()) {
+      report.setStat(s.name(), rand.nextInt(Integer.MAX_VALUE));
       List<ContainerID> containers = new ArrayList<>();
       for (int i = 0; i < 10; i++) {
         containers.add(ContainerID.valueOf(rand.nextInt(Integer.MAX_VALUE)));
       }
-      report.setSample(s.toString(), containers);
+      report.setSample(s.name(), containers);
     }
     HddsProtos.ReplicationManagerReportProto proto = report.toProtobuf();
     ReplicationManagerReport newReport
@@ -212,10 +184,7 @@ class TestReplicationManagerReport {
       assertEquals(report.getStat(s), newReport.getStat(s));
     }
 
-    for (ReplicationManagerReport.HealthState s :
-        ReplicationManagerReport.HealthState.values()) {
-      assertEquals(report.getSample(s), newReport.getSample(s));
-    }
+    // Sample tracking removed - health state now stored in ContainerInfo
   }
 
   @Test
@@ -231,8 +200,7 @@ class TestReplicationManagerReport {
         .build());
 
     proto.addStat(HddsProtos.KeyIntValue.newBuilder()
-        .setKey(ReplicationManagerReport.HealthState.UNDER_REPLICATED
-            .toString())
+        .setKey(ContainerHealthState.UNDER_REPLICATED.name())
         .setValue(20)
         .build());
 
@@ -245,7 +213,7 @@ class TestReplicationManagerReport {
     ReplicationManagerReport newReport =
         ReplicationManagerReport.fromProtobuf(proto.build());
     assertEquals(20, newReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        ContainerHealthState.UNDER_REPLICATED));
     assertEquals(100, newReport.getSampleLimit());
   }
 
