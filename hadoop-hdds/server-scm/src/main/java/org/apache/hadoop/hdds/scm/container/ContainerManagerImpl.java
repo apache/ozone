@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
@@ -71,6 +73,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private final SCMHAManager haManager;
   private final SequenceIdGenerator sequenceIdGen;
+  private final OzoneConfiguration conf;
 
   // TODO: Revisit this.
   // Metrics related to operations should be moved to ProtocolServer
@@ -99,6 +102,11 @@ public class ContainerManagerImpl implements ContainerManager {
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
     this.sequenceIdGen = sequenceIdGen;
+    if (conf instanceof OzoneConfiguration) {
+      this.conf = (OzoneConfiguration) conf;
+    } else {
+      this.conf = new OzoneConfiguration(conf);
+    }
     this.containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
@@ -352,23 +360,25 @@ public class ContainerManagerImpl implements ContainerManager {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize, conf);
+          if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
+                pipeline, requiredSpace);
           }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+          long requiredSpace = HddsServerUtil.requiredReplicationSpace(maxContainerSize, conf);
+          if (pipelineManager.hasEnoughSpace(pipeline, requiredSpace)) {
             containerInfo = allocateContainer(pipeline, owner);
           } else {
             LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
+                pipeline, requiredSpace);
           }
         }
         return containerInfo;
