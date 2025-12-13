@@ -23,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.JmxServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +66,15 @@ public class MetricsServiceProviderFactory {
       return new PrometheusServiceProviderImpl(configuration, reconUtils);
     }
     return null;
+  }
+
+  /**
+   * Returns the configured MetricsServiceProvider implementation for Jmx.
+   * @param endpoint
+   * @return MetricsServiceProvider instance for Jmx
+   */
+  public MetricsServiceProvider getJmxMetricsServiceProvider(String endpoint) {
+    return new JmxServiceProviderImpl(configuration, reconUtils, endpoint);
   }
 
   /**
