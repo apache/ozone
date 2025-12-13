@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdb.util;
+package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,10 +39,8 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.TestUtils;
-import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -63,8 +61,8 @@ class TestSstFileSetReader {
 
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
-  private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
-      .map(i -> String.format("%c", i))
+  private static final String KEY_PREFIX = IntStream.range(0, 5 << 10).boxed()
+      .map(i -> String.format("%c", i % 256))
       .collect(Collectors.joining(""));
 
   /**
