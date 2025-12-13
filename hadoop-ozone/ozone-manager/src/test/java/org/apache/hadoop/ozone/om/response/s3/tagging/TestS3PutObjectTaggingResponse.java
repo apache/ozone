@@ -55,7 +55,9 @@ public class TestS3PutObjectTaggingResponse extends TestOMKeyResponse {
     tags.put("tag-key1", "tag-value1");
     tags.put("tag-key2", "tag-value2");
 
-    omKeyInfo.setTags(tags);
+    omKeyInfo = omKeyInfo.toBuilder()
+        .setTags(tags)
+        .build();
 
     S3PutObjectTaggingResponse putObjectTaggingResponse = getPutObjectTaggingResponse(omKeyInfo, omResponse);
 

@@ -204,7 +204,9 @@ public class TestOmKeyInfo {
     assertEquals(key.getAcls(), cloneKey.getAcls());
 
     // Change object tags and check
-    key.setTags(Collections.singletonMap("tagKey3", "tagValue3"));
+    key = key.toBuilder()
+        .setTags(Collections.singletonMap("tagKey3", "tagValue3"))
+        .build();
 
     assertNotEquals(key, cloneKey);
   }
