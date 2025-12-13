@@ -247,13 +247,10 @@ public class TestVolumeOwner {
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName) {
     return RequestContext.newBuilder()
         .setClientUgi(UserGroupInformation.createRemoteUser(username))
-        .setIp(null)
-        .setHost(null)
         .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
         .setAclRights(type)
         .setOwnerName(ownerName)
         .build();
-
   }
 
   private static String getTestVolumeName(int index) {

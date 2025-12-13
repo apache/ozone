@@ -22,8 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,133 +30,25 @@ import org.junit.jupiter.api.Test;
 public class TestRequestContext {
 
   @Test
-  public void testRecursiveAccessFlag() throws IOException {
-    RequestContext context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE, false, "volume1",
-            true);
-    assertTrue(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
-
-    context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE, false, "volume1",
-            false);
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
-
-    context = getUserRequestContext(
-            "user1", IAccessAuthorizer.ACLType.CREATE,
-            true, "volume1");
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
-
+  void testRecursiveAccessFlag() {
     RequestContext.Builder builder = RequestContext.newBuilder();
 
-    assertFalse(builder.build().isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
+    assertFalse(builder.build().isRecursiveAccessCheck(), "default value");
 
     builder.setRecursiveAccessCheck(true);
-    assertTrue(builder.build().isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
+    assertTrue(builder.build().isRecursiveAccessCheck());
 
-    context = baseBuilder().build();
-    assertFalse(context.isRecursiveAccessCheck());
-
-    context = baseBuilder().setRecursiveAccessCheck(false).build();
-    assertFalse(context.isRecursiveAccessCheck());
-
-    context = baseBuilder().setRecursiveAccessCheck(true).build();
-    assertTrue(context.isRecursiveAccessCheck());
+    builder.setRecursiveAccessCheck(false);
+    assertFalse(builder.build().isRecursiveAccessCheck());
   }
 
   @Test
-  public void testSessionPolicy() {
-    RequestContext context = RequestContext.newBuilder()
-        .build();
-    assertNull(context.getSessionPolicy(), "sessionPolicy should default to null");
+  void testSessionPolicy() {
+    RequestContext.Builder builder = RequestContext.newBuilder();
+    assertNull(builder.build().getSessionPolicy(), "default value");
 
     final String policy = "{\"Statement\":[]}";
-    context = RequestContext.newBuilder()
-        .setSessionPolicy(policy)
-        .build();
-    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via builder");
-
-    context = RequestContext.newBuilder()
-        .setHost("host")
-        .setIp(null)
-        .setClientUgi(null)
-        .setServiceId("serviceId")
-        .setAclType(IAccessAuthorizer.ACLIdentityType.GROUP)
-        .setAclRights(IAccessAuthorizer.ACLType.CREATE)
-        .setOwnerName("owner")
-        .setRecursiveAccessCheck(true)
-        .setSessionPolicy(policy)
-        .build();
-    assertTrue(context.isRecursiveAccessCheck(), "recursiveAccessCheck should be true");
-    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via constructor");
-
-    context = RequestContext.newBuilder()
-        .setClientUgi(UserGroupInformation.createRemoteUser("user1"))
-        .setIp(null)
-        .setHost(null)
-        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-        .setAclRights(IAccessAuthorizer.ACLType.CREATE)
-        .setOwnerName("volume1")
-        .setRecursiveAccessCheck(true)
-        .setSessionPolicy(policy)
-        .build();
-    assertEquals(policy, context.getSessionPolicy(), "sessionPolicy should be set via getBuilder + builder");
-
-    context = RequestContext.newBuilder()
-        .setClientUgi(UserGroupInformation.createRemoteUser("user1"))
-        .setIp(null)
-        .setHost(null)
-        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-        .setAclRights(IAccessAuthorizer.ACLType.CREATE)
-        .setOwnerName("volume1")
-        .setRecursiveAccessCheck(true)
-        .setSessionPolicy(policy)
-        .build();
-    assertEquals(
-        policy, context.getSessionPolicy(),
-        "sessionPolicy should be set via getBuilder (all params) + builder");
-  }
-
-  private RequestContext getUserRequestContext(String username,
-      IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
-      boolean recursiveAccessCheck) throws IOException {
-
-    return RequestContext.newBuilder()
-        .setClientUgi(UserGroupInformation.createRemoteUser(username))
-        .setIp(null)
-        .setHost(null)
-        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-        .setAclRights(type)
-        .setOwnerName(ownerName)
-        .setRecursiveAccessCheck(recursiveAccessCheck)
-        .build();
-  }
-
-  private RequestContext getUserRequestContext(String username,
-      IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName) {
-
-    return RequestContext.newBuilder()
-        .setClientUgi(UserGroupInformation.createRemoteUser(username))
-        .setIp(null)
-        .setHost(null)
-        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-        .setAclRights(type)
-        .setOwnerName(ownerName)
-        .build();
-  }
-
-  private RequestContext.Builder baseBuilder() {
-    return RequestContext.newBuilder()
-        .setHost("host")
-        .setIp(null)
-        .setClientUgi(null)
-        .setServiceId("serviceId")
-        .setAclType(IAccessAuthorizer.ACLIdentityType.GROUP)
-        .setAclRights(IAccessAuthorizer.ACLType.CREATE)
-        .setOwnerName("owner");
+    builder.setSessionPolicy(policy);
+    assertEquals(policy, builder.build().getSessionPolicy());
   }
 }
