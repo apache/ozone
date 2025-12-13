@@ -146,10 +146,12 @@ credential will have the permissions comprising the intersection of the role per
 
 In the rare event temporary credentials need to be revoked (ex. for security reasons), a table in the OzoneManager RocksDB will be created
 to store revoked tokens, and a command-line utility will be created to add tokens to the table.  A background cleaner service
-will be created to run every 3 hours to delete revoked tokens that have been expired.  The
-input parameter for the command-line utility will be the `accessKeyId` and `sessionToken` of the temporary token - these values are returned in
+will be created to run every 3 hours to delete revoked tokens that have been in the table for more than 12 hours.  The
+input parameter for the command-line utility will be the accessKeyId of the temporary token - this value is returned in
 plain text as a result of the AssumeRole call (mentioned above).  In this way, specific STS tokens can be revoked as opposed 
 to all tokens.  Furthermore, AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
+Note: STS token revocation checks are strictly enforced and will fail-closed if there are internal errors such as not
+being able to communicate with the revocation database table, etc.
 
 ## 3.6 Prerequisites
 
