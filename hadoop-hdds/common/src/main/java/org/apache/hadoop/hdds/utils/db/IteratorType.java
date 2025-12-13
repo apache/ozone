@@ -21,28 +21,35 @@ package org.apache.hadoop.hdds.utils.db;
  * The iterator type.
  */
 public enum IteratorType {
+
   /**
    * Neither read key nor value.
    */
-  NEITHER,
+  NEITHER(0),
   /**
    * Read key only.
    */
-  KEY_ONLY,
+  KEY_ONLY(1),
   /**
    * Read value only.
    */
-  VALUE_ONLY,
+  VALUE_ONLY(2),
   /**
    * Read both key and value.
    */
-  KEY_AND_VALUE;
+  KEY_AND_VALUE(3);
 
-  boolean readKey() {
-    return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
+  private final int mask;
+
+  IteratorType(int mask) {
+    this.mask = mask;
   }
 
-  boolean readValue() {
-    return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
+  public boolean readKey() {
+    return (this.mask & KEY_ONLY.mask) != 0;
+  }
+
+  public boolean readValue() {
+    return (this.mask & VALUE_ONLY.mask) != 0;
   }
 }
