@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -92,9 +93,41 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
+
+    // Convert BucketLayoutProto -> BucketLayout enum.
+    BucketLayout bucketLayout =
+        BucketLayout.valueOf(bucketInfo.getBucketLayout().name());
+
+    // Determine if this bucket belongs to the S3 namespace.
+    String s3VolumeName = ozoneManager.getConfiguration().get(
+        OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+        OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    boolean isS3Bucket =
+        s3VolumeName != null && s3VolumeName.equals(bucketInfo.getVolumeName());
+
+    // Compute effectiveStrict based on global strict flag, S3 namespace,
+    // and bucket layout.
+    boolean globalStrict = ozoneManager.isStrictS3();
+    boolean effectiveStrict = globalStrict;
+
+
+    // When strict=false, only S3 buckets with FSO layout should allow
+    // non-S3-compliant characters (e.g. underscore).
+    // All other S3 bucket layouts must still enforce strict naming rules.
+    if (!globalStrict && isS3Bucket) {
+      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        // S3 + FSO + strict=false → bypass strict S3 validation (allow '_' and other non-S3 characters)
+        effectiveStrict = false;
+      } else {
+        // S3 + non-FSO + strict=false → strict S3 validation still applies
+        // '_' and other non-S3 characters are not permitted
+        effectiveStrict = true;
+      }
+    }
+
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
-        ozoneManager.isStrictS3());
+        effectiveStrict);
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
