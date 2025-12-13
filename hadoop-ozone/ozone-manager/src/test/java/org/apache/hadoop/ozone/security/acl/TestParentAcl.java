@@ -210,10 +210,11 @@ public class TestParentAcl {
   private void testParentChild(OzoneObj child,
       ACLType parentAclType, ACLType childAclType) throws IOException {
 
-    RequestContext requestContext = new RequestContext.Builder()
+    RequestContext requestContext = RequestContext.newBuilder()
         .setClientUgi(testUgi1)
         .setAclType(USER)
-        .setAclRights(childAclType).build();
+        .setAclRights(childAclType)
+        .build();
 
     OzoneAcl childAcl = OzoneAcl.of(USER,
         testUgi1.getUserName(), ACCESS, childAclType);
