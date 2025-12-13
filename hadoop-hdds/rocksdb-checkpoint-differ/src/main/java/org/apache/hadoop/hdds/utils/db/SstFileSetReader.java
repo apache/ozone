@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdb.util;
+package org.apache.hadoop.hdds.utils.db;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 
 import java.io.IOException;
@@ -31,22 +30,11 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.CodecException;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator.KeyValue;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
-import org.apache.hadoop.hdds.utils.db.CodecException;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
-import org.apache.hadoop.hdds.utils.db.MinHeapMergeIterator;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.rocksdb.RocksDBException;
 
@@ -120,10 +108,11 @@ public class SstFileSetReader {
 
       @Override
       protected ClosableIterator<String> getKeyIteratorForFile(String file) throws RocksDatabaseException {
-        return new ManagedSstFileIterator(file, options, readOptions) {
+        return new ManagedSstFileIterator<String>(file, options, readOptions, KEY_ONLY) {
+
           @Override
-          protected String getIteratorValue(ManagedSstFileReaderIterator iterator) {
-            return StringCodec.get().fromPersistedFormat(iterator.get().key());
+          protected String getIteratorValue(CodecBuffer key, CodecBuffer value) {
+            return StringCodec.get().fromCodecBuffer(key);
           }
         };
       }
@@ -174,43 +163,6 @@ public class SstFileSetReader {
       }
     };
     return itr;
-  }
-
-  private abstract static class ManagedSstFileIterator implements ClosableIterator<String> {
-    private final ManagedSstFileReader fileReader;
-    private final ManagedSstFileReaderIterator fileReaderIterator;
-
-    ManagedSstFileIterator(String path, ManagedOptions options, ManagedReadOptions readOptions)
-        throws RocksDatabaseException {
-      try {
-        this.fileReader = new ManagedSstFileReader(options);
-        this.fileReader.open(path);
-        this.fileReaderIterator = ManagedSstFileReaderIterator.managed(fileReader.newIterator(readOptions));
-        fileReaderIterator.get().seekToFirst();
-      } catch (RocksDBException e) {
-        throw new RocksDatabaseException("Failed to open SST file: " + path, e);
-      }
-    }
-
-    @Override
-    public void close() {
-      this.fileReaderIterator.close();
-      this.fileReader.close();
-    }
-
-    @Override
-    public boolean hasNext() {
-      return fileReaderIterator.get().isValid();
-    }
-
-    protected abstract String getIteratorValue(ManagedSstFileReaderIterator iterator);
-
-    @Override
-    public String next() {
-      String value = getIteratorValue(fileReaderIterator);
-      fileReaderIterator.get().next();
-      return value;
-    }
   }
 
   private static class ManagedRawSstFileIterator implements ClosableIterator<String> {

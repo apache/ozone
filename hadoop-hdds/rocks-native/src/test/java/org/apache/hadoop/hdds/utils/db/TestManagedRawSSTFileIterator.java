@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
@@ -93,7 +94,13 @@ class TestManagedRawSSTFileIterator {
             Named.of("Value starting & ending with a number & containing null character & new line character",
                 "%1$dvalue\n\0%1$d")),
         Arguments.of(Named.of("Key ending with a number & containing a null character", "key\0%1$d"),
-            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")))
+            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")),
+        Arguments.of(Named.of("Key with prefix length 5k of random alphaNumeric string",
+                new StringBuilder(RandomStringUtils.secure().nextAlphanumeric(5 << 10))
+                    .append("key%1$d").toString()),
+            Named.of("Value with prefix length 5k of random alphaNumeric string",
+                new StringBuilder(RandomStringUtils.secure().nextAlphanumeric(5 << 10))
+                    .append("%1$dvalue%1$d").toString())))
         .flatMap(i -> Arrays.stream(IteratorType.values()).map(type -> Arguments.of(i.get()[0], i.get()[1], type)));
   }
 
