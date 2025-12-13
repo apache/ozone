@@ -17,19 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
-
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -46,15 +42,11 @@ import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
 import org.apache.ratis.protocol.exceptions.ReconfigurationTimeoutException;
 import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utility class used by SCM HA.
  */
 public final class SCMHAUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SCMHAUtils.class);
 
   private static final ImmutableList<Class<? extends Exception>>
       RETRIABLE_WITH_NO_FAILOVER_EXCEPTION_LIST =
@@ -97,31 +89,18 @@ public final class SCMHAUtils {
             conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(scmRatisDirectory)) {
-      scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf);
+      scmRatisDirectory = ServerUtils.getDefaultRatisDirectory(conf, NodeType.SCM);
     }
     return scmRatisDirectory;
-  }
-
-  public static String getRatisStorageDir(final ConfigurationSource conf) {
-    String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
-    if (Strings.isNullOrEmpty(storageDir)) {
-      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-      storageDir = (new File(metaDirPath, "scm-ha")).getPath();
-    }
-    return storageDir;
   }
 
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
             conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
 
-    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
+    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir with component-specific location.
     if (Strings.isNullOrEmpty(snapshotDir)) {
-      LOG.warn("SCM snapshot dir is not configured. Falling back to {} config",
-          OZONE_METADATA_DIRS);
-      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-      snapshotDir =
-          Paths.get(metaDirPath.getPath(), OZONE_RATIS_SNAPSHOT_DIR).toString();
+      snapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, NodeType.SCM);
     }
     return snapshotDir;
   }

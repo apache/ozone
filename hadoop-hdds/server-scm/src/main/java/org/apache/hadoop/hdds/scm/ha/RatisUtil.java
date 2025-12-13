@@ -90,7 +90,7 @@ public final class RatisUtil {
   public static void setRaftStorageDir(final RaftProperties properties,
       final ConfigurationSource conf) {
     RaftServerConfigKeys.setStorageDir(properties, Collections
-        .singletonList(new File(SCMHAUtils.getRatisStorageDir(conf))));
+        .singletonList(new File(SCMHAUtils.getSCMRatisDirectory(conf))));
   }
 
   /**
