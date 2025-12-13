@@ -195,9 +195,19 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   private PurgePathRequest wrapPurgeRequest(
       final long volumeId, final long bucketId, final String purgeDeletedDir,
       final List<OmKeyInfo> purgeDeletedFiles, final List<OmKeyInfo> markDirsAsDeleted) {
+    return wrapPurgeRequest(
+        volumeId, bucketId, purgeDeletedDir, purgeDeletedFiles, markDirsAsDeleted,
+        null, null);
+  }
+
+  private PurgePathRequest wrapPurgeRequest(
+      final long volumeId, final long bucketId, final String purgeDeletedDir,
+      final List<OmKeyInfo> purgeDeletedFiles, final List<OmKeyInfo> markDirsAsDeleted,
+      final List<HddsProtos.KeyValue> deleteRangeSubDirs,
+      final List<HddsProtos.KeyValue> deleteRangeSubFiles) {
+
     // Put all keys to be purged in a list
-    PurgePathRequest.Builder purgePathsRequest
-        = PurgePathRequest.newBuilder();
+    PurgePathRequest.Builder purgePathsRequest = PurgePathRequest.newBuilder();
     purgePathsRequest.setVolumeId(volumeId);
     purgePathsRequest.setBucketId(bucketId);
 
@@ -215,6 +225,13 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
           dir.getProtobuf(ClientVersion.CURRENT_VERSION));
+    }
+
+    if (deleteRangeSubDirs != null) {
+      purgePathsRequest.addAllDeleteRangeSubDirs(deleteRangeSubDirs);
+    }
+    if (deleteRangeSubFiles != null) {
+      purgePathsRequest.addAllDeleteRangeSubFiles(deleteRangeSubFiles);
     }
 
     return purgePathsRequest.build();
@@ -616,6 +633,197 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // The keys should exist in the DeletedKeys table after dir delete
     validateDeletedKeys(omMetadataManager, deletedKeyNames);
+  }
+
+  @Test
+  public void testDeleteRangeSubFilesRespectedByPurge() throws Exception {
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    String bucket = "bucket" + RandomUtils.secure().randomInt();
+    OMRequestTestUtils.addVolumeAndBucketToDB(
+        volumeName, bucket, omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+
+    // Create parent directory "dir1"
+    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+        .setName("dir1")
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(1)
+        .setParentObjectID(bucketInfo.getObjectID())
+        .setUpdateID(0)
+        .build();
+    String dirKey = OMRequestTestUtils.addDirKeyToDirTable(
+        false, dir1, volumeName, bucket, 1L, omMetadataManager);
+
+    // Create 5 files under dir1
+    List<String> fileDbKeys = new ArrayList<>();
+    for (int i = 1; i <= 5; i++) {
+      OmKeyInfo subFile = OMRequestTestUtils
+          .createOmKeyInfo(volumeName, bucket, "file" + i,
+              RatisReplicationConfig.getInstance(ONE))
+          .setObjectID(10 + i)
+          .setParentObjectID(dir1.getObjectID())
+          .setUpdateID(100L)
+          .build();
+
+      String dbKey = OMRequestTestUtils.addFileToKeyTable(
+          false, true, subFile.getKeyName(), subFile, 1234L, 10 + i, omMetadataManager);
+      fileDbKeys.add(dbKey);
+    }
+
+    // Check: all 5 file keys exist before purge
+    for (String k : fileDbKeys) {
+      assertTrue(omMetadataManager.getFileTable().isExist(k));
+    }
+
+    // Build deleteRangeSubFiles:
+    // [file1, file3) and [file4, highKey) so that file1, file2, file4, file5 are purged,
+    // while file3 (the "non-reclaimable" middle entry) stays.
+    List<HddsProtos.KeyValue> fileRanges = new ArrayList<>();
+    fileRanges.add(HddsProtos.KeyValue.newBuilder()
+        .setKey(fileDbKeys.get(0))
+        .setValue(fileDbKeys.get(2))
+        .build());
+
+    String highKey = org.apache.hadoop.hdds.StringUtils
+        .getLexicographicallyHigherString(fileDbKeys.get(4));
+    fileRanges.add(HddsProtos.KeyValue.newBuilder()
+        .setKey(fileDbKeys.get(3))
+        .setValue(highKey)
+        .build());
+
+    Long volumeId = omMetadataManager.getVolumeId(bucketInfo.getVolumeName());
+    Long bucketId = bucketInfo.getObjectID();
+
+    PurgePathRequest purgePathRequest = wrapPurgeRequest(
+        volumeId, bucketId, dirKey,
+        Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList(), fileRanges);
+
+    List<PurgePathRequest> purgePathRequests = Collections.singletonList(purgePathRequest);
+    List<BucketNameInfo> bucketInfoList = Collections.singletonList(
+        BucketNameInfo.newBuilder()
+            .setVolumeName(bucketInfo.getVolumeName())
+            .setBucketName(bucketInfo.getBucketName())
+            .setBucketId(bucketId)
+            .setVolumeId(volumeId)
+            .build());
+
+    OMRequest omRequest = createPurgeKeysRequest(
+        null, purgePathRequests, bucketInfoList);
+    OMRequest preExecutedRequest = preExecute(omRequest);
+
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest dirReq =
+        preExecutedRequest.getPurgeDirectoriesRequest();
+    assertEquals(1, dirReq.getDeletedPathCount());
+    assertEquals(2, dirReq.getDeletedPath(0).getDeleteRangeSubFilesCount());
+
+    OzoneManagerProtocolProtos.PurgePathRequest path = dirReq.getDeletedPath(0);
+
+    // We expect two ranges: [file1, file3) and [file4, highKey)
+    assertEquals(2, path.getDeleteRangeSubFilesCount());
+    assertEquals(fileDbKeys.get(0), path.getDeleteRangeSubFiles(0).getKey());
+    assertEquals(fileDbKeys.get(2), path.getDeleteRangeSubFiles(0).getValue());
+    assertEquals(fileDbKeys.get(3), path.getDeleteRangeSubFiles(1).getKey());
+    assertEquals(highKey, path.getDeleteRangeSubFiles(1).getValue());
+  }
+
+  @Test
+  public void testDeleteRangeSubDirsRespectedByPurge() throws Exception {
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+
+    String bucket = "bucket" + RandomUtils.secure().randomInt();
+    OMRequestTestUtils.addVolumeAndBucketToDB(
+        volumeName, bucket, omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+
+    // Parent directory "dir1"
+    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+        .setName("dir1")
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(1)
+        .setParentObjectID(bucketInfo.getObjectID())
+        .setUpdateID(0)
+        .build();
+    String dirKey = OMRequestTestUtils.addDirKeyToDirTable(
+        false, dir1, volumeName, bucket, 1L, omMetadataManager);
+
+    // Create 5 subdirectories under dir1
+    List<String> subDirDbKeys = new ArrayList<>();
+    for (int i = 1; i <= 5; i++) {
+      OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
+          .setName("subdir" + i)
+          .setCreationTime(Time.now())
+          .setModificationTime(Time.now())
+          .setObjectID(10 + i)
+          .setParentObjectID(dir1.getObjectID())
+          .setUpdateID(0)
+          .build();
+      String subDirPath = OMRequestTestUtils.addDirKeyToDirTable(
+          false, subdir, volumeName, bucket, 2L + i, omMetadataManager);
+      subDirDbKeys.add(subDirPath);
+    }
+
+    // Check: all 5 subdir keys exist before purge
+    for (String k : subDirDbKeys) {
+      assertTrue(omMetadataManager.getDirectoryTable().isExist(k));
+    }
+
+    // Build deleteRangeSubDirs ranges like [subdir1, subdir3) and [subdir4, highKey)
+    List<HddsProtos.KeyValue> dirRanges = new ArrayList<>();
+    dirRanges.add(HddsProtos.KeyValue.newBuilder()
+        .setKey(subDirDbKeys.get(0))
+        .setValue(subDirDbKeys.get(2))
+        .build());
+
+    String highKey = org.apache.hadoop.hdds.StringUtils
+        .getLexicographicallyHigherString(subDirDbKeys.get(4));
+    dirRanges.add(HddsProtos.KeyValue.newBuilder()
+        .setKey(subDirDbKeys.get(3))
+        .setValue(highKey)
+        .build());
+
+    Long volumeId = omMetadataManager.getVolumeId(bucketInfo.getVolumeName());
+    Long bucketId = bucketInfo.getObjectID();
+
+    PurgePathRequest purgePathRequest = wrapPurgeRequest(
+        volumeId, bucketId, dirKey,
+        Collections.emptyList(), Collections.emptyList(),
+        dirRanges, Collections.emptyList());
+
+    List<PurgePathRequest> purgePathRequests =
+        Collections.singletonList(purgePathRequest);
+    List<BucketNameInfo> bucketInfoList = Collections.singletonList(
+        BucketNameInfo.newBuilder()
+            .setVolumeName(bucketInfo.getVolumeName())
+            .setBucketName(bucketInfo.getBucketName())
+            .setBucketId(bucketId)
+            .setVolumeId(volumeId)
+            .build());
+
+    OMRequest omRequest = createPurgeKeysRequest(
+        null, purgePathRequests, bucketInfoList);
+    OMRequest preExecutedRequest = preExecute(omRequest);
+
+    OzoneManagerProtocolProtos.PurgeDirectoriesRequest dirReq =
+        preExecutedRequest.getPurgeDirectoriesRequest();
+    assertEquals(1, dirReq.getDeletedPathCount());
+    OzoneManagerProtocolProtos.PurgePathRequest path = dirReq.getDeletedPath(0);
+
+    // We expect two directory ranges: [subdir1, subdir3) and [subdir4, highKey)
+    assertEquals(2, path.getDeleteRangeSubDirsCount());
+    assertEquals(subDirDbKeys.get(0), path.getDeleteRangeSubDirs(0).getKey());
+    assertEquals(subDirDbKeys.get(2), path.getDeleteRangeSubDirs(0).getValue());
+    assertEquals(subDirDbKeys.get(3), path.getDeleteRangeSubDirs(1).getKey());
+    assertEquals(highKey, path.getDeleteRangeSubDirs(1).getValue());
   }
 
   private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse)
