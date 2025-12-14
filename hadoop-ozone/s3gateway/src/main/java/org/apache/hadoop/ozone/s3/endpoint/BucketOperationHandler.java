@@ -19,30 +19,42 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import java.io.IOException;
 import java.io.InputStream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
- * Interface for handling bucket operations using chain of responsibility pattern.
+ * Interface for handling bucket operations based on query parameters.
  * Each implementation handles a specific S3 bucket subresource operation
  * (e.g., ?acl, ?lifecycle, ?notification).
- *
- * Implementations should extend EndpointBase to inherit all required functionality
- * (configuration, headers, request context, audit logging, metrics, etc.).
  */
 public interface BucketOperationHandler {
 
   /**
-   * Handle the bucket PUT operation if this handler is responsible for it.
-   * The handler inspects the request (query parameters, headers, etc.) to determine
-   * if it should handle the request.
+   * Handle the bucket operation.
    *
    * @param bucketName the name of the bucket
    * @param body the request body stream
-   * @return Response if this handler handles the request, null otherwise
+   * @param headers the HTTP headers
+   * @param context the endpoint context containing shared dependencies
+   * @param startNanos the start time in nanoseconds for metrics tracking
+   * @return HTTP response
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  Response handlePutRequest(String bucketName, InputStream body)
-      throws IOException, OS3Exception;
+  Response handlePutRequest(
+      String bucketName,
+      InputStream body,
+      HttpHeaders headers,
+      BucketEndpointContext context,
+      long startNanos
+  ) throws IOException, OS3Exception;
+
+  /**
+   * Get the query parameter name this handler is responsible for.
+   * For example: "acl", "lifecycle", "notification"
+   *
+   * @return the query parameter name
+   */
+  String getQueryParamName();
 }

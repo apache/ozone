@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -90,10 +91,25 @@ public class BucketEndpoint extends EndpointBase {
   private static final BucketOperationHandlerFactory HANDLER_FACTORY =
       new BucketOperationHandlerFactory();
 
+  @Context
+  private HttpHeaders headers;
+
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
-  private List<BucketOperationHandler> putHandlers;
+  private BucketEndpointContext context;
+
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
+
+  public BucketEndpoint() {
+    super();
+    this.context = new BucketEndpointContext(this);
+  }
+
+  private BucketEndpointContext getContext() {
+    return context;
+  }
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -330,6 +346,25 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
+      // Build map of query parameters
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("acl", aclMarker);
+      // Future handlers: queryParams.put("lifecycle", lifecycleMarker);
+
+      // Check for subresource operations using handlers
+      String queryParam = HANDLER_FACTORY.findFirstSupportedQueryParam(queryParams);
+
+      if (queryParam != null) {
+        BucketOperationHandler handler = HANDLER_FACTORY.getHandler(queryParam);
+        // Delegate to specific handler
+        s3GAction = getActionForQueryParam(queryParam);
+        Response response = handler.handlePutRequest(
+            bucketName, body, headers, getContext(), startNanos);
+        AUDIT.logWriteSuccess(
+            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+        return response;
+      }
+
       String location = createS3Bucket(bucketName);
       auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
@@ -345,6 +380,18 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       throw ex;
+    }
+  }
+
+  /**
+   * Map query parameter to corresponding S3GAction for audit logging.
+   */
+  private S3GAction getActionForQueryParam(String queryParam) {
+    switch (queryParam) {
+    case "acl":
+      return S3GAction.PUT_ACL;
+    default:
+      return S3GAction.GET_BUCKET;
     }
   }
 
