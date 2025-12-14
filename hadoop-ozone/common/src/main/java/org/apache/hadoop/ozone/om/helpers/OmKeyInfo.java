@@ -522,10 +522,9 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      Map<String, String> t = obj.getTags();
-      this.tags = (t == null || t.isEmpty())
+      this.tags = obj.tags.isEmpty()
           ? MapBuilder.empty()
-          : MapBuilder.copyOf(t);
+          : MapBuilder.of(obj.tags);
       this.acls.addAll(obj.getAcls());
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
