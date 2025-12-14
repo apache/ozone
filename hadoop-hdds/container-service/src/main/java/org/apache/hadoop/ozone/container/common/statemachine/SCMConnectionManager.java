@@ -228,16 +228,14 @@ public class SCMConnectionManager
   public void removeSCMServer(InetSocketAddress address) throws IOException {
     writeLock();
     try {
-      if (!scmMachines.containsKey(address)) {
+      EndpointStateMachine endPoint = scmMachines.remove(address);
+      if (endPoint == null) {
         LOG.warn("Trying to remove a non-existent SCM machine. " +
             "Ignoring the request.");
         return;
       }
-
-      EndpointStateMachine endPoint = scmMachines.get(address);
       endPoint.setState(EndPointStates.SHUTDOWN);
       endPoint.close();
-      scmMachines.remove(address);
     } finally {
       writeUnlock();
     }
