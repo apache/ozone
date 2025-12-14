@@ -119,12 +119,14 @@ public static final long EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS = -1L;
 ##### OM Commit Phase (Atomicity)
 
 1. During the commit phase (or strict atomic create), the OM validates that the key still does not exist.
-2. If a concurrent client created the key between the Create and Commit phases, the transaction fails with `KEY_ALREADY_EXISTS`.
+2. If a concurrent client created the key between the Create and Commit phases, the transaction fails with `KET_GENERATION_MISMATCH`.
 
 ##### Race Condition Handling
 
 Using `OzoneConsts.EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS = -1` ensures atomicity. If a concurrent write (Client B) commits between Client A's Create and Commit,
 Client A's commit fails the `CREATE IF NOT EXISTS` validation check, preserving strict create-if-not-exists semantics.
+
+> **Note**: This ability will be added along with [HDDS-13963](https://issues.apache.org/jira/browse/HDDS-13963) (Atomic Create-If-Not-Exists).
 
 #### If-Match Implementation
 
@@ -147,8 +149,8 @@ Validation is performed within the `validateAndUpdateCache` method to ensure ato
 3. **Validation**:
 
     - **Key Not Found**: If the key does not exist, throw `KEY_NOT_FOUND` (maps to S3 412).
-    - **No ETag Metadata**: If the existing key (e.g., uploaded via OFS) does not have an ETag property, validation fails. We do **not** calculate ETag on the spot to avoid performance overhead on the applier thread. Throws `PRECONDITION_FAILED`.
-    - **ETag Mismatch**: Compare `existingKey.ETag` with `expectedETag`. If they do not match, throw `PRECONDITION_FAILED` (maps to S3 412).
+    - **No ETag Metadata**: If the existing key (e.g., uploaded via OFS) does not have an ETag property, skip ETag validation and allow the operation to proceed. This ensures compatibility with mixed access patterns (OFS and S3A) where S3 Conditional Writes are primarily intended for pure S3 use cases. We do **not** calculate ETag on the spot to avoid performance overhead on the applier thread.
+    - **ETag Mismatch**: Compare `existingKey.ETag` with `expectedETag`. If they do not match, throw `ETAG_MISMATCH` (maps to S3 412).
 
 4. **Execution**: If validation passes, proceed with the operation (adding to OpenKeyTable).
 
@@ -157,10 +159,9 @@ Validation is performed within the `validateAndUpdateCache` method to ensure ato
 |   |   |   |   |
 |---|---|---|---|
 |**OM Error**|**S3 Status**|**S3 Error Code**|**Scenario**|
-|`KEY_ALREADY_EXISTS`|412|PreconditionFailed|If-None-Match failed|
+|`KEY_GENERATION_MISMATCH`|412|PreconditionFailed|If-None-Match failed|
 |`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed (key missing)|
 |`ETAG_MISMATCH`|412|PreconditionFailed|If-Match failed (ETag mismatch)|
-|`PRECONDITION_FAILED`|412|PreconditionFailed|If-Match failed (General/No ETag)|
 
 ## AWS S3 Conditional Read Implementation
 
