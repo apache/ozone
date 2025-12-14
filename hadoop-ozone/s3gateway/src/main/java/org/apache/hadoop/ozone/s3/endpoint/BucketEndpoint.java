@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -96,6 +97,23 @@ public class BucketEndpoint extends EndpointBase {
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
+  private static final BucketOperationHandlerFactory HANDLER_FACTORY =
+      new BucketOperationHandlerFactory();
+
+  @Context
+  private HttpHeaders headers;
+
+  private BucketEndpointContext context;
+
+  public BucketEndpoint() {
+    super();
+    this.context = new BucketEndpointContext(this);
+  }
+
+  private BucketEndpointContext getContext() {
+    return context;
+  }
+  
   /**
    * Rest endpoint to list objects in a specific bucket.
    * <p>
@@ -320,6 +338,7 @@ public class BucketEndpoint extends EndpointBase {
         auditWriteSuccess(s3GAction);
         return response;
       }
+
       String location = createS3Bucket(bucketName);
       auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
@@ -335,6 +354,18 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       throw ex;
+    }
+  }
+
+  /**
+   * Map query parameter to corresponding S3GAction for audit logging.
+   */
+  private S3GAction getActionForQueryParam(String queryParam) {
+    switch (queryParam) {
+    case "acl":
+      return S3GAction.PUT_ACL;
+    default:
+      return S3GAction.GET_BUCKET;
     }
   }
 
@@ -582,8 +613,8 @@ public class BucketEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     String grantReads = getHeaders().getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = getHeaders().getHeaderString(S3Acl.GRANT_WRITE);
-    String grantReadACP = getHeaders().getHeaderString(S3Acl.GRANT_READ_CAP);
-    String grantWriteACP = getHeaders().getHeaderString(S3Acl.GRANT_WRITE_CAP);
+    String grantReadACP = getHeaders().getHeaderString(S3Acl.GRANT_READ_ACP);
+    String grantWriteACP = getHeaders().getHeaderString(S3Acl.GRANT_WRITE_ACP);
     String grantFull = getHeaders().getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
