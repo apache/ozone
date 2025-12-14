@@ -36,14 +36,15 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.TestUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -153,7 +154,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     Pair<SortedMap<String, Integer>, List<Path>> data = createDummyData(numberOfFiles);
     List<Path> files = data.getRight();
     SortedMap<String, Integer> keys = data.getLeft();
@@ -171,15 +172,15 @@ class TestSstFileSetReader {
                     upperBound.map(u -> entry.getKey().compareTo(u) < 0)
                         .orElse(true))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        try (Stream<String> keyStream =
+        try (ClosableIterator<String> keyStream =
                  new SstFileSetReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
-          keyStream.forEach(key -> {
+          while (keyStream.hasNext()) {
+            String key = keyStream.next();
             assertEquals(1, keysInBoundary.get(key));
             assertNotNull(keysInBoundary.remove(key));
-          });
-          keysInBoundary.values()
-              .forEach(val -> assertEquals(0, val));
+          }
+          keysInBoundary.values().forEach(val -> assertEquals(0, val));
         }
       }
     }
@@ -194,7 +195,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     Pair<SortedMap<String, Integer>, List<Path>> data =
         createDummyData(numberOfFiles);
@@ -214,13 +215,13 @@ class TestSstFileSetReader {
                     upperBound.map(u -> entry.getKey().compareTo(u) < 0)
                         .orElse(true))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        try (Stream<String> keyStream = new SstFileSetReader(files)
+        try (ClosableIterator<String> keyStream = new SstFileSetReader(files)
             .getKeyStreamWithTombstone(lowerBound.orElse(null),
                 upperBound.orElse(null))) {
-          keyStream.forEach(
-              key -> {
-                assertNotNull(keysInBoundary.remove(key));
-              });
+          while (keyStream.hasNext()) {
+            String key = keyStream.next();
+            assertNotNull(keysInBoundary.remove(key));
+          }
         }
         assertEquals(0, keysInBoundary.size());
       }
@@ -234,7 +235,7 @@ class TestSstFileSetReader {
    */
   @ParameterizedTest
   @ValueSource(ints = {2, 3, 5})
-  public void testMinHeapWithOverlappingSstFiles(int numberOfFiles) throws RocksDBException {
+  public void testMinHeapWithOverlappingSstFiles(int numberOfFiles) throws RocksDBException, CodecException {
     assumeTrue(numberOfFiles >= 2);
 
     // Create overlapping SST files with some duplicate keys
@@ -284,8 +285,11 @@ class TestSstFileSetReader {
 
     // Read using SstFileSetReader and verify correct behavior
     List<String> actualKeys = new ArrayList<>();
-    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
-      keyStream.forEach(actualKeys::add);
+    try (ClosableIterator<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
+      while (keyStream.hasNext()) {
+        actualKeys.add(keyStream.next());
+      }
+
     }
 
     // Verify all expected keys are present and in sorted order
@@ -303,7 +307,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {3, 4, 5})
   public void testDuplicateKeyHandlingWithLatestFilePrecedence(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     assumeTrue(numberOfFiles >= 3);
 
     List<Path> files = new ArrayList<>();
@@ -330,8 +334,10 @@ class TestSstFileSetReader {
 
     // Read all keys
     List<String> actualKeys = new ArrayList<>();
-    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
-      keyStream.forEach(actualKeys::add);
+    try (ClosableIterator<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
+      while (keyStream.hasNext()) {
+        actualKeys.add(keyStream.next());
+      }
     }
 
     // Verify we only get each duplicate key once (not numberOfFiles times)

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 
 /**
@@ -24,8 +25,25 @@ import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
  * @param <V> Value type.
  */
 public class StringInMemoryTestTable<V> extends InMemoryTestTable<String, V> {
+
+  public StringInMemoryTestTable() {
+    super();
+  }
+
+  public StringInMemoryTestTable(Map<String, V> map) {
+    super(map);
+  }
+
+  public StringInMemoryTestTable(Map<String, V> map, String name) {
+    super(map, name);
+  }
+
+  public StringInMemoryTestTable(String name) {
+    super(name);
+  }
+
   @Override
-  public KeyValueIterator<String, V> iterator(String prefix, KeyValueIterator.Type type) {
+  public KeyValueIterator<String, V> iterator(String prefix, IteratorType type) {
     return new MapBackedTableIterator<>(getMap(), prefix);
   }
 }

@@ -25,13 +25,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 import java.util.StringTokenizer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
@@ -185,7 +185,7 @@ public class OFSPath {
     if (isEmpty()) {
       return "";
     }
-    Preconditions.checkNotNull(authority);
+    Objects.requireNonNull(authority, "authority == null");
     StringBuilder sb = new StringBuilder();
     if (!isMount()) {
       sb.append(volumeName);
@@ -343,7 +343,7 @@ public class OFSPath {
    */
   @VisibleForTesting
   static String getTempMountBucketName(String username) {
-    Preconditions.checkNotNull(username);
+    Objects.requireNonNull(username, "username == null");
     // TODO: Improve this to "slugify(username)-md5(username)" for better
     //  readability?
     return md5Hex(username);

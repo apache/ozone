@@ -91,7 +91,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -117,8 +116,10 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
+import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -141,11 +142,7 @@ import org.slf4j.LoggerFactory;
  * Class to generate snapshot diff.
  */
 public class SnapshotDiffManager implements AutoCloseable {
-  private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
-  private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
-  private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
-  private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String DELETE_DIFF_TABLE_SUFFIX = "-delete-diff";
   private static final String RENAME_DIFF_TABLE_SUFFIX = "-rename-diff";
   private static final String CREATE_DIFF_TABLE_SUFFIX = "-create-diff";
@@ -816,11 +813,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       // JobId is prepended to column families name to make them unique
       // for request.
       fromSnapshotColumnFamily =
-          createColumnFamily(jobId + FROM_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_FROM_SNAP_OBJECT_TABLE_NAME);
       toSnapshotColumnFamily =
-          createColumnFamily(jobId + TO_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_TO_SNAP_OBJECT_TABLE_NAME);
       objectIDsColumnFamily =
-          createColumnFamily(jobId + UNIQUE_IDS_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_UNIQUE_IDS_TABLE_NAME);
 
       // ObjectId to keyName map to keep key info for fromSnapshot.
       // objectIdToKeyNameMap is used to identify what keys were touched
@@ -1034,11 +1031,15 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (Strings.isNotEmpty(tablePrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
-    try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
+    try (ClosableIterator<String> keysToCheck = nativeRocksToolsLoaded ?
         sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
-        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
+        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound);
+         TableMergeIterator<String, WithParentObjectId> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
+             tablePrefix, (Table<String, WithParentObjectId>) fsTable, (Table<String, WithParentObjectId>) tsTable)) {
       AtomicLong keysProcessed = new AtomicLong(0);
-      keysToCheck.forEach(key -> {
+      while (tableMergeIterator.hasNext()) {
+        Table.KeyValue<String, List<WithParentObjectId>> kvs = tableMergeIterator.next();
+        String key = kvs.getKey();
         if (totalEstimatedKeysToProcess > 0) {
           double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
           if (progressPct >= checkpoint[0]) {
@@ -1048,16 +1049,14 @@ public class SnapshotDiffManager implements AutoCloseable {
         }
 
         try {
-          final WithParentObjectId fromObjectId = fsTable.get(key);
-          final WithParentObjectId toObjectId = tsTable.get(key);
-          if (areKeysEqual(fromObjectId, toObjectId) || !isKeyInBucket(key,
-              tablePrefixes, fsTable.getName())) {
+          final WithParentObjectId fromObjectId = kvs.getValue().get(0);
+          final WithParentObjectId toObjectId = kvs.getValue().get(1);
+          if (areKeysEqual(fromObjectId, toObjectId)) {
             keysProcessed.getAndIncrement();
-            return;
+            continue;
           }
           if (fromObjectId != null) {
-            byte[] rawObjId = codecRegistry.asRawData(
-                fromObjectId.getObjectID());
+            byte[] rawObjId = codecRegistry.asRawData(fromObjectId.getObjectID());
             // Removing volume bucket info by removing the table bucket Prefix
             // from the key.
             // For FSO buckets will be left with the parent id/keyname.
@@ -1071,8 +1070,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           }
           if (toObjectId != null) {
             byte[] rawObjId = codecRegistry.asRawData(toObjectId.getObjectID());
-            byte[] rawValue = codecRegistry.asRawData(
-                key.substring(tablePrefix.length()));
+            byte[] rawValue = codecRegistry.asRawData(key.substring(tablePrefix.length()));
             newObjIdToKeyMap.put(rawObjId, rawValue);
             objectIdToIsDirMap.put(rawObjId, isDirectoryTable);
             newParentIds.ifPresent(set -> set.add(toObjectId
@@ -1082,17 +1080,13 @@ public class SnapshotDiffManager implements AutoCloseable {
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      });
-    } catch (RocksDBException rocksDBException) {
-      // TODO: [SNAPSHOT] Gracefully handle exception
-      //  e.g. when input files do not exist
-      throw new RuntimeException(rocksDBException);
+      }
     }
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
       SstFileSetReader sstFileReader
-  ) throws RocksDBException, IOException {
+  ) throws IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
       // TODO: [SNAPSHOT] HDDS-8202: Change it to custom snapshot exception.

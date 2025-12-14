@@ -211,34 +211,9 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
-    Objects.requireNonNull(txIDs, "txIds cannot be null.");
-    ArrayList<DeletedBlocksTransaction> transactions = new ArrayList<>();
-    for (long txId: txIDs) {
-      try {
-        if (deletingTxIDs.contains(txId)) {
-          LOG.debug("txId {} is already in deletingTxIDs.", txId);
-          continue;
-        }
-        DeletedBlocksTransaction transaction = deletedTable.get(txId);
-        if (transaction == null) {
-          LOG.debug("txId {} is not found in deletedTable.", txId);
-          continue;
-        }
-        transactions.add(transaction);
-      } catch (IOException ex) {
-        LOG.error("Could not get deleted block transaction {}.", txId, ex);
-        throw ex;
-      }
-    }
-    LOG.debug("Get {} DeletedBlocksTransactions for {} input txIDs", transactions.size(), txIDs.size());
-    return transactions;
-  }
-
-  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
-    Preconditions.checkNotNull(deletingTxIDs);
+    Objects.requireNonNull(deletingTxIDs, "deletingTxIDs == null");
     deletingTxIDs.clear();
   }
 
@@ -297,7 +272,7 @@ public class DeletedBlockLogStateManagerImpl
     }
 
     public DeletedBlockLogStateManager build() throws IOException {
-      Preconditions.checkNotNull(deletedBlocksTransactionTable);
+      Objects.requireNonNull(deletedBlocksTransactionTable, "deletedBlocksTransactionTable == null");
 
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
           deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);

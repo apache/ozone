@@ -116,10 +116,7 @@ public final class TestBlockTokensCLI {
   @AfterAll
   public static void stop() {
     miniKdc.stop();
-    IOUtils.close(LOG, client);
-    if (cluster != null) {
-      cluster.stop();
-    }
+    IOUtils.close(LOG, client, cluster);
   }
 
   private SecretKeyManager getScmSecretKeyManager() {

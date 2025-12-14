@@ -79,7 +79,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -355,11 +358,21 @@ public class TestRocksDBCheckpointDiffer {
 
     try (MockedStatic<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
       mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary).thenReturn(true);
+      ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+      Function<Boolean, UncheckedAutoCloseable> lockFunction = (readLock) -> {
+        if (readLock) {
+          readWriteLock.readLock().lock();
+          return () -> readWriteLock.readLock().unlock();
+        } else {
+          readWriteLock.writeLock().lock();
+          return () -> readWriteLock.writeLock().unlock();
+        }
+      };
       rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
           SST_BACK_UP_DIR_NAME,
           COMPACTION_LOG_DIR_NAME,
           ACTIVE_DB_DIR_NAME,
-          config);
+          config, lockFunction);
     }
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
@@ -1632,7 +1645,7 @@ public class TestRocksDBCheckpointDiffer {
     when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
     try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
         ManagedRawSSTFileReader.class, (mock, context) -> {
-          when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+          when(mock.newIterator(any(), any(), any(), any())).thenReturn(mockedRawSSTFileItr);
           doNothing().when(mock).close();
         })) {
       rocksDBCheckpointDiffer.pruneSstFileValues();

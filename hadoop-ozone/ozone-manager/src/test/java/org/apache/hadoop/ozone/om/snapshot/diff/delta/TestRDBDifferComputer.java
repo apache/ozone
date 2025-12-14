@@ -161,7 +161,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -222,7 +222,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -276,7 +276,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -327,7 +327,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data with version mapping
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalDataWithVersions(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -360,10 +360,10 @@ public class TestRDBDifferComputer {
   }
 
   /**
-   * Tests that getDSIFromSI throws exception when no versions found.
+   * Tests that toDifferSnapshotInfo throws exception when no versions found.
    */
   @Test
-  public void testGetDSIFromSIWithNoVersions() throws IOException {
+  public void testToDifferSnapshotInfoWithNoVersions() throws IOException {
     rdbDifferComputer = new RDBDifferComputer(omSnapshotManager, activeMetadataManager,
         deltaDirPath, activityReporter);
 
@@ -375,12 +375,12 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data with empty versions
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = mock(OmSnapshotLocalData.class);
+    OmSnapshotLocalData fromSnapshotLocalDataMock = mock(OmSnapshotLocalData.class);
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(UUID.randomUUID(), 1);
 
-    when(fromSnapshotLocalData.getSnapshotId()).thenReturn(snapshotId);
-    when(fromSnapshotLocalData.getVersionSstFileInfos()).thenReturn(Collections.emptyMap());
-
+    when(fromSnapshotLocalDataMock.getSnapshotId()).thenReturn(snapshotId);
+    when(fromSnapshotLocalDataMock.getVersionSstFileInfos()).thenReturn(Collections.emptyMap());
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(fromSnapshotLocalDataMock);
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
     when(snapProvider.getSnapshotLocalData()).thenReturn(toSnapshotLocalData);
     when(localDataManager.getOmSnapshotLocalData(any(UUID.class), any(UUID.class))).thenReturn(snapProvider);
@@ -422,7 +422,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -457,7 +457,7 @@ public class TestRDBDifferComputer {
 
     // Mock snapshot local data
     ReadableOmSnapshotLocalDataProvider snapProvider = mock(ReadableOmSnapshotLocalDataProvider.class);
-    OmSnapshotLocalData fromSnapshotLocalData = createMockSnapshotLocalData(fromSnapshotId, 1);
+    Optional<OmSnapshotLocalData> fromSnapshotLocalData = Optional.of(createMockSnapshotLocalData(fromSnapshotId, 1));
     OmSnapshotLocalData toSnapshotLocalData = createMockSnapshotLocalData(toSnapshotId, 2);
 
     when(snapProvider.getPreviousSnapshotLocalData()).thenReturn(fromSnapshotLocalData);
@@ -486,8 +486,7 @@ public class TestRDBDifferComputer {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setName(snapshotName)
-        .setSnapshotId(snapshotId)
-        .setDbTxSequenceNumber(100L);
+        .setSnapshotId(snapshotId);
     return builder.build();
   }
 
@@ -528,8 +527,5 @@ public class TestRDBDifferComputer {
     return localData;
   }
 }
-
-
-
 
 

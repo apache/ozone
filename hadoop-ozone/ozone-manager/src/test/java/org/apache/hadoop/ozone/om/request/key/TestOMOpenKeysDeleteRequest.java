@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -235,14 +234,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     List<Pair<Long, OmKeyInfo>> keysWithHigherUpdateID = new ArrayList<>(1);
     keysWithHigherUpdateID.add(Pair.of(clientID,
         builder.setKeyName("key")
-            .setFileName("key")
             .setUpdateID(updateId)
             .build()));
 
     List<Pair<Long, OmKeyInfo>> keysWithSameUpdateID = new ArrayList<>(1);
     keysWithSameUpdateID.add(Pair.of(clientID,
         builder.setKeyName("key2")
-            .setFileName("key2")
             .setUpdateID(transactionId)
             .build()));
 
@@ -461,9 +458,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     for (int i = 0; i < count; i++) {
       final String name = key != null ? key : UUID.randomUUID().toString();
       builder.setKeyName(name);
-      if (getBucketLayout().isFileSystemOptimized()) {
-        builder.setFileName(OzoneFSUtils.getFileName(name));
-      }
       long clientID = random.nextLong();
       keys.add(Pair.of(clientID, builder.build()));
     }

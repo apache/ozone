@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -31,6 +30,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.slf4j.Logger;
@@ -54,10 +55,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-  private boolean autoFlushEnabled = true;
 
-  public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
-      throws IOException {
+  public SCMHADBTransactionBufferImpl(StorageContainerManager scm) throws RocksDatabaseException, CodecException {
     this.scm = scm;
     init();
   }
@@ -67,8 +66,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void addToBuffer(
-      Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
+  public <KEY, VALUE> void addToBuffer(Table<KEY, VALUE> table, KEY key, VALUE value)
+      throws RocksDatabaseException, CodecException {
     rwLock.readLock().lock();
     try {
       txFlushPending.getAndIncrement();
@@ -79,8 +78,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
-      throws IOException {
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws CodecException {
     rwLock.readLock().lock();
     try {
       txFlushPending.getAndIncrement();
@@ -123,7 +121,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void flush() throws IOException {
+  public void flush() throws RocksDatabaseException, CodecException {
     rwLock.writeLock().lock();
     try {
       // write latest trx info into trx table in the same batch
@@ -151,7 +149,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void init() throws IOException {
+  public void init() throws RocksDatabaseException, CodecException {
     metadataStore = scm.getScmMetadataStore();
 
     rwLock.writeLock().lock();
@@ -180,7 +178,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     rwLock.readLock().lock();
     try {
       long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
-      return autoFlushEnabled && txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
+      return txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
     } finally {
       rwLock.readLock().unlock();
     }
@@ -192,7 +190,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (currentBatchOperation != null) {
       currentBatchOperation.close();
     }

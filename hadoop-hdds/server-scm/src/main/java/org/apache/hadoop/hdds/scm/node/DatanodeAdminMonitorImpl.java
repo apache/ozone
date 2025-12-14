@@ -438,7 +438,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        ReplicationManagerReport report = new ReplicationManagerReport();
+        ReplicationManagerReport report = new ReplicationManagerReport(
+            replicationManager.getConfig().getContainerSampleLimit());
         replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
         boolean replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
 

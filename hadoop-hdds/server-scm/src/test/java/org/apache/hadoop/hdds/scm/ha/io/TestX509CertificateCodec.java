@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,7 +63,7 @@ public class TestX509CertificateCodec {
   public void testCodecError() {
 
     X509CertificateCodec x509CertificateCodec = new X509CertificateCodec();
-    final ByteString byteString = Proto2Utils.unsafeByteString("dummy".getBytes(UTF_8));
+    final ByteString byteString = ProtoUtils.unsafeByteString("dummy".getBytes(UTF_8));
 
     assertThrows(InvalidProtocolBufferException.class, () ->
         x509CertificateCodec.deserialize(X509Certificate.class, byteString));
