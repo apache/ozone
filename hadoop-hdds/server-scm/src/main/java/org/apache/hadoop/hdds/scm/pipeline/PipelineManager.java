@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -90,7 +92,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
-      throws IOException;
+      throws PipelineNotFoundException, InvalidPipelineStateException;
 
   /**
    * Add container to pipeline during SCM Start.
@@ -99,16 +101,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @param containerID ID of the container which is added to the pipeline.
    * @throws IOException in case of any Exception
    */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
-      ContainerID containerID) throws IOException;
+  void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException;
 
-  void removeContainerFromPipeline(PipelineID pipelineID,
-      ContainerID containerID) throws IOException;
+  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID);
 
-  NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID)
-      throws IOException;
+  NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
-  int getNumberOfContainers(PipelineID pipelineID) throws IOException;
+  int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException;
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
@@ -183,7 +182,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * during SCM reload.
    */
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException;
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException;
 
   /**
    * Ask pipeline manager to not create any new pipelines.

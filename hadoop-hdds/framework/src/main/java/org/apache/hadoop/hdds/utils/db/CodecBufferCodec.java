@@ -61,6 +61,11 @@ public final class CodecBufferCodec implements Codec<CodecBuffer> {
   }
 
   @Override
+  public CodecBuffer fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return buffer;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

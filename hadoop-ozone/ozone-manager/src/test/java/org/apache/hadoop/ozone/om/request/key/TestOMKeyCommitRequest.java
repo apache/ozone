@@ -237,10 +237,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
     omKeyInfoBuilder.setExpectedDataGeneration(1L);
-    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     omKeyInfoBuilder.addAcl(acls.get(0));
 
     String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
