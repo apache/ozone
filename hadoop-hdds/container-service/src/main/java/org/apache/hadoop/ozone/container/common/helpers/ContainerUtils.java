@@ -34,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -49,8 +50,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -175,16 +176,28 @@ public final class ContainerUtils {
     }
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
-    } catch (EmptyDatanodeIdFileException e) {
+    } catch (IOException e) {
       LOG.warn("Datanode ID file is empty. Recovering from VERSION file.", e);
       // Get the datanode UUID from the VERSION file
-      String dataNodeDir = conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
-      if (dataNodeDir == null || dataNodeDir.isEmpty()) {
+      String dnUuid = null;
+      Collection<String> dataNodeDirs = HddsServerUtil.getDatanodeStorageDirs(conf);
+      if (dataNodeDirs.isEmpty()) {
         throw new IOException("hdds.datanode.dir is not configured.", e);
       }
-      File versionFile = new File(dataNodeDir, "hdds/VERSION");
-      Properties props = DatanodeVersionFile.readFrom(versionFile);
-      String dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
+      for (String dataNodeDir : dataNodeDirs) {
+        File versionFile = new File(dataNodeDir, "hdds/VERSION");
+        if (versionFile.exists()) {
+          Properties props = DatanodeVersionFile.readFrom(versionFile);
+          dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
+          if (dnUuid != null && !dnUuid.isEmpty()) {
+            break;
+          }
+        }
+      }
+      if (dnUuid == null) {
+        throw new IOException("Conuld not find a valid datanode UUID from " +
+            "any VERSION file in " + dataNodeDirs, e);
+      }
 
       // Create a new DatanodeDetails with the UUID
       DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
