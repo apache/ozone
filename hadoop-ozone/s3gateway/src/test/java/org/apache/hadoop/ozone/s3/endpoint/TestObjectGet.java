@@ -93,11 +93,11 @@ public class TestObjectGet {
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     rest.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        null, null, 1, null, null, null, body);
+        1, null, null, null, body);
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        null, null, 1, null, null, null, body);
+        1, null, null, null, body);
 
     context = mock(ContainerRequestContext.class);
     when(context.getUriInfo()).thenReturn(mock(UriInfo.class));

@@ -717,7 +717,7 @@ public class ClientProtocolStub implements ClientProtocol {
       String prevSnapshot, int maxListResult) throws IOException {
     return null;
   }
-
+  
   @Override
   public void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName)

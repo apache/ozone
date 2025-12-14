@@ -89,13 +89,13 @@ public class TestObjectTaggingPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, null, null, 1, null, null, null, body);
+    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, null, body);
   }
 
   @Test
   public void testPutObjectTaggingWithEmptyBody() throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, null, null, 1, null, "", null,
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
           null);
       fail();
     } catch (OS3Exception ex) {
@@ -106,7 +106,7 @@ public class TestObjectTaggingPut {
 
   @Test
   public void testPutValidObjectTagging() throws Exception {
-    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, null, null, 1, null,
+    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null,
          "", null, twoTags()).getStatus());
     OzoneKeyDetails keyDetails =
         clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
@@ -128,7 +128,7 @@ public class TestObjectTaggingPut {
   private void testInvalidObjectTagging(Supplier<InputStream> inputStream,
                                         int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, null, null, 1, null, "", null,
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
           inputStream.get());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
@@ -140,7 +140,7 @@ public class TestObjectTaggingPut {
   @Test
   public void testPutObjectTaggingNoKeyFound() throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, "nonexistent", 0, null, null, 1,
+      objectEndpoint.put(BUCKET_NAME, "nonexistent", 0, 1,
           null, "", null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
@@ -152,7 +152,7 @@ public class TestObjectTaggingPut {
   @Test
   public void testPutObjectTaggingNoBucketFound() throws Exception {
     try {
-      objectEndpoint.put("nonexistent", "nonexistent", 0, null, null, 1,
+      objectEndpoint.put("nonexistent", "nonexistent", 0, 1,
           null, "", null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
@@ -184,7 +184,7 @@ public class TestObjectTaggingPut {
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);
 
     try {
-      endpoint.put("fsoBucket", "dir/", 0, null, null, 1, null, "",
+      endpoint.put("fsoBucket", "dir/", 0, 1, null, "",
           null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {

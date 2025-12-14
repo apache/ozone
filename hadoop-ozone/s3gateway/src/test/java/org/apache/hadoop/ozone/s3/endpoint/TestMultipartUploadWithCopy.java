@@ -277,7 +277,7 @@ public class TestMultipartUploadWithCopy {
     MODIFIED_SINCE_FUTURE_TS_UNMODIFIED_SINCE_UNPARSABLE_TS(
         futureTimeStr, UNPARSABLE_TIME_STR,
         null);
-
+    
     private final String modifiedTimestamp;
     private final String unmodifiedTimestamp;
     private final String errorCode;
@@ -336,7 +336,7 @@ public class TestMultipartUploadWithCopy {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
-        null, null, partNumber, uploadID, null, null, body);
+        partNumber, uploadID, null, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
@@ -380,8 +380,8 @@ public class TestMultipartUploadWithCopy {
     setHeaders(additionalHeaders);
 
     ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
-    Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, null, null,
-        partNumber, uploadID, null, null, body);
+    Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
+        uploadID, null, null, body);
     assertEquals(200, response.getStatus());
 
     CopyPartResult result = (CopyPartResult) response.getEntity();
@@ -408,7 +408,7 @@ public class TestMultipartUploadWithCopy {
         OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
     additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, "bytes=0-3");
     setHeaders(additionalHeaders);
-    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, null, null, 1, uploadID, null, null, body);
+    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, null, null, body);
     OzoneMultipartUploadPartListParts parts =
         CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
         .listParts(KEY, uploadID, 0, 100);

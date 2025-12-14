@@ -227,8 +227,6 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
       @HeaderParam("Content-Length") long length,
-      @HeaderParam("If-None-Match") String ifNoneMatch,
-      @HeaderParam("If-Match") String ifMatch,
       @QueryParam("partNumber")  int partNumber,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
       @QueryParam("tagging") String taggingMarker,
@@ -313,49 +311,6 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
-      // Check conditional write headers
-      // If-None-Match and If-Match are mutually exclusive
-      if (ifNoneMatch != null && ifMatch != null) {
-        throw newError(INVALID_ARGUMENT, keyPath);
-      }
-
-      Long expectedGeneration = null;
-
-      // Handle If-None-Match: * (create only if key doesn't exist)
-      if (ifNoneMatch != null) {
-        if (!"*".equals(ifNoneMatch.trim())) {
-          throw newError(INVALID_ARGUMENT, keyPath);
-        }
-        expectedGeneration = -1L;
-      }
-
-      // Handle If-Match: <etag> (update only if ETag matches)
-      if (ifMatch != null) {
-        try {
-          // Look up existing key to get its ETag and generation
-          OzoneKeyDetails existingKey = getClientProtocol().getS3KeyDetails(bucketName, keyPath);
-          String existingETag = existingKey.getMetadata().get(OzoneConsts.ETAG);
-
-          // Strip quotes from the provided ETag
-          String providedETag = stripQuotes(ifMatch.trim());
-
-          // Compare ETags
-          if (existingETag == null || !existingETag.equals(providedETag)) {
-            // ETag doesn't match - return 412 Precondition Failed
-            throw newError(S3ErrorTable.PRECOND_FAILED, keyPath);
-          }
-
-          // ETag matches - use the key's generation for optimistic locking
-          expectedGeneration = existingKey.getGeneration();
-        } catch (OMException ex) {
-          if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-            // Key doesn't exist - return 404 Not Found for If-Match
-            throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
-          }
-          throw ex;
-        }
-      }
-
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
           length, amzDecodedLength, keyPath);
@@ -376,21 +331,9 @@ public class ObjectEndpoint extends EndpointBase {
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
-        // Choose between rewriteKey (for If-Match and If-None-Match) or createKey (for normal put)
-        OzoneOutputStream output;
-        if (expectedGeneration != null) {
-          // If-Match: use rewriteKey with expectedDataGeneration for optimistic locking
-          output = getClientProtocol().rewriteKey(
-              volume.getName(), bucketName, keyPath, length, expectedGeneration,
-              replicationConfig, customMetadata);
-        } else {
-          // Normal create
-          output = getClientProtocol().createKey(
-              volume.getName(), bucketName, keyPath, length, replicationConfig,
-              customMetadata, tags);
-        }
-
-        try {
+        try (OzoneOutputStream output = getClientProtocol().createKey(
+            volume.getName(), bucketName, keyPath, length, replicationConfig,
+            customMetadata, tags)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -400,8 +343,6 @@ public class ObjectEndpoint extends EndpointBase {
                   digestInputStream.getMessageDigest().digest())
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
-        } finally {
-          output.close();
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -434,22 +375,6 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.QUOTA_EXCEEDED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS) {
-        // If this is a conditional write failure, return 412 Precondition Failed
-        if (ifNoneMatch != null && "*".equals(ifNoneMatch.trim())) {
-          throw newError(S3ErrorTable.PRECOND_FAILED, keyPath, ex);
-        }
-        throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        // For If-Match, if key doesn't exist during rewrite, return 404
-        // This can happen if key was deleted between the initial check and the rewrite
-        if (ifMatch != null) {
-          throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
-        }
-        throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_GENERATION_MISMATCH) {
-        // Generation mismatch during If-Match - return 412 Precondition Failed
-        throw newError(S3ErrorTable.PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
         throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
       }

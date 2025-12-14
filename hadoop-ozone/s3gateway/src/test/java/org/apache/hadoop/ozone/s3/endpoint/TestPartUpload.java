@@ -97,7 +97,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), null, null, 1, uploadID, null, null, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -119,7 +119,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), null, null, 1, uploadID, null, null, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -128,7 +128,7 @@ public class TestPartUpload {
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), null, null, 1, uploadID, null, null, body);
+        content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -140,7 +140,7 @@ public class TestPartUpload {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
-      rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), null, null, 1,
+      rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
           "random", null, null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
@@ -176,7 +176,7 @@ public class TestPartUpload {
     String uploadID = multipartUploadInitiateResponse.getUploadID();
     long contentLength = chunkedContent.length();
 
-    objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, null, null, 1,
+    objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, 1,
         uploadID, null, null, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertContentLength(uploadID, keyName, 15);
   }
@@ -200,7 +200,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     rest.put(OzoneConsts.S3_BUCKET, keyName,
-        contentLength, null, null, 1, uploadID, null, null, body);
+        contentLength, 1, uploadID, null, null, body);
     assertContentLength(uploadID, keyName, content.length());
   }
 
@@ -245,7 +245,7 @@ public class TestPartUpload {
           new ByteArrayInputStream(content.getBytes(UTF_8));
       try {
         objectEndpoint.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-            content.length(), null, null, 1, uploadID, null, null, body);
+            content.length(), 1, uploadID, null, null, body);
         fail("Should throw IOException");
       } catch (IOException ignored) {
         // Verify that the message digest is reset so that the instance can be reused for the
