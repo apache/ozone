@@ -23,7 +23,7 @@ BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/javadoc"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS="-B -fae -DskipDocs -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
+MAVEN_OPTIONS="-B -fae -DskipDocs -DskipRecon -DskipShade --no-transfer-progress ${MAVEN_OPTIONS:-}"
 
 mvn ${MAVEN_OPTIONS} javadoc:aggregate "$@" | tee output.log
 rc=$?

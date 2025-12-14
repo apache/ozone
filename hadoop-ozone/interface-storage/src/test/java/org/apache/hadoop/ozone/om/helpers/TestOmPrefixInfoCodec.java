@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -49,7 +50,7 @@ public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
     OmPrefixInfo opiSave = OmPrefixInfo.newBuilder()
         .setName("/user/hive/warehouse")
         .setAcls(acls)
-        .addMetadata("id", "100")
+        .addAllMetadata(singletonMap("id", "100"))
         .build();
 
     final Codec<OmPrefixInfo> codec = getCodec();

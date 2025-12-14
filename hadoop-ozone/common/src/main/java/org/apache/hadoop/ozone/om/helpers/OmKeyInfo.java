@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -94,7 +93,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
 
   /**
    * Used for S3 tags.
@@ -120,7 +119,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.encInfo = b.encInfo;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
@@ -159,7 +158,8 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public void setKeyName(String keyName) {
-    this.keyName = keyName;
+    this.keyName = Objects.requireNonNull(keyName, "keyName == null");
+    this.fileName = OzoneFSUtils.getFileName(keyName);
   }
 
   public long getDataSize() {
@@ -172,10 +172,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public void setDataSize(long size) {
     this.dataSize = size;
-  }
-
-  public void setFileName(String fileName) {
-    this.fileName = fileName;
   }
 
   public String getFileName() {
@@ -216,16 +212,6 @@ public final class OmKeyInfo extends WithParentObjectId
     Map<String, String> metadataCopy = new HashMap<>(getMetadata());
     metadataUpdater.accept(metadataCopy);
     return toBuilder().setMetadata(metadataCopy).build();
-  }
-
-  /**
-   * Returns a new {@link OmKeyInfo} with metadata replaced by the provided
-   * map.
-   * @param metadata the metadata to set
-   * @return a new {@link OmKeyInfo}
-   */
-  public OmKeyInfo withMetadata(Map<String, String> metadata) {
-    return toBuilder().setMetadata(metadata).build();
   }
 
   public boolean isDeletedKeyCommitted() {
@@ -455,19 +441,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
-  }
-
-  public boolean addAcl(OzoneAcl acl) {
-    return OzoneAclUtil.addAcl(acls, acl);
-  }
-
-  public boolean removeAcl(OzoneAcl acl) {
-    return OzoneAclUtil.removeAcl(acls, acl);
-  }
-
-  public boolean setAcls(List<OzoneAcl> newAcls) {
-    return OzoneAclUtil.setAcl(acls, newAcls);
+    return acls;
   }
 
   public void setReplicationConfig(ReplicationConfig repConfig) {
@@ -512,7 +486,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private FileEncryptionInfo encInfo;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private final AclListBuilder acls;
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private FileChecksum fileChecksum;
@@ -522,10 +496,16 @@ public final class OmKeyInfo extends WithParentObjectId
     private Long expectedDataGeneration = null;
 
     public Builder() {
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
     }
 
     public Builder(OmKeyInfo obj) {
       super(obj);
+      this.acls = AclListBuilder.of(obj.acls);
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -542,7 +522,6 @@ public final class OmKeyInfo extends WithParentObjectId
       if (obj.getTags() != null) {
         this.tags.putAll(obj.getTags());
       }
-      this.acls.addAll(obj.getAcls());
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
@@ -560,8 +539,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setKeyName(String key) {
-      this.keyName = key;
+    public Builder setKeyName(String newValue) {
+      if (!Objects.equals(newValue, keyName)) {
+        this.keyName = newValue;
+        this.fileName = null;
+      }
       return this;
     }
 
@@ -631,9 +613,13 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls.set(listOfAcls);
       }
       return this;
+    }
+
+    public AclListBuilder acls() {
+      return acls;
     }
 
     public Builder addAcl(OzoneAcl ozoneAcl) {
@@ -652,11 +638,6 @@ public final class OmKeyInfo extends WithParentObjectId
     @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
-      return this;
-    }
-
-    public Builder setFileName(String keyFileName) {
-      this.fileName = keyFileName;
       return this;
     }
 
@@ -698,7 +679,17 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(keyName, "keyName == null");
+    }
+
+    @Override
     protected OmKeyInfo buildObject() {
+      // not persisted to DB
+      if (fileName == null) {
+        fileName = OzoneFSUtils.getFileName(keyName);
+      }
       return new OmKeyInfo(this);
     }
   }
@@ -863,8 +854,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
     }
-    // not persisted to DB. FileName will be filtered out from keyName
-    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder;
   }
 

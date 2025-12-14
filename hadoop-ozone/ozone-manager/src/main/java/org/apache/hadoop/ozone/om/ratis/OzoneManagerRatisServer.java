@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
-import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -54,7 +55,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -327,7 +328,7 @@ public final class OzoneManagerRatisServer {
    * Add new OM to the Ratis ring.
    */
   public void addOMToRatisRing(OMNodeDetails newOMNode) throws IOException {
-    Preconditions.checkNotNull(newOMNode);
+    Objects.requireNonNull(newOMNode, "newOMNode == null");
 
     String newOMNodeId = newOMNode.getNodeId();
     RaftPeer newRaftPeer = OzoneManagerRatisServer.createRaftPeer(newOMNode);
@@ -353,7 +354,7 @@ public final class OzoneManagerRatisServer {
    */
   public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
       throws IOException {
-    Preconditions.checkNotNull(removeOMNode);
+    Objects.requireNonNull(removeOMNode, "removeOMNode == null");
 
     String removeNodeId = removeOMNode.getNodeId();
     LOG.info("{}: Submitting SetConfiguration request to Ratis server to " +

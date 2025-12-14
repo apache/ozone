@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -378,20 +379,26 @@ class TestOmSnapshotManager {
     Files.move(hardLinkList, Paths.get(candidateDir.toString(),
         OM_HARDLINK_FILE));
 
-    // Pointers to follower links to be created.
-    File f1FileLink = new File(followerSnapDir2, "f1.sst");
-    File s1FileLink = new File(followerSnapDir2, "s1.sst");
+    Path snapshot2Path = Paths.get(candidateDir.getPath(),
+        OM_SNAPSHOT_CHECKPOINT_DIR, followerSnapDir2.getName());
 
+    // Pointers to follower links to be created.
+    File f1FileLink = new File(snapshot2Path.toFile(), "f1.sst");
+    File s1FileLink = new File(snapshot2Path.toFile(), "s1.sst");
+    Object s1FileInode = getINode(s1File.toPath());
+    Object f1FileInode = getINode(f1File.toPath());
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(candidateDir.toPath());
+    assertNotNull(obtainedCheckpoint);
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
-    assertEquals(getINode(s1File.toPath()),
+    assertEquals(s1FileInode,
         getINode(s1FileLink.toPath()), "link matches original file");
 
     assertTrue(f1FileLink.exists());
-    assertEquals(getINode(f1File.toPath()),
+    assertEquals(f1FileInode,
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 

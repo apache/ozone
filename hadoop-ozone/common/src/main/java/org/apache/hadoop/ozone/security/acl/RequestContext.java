@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import java.net.InetAddress;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -26,7 +25,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 /**
  * This class encapsulates information required for Ozone ACLs.
  * */
-public class RequestContext {
+public final class RequestContext {
   private final String host;
   private final InetAddress ip;
   private final UserGroupInformation clientUgi;
@@ -43,34 +42,30 @@ public class RequestContext {
    */
   private final boolean recursiveAccessCheck;
 
-  @SuppressWarnings("parameternumber")
-  public RequestContext(String host, InetAddress ip,
-      UserGroupInformation clientUgi, String serviceId,
-      ACLIdentityType aclType, ACLType aclRights,
-      String ownerName) {
-    this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
-            false);
-  }
+  /**
+   * Represents optional session policy JSON for Ranger to use when authorizing
+   * an STS token.  This value would have come as a result of a previous
+   * {@link IAccessAuthorizer#generateAssumeRoleSessionPolicy(AssumeRoleRequest)} call.
+   * The sessionPolicy includes the roleName.
+   */
+  private final String sessionPolicy;
 
-  @SuppressWarnings("parameternumber")
-  public RequestContext(String host, InetAddress ip,
-      UserGroupInformation clientUgi, String serviceId,
-      ACLIdentityType aclType, ACLType aclRights,
-      String ownerName, boolean recursiveAccessCheck) {
-    this.host = host;
-    this.ip = ip;
-    this.clientUgi = clientUgi;
-    this.serviceId = serviceId;
-    this.aclType = aclType;
-    this.aclRights = aclRights;
-    this.ownerName = ownerName;
-    this.recursiveAccessCheck = recursiveAccessCheck;
+  private RequestContext(Builder builder) {
+    this.host = builder.host;
+    this.ip = builder.ip;
+    this.clientUgi = builder.clientUgi;
+    this.serviceId = builder.serviceId;
+    this.aclType = builder.aclType;
+    this.aclRights = builder.aclRights;
+    this.ownerName = builder.ownerName;
+    this.recursiveAccessCheck = builder.recursiveAccessCheck;
+    this.sessionPolicy = builder.sessionPolicy;
   }
 
   /**
    * Builder class for @{@link RequestContext}.
    */
-  public static class Builder {
+  public static final class Builder {
     private String host;
     private InetAddress ip;
     private UserGroupInformation clientUgi;
@@ -85,6 +80,11 @@ public class RequestContext {
     private String ownerName;
 
     private boolean recursiveAccessCheck;
+    private String sessionPolicy;
+
+    private Builder() {
+
+    }
 
     public Builder setHost(String bHost) {
       this.host = bHost;
@@ -130,43 +130,18 @@ public class RequestContext {
       return this;
     }
 
+    public Builder setSessionPolicy(String sessionPolicy) {
+      this.sessionPolicy = sessionPolicy;
+      return this;
+    }
+
     public RequestContext build() {
-      return new RequestContext(host, ip, clientUgi, serviceId, aclType,
-          aclRights, ownerName, recursiveAccessCheck);
+      return new RequestContext(this);
     }
   }
 
   public static Builder newBuilder() {
     return new Builder();
-  }
-
-  public static RequestContext.Builder getBuilder(
-      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      ACLType aclType, String ownerName) {
-    return getBuilder(ugi, remoteAddress, hostName, aclType, ownerName,
-            false);
-  }
-
-  public static RequestContext.Builder getBuilder(
-      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      ACLType aclType, String ownerName, boolean recursiveAccessCheck) {
-    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
-        .setClientUgi(ugi)
-        .setIp(remoteAddress)
-        .setHost(hostName)
-        .setAclType(ACLIdentityType.USER)
-        .setAclRights(aclType)
-        .setOwnerName(ownerName)
-        .setRecursiveAccessCheck(recursiveAccessCheck);
-    return contextBuilder;
-  }
-
-  public static RequestContext.Builder getBuilder(UserGroupInformation ugi,
-      ACLType aclType, String ownerName) {
-    return getBuilder(ugi,
-        ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-        aclType, ownerName);
   }
 
   public String getHost() {
@@ -205,5 +180,9 @@ public class RequestContext {
    */
   public boolean isRecursiveAccessCheck() {
     return recursiveAccessCheck;
+  }
+
+  public String getSessionPolicy() {
+    return sessionPolicy;
   }
 }

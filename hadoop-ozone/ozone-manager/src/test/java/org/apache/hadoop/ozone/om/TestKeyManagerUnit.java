@@ -437,7 +437,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setBucketName(bucket)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
-        .setAcls(new ArrayList<>())
         .build();
     OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }

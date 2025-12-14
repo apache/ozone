@@ -22,11 +22,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -394,7 +394,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public void close() {
-    IOUtils.close(LOG, transactionBuffer);
+    IOUtils.close(LOG, transactionBuffer::close);
   }
 
   @Override
@@ -406,8 +406,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
               + " has cluster Id " + request.getClusterId()
               + " but leader SCM cluster id is " + clusterId);
     }
-    Preconditions.checkNotNull(
-        getRatisServer().getDivision().getGroup().getGroupId());
+    Objects.requireNonNull(
+        getRatisServer().getDivision().getGroup().getGroupId(), "GroupId == null");
     return getRatisServer().addSCM(request);
   }
 
@@ -424,7 +424,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
           " has cluster Id " + request.getClusterId() +
           " but leader SCM cluster id is " + clusterId);
     }
-    Preconditions.checkNotNull(ratisServer.getDivision().getGroup());
+    Objects.requireNonNull(ratisServer.getDivision().getGroup(), "Group == null");
     return ratisServer.removeSCM(request);
   }
 

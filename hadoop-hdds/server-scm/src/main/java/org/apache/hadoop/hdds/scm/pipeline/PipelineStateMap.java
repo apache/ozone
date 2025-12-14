@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -63,8 +64,8 @@ class PipelineStateMap {
    * @param pipeline - Pipeline to add
    * @throws IOException if pipeline with provided pipelineID already exists
    */
-  void addPipeline(Pipeline pipeline) throws IOException {
-    Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
+  void addPipeline(Pipeline pipeline) throws DuplicatedPipelineIdException {
+    Objects.requireNonNull(pipeline, "Pipeline cannot be null");
     Preconditions.checkArgument(
         pipeline.getNodes().size() == pipeline.getReplicationConfig()
             .getRequiredNodes(),
@@ -89,13 +90,12 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
-   * @throws IOException if pipeline is not in open state or does not exist
    */
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
-      throws IOException {
-    Preconditions.checkNotNull(pipelineID,
+      throws InvalidPipelineStateException, PipelineNotFoundException {
+    Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID,
+    Objects.requireNonNull(containerID,
         "Container Id cannot be null");
 
     Pipeline pipeline = getPipeline(pipelineID);
@@ -112,11 +112,11 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
    */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
-    Preconditions.checkNotNull(pipelineID,
+  void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
+    Objects.requireNonNull(pipelineID,
             "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID,
+    Objects.requireNonNull(containerID,
             "Container Id cannot be null");
 
     Pipeline pipeline = getPipeline(pipelineID);
@@ -141,7 +141,7 @@ class PipelineStateMap {
    * @throws PipelineNotFoundException if pipeline is not found
    */
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID,
+    Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
 
     Pipeline pipeline = pipelineMap.get(pipelineID);
@@ -167,8 +167,7 @@ class PipelineStateMap {
    * @return List of pipelines which have the specified replication type
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
-    Preconditions
-        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
 
     List<Pipeline> pipelines = new ArrayList<>();
     for (Pipeline pipeline : pipelineMap.values()) {
@@ -191,9 +190,8 @@ class PipelineStateMap {
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state) {
-    Preconditions
-        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
-    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
       return new ArrayList<>(
@@ -223,9 +221,8 @@ class PipelineStateMap {
    */
   int getPipelineCount(ReplicationConfig replicationConfig,
       PipelineState state) {
-    Preconditions
-        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
-    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
       return query2OpenPipelines.getOrDefault(
@@ -256,13 +253,10 @@ class PipelineStateMap {
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
-    Preconditions
-        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
-    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
-    Preconditions
-        .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
-    Preconditions
-        .checkNotNull(excludePipelines, "Pipeline exclude list cannot be null");
+    Objects.requireNonNull(replicationConfig, "ReplicationConfig cannot be null");
+    Objects.requireNonNull(state, "Pipeline state cannot be null");
+    Objects.requireNonNull(excludeDns, "Datanode exclude list cannot be null");
+    Objects.requireNonNull(excludePipelines, "Pipeline exclude list cannot be null");
 
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {
@@ -304,7 +298,7 @@ class PipelineStateMap {
    */
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID,
+    Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
 
     NavigableSet<ContainerID> containerIDs = pipeline2container.get(pipelineID);
@@ -324,7 +318,7 @@ class PipelineStateMap {
    */
   int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID,
+    Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
 
     Set<ContainerID> containerIDs = pipeline2container.get(pipelineID);
@@ -339,10 +333,9 @@ class PipelineStateMap {
    * Remove pipeline from the data structures.
    *
    * @param pipelineID - PipelineID of the pipeline to be removed
-   * @throws IOException if the pipeline is not empty or does not exist
    */
-  Pipeline removePipeline(PipelineID pipelineID) throws IOException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+  Pipeline removePipeline(PipelineID pipelineID) throws PipelineNotFoundException, InvalidPipelineStateException {
+    Objects.requireNonNull(pipelineID, "Pipeline Id cannot be null");
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (!pipeline.isClosed()) {
@@ -361,13 +354,11 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline from which container needs
    *                   to be removed
    * @param containerID - ContainerID of the container to remove
-   * @throws IOException if pipeline does not exist
    */
-  void removeContainerFromPipeline(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
-    Preconditions.checkNotNull(pipelineID,
+  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException {
+    Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID,
+    Objects.requireNonNull(containerID,
         "container Id cannot be null");
 
     Set<ContainerID> containerIDs = pipeline2container.get(pipelineID);
@@ -389,8 +380,8 @@ class PipelineStateMap {
    */
   Pipeline updatePipelineState(PipelineID pipelineID, PipelineState state)
       throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");
+    Objects.requireNonNull(pipelineID, "Pipeline Id cannot be null");
+    Objects.requireNonNull(state, "Pipeline LifeCycleState cannot be null");
 
     final Pipeline pipeline = getPipeline(pipelineID);
     // Return the old pipeline if updating same state

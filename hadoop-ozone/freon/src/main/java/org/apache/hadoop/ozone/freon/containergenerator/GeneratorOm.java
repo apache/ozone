@@ -141,10 +141,10 @@ public class GeneratorOm extends BaseGenerator implements
         .setObjectID(1L)
         .setUpdateID(1L)
         .setQuotaInBytes(100L)
-        .addOzoneAcls(
+        .addAcl(
             OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.WORLD, "",
                 ACCESS, IAccessAuthorizer.ACLType.ALL))
-        .addOzoneAcls(
+        .addAcl(
             OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
                 ACCESS, IAccessAuthorizer.ACLType.ALL)
         ).build();
