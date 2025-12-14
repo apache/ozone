@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.tagging;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -116,9 +117,9 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
 
       // Clear / delete the tags
-      omKeyInfo.getTags().clear();
       // Set the UpdateId to the current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
+          .setTags(Collections.emptyMap())
           .setUpdateID(trxnLogIndex)
           .build();
 

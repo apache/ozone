@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -127,9 +128,9 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       }
 
       // Clear / delete the tags
-      omKeyInfo.getTags().clear();
       // Set the UpdateID to the current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
+          .setTags(Collections.emptyMap())
           .setUpdateID(trxnLogIndex)
           .build();
 
