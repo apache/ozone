@@ -107,7 +107,7 @@ public class VolumeUsage {
     Preconditions.assertTrue(reservedInBytes >= 0, reservedInBytes + " < 0");
   }
 
-  SpaceUsageSource realUsage() {
+  SpaceUsageSource.Fixed realUsage() {
     return source.snapshot();
   }
 
@@ -123,9 +123,8 @@ public class VolumeUsage {
    * </pre>
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
-  public SpaceUsageSource getCurrentUsage() {
-    SpaceUsageSource real = realUsage();
-
+  public SpaceUsageSource.Fixed getCurrentUsage() {
+    final SpaceUsageSource.Fixed real = realUsage();
     return reservedInBytes == 0
         ? real
         : new SpaceUsageSource.Fixed(
