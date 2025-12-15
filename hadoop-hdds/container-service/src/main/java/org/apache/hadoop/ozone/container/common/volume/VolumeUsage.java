@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -108,7 +107,6 @@ public class VolumeUsage {
     Preconditions.assertTrue(reservedInBytes >= 0, reservedInBytes + " < 0");
   }
 
-  @VisibleForTesting
   SpaceUsageSource realUsage() {
     return source.snapshot();
   }
@@ -150,7 +148,7 @@ public class VolumeUsage {
    * so there could be that DU value > totalUsed when there are deletes.
    * @return other used space
    */
-  private static long getOtherUsed(SpaceUsageSource usage) {
+  static long getOtherUsed(SpaceUsageSource usage) {
     long totalUsed = usage.getCapacity() - usage.getAvailable();
     return Math.max(totalUsed - usage.getUsedSpace(), 0L);
   }
@@ -236,15 +234,5 @@ public class VolumeUsage {
     }
 
     return (long) Math.ceil(capacity * percentage);
-  }
-
-  public boolean isReservedUsagesInRange() {
-    SpaceUsageSource spaceUsageSource = realUsage();
-    long reservedUsed = getOtherUsed(spaceUsageSource);
-    if (reservedInBytes > 0 && reservedUsed > reservedInBytes) {
-      LOG.warn("Reserved usages {} is higher than actual allocated reserved space {}.", reservedUsed, reservedInBytes);
-      return false;
-    }
-    return true;
   }
 }

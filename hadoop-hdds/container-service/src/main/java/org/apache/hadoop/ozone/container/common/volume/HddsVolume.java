@@ -107,7 +107,7 @@ public class HddsVolume extends StorageVolume {
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
   private File deletedContainerDir;
-  private AtomicBoolean dbLoaded = new AtomicBoolean(false);
+  private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
 
   private final int volumeTestCount;
@@ -328,7 +328,7 @@ public class HddsVolume extends StorageVolume {
 
     final boolean isVolumeTestResultHealthy = true;
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
       volumeTestResultQueue.add(isVolumeTestResultHealthy);
     } catch (Exception e) {
       if (Thread.currentThread().isInterrupted()) {
@@ -357,28 +357,35 @@ public class HddsVolume extends StorageVolume {
     return VolumeCheckResult.HEALTHY;
   }
 
-  @VisibleForTesting
-  public void checkVolumeUsages() {
+  void checkVolumeUsages() {
     boolean isEnoughSpaceAvailable = true;
     SpaceUsageSource currentUsage = getCurrentUsage();
     long getFreeSpaceToSpare = getFreeSpaceToSpare(currentUsage.getCapacity());
-    if (currentUsage.getAvailable() < getFreeSpaceToSpare) {
+    final long committed = committedBytes.get();
+    final long available = currentUsage.getAvailable();
+    if (available < getFreeSpaceToSpare) {
       LOG.warn("Volume {} has insufficient space for write operation. Available: {}, Free space to spare: {}",
-          getStorageDir(), currentUsage.getAvailable(), getFreeSpaceToSpare);
+          getStorageDir(), available, getFreeSpaceToSpare);
       isEnoughSpaceAvailable = false;
-    } else if (committedBytes.get() > 0 && currentUsage.getAvailable() < committedBytes.get() + getFreeSpaceToSpare) {
+    } else if (committed > 0 && available < committed + getFreeSpaceToSpare) {
       LOG.warn("Volume {} has insufficient space for on-going container write operation. " +
               "Committed: {}, Available: {}, Free space to spare: {}",
-          getStorageDir(), committedBytes.get(), currentUsage.getAvailable(), getFreeSpaceToSpare);
+          getStorageDir(), committed, available, getFreeSpaceToSpare);
       isEnoughSpaceAvailable = false;
     }
 
     volumeInfoMetrics.setAvailableSpaceInsufficient(!isEnoughSpaceAvailable);
 
-    if (!getVolumeUsage().map(VolumeUsage::isReservedUsagesInRange).orElse(true)) {
-      LOG.warn("Volume {} reserved usages is higher than actual allocated reserved space.",
-          getStorageDir());
-      volumeInfoMetrics.setReservedCrossesLimit(true);
+    final VolumeUsage usage = getVolumeUsage();
+    if (usage != null && usage.getReservedInBytes() > 0) {
+      final SpaceUsageSource realUsage = usage.realUsage();
+      long reservedUsed = VolumeUsage.getOtherUsed(realUsage);
+      final boolean crossesLimit = reservedUsed > usage.getReservedInBytes();
+      if (crossesLimit) {
+        LOG.warn("Volume {} reserved usages {} is higher than actual allocated reserved space {}. (Real usage: {})",
+            getStorageDir(), reservedUsed, usage.getReservedInBytes(), realUsage);
+      }
+      volumeInfoMetrics.setReservedCrossesLimit(crossesLimit);
     } else {
       volumeInfoMetrics.setReservedCrossesLimit(false);
     }
@@ -552,7 +559,6 @@ public class HddsVolume extends StorageVolume {
   /**
    * Pick a DbVolume for HddsVolume and init db instance.
    * Use the HddsVolume directly if no DbVolume found.
-   * @param dbVolumeSet
    */
   public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
     DbVolume chosenDbVolume = null;
