@@ -468,7 +468,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   /** Get current usage of the volume. */
-  public SpaceUsageSource getCurrentUsage() {
+  public SpaceUsageSource.Fixed getCurrentUsage() {
     return volumeUsage != null ? volumeUsage.getCurrentUsage() : SpaceUsageSource.UNKNOWN;
   }
 
