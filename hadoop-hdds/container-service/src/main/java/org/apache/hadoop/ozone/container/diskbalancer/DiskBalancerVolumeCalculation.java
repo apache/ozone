@@ -17,14 +17,17 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.ratis.util.Preconditions.assertInstanceOf;
+import static org.apache.ratis.util.Preconditions.assertTrue;
+
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +52,12 @@ public final class DiskBalancerVolumeCalculation {
    * Get an immutable snapshot of volumes from a MutableVolumeSet.
    * 
    * @param volumeSet The MutableVolumeSet to create a snapshot from
-   * @return Immutable list of HddsVolume objects
+   * @return a list of volumes and usages
    */
-  public static ImmutableList<HddsVolume> getImmutableVolumeSet(MutableVolumeSet volumeSet) {
-    // Create an immutable copy of the volume list at this point in time
-    List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
-    return ImmutableList.copyOf(volumes);
+  public static List<VolumeFixedUsage> getVolumeUsages(MutableVolumeSet volumeSet) {
+    return volumeSet.getVolumesList().stream()
+        .map(VolumeFixedUsage::new)
+        .collect(Collectors.toList());
   }
   
   /**
@@ -66,12 +69,12 @@ public final class DiskBalancerVolumeCalculation {
    * @return Ideal usage as a ratio (used space / total capacity)
    * @throws IllegalArgumentException if total capacity is zero
    */
-  public static double getIdealUsage(ImmutableList<HddsVolume> volumes,
-      Map<HddsVolume, Long> deltaMap) {
+  public static double getIdealUsage(List<VolumeFixedUsage> volumes, Map<HddsVolume, Long> deltaMap) {
     long totalCapacity = 0L, totalEffectiveUsed = 0L;
     
-    for (HddsVolume volume : volumes) {
-      SpaceUsageSource usage = volume.getCurrentUsage();
+    for (VolumeFixedUsage volumeUsage : volumes) {
+      final HddsVolume volume = volumeUsage.getVolume();
+      final SpaceUsageSource.Fixed usage = volumeUsage.getUsage();
       totalCapacity += usage.getCapacity();
       long currentUsed = usage.getCapacity() - usage.getAvailable();
       long delta = (deltaMap != null) ? deltaMap.getOrDefault(volume, 0L) : 0L;
@@ -90,7 +93,7 @@ public final class DiskBalancerVolumeCalculation {
    * @param deltaMap Map of volume to delta sizes (ongoing operations), can be null
    * @return VolumeDataDensity sum across all volumes
    */
-  public static double calculateVolumeDataDensity(ImmutableList<HddsVolume> volumeSet,
+  public static double calculateVolumeDataDensity(List<VolumeFixedUsage> volumeSet,
       Map<HddsVolume, Long> deltaMap) {
     if (volumeSet == null) {
       LOG.warn("VolumeSet is null, returning 0.0 for VolumeDataDensity");
@@ -108,14 +111,9 @@ public final class DiskBalancerVolumeCalculation {
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot
-      for (HddsVolume volume : volumeSet) {
-        SpaceUsageSource usage = volume.getCurrentUsage();
-        Preconditions.checkArgument(usage.getCapacity() != 0);
+      for (VolumeFixedUsage volumeUsage : volumeSet) {
+        final double currentUsage = volumeUsage.computeUtilization(deltaMap);
 
-        long deltaSize = (deltaMap != null) ? deltaMap.getOrDefault(volume, 0L) : 0L;
-        double currentUsage = (double)((usage.getCapacity() - usage.getAvailable())
-            + deltaSize + volume.getCommittedBytes()) / usage.getCapacity();
-        
         // Calculate density as absolute difference from ideal usage
         double volumeDensity = Math.abs(currentUsage - idealUsage);
         volumeDensitySum += volumeDensity;
@@ -124,6 +122,43 @@ public final class DiskBalancerVolumeCalculation {
     } catch (Exception e) {
       LOG.error("Error calculating VolumeDataDensity", e);
       return -1.0;
+    }
+  }
+
+  public static double computeUtilization(HddsVolume volume, long delta) {
+    return computeUtilization(volume.getCurrentUsage(), volume.getCommittedBytes(), delta);
+  }
+
+  private static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long delta) {
+    assertTrue(usage.getCapacity() > 0);
+    return (usage.getCapacity() - usage.getAvailable() + committed + delta) / (double) usage.getCapacity();
+  }
+
+  /** {@link HddsVolume} with a {@link SpaceUsageSource.Fixed} usage. */
+  public static class VolumeFixedUsage {
+    private final HddsVolume volume;
+    private final SpaceUsageSource.Fixed usage;
+
+    public VolumeFixedUsage(HddsVolume volume) {
+      this.volume = volume;
+      this.usage = volume.getCurrentUsage();
+    }
+
+    public VolumeFixedUsage(StorageVolume volume) {
+      this(assertInstanceOf(volume, HddsVolume.class));
+    }
+
+    public HddsVolume getVolume() {
+      return volume;
+    }
+
+    public SpaceUsageSource.Fixed getUsage() {
+      return usage;
+    }
+
+    public double computeUtilization(Map<HddsVolume, Long> deltas) {
+      final long delta = deltas == null ? 0L : deltas.getOrDefault(volume, 0L);
+      return DiskBalancerVolumeCalculation.computeUtilization(usage, volume.getCommittedBytes(), delta);
     }
   }
 }

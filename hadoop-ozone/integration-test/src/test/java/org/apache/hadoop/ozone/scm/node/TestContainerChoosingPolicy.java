@@ -279,7 +279,6 @@ public class TestContainerChoosingPolicy {
         containerSet.addContainer(container); // Add container to ContainerSet
       } catch (Exception e) {
         Assertions.fail(e.getMessage());
-        throw new RuntimeException("Failed to add container to ContainerSet", e);
       }
 
       // Collect IDs of closed containers
