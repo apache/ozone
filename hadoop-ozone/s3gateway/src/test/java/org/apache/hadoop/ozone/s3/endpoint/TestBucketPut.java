@@ -183,7 +183,7 @@ public class TestBucketPut {
         () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
 
     assertEquals(INVALID_ARGUMENT.getCode(), os3.getCode());
-    assertEquals(400, os3.getHttpCode());
+    assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
   }
 
   @Test
@@ -248,6 +248,6 @@ public class TestBucketPut {
         () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
 
     assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
-    assertEquals(400, ex.getHttpCode());
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
   }
 }
