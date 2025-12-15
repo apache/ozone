@@ -184,7 +184,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -1607,10 +1606,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     OmUtils.createOMDir(omRatisDirectory);
 
-    String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
-    if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
-        .isNullOrEmpty(scmStorageDir) && omRatisDirectory
-        .equals(scmStorageDir)) {
+    String omRatisConfigured = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+    String scmRatisConfigured = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+
+    // Only check co-location if BOTH are explicitly configured
+    if (!Strings.isNullOrEmpty(omRatisConfigured) &&
+        !Strings.isNullOrEmpty(scmRatisConfigured) &&
+        omRatisConfigured.equals(scmRatisConfigured)) {
       throw new IOException(
           "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
               + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
