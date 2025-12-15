@@ -32,7 +32,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix, Type type) {
+      CodecBuffer prefix, IteratorType type) {
     super(iterator, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;

@@ -394,7 +394,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public void close() {
-    IOUtils.close(LOG, transactionBuffer);
+    IOUtils.close(LOG, transactionBuffer::close);
   }
 
   @Override

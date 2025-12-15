@@ -97,19 +97,17 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
-      // Reverting back the full path to key name
-      // Eg: a/b/c/d/e/file1 -> file1
-      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(key));
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
-      operationResult = apply(omKeyInfo, trxnLogIndex);
-      omKeyInfo = omKeyInfo.toBuilder()
-          .setUpdateID(trxnLogIndex)
-          .build();
 
+      // Reverting back the full path to key name
+      // Eg: a/b/c/d/e/file1 -> file1
+      OmKeyInfo.Builder builder = omKeyInfo.toBuilder()
+          .setKeyName(OzoneFSUtils.getFileName(key));
+      operationResult = apply(builder, trxnLogIndex);
 
       // Update the modification time when updating ACLs of Key.
       long modificationTime = omKeyInfo.getModificationTime();
@@ -124,7 +122,11 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         modificationTime =
             getOmRequest().getRemoveAclRequest().getModificationTime();
       }
-      omKeyInfo.setModificationTime(modificationTime);
+
+      omKeyInfo = builder
+          .setModificationTime(modificationTime)
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // update cache.
       if (isDirectory) {
