@@ -32,7 +32,6 @@ public class DeleteKeysResult {
   private List<OmKeyInfo> keysToDelete;
   private boolean processedKeys;
   private List<ExclusiveRange> keyRanges;
-  private static final Logger LOG = LoggerFactory.getLogger(DeleteKeysResult.class);
 
   DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
     this.keysToDelete = Collections.unmodifiableList(keysToDelete);
