@@ -57,7 +57,7 @@ public class MutableVolumeSet implements VolumeSet {
    * Maintains a map of all active volumes in the DataNode.
    * Each volume has one-to-one mapping with a volumeInfo object.
    */
-  private Map<String, StorageVolume> volumeMap;
+  private final Map<String, StorageVolume> volumeMap = new ConcurrentHashMap<>();
   /**
    * Maintains a map of volumes which have failed. The keys in this map and
    * {@link #volumeMap} are mutually exclusive.
@@ -147,7 +147,6 @@ public class MutableVolumeSet implements VolumeSet {
    * Add DN volumes configured through ConfigKeys to volumeMap.
    */
   private void initializeVolumeSet() throws IOException {
-    volumeMap = new ConcurrentHashMap<>();
     failedVolumeMap = new ConcurrentHashMap<>();
     volumeStateMap = new EnumMap<>(StorageType.class);
 
@@ -452,8 +451,9 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  public void setVolumeMap(Map<String, StorageVolume> map) {
-    this.volumeMap = map;
+  public void setVolumeMapForTesting(Map<String, StorageVolume> map) {
+    volumeMap.clear();
+    volumeMap.putAll(map);
   }
 
   @VisibleForTesting
