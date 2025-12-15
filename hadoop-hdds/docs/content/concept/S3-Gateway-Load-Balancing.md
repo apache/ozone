@@ -1,13 +1,12 @@
 ---
 title: "S3 Gateway Load Balancing"
-linkTitle: "S3 Gateway Load Balancing"
-date: 2023-11-29
+date: 2025-12-15
 weight: 1
-description: >
-  This document describes how to set up multiple S3 gateways with a proxy for load balancing.
 menu:
   main:
     parent: "Ozone S3 Gateway"
+summary: This document describes how to set up multiple S3 gateways with a proxy for load balancing.
+
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
