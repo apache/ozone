@@ -132,7 +132,7 @@ public class DataNodeMetricsService {
     CompletableFuture.runAsync(() -> collectMetrics(nodes), executorService)
         .exceptionally(throwable -> {
           LOG.error("Metrics collection failed", throwable);
-          synchronized (this) {
+          synchronized (DataNodeMetricsService.this) {
             currentStatus = MetricCollectionStatus.SUCCEEDED;
           }
           return null;
@@ -143,11 +143,18 @@ public class DataNodeMetricsService {
    * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
   private void collectMetrics(Set<DatanodeDetails> nodes) {
+    CollectionContext context = submitMetricsCollectionTasks(nodes);
+    processCollectionFutures(context);
+    updateFinalState(context);
+  }
+
+  /**
+   * Submits metrics collection tasks for all given datanodes.
+   * @return A context object containing tracking structures for the submitted futures.
+   */
+  private CollectionContext submitMetricsCollectionTasks(Set<DatanodeDetails> nodes) {
     // Initialize state
     List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
-    long totalPending = 0L;
-    int failed = 0;
-
     // Submit all collection tasks
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
     Map<DatanodePendingDeletionMetrics, Long> submissionTimes = new HashMap<>();
@@ -157,69 +164,45 @@ public class DataNodeMetricsService {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
           node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
-          node.getHostName(), node.getUuidString(), -1L);
+          node.getHostName(), node.getUuidString(), -1L); // -1 is used as placeholder/failed status
       futures.put(key, executorService.submit(task));
       submissionTimes.put(key, submissionTime);
     }
-
     int totalQueried = futures.size();
     LOG.debug("Submitted {} collection tasks", totalQueried);
+    return new CollectionContext(totalQueried, futures, submissionTimes, results);
+  }
 
+  /**
+   * Polls the submitted futures, enforcing timeouts and aggregating results until all are complete.
+   */
+  private void processCollectionFutures(CollectionContext context) {
     // Poll with timeout enforcement
-    while (!futures.isEmpty()) {
+    while (!context.futures.isEmpty()) {
       long currentTime = System.currentTimeMillis();
       Iterator<Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>>>
-          iterator = futures.entrySet().iterator();
-
+          iterator = context.futures.entrySet().iterator();
       boolean processedAny = false;
       while (iterator.hasNext()) {
         Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> entry =
             iterator.next();
         DatanodePendingDeletionMetrics key = entry.getKey();
         Future<DatanodePendingDeletionMetrics> future = entry.getValue();
-
-        // Check if this task exceeded timeout
-        long elapsedTime = currentTime - submissionTimes.get(key);
-        if (elapsedTime > PER_NODE_TIMEOUT_MS && !future.isDone()) {
-          LOG.warn("Task for datanode {} [{}] timed out after {}ms",
-              key.getHostName(), key.getDatanodeUuid(), elapsedTime);
-          future.cancel(true); // Interrupt the task
-          failed++;
-          results.add(key); // Add with -1 (failed)
+        // Check for timeout
+        if (checkAndHandleTimeout(key, future, context, currentTime)) {
           iterator.remove();
           processedAny = true;
           continue;
         }
-
-        // Check if this task is done
+        // Check for completion
         if (future.isDone()) {
-          try {
-            DatanodePendingDeletionMetrics result = future.get();
-            if (result.getPendingBlockSize() < 0) {
-              failed++;
-            } else {
-              totalPending += result.getPendingBlockSize();
-            }
-            results.add(result);
-            LOG.debug("Processed result from {}", key.getHostName());
-          } catch (ExecutionException | InterruptedException e) {
-            String errorType = e instanceof InterruptedException ? "interrupted" : "execution failed";
-            LOG.error("Task {} for datanode {} [{}]: {}",
-                errorType, key.getHostName(), key.getDatanodeUuid(), e.getMessage());
-            failed++;
-            results.add(key);
-            if (e instanceof InterruptedException) {
-              Thread.currentThread().interrupt();
-              break;
-            }
-          }
+          handleCompletedFuture(key, future, context);
           iterator.remove();
           processedAny = true;
         }
       }
-
-      // Sleep before next poll only if there are remaining futures
-      if (!futures.isEmpty() && !processedAny) {
+      // Sleep before the next poll only if there are remaining futures and nothing was processed
+      if (!context.futures.isEmpty() && !processedAny) {
         try {
           Thread.sleep(POLL_INTERVAL_MS);
         } catch (InterruptedException e) {
@@ -229,18 +212,63 @@ public class DataNodeMetricsService {
         }
       }
     }
+  }
 
+  private boolean checkAndHandleTimeout(
+      DatanodePendingDeletionMetrics key, Future<DatanodePendingDeletionMetrics> future,
+      CollectionContext context, long currentTime) {
+    long elapsedTime = currentTime - context.submissionTimes.get(key);
+    if (elapsedTime > PER_NODE_TIMEOUT_MS && !future.isDone()) {
+      LOG.warn("Task for datanode {} [{}] timed out after {}ms",
+          key.getHostName(), key.getDatanodeUuid(), elapsedTime);
+      future.cancel(true); // Interrupt the task
+      context.failed++;
+      context.results.add(key); // Add with -1 (failed)
+      return true;
+    }
+    return false;
+  }
+
+  private void handleCompletedFuture(
+      DatanodePendingDeletionMetrics key, Future<DatanodePendingDeletionMetrics> future,
+      CollectionContext context) {
+    try {
+      DatanodePendingDeletionMetrics result = future.get();
+      if (result.getPendingBlockSize() < 0) {
+        context.failed++;
+      } else {
+        context.totalPending += result.getPendingBlockSize();
+      }
+      context.results.add(result);
+      LOG.debug("Processed result from {}", key.getHostName());
+    } catch (ExecutionException | InterruptedException e) {
+      String errorType = e instanceof InterruptedException ? "interrupted" : "execution failed";
+      LOG.error("Task {} for datanode {} [{}]: {}",
+          errorType, key.getHostName(), key.getDatanodeUuid(), e.getMessage());
+      context.failed++;
+      context.results.add(key);
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  /**
+   * Atomically updates the class's shared state with the results from the collection context.
+   */
+  private void updateFinalState(CollectionContext context) {
     // Update shared state atomically
     synchronized (this) {
-      pendingDeletionList = results;
-      totalPendingDeletion = totalPending;
-      totalNodesQueried = totalQueried;
-      totalNodesFailed = failed;
+      pendingDeletionList = context.results;
+      totalPendingDeletion = context.totalPending;
+      totalNodesQueried = context.totalQueried;
+      totalNodesFailed = context.failed;
       currentStatus = MetricCollectionStatus.SUCCEEDED;
       lastCollectionEndTime = System.currentTimeMillis();
     }
-    
-    LOG.info("Metrics collection completed. Queried: {}, Failed: {}", totalQueried, failed);
+
+    LOG.info("Metrics collection completed. Queried: {}, Failed: {}",
+        context.totalQueried, context.failed);
   }
 
   /**
@@ -291,5 +319,24 @@ public class DataNodeMetricsService {
    */
   public enum MetricCollectionStatus {
     NOT_STARTED, IN_PROGRESS, SUCCEEDED
+  }
+
+  private static class CollectionContext {
+    private final int totalQueried;
+    private final Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures;
+    private final Map<DatanodePendingDeletionMetrics, Long> submissionTimes;
+    private final List<DatanodePendingDeletionMetrics> results;
+    private long totalPending = 0L;
+    private int failed = 0;
+
+    CollectionContext(int totalQueried,
+                      Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
+                      Map<DatanodePendingDeletionMetrics, Long> submissionTimes,
+                      List<DatanodePendingDeletionMetrics> results) {
+      this.totalQueried = totalQueried;
+      this.futures = futures;
+      this.submissionTimes = submissionTimes;
+      this.results = results;
+    }
   }
 }

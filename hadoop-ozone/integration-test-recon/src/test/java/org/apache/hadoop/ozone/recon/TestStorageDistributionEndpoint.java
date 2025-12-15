@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -49,13 +50,12 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -187,110 +187,109 @@ public class TestStorageDistributionEndpoint {
       }
     }
     waitForKeysCreated(replicationConfig);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(getReconWebAddress(conf))
-            .append(STORAGE_DIST_ENDPOINT);
-        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-        StorageCapacityDistributionResponse storageResponse =
-            MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
-
-        assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
-        assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
-        assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
-        assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
-        assertEquals(3, storageResponse.getDataNodeUsage().size());
-
-        return true;
-      } catch (Exception e) {
-        LOG.debug("Waiting for storage distribution assertions to pass", e);
-        return false;
-      }
-    }, 1000, 30000);
-    closeAllContainers();
+    GenericTestUtils.waitFor(this::verifyStorageDistributionAfterKeyCreation, 1000, 30000);
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     fs.delete(dir1, true);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        syncDataFromOM();
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT + "?component=om");
-        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-        Map<String, Integer> pendingDeletionMap =
-            MAPPER.readValue(response, Map.class);
-        assertEquals(30, pendingDeletionMap.get("totalSize"));
-        assertEquals(30, pendingDeletionMap.get("pendingDirectorySize") + pendingDeletionMap.get("pendingKeySize"));
-        return true;
-      } catch (Throwable e) {
-        LOG.debug("Waiting for storage distribution assertions to pass", e);
-        return false;
-      }
-    }, 1000, 30000);
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT + "?component=scm");
-        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-        ScmPendingDeletion pendingDeletion =
-            MAPPER.readValue(response, ScmPendingDeletion.class);
-        assertEquals(30, pendingDeletion.getTotalReplicatedBlockSize());
-        assertEquals(10, pendingDeletion.getTotalBlocksize());
-        assertEquals(10, pendingDeletion.getTotalBlocksCount());
-        return true;
-      } catch (Throwable e) {
-        LOG.debug("Waiting for storage distribution assertions to pass", e);
-        return false;
-      }
-    }, 2000, 30000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOm, 1000, 30000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionScm, 2000, 30000);
     GenericTestUtils.waitFor(() ->
-            scm.getClientProtocolServer().getDeletedBlockSummary().getTotalBlockCount() == 0,
+            Objects.requireNonNull(scm.getClientProtocolServer().getDeletedBlockSummary()).getTotalBlockCount() == 0,
         1000, 30000);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT + "?component=dn");
-        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-        DataNodeMetricsServiceResponse pendingDeletion =
-            MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
-        assertNotNull(pendingDeletion);
-        assertEquals(30, pendingDeletion.getTotalPendingDeletion());
-        assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
-        assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
-        assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
-        pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
-          assertEquals(10, dn.getPendingBlockSize());
-        });
-        return true;
-      } catch (Throwable e) {
-        LOG.debug("Waiting for storage distribution assertions to pass", e);
-        return false;
-      }
-    }, 2000, 60000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionDn, 2000, 60000);
     cluster.getHddsDatanodes().get(0).stop();
+    GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOnDnFailure, 2000, 60000);
+  }
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(getReconWebAddress(conf))
-            .append(PENDING_DELETION_ENDPOINT + "?component=dn");
-        String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-        DataNodeMetricsServiceResponse pendingDeletion =
-            MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
-        assertNotNull(pendingDeletion);
-        assertEquals(1, pendingDeletion.getTotalNodeQueryFailures());
-        assertTrue(pendingDeletion.getPendingDeletionPerDataNode()
-            .stream()
-            .anyMatch(dn -> dn.getPendingBlockSize() == -1));
-        return true;
-      } catch (Throwable e) {
-        return false;
-      }
-    }, 2000, 60000);
+  private boolean verifyStorageDistributionAfterKeyCreation() {
+    try {
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(STORAGE_DIST_ENDPOINT);
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      StorageCapacityDistributionResponse storageResponse =
+          MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
+
+      assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
+      assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
+      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+      assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
+      assertEquals(3, storageResponse.getDataNodeUsage().size());
+
+      return true;
+    } catch (Exception e) {
+      LOG.debug("Waiting for storage distribution assertions to pass", e);
+      return false;
+    }
+  }
+
+  private boolean verifyPendingDeletionAfterKeyDeletionOm() {
+    try {
+      syncDataFromOM();
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=om");
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      Map<String, Integer> pendingDeletionMap = MAPPER.readValue(response, Map.class);
+      assertEquals(30, pendingDeletionMap.get("totalSize"));
+      assertEquals(30, pendingDeletionMap.get("pendingDirectorySize") + pendingDeletionMap.get("pendingKeySize"));
+      return true;
+    } catch (Throwable e) {
+      LOG.debug("Waiting for storage distribution assertions to pass", e);
+      return false;
+    }
+  }
+
+  private boolean verifyPendingDeletionAfterKeyDeletionScm() {
+    try {
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=scm");
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      ScmPendingDeletion pendingDeletion = MAPPER.readValue(response, ScmPendingDeletion.class);
+      assertEquals(30, pendingDeletion.getTotalReplicatedBlockSize());
+      assertEquals(10, pendingDeletion.getTotalBlocksize());
+      assertEquals(10, pendingDeletion.getTotalBlocksCount());
+      return true;
+    } catch (Throwable e) {
+      LOG.debug("Waiting for storage distribution assertions to pass", e);
+      return false;
+    }
+  }
+
+  private boolean verifyPendingDeletionAfterKeyDeletionDn() {
+    try {
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=dn");
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      assertNotNull(pendingDeletion);
+      assertEquals(30, pendingDeletion.getTotalPendingDeletion());
+      assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
+      assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
+      assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
+      pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
+        assertEquals(10, dn.getPendingBlockSize());
+      });
+      return true;
+    } catch (Throwable e) {
+      LOG.debug("Waiting for storage distribution assertions to pass", e);
+      return false;
+    }
+  }
+
+  private boolean verifyPendingDeletionAfterKeyDeletionOnDnFailure() {
+    try {
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=dn");
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      assertNotNull(pendingDeletion);
+      assertEquals(1, pendingDeletion.getTotalNodeQueryFailures());
+      assertTrue(pendingDeletion.getPendingDeletionPerDataNode()
+          .stream()
+          .anyMatch(dn -> dn.getPendingBlockSize() == -1));
+      return true;
+    } catch (Throwable e) {
+      return false;
+    }
   }
 
   private void verifyBlocksCreated(
@@ -351,14 +350,6 @@ public class TestStorageDistributionEndpoint {
         BlockID blockID = omKeyLocationInfo.getBlockID();
         consumer.accept(blockID);
       }
-    }
-  }
-
-  private static void closeAllContainers() {
-    for (ContainerInfo container :
-        scm.getContainerManager().getContainers()) {
-      scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
-          container.containerID());
     }
   }
 
