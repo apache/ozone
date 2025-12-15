@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.StopDisk
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.StopDiskBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.UpdateDiskBalancerConfigurationRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.UpdateDiskBalancerConfigurationResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 
 /**
@@ -48,10 +47,8 @@ public class DiskBalancerProtocolServerSideTranslatorPB
   public GetDiskBalancerInfoResponseProto getDiskBalancerInfo(RpcController controller,
       GetDiskBalancerInfoRequestProto request) throws ServiceException {
     try {
-      DatanodeDiskBalancerInfoProto info =
-          impl.getDiskBalancerInfo(request.getInfoType(), request.getClientVersion());
       return GetDiskBalancerInfoResponseProto.newBuilder()
-          .setInfo(info)
+          .setInfo(impl.getDiskBalancerInfo(request))
           .build();
     } catch (IOException ex) {
       throw new ServiceException(ex);

@@ -42,13 +42,11 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -402,8 +400,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
     DatanodeDiskBalancerInfoProto statusProto3 = generateRandomStatusProto("host-3");
     
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto1, statusProto2, statusProto3);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -426,8 +423,7 @@ public class TestDiskBalancerSubCommands {
     
     DatanodeDiskBalancerInfoProto statusProto = generateRandomStatusProto("host-1");
     
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -453,8 +449,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
     DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
     
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto1, statusProto2);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -474,7 +469,7 @@ public class TestDiskBalancerSubCommands {
     DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
     
     doThrow(new IOException("Status query failed")).when(mockProtocol)
-        .getDiskBalancerInfo(DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        .getDiskBalancerInfo();
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
 
@@ -495,8 +490,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
     DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
     
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto1, statusProto2);
 
     String input = "host-1\nhost-2\n";
@@ -526,8 +520,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
     DatanodeDiskBalancerInfoProto reportProto3 = generateRandomReportProto("host-3");
 
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(reportProto1, reportProto2, reportProto3);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -550,8 +543,7 @@ public class TestDiskBalancerSubCommands {
 
     DatanodeDiskBalancerInfoProto reportProto = generateRandomReportProto("host-1");
 
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(reportProto);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -573,8 +565,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
     DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
 
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(reportProto1, reportProto2);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
@@ -596,8 +587,7 @@ public class TestDiskBalancerSubCommands {
     DatanodeDiskBalancerInfoProto reportProto1 = generateRandomReportProto("host-1");
     DatanodeDiskBalancerInfoProto reportProto2 = generateRandomReportProto("host-2");
 
-    when(mockProtocol.getDiskBalancerInfo(
-        DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION))
+    when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(reportProto1, reportProto2);
 
     String input = "host-1\nhost-2\n";
@@ -621,7 +611,7 @@ public class TestDiskBalancerSubCommands {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
 
     doThrow(new IOException("Report query failed")).when(mockProtocol)
-        .getDiskBalancerInfo(DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION);
+        .getDiskBalancerInfo();
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
 
