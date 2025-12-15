@@ -1389,7 +1389,7 @@ public abstract class AbstractS3SDKV1Tests {
 
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-  class BucketOwnershipLinkBucketTests {
+  static class BucketOwnershipLinkBucketTests {
     private String nonS3VolumeName;
     private String linkBucketName;
     private String sourceBucketName;
