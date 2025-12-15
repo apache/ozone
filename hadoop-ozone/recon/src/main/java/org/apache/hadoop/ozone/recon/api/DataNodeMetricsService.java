@@ -148,66 +148,83 @@ public class DataNodeMetricsService {
     int failed = 0;
 
     // Submit all collection tasks
-    Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures =
-        new HashMap<>();
+    Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
+    Map<DatanodePendingDeletionMetrics, Long> submissionTimes = new HashMap<>();
+
+    long submissionTime = System.currentTimeMillis();
     for (DatanodeDetails node : nodes) {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
           node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
           node.getHostName(), node.getUuidString(), -1L);
       futures.put(key, executorService.submit(task));
+      submissionTimes.put(key, submissionTime);
     }
-    
+
     int totalQueried = futures.size();
     LOG.debug("Submitted {} collection tasks", totalQueried);
 
-    // Poll for completed tasks, process them immediately, wait for all (no timeout)
+    // Poll with timeout enforcement
     while (!futures.isEmpty()) {
-      Iterator<Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>>> 
+      long currentTime = System.currentTimeMillis();
+      Iterator<Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>>>
           iterator = futures.entrySet().iterator();
-      
+
       boolean processedAny = false;
       while (iterator.hasNext()) {
-        Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> entry = 
+        Map.Entry<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> entry =
             iterator.next();
-        
+        DatanodePendingDeletionMetrics key = entry.getKey();
+        Future<DatanodePendingDeletionMetrics> future = entry.getValue();
+
+        // Check if this task exceeded timeout
+        long elapsedTime = currentTime - submissionTimes.get(key);
+        if (elapsedTime > KEEP_ALIVE_TIME * 1000 && !future.isDone()) {
+          LOG.warn("Task for datanode {} [{}] timed out after {}ms",
+              key.getHostName(), key.getDatanodeUuid(), elapsedTime);
+          future.cancel(true); // Interrupt the task
+          failed++;
+          results.add(key); // Add with -1 (failed)
+          iterator.remove();
+          processedAny = true;
+          continue;
+        }
+
         // Check if this task is done
-        if (entry.getValue().isDone()) {
+        if (future.isDone()) {
           try {
-            DatanodePendingDeletionMetrics result = entry.getValue().get();
+            DatanodePendingDeletionMetrics result = future.get();
             if (result.getPendingBlockSize() < 0) {
               failed++;
             } else {
               totalPending += result.getPendingBlockSize();
             }
             results.add(result);
-            LOG.debug("Processed result from {}", entry.getKey().getHostName());
+            LOG.debug("Processed result from {}", key.getHostName());
           } catch (ExecutionException | InterruptedException e) {
             String errorType = e instanceof InterruptedException ? "interrupted" : "execution failed";
             LOG.error("Task {} for datanode {} [{}]: {}",
-                errorType, entry.getKey().getHostName(), entry.getKey().getDatanodeUuid(), e.getMessage());
+                errorType, key.getHostName(), key.getDatanodeUuid(), e.getMessage());
             failed++;
-            results.add(entry.getKey());
+            results.add(key);
             if (e instanceof InterruptedException) {
               Thread.currentThread().interrupt();
-              break; // Exit if interrupted
+              break;
             }
           }
           iterator.remove();
           processedAny = true;
         }
       }
-      
-      // Sleep before next poll only if there are remaining futures and we didn't process any
-      if (!futures.isEmpty()) {
-        if (!processedAny) {
-          try {
-            Thread.sleep(POLL_INTERVAL_MS);
-          } catch (InterruptedException e) {
-            LOG.warn("Collection polling interrupted");
-            Thread.currentThread().interrupt();
-            break;
-          }
+
+      // Sleep before next poll only if there are remaining futures
+      if (!futures.isEmpty() && !processedAny) {
+        try {
+          Thread.sleep(POLL_INTERVAL_MS);
+        } catch (InterruptedException e) {
+          LOG.warn("Collection polling interrupted");
+          Thread.currentThread().interrupt();
+          break;
         }
       }
     }
