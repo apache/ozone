@@ -367,7 +367,7 @@ public final class ContainerStateManagerImpl
         // Synchronize sequenceId first
         if (containerInfo.getSequenceId() < sequenceId) {
           containerInfo.updateSequenceId(sequenceId);
-        } else {
+        } else if (containerInfo.getSequenceId() > sequenceId) {
           LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
               containerInfo.getSequenceId(), sequenceId);
         }
