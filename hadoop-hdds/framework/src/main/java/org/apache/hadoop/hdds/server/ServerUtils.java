@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -319,7 +318,7 @@ public final class ServerUtils {
    * @return Path to the component-specific ratis directory
    */
   public static String getDefaultRatisDirectory(ConfigurationSource conf,
-      HddsProtos.NodeType nodeType) {
+      NodeType nodeType) {
     LOG.warn("Storage directory for Ratis is not configured. It is a good " +
             "idea to map this to an SSD disk. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);
@@ -412,7 +411,7 @@ public final class ServerUtils {
    * @return Path to the component-specific ratis snapshot directory
    */
   public static String getDefaultRatisSnapshotDirectory(ConfigurationSource conf,
-      HddsProtos.NodeType nodeType) {
+      NodeType nodeType) {
     LOG.warn("Snapshot directory for Ratis is not configured. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
