@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
- package org.apache.hadoop.hdds.scm;
+package org.apache.hadoop.hdds.scm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
