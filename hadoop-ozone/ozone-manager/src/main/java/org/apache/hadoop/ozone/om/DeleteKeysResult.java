@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Used in {@link org.apache.hadoop.ozone.om.service.DirectoryDeletingService}
