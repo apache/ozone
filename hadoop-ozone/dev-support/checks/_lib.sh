@@ -35,35 +35,54 @@ _install_tool() {
   bin="${4:-"${tool}"}"
   func="${5:-"_install_${tool}"}"
 
-  if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]] && which "$bin" >& /dev/null; then
+  if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]] && which "${bin}" >& /dev/null; then
     echo "Skip installing $bin, as it's already available on PATH."
     return
   fi
 
-  if [[ ! -d "${dir}" ]] || ! which "$bin" >& /dev/null; then
+  if [[ ! -d "${dir}" ]]; then
     mkdir -pv "${dir}"
-    pushd "${dir}"
-    if eval "${func}"; then
-      echo "Installed ${tool} in ${dir}"
-    else
-      msg="Failed to install ${tool}"
-      echo "$msg" >&2
-      if [[ -n "${REPORT_FILE}" ]]; then
-        echo "$msg" >> "${REPORT_FILE}"
-      fi
-      exit 1
-    fi
-    popd
+    _do_install "${tool}" "${dir}" "${func}"
   fi
 
   if [[ -n "${bindir}" ]]; then
-    bindir="${dir}"/"${bindir}"
-    if [[ -d "${bindir}" ]]; then
-      if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]]; then
-        export PATH="${PATH}:${bindir}"
-      else
-        export PATH="${bindir}:${PATH}"
-      fi
+    _add_to_path "${dir}"/"${bindir}"
+
+    if ! which "${bin}" >& /dev/null; then
+      _do_install "${tool}" "${dir}" "${func}"
+      _add_to_path "${dir}"/"${bindir}"
+    fi
+  fi
+}
+
+_do_install() {
+  local tool="$1"
+  local dir="$2"
+  local func="$3"
+
+  pushd "${dir}"
+  if eval "${func}"; then
+    echo "Installed ${tool} in ${dir}"
+    popd
+  else
+    popd
+    msg="Failed to install ${tool}"
+    echo "${msg}" >&2
+    if [[ -n "${REPORT_FILE}" ]]; then
+      echo "${msg}" >> "${REPORT_FILE}"
+    fi
+    exit 1
+  fi
+}
+
+_add_to_path() {
+  local bindir="$1"
+
+  if [[ -d "${bindir}" ]]; then
+    if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]]; then
+      export PATH="${PATH}:${bindir}"
+    else
+      export PATH="${bindir}:${PATH}"
     fi
   fi
 }
