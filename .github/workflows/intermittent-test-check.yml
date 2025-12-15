@@ -201,7 +201,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy -DskipShade -Drocks_tools_native"
+          args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
           if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
