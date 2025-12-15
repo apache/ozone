@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import jakarta.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,7 +49,7 @@ public final class OmKeyArgs implements Auditable {
   private final int multipartUploadPartNumber;
   private final Map<String, String> metadata;
   private final boolean sortDatanodesInPipeline;
-  private final List<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
@@ -73,7 +74,7 @@ public final class OmKeyArgs implements Auditable {
     this.multipartUploadID = b.multipartUploadID;
     this.multipartUploadPartNumber = b.multipartUploadPartNumber;
     this.metadata = b.metadata;
-    this.acls = b.acls;
+    this.acls = b.acls.build();
     this.sortDatanodesInPipeline = b.sortDatanodesInPipeline;
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
@@ -191,30 +192,7 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOwnerName(ownerName)
-        .setDataSize(dataSize)
-        .setReplicationConfig(replicationConfig)
-        .setLocationInfoList(locationInfoList)
-        .setIsMultipartKey(isMultipartKey)
-        .setMultipartUploadID(multipartUploadID)
-        .setMultipartUploadPartNumber(multipartUploadPartNumber)
-        .addAllMetadata(metadata)
-        .setSortDatanodesInPipeline(sortDatanodesInPipeline)
-        .setHeadOp(headOp)
-        .setLatestVersionLocation(latestVersionLocation)
-        .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
-        .addAllTags(tags);
-
-    if (expectedDataGeneration != null) {
-      builder.setExpectedDataGeneration(expectedDataGeneration);
-    }
-
-    return builder;
+    return new Builder(this);
   }
 
   @Nonnull
@@ -256,12 +234,43 @@ public final class OmKeyArgs implements Auditable {
     private final Map<String, String> metadata = new HashMap<>();
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
-    private List<OzoneAcl> acls;
+    private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
     private final Map<String, String> tags = new HashMap<>();
     private Long expectedDataGeneration = null;
+
+    public Builder() {
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
+    }
+
+    public Builder(OmKeyArgs obj) {
+      this.volumeName = obj.volumeName;
+      this.bucketName = obj.bucketName;
+      this.keyName = obj.keyName;
+      this.ownerName = obj.ownerName;
+      this.dataSize = obj.dataSize;
+      this.replicationConfig = obj.replicationConfig;
+      this.locationInfoList = obj.locationInfoList;
+      this.isMultipartKey = obj.isMultipartKey;
+      this.multipartUploadID = obj.multipartUploadID;
+      this.multipartUploadPartNumber = obj.multipartUploadPartNumber;
+      this.sortDatanodesInPipeline = obj.sortDatanodesInPipeline;
+      this.latestVersionLocation = obj.latestVersionLocation;
+      this.recursive = obj.recursive;
+      this.headOp = obj.headOp;
+      this.forceUpdateContainerCacheFromSCM =
+          obj.forceUpdateContainerCacheFromSCM;
+      this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.metadata.putAll(obj.metadata);
+      this.tags.putAll(obj.tags);
+      this.acls = AclListBuilder.of(obj.acls);
+    }
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -299,7 +308,7 @@ public final class OmKeyArgs implements Auditable {
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      this.acls = listOfAcls;
+      this.acls.addAll(listOfAcls);
       return this;
     }
 

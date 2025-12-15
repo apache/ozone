@@ -21,17 +21,20 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -300,11 +303,136 @@ public final class ServerUtils {
     return remoteUser != null ? remoteUser.getUserName() : null;
   }
 
-  public static String getDefaultRatisDirectory(ConfigurationSource conf) {
+  /**
+   * Get the default Ratis directory for a component when the specific
+   * configuration is not set. This creates a component-specific subdirectory
+   * under ozone.metadata.dirs to avoid conflicts when multiple components
+   * are colocated on the same host.
+   *
+   * <p>For backward compatibility during upgrades, this method checks for
+   * existing Ratis data in old locations before using the new component-specific
+   * location. See {@link #findExistingRatisDirectory} for details on old locations.
+   *
+   * @param conf Configuration source
+   * @param nodeType Type of the node component
+   * @return Path to the component-specific ratis directory
+   */
+  public static String getDefaultRatisDirectory(ConfigurationSource conf,
+      NodeType nodeType) {
     LOG.warn("Storage directory for Ratis is not configured. It is a good " +
             "idea to map this to an SSD disk. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-    return (new File(metaDirPath, "ratis")).getPath();
+    
+    // Check for existing Ratis data from old versions for backward compatibility
+    String existingDir = findExistingRatisDirectory(metaDirPath, nodeType);
+    if (existingDir != null) {
+      return existingDir;
+    }
+    
+    // Use new component-specific location for new installations
+    String componentName = getComponentName(nodeType);
+    return Paths.get(metaDirPath.getPath(), componentName + ".ratis").toString();
+  }
+
+  /**
+   * Checks for existing Ratis directories from previous versions for backward
+   * compatibility during upgrades.
+   *
+   * <p>Older versions of Ozone used different directory structures:
+   * <ul>
+   *   <li>Versions up to 2.0.0: Shared {@code <ozone.metadata.dirs>/ratis} for all components</li>
+   *   <li>Some SCM versions: Used {@code <ozone.metadata.dirs>/scm-ha}</li>
+   * </ul>
+   *
+   * @param metaDirPath The ozone metadata directory path
+   * @param nodeType Type of the node component
+   * @return Path to existing old Ratis directory if found, null otherwise
+   */
+  private static String findExistingRatisDirectory(File metaDirPath,
+      NodeType nodeType) {
+    // Check component-specific old location (SCM used scm-ha in some versions)
+    if ("scm".equals(getComponentName(nodeType))) {
+      File oldScmRatisDir = new File(metaDirPath, "scm-ha");
+      if (isNonEmptyDirectory(oldScmRatisDir)) {
+        LOG.info("Found existing SCM Ratis directory at old location: {}. " +
+                "Using it for backward compatibility during upgrade.",
+            oldScmRatisDir.getPath());
+        return oldScmRatisDir.getPath();
+      }
+    }
+
+    // Check old shared Ratis location (used by version 2.0.0 and earlier)
+    // All components (OM, SCM) shared /data/metadata/ratis
+    File oldSharedRatisDir = new File(metaDirPath, "ratis");
+    if (isNonEmptyDirectory(oldSharedRatisDir)) {
+      LOG.info("Found existing Ratis directory at old shared location: {}. " +
+              "Using it for backward compatibility during upgrade.",
+          oldSharedRatisDir.getPath());
+      return oldSharedRatisDir.getPath();
+    }
+
+    return null;
+  }
+
+  /**
+   * Converts NodeType enum to the component name string used for directory naming.
+   *
+   * @param nodeType Type of the node component
+   * @return Component name string (e.g., "om", "scm", "dn", "recon")
+   */
+  private static String getComponentName(NodeType nodeType) {
+    switch (nodeType) {
+    case OM:
+      return "om";
+    case SCM:
+      return "scm";
+    case DATANODE:
+      return "dn";
+    case RECON:
+      return "recon";
+    default:
+      throw new IllegalArgumentException("Unknown NodeType: " + nodeType);
+    }
+  }
+
+  /**
+   * Get the default Ratis snapshot directory for a component when the specific
+   * configuration is not set. This creates a component-specific subdirectory
+   * under ozone.metadata.dirs to avoid conflicts when multiple components
+   * are colocated on the same host.
+   *
+   * New path format: {ozone.metadata.dirs}/{NodeType}.ratis.snapshot
+   * eg: /data/metadata/om.ratis.snapshot
+   *     /data/metadata/scm.ratis.snapshot
+   *
+   * @param conf Configuration source
+   * @param nodeType Type of the node component
+   * @return Path to the component-specific ratis snapshot directory
+   */
+  public static String getDefaultRatisSnapshotDirectory(ConfigurationSource conf,
+      NodeType nodeType) {
+    LOG.warn("Snapshot directory for Ratis is not configured. Falling back to {}",
+        HddsConfigKeys.OZONE_METADATA_DIRS);
+    File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    
+    // Use component-specific location
+    String componentName = getComponentName(nodeType);
+    return Paths.get(metaDirPath.getPath(),
+        componentName + ".ratis." + OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR).toString();
+  }
+
+  /**
+   * Checks if a directory exists and is non-empty.
+   *
+   * @param dir Directory to check
+   * @return true if directory exists and contains at least one file
+   */
+  private static boolean isNonEmptyDirectory(File dir) {
+    if (dir != null && dir.exists() && dir.isDirectory()) {
+      File[] files = dir.listFiles();
+      return files != null && files.length > 0;
+    }
+    return false;
   }
 }

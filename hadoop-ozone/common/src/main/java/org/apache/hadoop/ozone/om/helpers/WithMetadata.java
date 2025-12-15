@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import net.jcip.annotations.Immutable;
 
 /**
@@ -28,39 +27,37 @@ import net.jcip.annotations.Immutable;
 @Immutable
 public abstract class WithMetadata {
 
-  private final Map<String, String> metadata;
+  private final ImmutableMap<String, String> metadata;
 
   protected WithMetadata() {
     metadata = ImmutableMap.of();
   }
 
   protected WithMetadata(Builder b) {
-    metadata = b.metadata == null ? ImmutableMap.of()
-        : ImmutableMap.copyOf(b.metadata);
+    metadata = b.metadata.build();
   }
 
   protected WithMetadata(WithMetadata other) {
-    metadata = other.getMetadata() == null ? ImmutableMap.of()
-        : ImmutableMap.copyOf(other.getMetadata());
+    metadata = other.getMetadata();
   }
 
   /**
    * Custom key value metadata.
    */
-  public final Map<String, String> getMetadata() {
+  public final ImmutableMap<String, String> getMetadata() {
     return metadata;
   }
 
   /** Builder for {@link WithMetadata}. */
   public static class Builder {
-    private final Map<String, String> metadata;
+    private final MapBuilder<String, String> metadata;
 
     protected Builder() {
-      metadata = new ConcurrentHashMap<>();
+      metadata = MapBuilder.empty();
     }
 
     protected Builder(WithMetadata obj) {
-      metadata = new ConcurrentHashMap<>(obj.getMetadata());
+      metadata = MapBuilder.of(obj.getMetadata());
     }
 
     public Builder addMetadata(String key, String value) {
@@ -76,12 +73,11 @@ public abstract class WithMetadata {
     }
 
     public Builder setMetadata(Map<String, String> map) {
-      metadata.clear();
-      addAllMetadata(map);
+      metadata.set(map);
       return this;
     }
 
-    public Map<String, String> getMetadata() {
+    public MapBuilder<String, String> metadata() {
       return metadata;
     }
   }

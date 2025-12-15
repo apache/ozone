@@ -183,7 +183,7 @@ public class TestStorageContainerManager {
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<File> directories = Arrays.asList(
-          new File(SCMHAUtils.getRatisStorageDir(scm.getConfiguration())),
+          new File(SCMHAUtils.getSCMRatisDirectory(scm.getConfiguration())),
           scm.getScmMetadataStore().getStore().getDbLocation(),
           new File(scm.getScmStorageConfig().getStorageDir())
       );

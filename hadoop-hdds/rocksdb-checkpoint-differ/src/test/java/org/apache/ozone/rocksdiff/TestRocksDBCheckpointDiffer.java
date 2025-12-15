@@ -1645,7 +1645,7 @@ public class TestRocksDBCheckpointDiffer {
     when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
     try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
         ManagedRawSSTFileReader.class, (mock, context) -> {
-          when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+          when(mock.newIterator(any(), any(), any(), any())).thenReturn(mockedRawSSTFileItr);
           doNothing().when(mock).close();
         })) {
       rocksDBCheckpointDiffer.pruneSstFileValues();

@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,7 +302,6 @@ public class TestCleanupTableInfo {
     return OmBucketInfo.newBuilder()
         .setVolumeName(TEST_VOLUME_NAME)
         .setBucketName(TEST_BUCKET_NAME)
-        .setAcls(Collections.emptyList())
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.DEFAULT)
         .build();
