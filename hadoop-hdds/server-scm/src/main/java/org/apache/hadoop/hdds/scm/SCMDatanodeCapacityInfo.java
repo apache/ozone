@@ -92,11 +92,13 @@ public class SCMDatanodeCapacityInfo {
     }
 
     if (!hasEnoughDataSpace()) {
-      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for data. data=%s, metadata=%s",
-          datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, dataVolumeInfo, metaVolumeInfo);
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for data." +
+              " data=%s, metadata=%s", datanodeDetails.getUuidString(), dataVolumeInfo.requiredSpace, dataVolumeInfo,
+          metaVolumeInfo);
     } else {
-      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for metadata. data=%s, metadata=%s",
-          datanodeDetails.getUuidString(), metaVolumeInfo.requiredSpace, dataVolumeInfo, metaVolumeInfo);
+      return String.format("Datanode %s has no volumes with enough space to allocate %d bytes for metadata." +
+              " data=%s, metadata=%s", datanodeDetails.getUuidString(), metaVolumeInfo.requiredSpace, dataVolumeInfo,
+          metaVolumeInfo);
     }
   }
 
