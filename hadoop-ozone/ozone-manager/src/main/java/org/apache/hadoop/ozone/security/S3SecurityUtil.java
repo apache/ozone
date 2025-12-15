@@ -159,12 +159,8 @@ public final class S3SecurityUtil {
         throw new OMException(msg, INTERNAL_ERROR);
       }
 
+      // When the STSTokenIdentifier is validated, it ensures the temp access key id is not null/empty
       final String tempAccessKeyId = stsTokenIdentifier.getTempAccessKeyId();
-      if (tempAccessKeyId == null || tempAccessKeyId.isEmpty()) {
-        final String msg = "Could not determine STS revocation: tempAccessKeyId in STSTokenIdentifier is null/empty";
-        LOG.warn(msg);
-        throw new OMException(msg, INTERNAL_ERROR);
-      }
 
       return revokedStsTokenTable.getIfExist(tempAccessKeyId) != null;
     } catch (Exception e) {

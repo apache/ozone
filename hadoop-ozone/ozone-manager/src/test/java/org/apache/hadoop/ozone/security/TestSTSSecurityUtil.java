@@ -28,12 +28,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
@@ -314,5 +316,74 @@ public class TestSTSSecurityUtil {
     assertThat(result2.getOwnerId()).isEqualTo("temp-key-2");
     assertThat(result2.getOriginalAccessKeyId()).isEqualTo("orig-key-2");
   }
-}
 
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingExpiry() {
+    final byte[] encryptionBytes = new byte[5];
+    ThreadLocalRandom.current().nextBytes(encryptionBytes);
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, null, SECRET_ACCESS_KEY, SESSION_POLICY, encryptionBytes);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - expiry is null");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingTempAccessKeyId() throws Exception {
+    final String tokenString = createTokenWithMissingField(MissingField.TEMP_ACCESS_KEY_ID);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - tempAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingRoleArn() throws Exception {
+    final String tokenString = createTokenWithMissingField(MissingField.ROLE_ARN);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - roleArn is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingOriginalAccessKeyId() throws Exception {
+    final String tokenString = createTokenWithMissingField(MissingField.ORIGINAL_ACCESS_KEY_ID);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - originalAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingSecretAccessKey() throws Exception {
+    final String tokenString = createTokenWithMissingField(MissingField.SECRET_ACCESS_KEY);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
+        .isInstanceOf(OMException.class)
+        .hasMessage("Invalid STS token format: Invalid STS token - secretAccessKey is null/empty");
+  }
+
+  private String createTokenWithMissingField(MissingField missingField) throws IOException {
+    final String tempAccessKey = missingField == MissingField.TEMP_ACCESS_KEY_ID ? "" : TEMP_ACCESS_KEY;
+    final String originalAccessKey = missingField == MissingField.ORIGINAL_ACCESS_KEY_ID ? "" : ORIGINAL_ACCESS_KEY;
+    final String roleArn = missingField == MissingField.ROLE_ARN ? "" : ROLE_ARN;
+    final String secretAccessKey = missingField == MissingField.SECRET_ACCESS_KEY ? "" : SECRET_ACCESS_KEY;
+
+    return tokenSecretManager.createSTSTokenString(
+        tempAccessKey, originalAccessKey, roleArn, DURATION_SECONDS, secretAccessKey, SESSION_POLICY, clock);
+  }
+
+  private enum MissingField {
+    TEMP_ACCESS_KEY_ID,
+    EXPIRY,
+    ROLE_ARN,
+    ORIGINAL_ACCESS_KEY_ID,
+    SECRET_ACCESS_KEY
+  }
+}

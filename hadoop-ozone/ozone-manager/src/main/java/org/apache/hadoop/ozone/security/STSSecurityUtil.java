@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.security;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -102,6 +104,9 @@ public final class STSSecurityUtil {
       throw new SecretManager.InvalidToken("Invalid STS token - could not readFromByteArray: " + e.getMessage());
     }
 
+    // Ensure essential fields are present in the token
+    ensureEssentialFieldsArePresentInToken(tokenId);
+
     // Check expiration
     if (tokenId.isExpired(clock.instant())) {
       throw new SecretManager.InvalidToken("Invalid STS token - token expired at " + tokenId.getExpiry());
@@ -147,6 +152,26 @@ public final class STSSecurityUtil {
       return token;
     } catch (IOException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
+    }
+  }
+
+  @VisibleForTesting
+  static void ensureEssentialFieldsArePresentInToken(STSTokenIdentifier stsTokenIdentifier)
+      throws SecretManager.InvalidToken {
+    if (StringUtils.isEmpty(stsTokenIdentifier.getTempAccessKeyId())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - tempAccessKeyId is null/empty");
+    }
+    if (stsTokenIdentifier.getExpiry() == null) {
+      throw new SecretManager.InvalidToken("Invalid STS token - expiry is null");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getRoleArn())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - roleArn is null/empty");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getOriginalAccessKeyId())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - originalAccessKeyId is null/empty");
+    }
+    if (StringUtils.isEmpty(stsTokenIdentifier.getSecretAccessKey())) {
+      throw new SecretManager.InvalidToken("Invalid STS token - secretAccessKey is null/empty");
     }
   }
 }
