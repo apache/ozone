@@ -60,6 +60,7 @@ public class DataNodeMetricsService {
   private static final int KEEP_ALIVE_TIME = 60;
   private static final int QUEUE_CAPACITY = 500;
   private static final int POLL_INTERVAL_MS = 200;
+  private static final int PER_NODE_TIMEOUT_MS = 120000;
 
   private final ThreadPoolExecutor executorService;
   private final ReconNodeManager reconNodeManager;
@@ -179,7 +180,7 @@ public class DataNodeMetricsService {
 
         // Check if this task exceeded timeout
         long elapsedTime = currentTime - submissionTimes.get(key);
-        if (elapsedTime > KEEP_ALIVE_TIME * 1000 && !future.isDone()) {
+        if (elapsedTime > PER_NODE_TIMEOUT_MS && !future.isDone()) {
           LOG.warn("Task for datanode {} [{}] timed out after {}ms",
               key.getHostName(), key.getDatanodeUuid(), elapsedTime);
           future.cancel(true); // Interrupt the task
