@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -52,7 +53,7 @@ public class OneReplicaPipelineSafeModeRule extends
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
 
   private int thresholdCount;
-  private Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
+  private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
   private Set<PipelineID> oldPipelineIDSet;
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
@@ -86,11 +87,9 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
-    if (validateBasedOnReportProcessing()) {
-      return currentReportedPipelineCount >= thresholdCount;
+    if (!validateBasedOnReportProcessing()) {
+      updateReportedPipelineSet();
     }
-
-    updateReportedPipelineSet();
     return currentReportedPipelineCount >= thresholdCount;
   }
 
@@ -146,8 +145,8 @@ public class OneReplicaPipelineSafeModeRule extends
     return currentReportedPipelineCount;
   }
 
-  public Set<PipelineID> getReportedPipelineIDSet() {
-    return reportedPipelineIDSet;
+  Set<PipelineID> getReportedPipelineIDSet() {
+    return Collections.unmodifiableSet(reportedPipelineIDSet);
   }
 
   @Override
@@ -191,14 +190,11 @@ public class OneReplicaPipelineSafeModeRule extends
 
     for (Pipeline pipeline : openRatisPipelines) {
       PipelineID pipelineID = pipeline.getId();
-      boolean atleastOnePipelineReported = !pipeline.getNodeSet().isEmpty();
-      boolean notAlreadyReported = !reportedPipelineIDSet.contains(pipelineID);
-      boolean wasExistingPipeline = oldPipelineIDSet.contains(pipelineID);
-
-      if (atleastOnePipelineReported && notAlreadyReported && wasExistingPipeline) {
+      if (!pipeline.getNodeSet().isEmpty()
+          && oldPipelineIDSet.contains(pipelineID)
+          && reportedPipelineIDSet.add(pipelineID)) {
         getSafeModeMetrics().incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
         currentReportedPipelineCount++;
-        reportedPipelineIDSet.add(pipelineID);
       }
     }
   }
