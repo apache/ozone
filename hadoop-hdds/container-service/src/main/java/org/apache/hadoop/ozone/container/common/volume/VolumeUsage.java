@@ -175,8 +175,7 @@ public class VolumeUsage {
     return reservedInBytes;
   }
 
-  private static long getUsableSpace(
-      long available, long committed, long minFreeSpace) {
+  public static long getUsableSpace(long available, long committed, long minFreeSpace) {
     return available - committed - minFreeSpace;
   }
 

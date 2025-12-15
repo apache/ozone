@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -61,13 +60,13 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
         return null; // Can't balance with less than 2 volumes.
       }
 
-      // Calculate usages and sort in ascending order
+      // Calculate usages and sort in ascending order of utilization
       final List<VolumeFixedUsage> volumeUsages = allVolumes.stream()
           .map(VolumeFixedUsage::new)
           .sorted(Comparator.comparingDouble(v -> v.computeUtilization(deltaMap)))
           .collect(Collectors.toList());
 
-      // Find src
+      // Calculate the actual threshold and check src
       final double actualThreshold = getIdealUsage(volumeUsages, deltaMap) + thresholdPercentage / 100;
       final VolumeFixedUsage src = volumeUsages.get(volumeUsages.size() - 1);
       if (src.computeUtilization(deltaMap) < actualThreshold) {
@@ -75,10 +74,11 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       }
 
       // Find dst
-      AvailableSpaceFilter filter = new AvailableSpaceFilter(containerSize);
       for (int i = 0; i < volumeUsages.size() - 1; i++) {
-        final HddsVolume dst = volumeUsages.get(i).getVolume();
-        if (filter.test(dst)) {
+        final VolumeFixedUsage dstUsage = volumeUsages.get(i);
+        final HddsVolume dst = dstUsage.getVolume();
+
+        if (containerSize < dstUsage.computeUsableSpace()) {
           // Found dst, reserve space and return
           dst.incCommittedBytes(containerSize);
           return Pair.of(src.getVolume(), dst);

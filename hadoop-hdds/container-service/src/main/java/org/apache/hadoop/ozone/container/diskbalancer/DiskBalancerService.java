@@ -659,7 +659,7 @@ public class DiskBalancerService extends BackgroundService {
       return 0;
     }
 
-    // Calculate ideal usage
+    // Calculate actual threshold
     final double actualThreshold = getIdealUsage(inputVolumeSet, deltaSizes) + threshold / 100.0;
 
     long totalBytesToMove = 0;

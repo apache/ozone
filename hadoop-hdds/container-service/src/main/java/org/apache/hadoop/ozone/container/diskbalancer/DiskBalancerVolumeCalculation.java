@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +132,7 @@ public final class DiskBalancerVolumeCalculation {
 
   private static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long delta) {
     assertTrue(usage.getCapacity() > 0);
-    return (usage.getCapacity() - usage.getAvailable() + committed + delta) / (double) usage.getCapacity();
+    return 1 - (usage.getAvailable() + committed + delta) / (double) usage.getCapacity();
   }
 
   /** {@link HddsVolume} with a {@link SpaceUsageSource.Fixed} usage. */
@@ -159,6 +160,11 @@ public final class DiskBalancerVolumeCalculation {
     public double computeUtilization(Map<HddsVolume, Long> deltas) {
       final long delta = deltas == null ? 0L : deltas.getOrDefault(volume, 0L);
       return DiskBalancerVolumeCalculation.computeUtilization(usage, volume.getCommittedBytes(), delta);
+    }
+
+    public long computeUsableSpace() {
+      final long minFreeSpace = volume.getFreeSpaceToSpare(usage.getCapacity());
+      return VolumeUsage.getUsableSpace(usage.getAvailable(), volume.getCommittedBytes(), minFreeSpace);
     }
   }
 }

@@ -68,9 +68,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       return null;
     }
 
-    // Calculate actual threshold
+    // Calculate the actual threshold
     final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet);
-    double actualThreshold = getIdealUsage(volumeUsages, deltaMap) + thresholdPercentage / 100.0;
+    final double actualThreshold = getIdealUsage(volumeUsages, deltaMap) + thresholdPercentage / 100.0;
 
     // Find container
     while (itr.hasNext()) {
