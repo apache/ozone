@@ -272,15 +272,23 @@ public abstract class SCMCommonPlacementPolicy implements
   public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
+    List<String> rejectedNodes = new ArrayList<>();
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d -> {
       SCMDatanodeCapacityInfo capacityInfo = checkSpace(d, metadataSizeRequired, dataSizeRequired, conf);
       if (!capacityInfo.hasEnoughSpace()) {
-        LOG.info(capacityInfo.getInsufficientSpaceMessage());
+        rejectedNodes.add(capacityInfo.getInsufficientSpaceMessage());
         return false;
       }
 
       return true;
     }).collect(Collectors.toList());
+
+    if (!rejectedNodes.isEmpty()) {
+      LOG.info("Container placement rejected {} nodes due to insufficient space:", rejectedNodes.size());
+      for (String message : rejectedNodes) {
+        LOG.info("  {}", message);
+      }
+    }
 
     if (nodesWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
