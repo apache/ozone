@@ -1018,7 +1018,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path,
         ozoneConfiguration);
-    return this.makeQualified(ofsPath.getTrashRoot());
+    return this.makeQualified(ofsPath.getTrashRoot(getUsername()));
   }
 
   /**
