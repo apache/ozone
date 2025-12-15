@@ -157,10 +157,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       for (HddsProtos.KeyValue keyRanges : path.getDeleteRangeSubDirsList()) {
         keySpaceOmMetadataManager.getDirectoryTable()
             .deleteRangeWithBatch(keySpaceBatchOperation, keyRanges.getKey(), keyRanges.getValue());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sub Directory delete range Start Key(inclusive): {} and End Key(exclusive): {}",
-              keyRanges.getKey(), keyRanges.getValue());
-        }
+        LOG.debug("Sub Directory delete range Start Key(inclusive): {} and End Key(exclusive): {}", keyRanges.getKey(),
+            keyRanges.getValue());
       }
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
@@ -190,10 +188,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       for (HddsProtos.KeyValue keyRanges : path.getDeleteRangeSubFilesList()) {
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
             .deleteRangeWithBatch(keySpaceBatchOperation, keyRanges.getKey(), keyRanges.getValue());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sub File delete range Start Key(inclusive): {} and End Key(exclusive): {}", keyRanges.getKey(),
-              keyRanges.getValue());
-        }
+        LOG.debug("Sub File delete range Start Key(inclusive): {} and End Key(exclusive): {}", keyRanges.getKey(),
+            keyRanges.getValue());
       }
 
       if (!openKeyInfoMap.isEmpty()) {

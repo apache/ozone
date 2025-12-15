@@ -34,31 +34,10 @@ public class DeleteKeysResult {
   private List<ExclusiveRange> keyRanges;
   private static final Logger LOG = LoggerFactory.getLogger(DeleteKeysResult.class);
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
-    this.keysToDelete = keysToDelete;
+  DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
+    this.keysToDelete = Collections.unmodifiableList(keysToDelete);
     this.processedKeys = processedKeys;
-    this.keyRanges = keyRanges;
-    validateNonOverlappingRanges();
-  }
-
-  private void validateNonOverlappingRanges() {
-    if (keyRanges == null || keyRanges.size() <= 1) {
-      return;
-    }
-    String lastEnd = null;
-    for (ExclusiveRange range : keyRanges) {
-      if (range == null || range.getStartKey() == null || range.getExclusiveEndKey() == null) {
-        continue;
-      }
-      if (lastEnd != null && range.getStartKey().compareTo(lastEnd) < 0) {
-        LOG.warn(
-            "Overlapping or unsorted delete ranges detected. " + "Clearing keyRanges to avoid incorrect deleteRange. " +
-                "previousEnd={}, currentStart={}", lastEnd, range.getStartKey());
-        keyRanges = Collections.emptyList();
-        return;
-      }
-      lastEnd = range.getExclusiveEndKey();
-    }
+    this.keyRanges = Collections.unmodifiableList(keyRanges);
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
