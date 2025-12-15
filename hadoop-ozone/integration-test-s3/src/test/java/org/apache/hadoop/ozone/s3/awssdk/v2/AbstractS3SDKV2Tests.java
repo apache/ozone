@@ -60,7 +60,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -475,7 +474,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             .bucket(bucketName)
             .key(keyName)
             .tagging(Tagging.builder().tagSet(tags).build())));
-    assertEquals(400, exception.statusCode());
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception.statusCode());
   }
 
   @Test
@@ -575,13 +574,13 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             .bucket(bucketName)
             .key(keyName)
             .tagging(Tagging.builder().tagSet(tags).build())));
-    assertEquals(404, exception.statusCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
 
     exception = assertThrows(NoSuchKeyException.class, () ->
         s3Client.getObjectTagging(b -> b
             .bucket(bucketName)
             .key(keyName)));
-    assertEquals(404, exception.statusCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
   }
 
   @Test
@@ -594,7 +593,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         s3Client.deleteObjectTagging(b -> b
             .bucket(bucketName)
             .key(keyName)));
-    assertEquals(404, exception.statusCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
   }
 
   @Test
@@ -1885,29 +1884,35 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class LinkBucketTests {
-      private static final String NON_S3_VOLUME_NAME = "link-bucket-volume";
+      private String nonS3VolumeName;
+      private String linkBucketName;
+      private String danglingSourceBucketName;
+      private String danglingLinkBucketName;
       private OzoneVolume nonS3Volume;
       private OzoneVolume s3Volume;
 
       @BeforeAll
       public void setup() throws Exception {
         try (OzoneClient ozoneClient = cluster.newClient()) {
-          ozoneClient.getObjectStore().createVolume(NON_S3_VOLUME_NAME);
-          nonS3Volume = ozoneClient.getObjectStore().getVolume(NON_S3_VOLUME_NAME);
+          nonS3VolumeName = randomName("link-vol");
+          linkBucketName = randomName("link-bucket");
+          danglingSourceBucketName = randomName("link-source");
+          danglingLinkBucketName = randomName("link-bucket-dangling");
+          ozoneClient.getObjectStore().createVolume(nonS3VolumeName);
+          nonS3Volume = ozoneClient.getObjectStore().getVolume(nonS3VolumeName);
           s3Volume = ozoneClient.getObjectStore().getS3Volume();
         }
       }
 
       @Test
       public void setBucketVerificationOnLinkBucket() throws Exception {
-        // create link bucket
-        String linkBucketName = "link-bucket";
-        nonS3Volume.createBucket(OzoneConsts.BUCKET);
+        String sourceBucketName = randomName("source");
+        nonS3Volume.createBucket(sourceBucketName);
         BucketArgs.Builder bb = new BucketArgs.Builder()
             .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
-            .setSourceVolume(NON_S3_VOLUME_NAME)
-            .setSourceBucket(OzoneConsts.BUCKET);
+            .setSourceVolume(nonS3VolumeName)
+            .setSourceBucket(sourceBucketName);
         s3Volume.createBucket(linkBucketName, bb.build());
 
         GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
@@ -1930,35 +1935,38 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
       @Test
       public void testDanglingBucket() throws Exception {
-        String sourceBucket = "source-bucket";
-        String linkBucket = "link-bucket-dangling";
-        nonS3Volume.createBucket(sourceBucket);
+        nonS3Volume.createBucket(danglingSourceBucketName);
         BucketArgs.Builder bb = new BucketArgs.Builder()
             .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
-            .setSourceVolume(NON_S3_VOLUME_NAME)
-            .setSourceBucket(sourceBucket);
-        s3Volume.createBucket(linkBucket, bb.build());
+            .setSourceVolume(nonS3VolumeName)
+            .setSourceBucket(danglingSourceBucketName);
+        s3Volume.createBucket(danglingLinkBucketName, bb.build());
 
         // remove source bucket to make dangling bucket
-        nonS3Volume.deleteBucket(sourceBucket);
+        nonS3Volume.deleteBucket(danglingSourceBucketName);
 
         GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .expectedBucketOwner(WRONG_OWNER)
             .build();
 
         verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.getBucketAcl(wrongRequest));
 
         String owner = s3Client.getBucketAcl(GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .build()).owner().displayName();
         GetBucketAclRequest correctRequest = GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .expectedBucketOwner(owner)
             .build();
 
         verifyPassBucketOwnershipVerification(() -> s3Client.getBucketAcl(correctRequest));
+      }
+
+      private String randomName(String prefix) {
+        return (prefix + "-" + RandomStringUtils.secure().nextAlphanumeric(8))
+            .toLowerCase(Locale.ROOT);
       }
     }
 
