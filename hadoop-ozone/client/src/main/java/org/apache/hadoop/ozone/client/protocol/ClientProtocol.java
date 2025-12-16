@@ -1376,8 +1376,7 @@ public interface ClientProtocol {
   /**
    * Revokes an STS token.
    * @param accessKeyId             The STS accessKeyId (starting with ASIA...)
-   * @param sessionToken            The STS session token
    * @throws IOException            if an error occurs while revoking the STS token
    */
-  void revokeSTSToken(String accessKeyId, String sessionToken) throws IOException;
+  void revokeSTSToken(String accessKeyId) throws IOException;
 }

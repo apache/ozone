@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -34,8 +32,6 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSTSTokenResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,9 +47,6 @@ import org.slf4j.LoggerFactory;
 public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3RevokeSTSTokenRequest.class);
-  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
-
-  private String originalAccessKeyId;
 
   public S3RevokeSTSTokenRequest(OMRequest omRequest) {
     super(omRequest);
@@ -64,26 +57,11 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq =
         getOmRequest().getRevokeSTSTokenRequest();
 
-    // Get the original (long-lived) access key id from the session token
-    // and enforce the same permission model that is used for S3 secret
-    // operations (get/set/revoke). Only the owner of the original access
-    // key (or an S3 / tenant admin) is allowed to revoke its temporary
-    // STS credentials.
-    final String sessionToken = revokeReq.getSessionToken();
-    final String tempAccessKeyId = revokeReq.getAccessKeyId();
-    final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
-        sessionToken, ozoneManager.getSecretKeyClient(), CLOCK);
-    originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
-
-    // Validate that the Access Key ID in the request matches the one in the token
-    // to prevent users from revoking arbitrary keys using a valid token.
-    if (!stsTokenIdentifier.getTempAccessKeyId().equals(tempAccessKeyId)) {
-      throw new OMException("Access Key ID in request does not match the session token",
-          OMException.ResultCodes.INVALID_REQUEST);
+    // Only S3/Ozone admins can revoke STS tokens by temporary access key ID.
+    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(getUserInfo().getUserName());
+    if (!ozoneManager.isS3Admin(ugi)) {
+      throw new OMException("Only S3/Ozone admins can revoke STS tokens.", OMException.ResultCodes.PERMISSION_DENIED);
     }
-
-    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(originalAccessKeyId);
-    S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
     final OMRequest.Builder omRequest = OMRequest.newBuilder()
         .setRevokeSTSTokenRequest(revokeReq)
@@ -104,15 +82,14 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq = getOmRequest().getRevokeSTSTokenRequest();
     final String accessKeyId = revokeReq.getAccessKeyId();
-    final String sessionToken = revokeReq.getSessionToken();
 
     // All actual DB mutations are done in the response's addToDBBatch().
     final OMClientResponse omClientResponse = new S3RevokeSTSTokenResponse(
-        accessKeyId, sessionToken, omResponse.build());
+        accessKeyId, omResponse.build());
 
     // Audit log
     final Map<String, String> auditMap = new HashMap<>();
-    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, originalAccessKeyId);
+    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, getOmRequest().getUserInfo().getUserName());
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.REVOKE_STS_TOKEN, auditMap, null, getOmRequest().getUserInfo()));
 

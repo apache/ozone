@@ -2388,7 +2388,6 @@ message AssumeRoleResponse {
 
 message RevokeSTSTokenRequest {
     required string accessKeyId = 1;
-    required string sessionToken = 2;
 }
 
 message RevokeSTSTokenResponse {
