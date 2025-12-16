@@ -15,36 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.awssdk.v1;
+package org.apache.hadoop.ozone.s3.awssdk;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 
-/**
- * Tests the AWS S3 SDK basic operations with OM Ratis enabled and Streaming Write Pipeline.
- */
-public class TestS3SDKV1WithRatisStreaming extends AbstractS3SDKV1Tests {
-
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
-        false);
-    conf.setBoolean(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
-        true);
+class TestS3SDKWithRatisStreaming extends OzoneS3SDKTests {
+  @Override
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = super.createOzoneConfig();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED, true);
     // Ensure that all writes use datastream
     conf.set(OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD, "0MB");
-    startCluster(conf);
-  }
-
-  @AfterAll
-  public static void shutdown() throws IOException {
-    shutdownCluster();
+    return conf;
   }
 }
