@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -98,7 +99,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Used for S3 tags.
    */
-  private Map<String, String> tags;
+  private final ImmutableMap<String, String> tags;
 
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
@@ -124,7 +125,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileName = b.fileName;
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
-    this.tags = b.tags;
+    this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
@@ -255,11 +256,6 @@ public final class OmKeyInfo extends WithParentObjectId
   @Override
   public Map<String, String> getTags() {
     return tags;
-  }
-
-  @Override
-  public void setTags(Map<String, String> tags) {
-    this.tags = tags;
   }
 
   /**
@@ -492,15 +488,12 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
-    private final Map<String, String> tags = new HashMap<>();
+    private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
 
     public Builder() {
-      this(AclListBuilder.empty());
-    }
-
-    private Builder(AclListBuilder acls) {
-      this.acls = acls;
+      this.acls = AclListBuilder.empty();
+      this.tags = MapBuilder.empty();
     }
 
     public Builder(OmKeyInfo obj) {
@@ -519,9 +512,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      if (obj.getTags() != null) {
-        this.tags.putAll(obj.getTags());
-      }
+      this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
@@ -658,18 +649,17 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder setTags(Map<String, String> tags) {
-      this.tags.clear();
-      addAllTags(tags);
+      this.tags.set(tags);
       return this;
     }
 
     public Builder addTag(String key, String value) {
-      tags.put(key, value);
+      this.tags.put(key, value);
       return this;
     }
 
     public Builder addAllTags(Map<String, String> keyTags) {
-      tags.putAll(keyTags);
+      this.tags.putAll(keyTags);
       return this;
     }
 

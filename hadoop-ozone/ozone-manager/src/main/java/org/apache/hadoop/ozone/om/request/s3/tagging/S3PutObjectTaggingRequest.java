@@ -127,11 +127,8 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
 
-      // Set the tags
-      omKeyInfo.getTags().clear();
-      omKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()));
-      // Set the UpdateID to the current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
+          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .setUpdateID(trxnLogIndex)
           .build();
 
