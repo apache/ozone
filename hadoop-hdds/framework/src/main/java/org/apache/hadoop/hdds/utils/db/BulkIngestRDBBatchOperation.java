@@ -62,7 +62,7 @@ public abstract class BulkIngestRDBBatchOperation implements AbstractRDBBatchOpe
 
   @Override
   public long size() {
-    return 0;
+    return rdbBatchOperation.size();
   }
 
   private void performOpAndFlushBatchIfFull(Consumer<RDBBatchOperation> op) throws RocksDatabaseException {

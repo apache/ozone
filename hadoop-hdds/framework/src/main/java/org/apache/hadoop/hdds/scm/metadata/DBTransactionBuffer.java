@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -33,5 +32,5 @@ public interface DBTransactionBuffer {
   <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws RocksDatabaseException, CodecException;
 
-  void close() throws IOException;
+  void close() throws RocksDatabaseException;
 }
