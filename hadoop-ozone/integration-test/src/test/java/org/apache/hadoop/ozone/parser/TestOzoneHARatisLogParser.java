@@ -18,15 +18,14 @@
 package org.apache.hadoop.ozone.parser;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
@@ -40,6 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -100,13 +100,14 @@ class TestOzoneHARatisLogParser {
         cluster.getOMLeader().getConfiguration();
 
     StorageContainerManager scm = cluster.getActiveSCM();
-    Preconditions.checkNotNull(scm);
+    Objects.requireNonNull(scm, "scm == null");
     OzoneConfiguration leaderSCMConfig = scm.getConfiguration();
 
     cluster.stop();
 
-    File omMetaDir = new File(ozoneConfiguration.get(OZONE_METADATA_DIRS),
-        "ratis");
+    // Get the OM Ratis directory using the proper utility method
+    File omMetaDir = new File(
+        OzoneManagerRatisUtils.getOMRatisDirectory(ozoneConfiguration));
     assertThat(omMetaDir).isDirectory();
 
     String[] ratisDirs = omMetaDir.list();
@@ -134,7 +135,7 @@ class TestOzoneHARatisLogParser {
 
     // Now check for SCM.
     File scmMetadataDir =
-        new File(SCMHAUtils.getRatisStorageDir(leaderSCMConfig));
+        new File(SCMHAUtils.getSCMRatisDirectory(leaderSCMConfig));
     assertThat(scmMetadataDir).isDirectory();
 
     ratisDirs = scmMetadataDir.list();

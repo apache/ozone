@@ -201,7 +201,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -265,7 +264,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -288,12 +286,12 @@ public class TestS3MultipartResponse {
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           partKeyToBeDeleted.getObjectID(), multipartKey);
 
-      keyToDeleteMap.put(delKeyName, new RepeatedOmKeyInfo(partKeyToBeDeleted));
+      keyToDeleteMap.put(delKeyName, new RepeatedOmKeyInfo(partKeyToBeDeleted, omBucketInfo.getObjectID()));
     }
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
-        openPartKeyInfoToBeDeleted, omBucketInfo,
+        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
 

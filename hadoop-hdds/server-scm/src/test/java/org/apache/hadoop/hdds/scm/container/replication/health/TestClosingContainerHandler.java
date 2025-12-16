@@ -103,7 +103,7 @@ public class TestClosingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -121,7 +121,7 @@ public class TestClosingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -149,7 +149,7 @@ public class TestClosingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -172,7 +172,7 @@ public class TestClosingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -193,7 +193,7 @@ public class TestClosingContainerHandler {
         ContainerReplicaProto.State.OPEN);
     containerReplicas.add(openReplica);
 
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
 
     ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -215,7 +215,7 @@ public class TestClosingContainerHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         RATIS_REPLICATION_CONFIG, 1, CLOSING);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(report)
@@ -251,7 +251,7 @@ public class TestClosingContainerHandler {
         .build();
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(new HashSet<>())
         .build();
@@ -279,7 +279,7 @@ public class TestClosingContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0);
 
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -313,7 +313,7 @@ public class TestClosingContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.UNHEALTHY, 1, 2, 3, 4, 5);
 
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -376,7 +376,7 @@ public class TestClosingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();

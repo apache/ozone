@@ -1888,7 +1888,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
-        "org.apache.hadoop.ipc.ProcessingDetails");
+        "org.apache.hadoop.ipc_.ProcessingDetails");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);

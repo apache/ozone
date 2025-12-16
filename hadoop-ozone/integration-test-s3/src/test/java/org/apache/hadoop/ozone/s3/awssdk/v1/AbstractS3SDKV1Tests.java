@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -97,6 +98,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -128,6 +130,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This is an abstract class to test the AWS Java S3 SDK operations.
@@ -140,6 +144,9 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
+
+  // server-side limitation
+  private static final int MAX_UPLOADS_LIMIT = 1000;
 
   /**
    * There are still some unsupported S3 operations.
@@ -758,6 +765,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     uploadIds.add(uploadId3);
 
     ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
+    listMultipartUploadsRequest.setMaxUploads(5000);
 
     MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
 
@@ -768,26 +776,31 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(uploadIds, listUploadIds);
   }
 
-  @Test
-  public void testListMultipartUploadsPagination() {
-    final String bucketName = getBucketName();
+  @ParameterizedTest
+  @ValueSource(ints = {10, 5000})
+  public void testListMultipartUploadsPagination(int requestedMaxUploads) {
+    final String bucketName = getBucketName() + "-" + requestedMaxUploads;
     final String multipartKeyPrefix = getKeyName("multipart");
 
     s3Client.createBucket(bucketName);
 
-    // Create 25 multipart uploads to test pagination
+    // Create multipart uploads to test pagination
     List<String> allKeys = new ArrayList<>();
     Map<String, String> keyToUploadId = new HashMap<>();
 
-    for (int i = 0; i < 25; i++) {
-      String key = String.format("%s-%03d", multipartKeyPrefix, i);
+    final int effectiveMaxUploads = Math.min(requestedMaxUploads, MAX_UPLOADS_LIMIT);
+    final int uploadsCreated = 2 * effectiveMaxUploads + 5;
+    final int expectedPages = uploadsCreated / effectiveMaxUploads + 1;
+
+    for (int i = 0; i < uploadsCreated; i++) {
+      String key = String.format("%s-%04d", multipartKeyPrefix, i);
       allKeys.add(key);
       String uploadId = initiateMultipartUpload(bucketName, key, null, null, null);
       keyToUploadId.put(key, uploadId);
     }
     Collections.sort(allKeys);
 
-    // Test pagination with maxUploads=10
+    // Test pagination
     Set<String> retrievedKeys = new HashSet<>();
     String keyMarker = null;
     String uploadIdMarker = null;
@@ -796,18 +809,19 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     do {
       ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName)
-          .withMaxUploads(10)
+          .withMaxUploads(requestedMaxUploads)
           .withKeyMarker(keyMarker)
           .withUploadIdMarker(uploadIdMarker);
 
       MultipartUploadListing result = s3Client.listMultipartUploads(request);
+      pageCount++;
 
       // Verify page size
-      if (pageCount < 2) {
-        assertEquals(10, result.getMultipartUploads().size());
+      if (pageCount < expectedPages) {
+        assertEquals(effectiveMaxUploads, result.getMultipartUploads().size());
         assertTrue(result.isTruncated());
       } else {
-        assertEquals(5, result.getMultipartUploads().size());
+        assertEquals(uploadsCreated % effectiveMaxUploads, result.getMultipartUploads().size());
         assertFalse(result.isTruncated());
       }
 
@@ -822,7 +836,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       assertNull(result.getPrefix());
       assertEquals(result.getUploadIdMarker(), uploadIdMarker);
       assertEquals(result.getKeyMarker(), keyMarker);
-      assertEquals(result.getMaxUploads(), 10);
+      assertEquals(effectiveMaxUploads, result.getMaxUploads());
 
       // Verify next markers content
       if (result.isTruncated()) {
@@ -840,20 +854,19 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       uploadIdMarker = result.getNextUploadIdMarker();
 
       truncated = result.isTruncated();
-      pageCount++;
 
     } while (truncated);
 
     // Verify pagination results
-    assertEquals(3, pageCount, "Should have exactly 3 pages");
-    assertEquals(25, retrievedKeys.size(), "Should retrieve all uploads");
+    assertEquals(expectedPages, pageCount);
+    assertEquals(uploadsCreated, retrievedKeys.size(), "Should retrieve all uploads");
     assertEquals(
         allKeys,
         retrievedKeys.stream().sorted().collect(Collectors.toList()),
         "Retrieved keys should match expected keys in order");
 
     // Test with prefix
-    String prefix = multipartKeyPrefix + "-01";
+    String prefix = multipartKeyPrefix + "-001";
     ListMultipartUploadsRequest prefixRequest = new ListMultipartUploadsRequest(bucketName)
         .withPrefix(prefix);
 
@@ -861,11 +874,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     assertEquals(prefix, prefixResult.getPrefix());
     assertEquals(
-        Arrays.asList(multipartKeyPrefix + "-010", multipartKeyPrefix + "-011",
-            multipartKeyPrefix + "-012", multipartKeyPrefix + "-013",
-            multipartKeyPrefix + "-014", multipartKeyPrefix + "-015",
-            multipartKeyPrefix + "-016", multipartKeyPrefix + "-017",
-            multipartKeyPrefix + "-018", multipartKeyPrefix + "-019"),
+        IntStream.rangeClosed(0, 9)
+            .mapToObj(i -> prefix + i)
+            .collect(Collectors.toList()),
         prefixResult.getMultipartUploads().stream()
             .map(MultipartUpload::getKey)
             .collect(Collectors.toList()));
@@ -1221,7 +1232,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       for (PartETag part : completedParts) {
         completionXml.append("  <Part>\n");
         completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
-        completionXml.append("    <ETag>").append(part.getETag()).append("</ETag>\n");
+        completionXml.append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n");
         completionXml.append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");

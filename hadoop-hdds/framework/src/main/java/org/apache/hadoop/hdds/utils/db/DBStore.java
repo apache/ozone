@@ -17,13 +17,23 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.Table.newKeyValue;
+
 import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -46,7 +56,7 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   Table<byte[], byte[]> getTable(String name) throws RocksDatabaseException;
 
   /** The same as getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE). */
-  default <KEY, VALUE> TypedTable<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
+  default <KEY, VALUE> Table<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
       throws RocksDatabaseException, CodecException {
     return getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE);
   }
@@ -60,7 +70,7 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
    * @param cacheType - cache type
    * @return - Table Store
    */
-  <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
+  <KEY, VALUE> Table<KEY, VALUE> getTable(
       String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType)
       throws RocksDatabaseException, CodecException;
 
@@ -146,6 +156,12 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   Map<Integer, String> getTableNames();
 
   /**
+   * Drop the specific table.
+   * @param tableName - Name of the table to truncate.
+   */
+  void dropTable(String tableName) throws RocksDatabaseException;
+
+  /**
    * Get data written to DB since a specific sequence number.
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
@@ -162,4 +178,41 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
    * @return true if the DB is closed.
    */
   boolean isClosed();
+
+  String getSnapshotsParentDir();
+
+  /**
+   * Creates an iterator that merges multiple tables into a single iterator,
+   * grouping values with the same key across the tables.
+   *
+   * @param <KEY> the type of keys for the tables
+   * @param keyComparator the comparator used to compare keys from different tables
+   * @param prefix the prefix used to filter entries of each table
+   * @param table one or more tables to merge
+   * @return a closable iterator over merged key-value pairs, where each key corresponds
+   *         to a collection of values from the tables
+   */
+  default <KEY> ClosableIterator<KeyValue<KEY, Collection<Object>>> getMergeIterator(
+      Comparator<KEY> keyComparator, KEY prefix, Table<KEY, Object>... table) {
+    List<Object> tableValues = IntStream.range(0, table.length).mapToObj(i -> null).collect(Collectors.toList());
+    KeyValue<KEY, Object> defaultNullValue = newKeyValue(null, null);
+    Comparator<KeyValue<KEY, Object>> comparator = Comparator.comparing(KeyValue::getKey, keyComparator);
+    return new MinHeapMergeIterator<KeyValue<KEY, Object>, Table.KeyValueIterator<KEY, Object>,
+        KeyValue<KEY, Collection<Object>>>(table.length + 1, comparator) {
+      @Override
+      protected Table.KeyValueIterator<KEY, Object> getIterator(int idx) throws IOException {
+        return table[idx].iterator(prefix);
+      }
+
+      @Override
+      protected KeyValue<KEY, Collection<Object>> merge(Map<Integer, KeyValue<KEY, Object>> keysToMerge) {
+        KEY key = keysToMerge.values().stream().findAny()
+            .orElseThrow(() -> new NoSuchElementException("No keys found")).getKey();
+        for (int i = 0; i < tableValues.size(); i++) {
+          tableValues.set(i, keysToMerge.getOrDefault(i, defaultNullValue).getValue());
+        }
+        return newKeyValue(key, tableValues);
+      }
+    };
+  }
 }

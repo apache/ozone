@@ -21,16 +21,16 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
-  private static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
 
   private OMRequest omRequest;
@@ -94,7 +94,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMClientRequest(OMRequest omRequest) {
-    Preconditions.checkNotNull(omRequest);
+    Objects.requireNonNull(omRequest, "omRequest == null");
     this.omRequest = omRequest;
     this.omLockDetails.clear();
   }
@@ -134,8 +134,12 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Validate the OMRequest and update the cache.
    * This step should verify that the request can be executed, perform
    * any authorization steps and update the in-memory cache.
-
+   *
    * This step does not persist the changes to the database.
+   *
+   * To coders and reviewers, CAUTION: Do NOT bring external dependencies into this method, doing so could potentially
+   * cause divergence in OM DB states in HA. If you have to, be extremely careful.
+   * e.g. Do NOT invoke ACL check inside validateAndUpdateCache, which can use Ranger plugin that relies on external DB.
    *
    * @return the response that will be returned to the client.
    */

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -102,14 +102,13 @@ public class QuotaRepairTask {
 
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
-    OMMetadataManager activeMetaManager = null;
-    try {
-      // thread pool with 3 Table type * (1 task each + 3 thread for each task)
-      executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    // thread pool with 3 Table type * (1 task each + 3 thread for each task)
+    executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    try (OMMetadataManager activeMetaManager =
+        createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
-      activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
       repairActiveDb(activeMetaManager, builder, buckets);
 
       // TODO: repair snapshots for quota
@@ -137,9 +136,6 @@ public class QuotaRepairTask {
       LOG.info("Completed quota repair task {}", REPAIR_STATUS);
       executor.shutdown();
       try {
-        if (null != activeMetaManager) {
-          activeMetaManager.stop();
-        }
         cleanTempCheckPointPath(om.getMetadataManager());
       } catch (Exception exp) {
         LOG.error("failed to cleanup", exp);
@@ -255,8 +251,8 @@ public class QuotaRepairTask {
     String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
     oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
-    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    bucketInfo.decrUsedBytes(bucketInfo.getUsedBytes(), false);
+    bucketInfo.decrUsedNamespace(bucketInfo.getUsedNamespace(), false);
     nameBucketInfoMap.put(bucketNameKey, bucketInfo);
     idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
             bucketInfo.getObjectID()), bucketInfo);

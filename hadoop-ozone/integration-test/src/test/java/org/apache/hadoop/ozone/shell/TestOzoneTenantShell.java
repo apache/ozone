@@ -100,12 +100,6 @@ public class TestOzoneTenantShell {
 
   private static final boolean USE_ACTUAL_RANGER = false;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists

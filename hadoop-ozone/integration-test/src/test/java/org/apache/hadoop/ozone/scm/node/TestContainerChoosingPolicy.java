@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -277,6 +278,7 @@ public class TestContainerChoosingPolicy {
       try {
         containerSet.addContainer(container); // Add container to ContainerSet
       } catch (Exception e) {
+        Assertions.fail(e.getMessage());
         throw new RuntimeException("Failed to add container to ContainerSet", e);
       }
 

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -69,6 +70,8 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -95,13 +98,6 @@ public class TestFailureHandlingByClient {
   private String keyString;
   private final List<DatanodeDetails> restartDataNodes = new ArrayList<>();
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -169,9 +165,6 @@ public class TestFailureHandlingByClient {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -183,35 +176,35 @@ public class TestFailureHandlingByClient {
   @Test
   public void testBlockWritesWithDnFailures() throws Exception {
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     byte[] data = ContainerTestHelper.getFixedLengthString(
         keyString, 2 * chunkSize + chunkSize / 2).getBytes(UTF_8);
-    key.write(data);
+    try (OzoneOutputStream key = createKey(keyName, RATIS, 0)) {
+      key.write(data);
 
-    // get the name of a valid container
-    KeyOutputStream groupOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    // assert that the exclude list's expire time equals to
-    // default value 600000 ms in OzoneClientConfig.java
-    assertEquals(groupOutputStream.getExcludeList().getExpiryTime(), 600000);
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    long containerId = locationInfoList.get(0).getContainerID();
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager()
-        .getContainer(ContainerID.valueOf(containerId));
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
-    cluster.shutdownHddsDatanode(datanodes.get(0));
-    cluster.shutdownHddsDatanode(datanodes.get(1));
-    restartDataNodes.add(datanodes.get(0));
-    restartDataNodes.add(datanodes.get(1));
-    // The write will fail but exception will be handled and length will be
-    // updated correctly in OzoneManager once the steam is closed
-    key.close();
+      // get the name of a valid container
+      KeyOutputStream groupOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      // assert that the exclude list's expire time equals to
+      // default value 600000 ms in OzoneClientConfig.java
+      assertEquals(groupOutputStream.getExcludeList().getExpiryTime(), 600000);
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      long containerId = locationInfoList.get(0).getContainerID();
+      ContainerInfo container = cluster.getStorageContainerManager()
+          .getContainerManager()
+          .getContainer(ContainerID.valueOf(containerId));
+      Pipeline pipeline =
+          cluster.getStorageContainerManager().getPipelineManager()
+              .getPipeline(container.getPipelineID());
+      List<DatanodeDetails> datanodes = pipeline.getNodes();
+      cluster.shutdownHddsDatanode(datanodes.get(0));
+      cluster.shutdownHddsDatanode(datanodes.get(1));
+      restartDataNodes.add(datanodes.get(0));
+      restartDataNodes.add(datanodes.get(1));
+      // The write will fail but exception will be handled and length will be
+      // updated correctly in OzoneManager once the steam is closed
+    }
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -323,31 +316,33 @@ public class TestFailureHandlingByClient {
   @Test
   public void testWriteSmallFile() throws Exception {
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, 0);
     String data = ContainerTestHelper
         .getFixedLengthString(keyString,  chunkSize / 2);
-    key.write(data.getBytes(UTF_8));
-    // get the name of a valid container
-    KeyOutputStream keyOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    List<OmKeyLocationInfo> locationInfoList =
-        keyOutputStream.getLocationInfoList();
-    long containerId = locationInfoList.get(0).getContainerID();
-    BlockID blockId = locationInfoList.get(0).getBlockID();
-    ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueOf(containerId));
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
 
-    cluster.shutdownHddsDatanode(datanodes.get(0));
-    cluster.shutdownHddsDatanode(datanodes.get(1));
-    restartDataNodes.add(datanodes.get(0));
-    restartDataNodes.add(datanodes.get(1));
-    key.close();
+    BlockID blockId;
+    try (OzoneOutputStream key = createKey(keyName, RATIS, 0)) {
+      key.write(data.getBytes(UTF_8));
+      // get the name of a valid container
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<OmKeyLocationInfo> locationInfoList =
+          keyOutputStream.getLocationInfoList();
+      long containerId = locationInfoList.get(0).getContainerID();
+      blockId = locationInfoList.get(0).getBlockID();
+      ContainerInfo container =
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId));
+      Pipeline pipeline =
+          cluster.getStorageContainerManager().getPipelineManager()
+              .getPipeline(container.getPipelineID());
+      List<DatanodeDetails> datanodes = pipeline.getNodes();
+
+      cluster.shutdownHddsDatanode(datanodes.get(0));
+      cluster.shutdownHddsDatanode(datanodes.get(1));
+      restartDataNodes.add(datanodes.get(0));
+      restartDataNodes.add(datanodes.get(1));
+    }
+
     // this will throw AlreadyClosedException and and current stream
     // will be discarded and write a new block
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
@@ -369,42 +364,43 @@ public class TestFailureHandlingByClient {
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, blockSize);
     String data = ContainerTestHelper
         .getFixedLengthString(keyString,  chunkSize);
 
-    // get the name of a valid container
-    KeyOutputStream keyOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    List<BlockOutputStreamEntry> streamEntryList =
-        keyOutputStream.getStreamEntries();
+    BlockID blockId;
+    try (OzoneOutputStream key = createKey(keyName, RATIS, blockSize)) {
+      // get the name of a valid container
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<BlockOutputStreamEntry> streamEntryList =
+          keyOutputStream.getStreamEntries();
 
-    // Assert that 1 block will be preallocated
-    assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
-    List<Long> containerIdList = new ArrayList<>();
-    containerIdList.add(containerId);
+      // Assert that 1 block will be preallocated
+      assertEquals(1, streamEntryList.size());
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      long containerId = streamEntryList.get(0).getBlockID().getContainerID();
+      blockId = streamEntryList.get(0).getBlockID();
+      List<Long> containerIdList = new ArrayList<>();
+      containerIdList.add(containerId);
 
-    // below check will assert if the container does not get closed
-    TestHelper
-        .waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
+      // below check will assert if the container does not get closed
+      TestHelper
+          .waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
 
-    // This write will hit ClosedContainerException and this container should
-    // will be added in the excludelist
-    key.write(data.getBytes(UTF_8));
-    key.flush();
+      // This write will hit ClosedContainerException and this container should
+      // will be added in the excludelist
+      key.write(data.getBytes(UTF_8));
+      key.flush();
 
-    assertThat(keyOutputStream.getExcludeList().getContainerIds())
-        .contains(ContainerID.valueOf(containerId));
-    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-    assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getContainerIds())
+          .contains(ContainerID.valueOf(containerId));
+      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
 
-    // The close will just write to the buffer
-    key.close();
+      // The close will just write to the buffer
+    }
+
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
@@ -422,6 +418,7 @@ public class TestFailureHandlingByClient {
 
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  @Flaky("HDDS-13972")
   public void testDatanodeExclusionWithMajorityCommit(RaftProtos.ReplicationLevel type) throws Exception {
     OzoneConfiguration localConfig = new OzoneConfiguration(conf);
     RatisClientConfig ratisClientConfig = localConfig.getObject(RatisClientConfig.class);
@@ -431,49 +428,52 @@ public class TestFailureHandlingByClient {
     ObjectStore localObjectStore = localClient.getObjectStore();
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key =
-        TestHelper.createKey(keyName, ReplicationType.RATIS, blockSize, localObjectStore, volumeName,
-            bucketName);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize);
+        .getFixedLengthString(keyString, chunkSize);
 
-    // get the name of a valid container
-    KeyOutputStream keyOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    List<BlockOutputStreamEntry> streamEntryList =
-        keyOutputStream.getStreamEntries();
+    BlockID blockId;
+    try (OzoneOutputStream key = TestHelper.createKey(keyName, RATIS, blockSize, localObjectStore, volumeName,
+        bucketName)) {
+      // get the name of a valid container
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<BlockOutputStreamEntry> streamEntryList =
+          keyOutputStream.getStreamEntries();
 
-    // Assert that 1 block will be preallocated
-    assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
-    ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueOf(containerId));
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
+      // Assert that 1 block will be preallocated
+      assertEquals(1, streamEntryList.size());
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      long containerId = streamEntryList.get(0).getBlockID().getContainerID();
+      blockId = streamEntryList.get(0).getBlockID();
+      ContainerInfo container =
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId));
+      Pipeline pipeline =
+          cluster.getStorageContainerManager().getPipelineManager()
+              .getPipeline(container.getPipelineID());
+      List<DatanodeDetails> datanodes = pipeline.getNodes();
 
-    // shutdown 1 datanode. This will make sure the 2 way commit happens for
-    // next write ops.
-    cluster.shutdownHddsDatanode(datanodes.get(0));
-    restartDataNodes.add(datanodes.get(0));
+      // shutdown 1 datanode. This will make sure the 2 way commit happens for
+      // next write ops.
+      cluster.shutdownHddsDatanode(datanodes.get(0));
+      restartDataNodes.add(datanodes.get(0));
 
-    key.write(data.getBytes(UTF_8));
-    key.write(data.getBytes(UTF_8));
-    key.flush();
+      HddsDatanodeService hddsDatanode = cluster.getHddsDatanode(datanodes.get(0));
+      GenericTestUtils.waitFor(hddsDatanode::isStopped, 1000, 30000);
 
-    if (type == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
-      assertThat(keyOutputStream.getExcludeList().getDatanodes())
-          .contains(datanodes.get(0));
+      key.write(data.getBytes(UTF_8));
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+
+      if (type == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
+        assertThat(keyOutputStream.getExcludeList().getDatanodes())
+            .contains(datanodes.get(0));
+      }
+      assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
+      // The close will just write to the buffer
     }
-    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-    assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
-    // The close will just write to the buffer
-    key.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -495,47 +495,46 @@ public class TestFailureHandlingByClient {
   @Test
   public void testPipelineExclusionWithPipelineFailure() throws Exception {
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, blockSize);
     String data = ContainerTestHelper
         .getFixedLengthString(keyString,  chunkSize);
+    BlockID blockId;
+    try (OzoneOutputStream key = createKey(keyName, RATIS, blockSize)) {
+      // get the name of a valid container
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<BlockOutputStreamEntry> streamEntryList =
+          keyOutputStream.getStreamEntries();
 
-    // get the name of a valid container
-    KeyOutputStream keyOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    List<BlockOutputStreamEntry> streamEntryList =
-        keyOutputStream.getStreamEntries();
+      // Assert that 1 block will be preallocated
+      assertEquals(1, streamEntryList.size());
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      long containerId = streamEntryList.get(0).getBlockID().getContainerID();
+      blockId = streamEntryList.get(0).getBlockID();
+      ContainerInfo container =
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId));
+      Pipeline pipeline =
+          cluster.getStorageContainerManager().getPipelineManager()
+              .getPipeline(container.getPipelineID());
+      List<DatanodeDetails> datanodes = pipeline.getNodes();
 
-    // Assert that 1 block will be preallocated
-    assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
-    ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueOf(containerId));
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
+      // Two nodes, next write will hit AlreadyClosedException , the pipeline
+      // will be added in the exclude list
+      cluster.shutdownHddsDatanode(datanodes.get(0));
+      cluster.shutdownHddsDatanode(datanodes.get(1));
+      restartDataNodes.add(datanodes.get(0));
+      restartDataNodes.add(datanodes.get(1));
 
-    // Two nodes, next write will hit AlreadyClosedException , the pipeline
-    // will be added in the exclude list
-    cluster.shutdownHddsDatanode(datanodes.get(0));
-    cluster.shutdownHddsDatanode(datanodes.get(1));
-    restartDataNodes.add(datanodes.get(0));
-    restartDataNodes.add(datanodes.get(1));
-
-    key.write(data.getBytes(UTF_8));
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
-        .contains(pipeline.getId());
-    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-    // The close will just write to the buffer
-    key.close();
+      key.write(data.getBytes(UTF_8));
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+          .contains(pipeline.getId());
+      assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      // The close will just write to the buffer
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)

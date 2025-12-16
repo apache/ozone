@@ -179,7 +179,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         throw new OMException("Volume " + volumeName + " is not found",
             OMException.ResultCodes.VOLUME_NOT_FOUND);
       }
-      omVolumeArgs.incrUsedNamespace(-1L);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .incrUsedNamespace(-1L)
+          .build();
       // Update table cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(volumeKey),

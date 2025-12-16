@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -119,6 +121,23 @@ public abstract class Handler {
       return;
     }
     icrSender.send(container);
+  }
+
+  /**
+   * This should be called when there is no state change.
+   * ICR will be deferred to next heartbeat.
+   *
+   * @param container Container for which deferred ICR has to be sent
+   */
+  protected void sendDeferredICR(final Container container)
+      throws StorageContainerException {
+    if (container
+        .getContainerState() == ContainerProtos.ContainerDataProto
+        .State.RECOVERING) {
+      // Ignoring the recovering containers reports for now.
+      return;
+    }
+    icrSender.sendDeferred(container);
   }
 
   public abstract ContainerCommandResponseProto handle(
@@ -259,5 +278,10 @@ public abstract class Handler {
    * Imports container from a container which is under the temp directory.
    */
   public abstract Container importContainer(ContainerData targetTempContainerData) throws IOException;
-}
 
+  public abstract ContainerCommandResponseProto readBlock(
+      ContainerCommandRequestProto msg, Container container,
+      RandomAccessFileChannel blockFile,
+      StreamObserver<ContainerCommandResponseProto> streamObserver);
+
+}

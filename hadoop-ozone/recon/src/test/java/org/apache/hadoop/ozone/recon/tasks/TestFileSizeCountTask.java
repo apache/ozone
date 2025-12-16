@@ -19,12 +19,13 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
@@ -33,50 +34,75 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
-import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
-import org.jooq.DSLContext;
-import org.jooq.Record3;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit test for File Size Count Task.
  */
-public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
+public class TestFileSizeCountTask {
 
-  private FileCountBySizeDao fileCountBySizeDao;
+  @TempDir
+  private static Path temporaryFolder;
+  private static ReconFileMetadataManager reconFileMetadataManager;
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
-  private DSLContext dslContext;
 
-  public TestFileSizeCountTask() {
-    super();
+  @BeforeAll
+  public static void setupOnce() throws Exception {
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
+            .withReconSqlDb()
+            .withReconOm(reconOMMetadataManager)
+            .withContainerDB()
+            .build();
+    reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
   }
 
   @BeforeEach
-  public void setUp() {
-    fileCountBySizeDao = getDao(FileCountBySizeDao.class);
-    UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
+  public void setUp() throws IOException {
+    // Reset the truncated flag to ensure clean state for each test
+    ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    
+    OzoneConfiguration configuration = new OzoneConfiguration();
     // Create separate task instances.
-    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
-    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
-    dslContext = utilizationSchemaDefinition.getDSLContext();
-    // Truncate table before each test.
-    dslContext.truncate(FILE_COUNT_BY_SIZE);
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
+    // Clear RocksDB table before each test.
+    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
+         reconFileMetadataManager.getFileCountTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<FileSizeCountKey, Long> keyValue = iterator.next();
+        reconFileMetadataManager.getFileCountTable().delete(keyValue.getKey());
+      }
+    } catch (Exception e) {
+      // Ignore cleanup errors
+    }
   }
 
   @Test
@@ -108,6 +134,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     // Note: Even though legacy and OBS share the same underlying table, we simulate OBS here.
     when(omMetadataManager.getKeyTable(eq(BucketLayout.OBJECT_STORE)))
         .thenReturn(keyTableOBS);
+    when(keyTableOBS.getName()).thenReturn("keyTable");  // Mock table name for parallelization
     TypedTable.TypedTableIterator mockIterOBS = mock(TypedTable.TypedTableIterator.class);
     when(keyTableOBS.iterator()).thenReturn(mockIterOBS);
     // Simulate three keys then end.
@@ -120,6 +147,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     TypedTable<String, OmKeyInfo> keyTableFSO = mock(TypedTable.class);
     when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
         .thenReturn(keyTableFSO);
+    when(keyTableFSO.getName()).thenReturn("fileTable");  // Mock table name for parallelization
     TypedTable.TypedTableIterator mockIterFSO = mock(TypedTable.TypedTableIterator.class);
     when(keyTableFSO.iterator()).thenReturn(mockIterFSO);
     when(mockIterFSO.hasNext()).thenReturn(true, true, true, false);
@@ -127,9 +155,6 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     when(mockIterFSO.next()).thenReturn(mockKeyValueFSO);
     when(mockKeyValueFSO.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1], omKeyInfos[2]);
 
-    // Simulate a preexisting entry in the DB.
-    // (This record will be removed by the first task via table truncation.)
-    fileCountBySizeDao.insert(new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
     // Call reprocess on both tasks.
     ReconOmTask.TaskResult resultOBS = fileSizeCountTaskOBS.reprocess(omMetadataManager);
@@ -139,37 +164,31 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     assertTrue(resultOBS.isTaskSuccess(), "OBS reprocess should return true");
     assertTrue(resultFSO.isTaskSuccess(), "FSO reprocess should return true");
 
-    // After processing, there should be 3 rows (one per bin).
-    assertEquals(3, fileCountBySizeDao.count(), "Expected 3 rows in the DB");
-
-    // Now verify the counts in each bin.
+    // Verify RocksDB results.
+    // After processing, the data should be in RocksDB.
     // Because each task processes the same 3 keys and each key contributes a count of 1,
     // the final count per bin should be 2 (1 from OBS + 1 from FSO).
+    // Check bin for key size 1000L -> upper bound 1024L.
+    FileSizeCountKey rocksKey1 = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    Long rocksCount1 = reconFileMetadataManager.getFileSizeCount(rocksKey1);
+    assertNotNull(rocksCount1, "Expected RocksDB bin 1024 to exist");
+    assertEquals(2L, rocksCount1.longValue(), "Expected RocksDB bin 1024 to have count 2");
 
-    // Verify bin for key size 1000L -> upper bound 1024L.
-    Record3<String, String, Long> recordToFind = dslContext.newRecord(
-            FILE_COUNT_BY_SIZE.VOLUME,
-            FILE_COUNT_BY_SIZE.BUCKET,
-            FILE_COUNT_BY_SIZE.FILE_SIZE)
-        .value1("vol1")
-        .value2("bucket1")
-        .value3(1024L);
-    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
-        "Expected bin 1024 to have count 2");
+    // Check bin for key size 100000L -> upper bound 131072L.
+    FileSizeCountKey rocksKey2 = new FileSizeCountKey("vol1", "bucket1", 131072L);
+    Long rocksCount2 = reconFileMetadataManager.getFileSizeCount(rocksKey2);
+    assertNotNull(rocksCount2, "Expected RocksDB bin 131072 to exist");
+    assertEquals(2L, rocksCount2.longValue(), "Expected RocksDB bin 131072 to have count 2");
 
-    // Verify bin for key size 100000L -> upper bound 131072L.
-    recordToFind.value3(131072L);
-    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
-        "Expected bin 131072 to have count 2");
-
-    // Verify bin for key size 4PB -> upper bound Long.MAX_VALUE.
-    recordToFind.value3(Long.MAX_VALUE);
-    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
-        "Expected bin Long.MAX_VALUE to have count 2");
+    // Check bin for key size 4PB -> upper bound Long.MAX_VALUE.
+    FileSizeCountKey rocksKey3 = new FileSizeCountKey("vol1", "bucket1", Long.MAX_VALUE);
+    Long rocksCount3 = reconFileMetadataManager.getFileSizeCount(rocksKey3);
+    assertNotNull(rocksCount3, "Expected RocksDB bin Long.MAX_VALUE to exist");
+    assertEquals(2L, rocksCount3.longValue(), "Expected RocksDB bin Long.MAX_VALUE to have count 2");
   }
 
   @Test
-  public void testProcess() {
+  public void testProcess() throws IOException {
     // First batch: Write 2 keys.
     OmKeyInfo toBeDeletedKey = mock(OmKeyInfo.class);
     given(toBeDeletedKey.getVolumeName()).willReturn("vol1");
@@ -203,22 +222,20 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     // After processing the first batch:
-    // Since each endpoint processes the same events, the counts are doubled.
-    // Expected: 2 rows (bins 2048 and 16384) with counts 2 each.
-    assertEquals(2, fileCountBySizeDao.count());
-    Record3<String, String, Long> recordToFind = dslContext
-        .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
-            FILE_COUNT_BY_SIZE.BUCKET,
-            FILE_COUNT_BY_SIZE.FILE_SIZE)
-        .value1("vol1")
-        .value2("bucket1")
-        .value3(2048L);
-    assertEquals(1L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
-    // file size upper bound for 10000L is 16384L (next highest power of 2)
-    recordToFind.value3(16384L);
-    assertEquals(1L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    // Since each endpoint processes the same events, the counts are additive.
+    // Expected: 2 bins (2048 and 16384) with count 1 each.
+    
+    // Verify RocksDB bin for data size 2000L -> upper bound 2048L
+    FileSizeCountKey key2048 = new FileSizeCountKey("vol1", "bucket1", 2048L);
+    Long count2048 = reconFileMetadataManager.getFileSizeCount(key2048);
+    assertNotNull(count2048, "Expected RocksDB bin 2048 to exist");
+    assertEquals(1L, count2048.longValue(), "Expected RocksDB bin 2048 to have count 1");
+    
+    // Verify RocksDB bin for data size 10000L -> upper bound 16384L
+    FileSizeCountKey key16384 = new FileSizeCountKey("vol1", "bucket1", 16384L);
+    Long count16384 = reconFileMetadataManager.getFileSizeCount(key16384);
+    assertNotNull(count16384, "Expected RocksDB bin 16384 to exist");
+    assertEquals(1L, count16384.longValue(), "Expected RocksDB bin 16384 to have count 1");
 
     // Second batch: Process update events.
     // Add new key.
@@ -261,19 +278,33 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
     fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
-    assertEquals(4, fileCountBySizeDao.count());
-    recordToFind.value3(1024L);
-    assertEquals(1, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
-    recordToFind.value3(2048L);
-    assertEquals(0, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
-    recordToFind.value3(16384L);
-    assertEquals(0, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
-    recordToFind.value3(65536L);
-    assertEquals(1, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
+    // After the second batch (updates):
+    // New key (1000L) -> bin 1024L: count = 1
+    // Deleted key (2000L) -> bin 2048L: count = 0 (deleted)
+    // Updated key: old (10000L) -> bin 16384L: count = 0, new (50000L) -> bin 65536L: count = 1
+    
+    // Verify RocksDB bin for new key data size 1000L -> upper bound 1024L
+    FileSizeCountKey key1024 = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    Long count1024 = reconFileMetadataManager.getFileSizeCount(key1024);
+    assertNotNull(count1024, "Expected RocksDB bin 1024 to exist");
+    assertEquals(1L, count1024.longValue(), "Expected RocksDB bin 1024 to have count 1");
+    
+    // Verify RocksDB bin 2048L should be 0 (deleted key)
+    count2048 = reconFileMetadataManager.getFileSizeCount(key2048);
+    // Count might be null or 0 after deletion
+    Long expected2048 = count2048 != null ? count2048 : 0L;
+    assertEquals(0L, expected2048.longValue(), "Expected RocksDB bin 2048 to have count 0");
+    
+    // Verify RocksDB bin 16384L should be 0 (updated key moved out)
+    count16384 = reconFileMetadataManager.getFileSizeCount(key16384);
+    Long expected16384 = count16384 != null ? count16384 : 0L;
+    assertEquals(0L, expected16384.longValue(), "Expected RocksDB bin 16384 to have count 0");
+    
+    // Verify RocksDB bin for updated key data size 50000L -> upper bound 65536L
+    FileSizeCountKey key65536 = new FileSizeCountKey("vol1", "bucket1", 65536L);
+    Long count65536 = reconFileMetadataManager.getFileSizeCount(key65536);
+    assertNotNull(count65536, "Expected RocksDB bin 65536 to exist");
+    assertEquals(1L, count65536.longValue(), "Expected RocksDB bin 65536 to have count 1");
   }
 
   @Test
@@ -329,35 +360,32 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     assertTrue(resultOBS.isTaskSuccess());
     assertTrue(resultFSO.isTaskSuccess());
 
-    // 2 volumes * 500 buckets * 42 bins = 42000 rows
-    assertEquals(42000, fileCountBySizeDao.count());
-
-    // Verify counts for a few representative bins.
+    // Verify RocksDB data for scale test
+    // 2 volumes * 500 buckets * 42 unique keys each = large dataset processed
+    // Since both OBS and FSO tasks process the same data, counts should be doubled
+    
+    // Verify counts for a few representative bins in RocksDB.
     // For volume "vol1", bucket "bucket1", the first bin (upper bound 1024L) should have a count of 2.
-    Record3<String, String, Long> recordToFind = dslContext.newRecord(
-            FILE_COUNT_BY_SIZE.VOLUME,
-            FILE_COUNT_BY_SIZE.BUCKET,
-            FILE_COUNT_BY_SIZE.FILE_SIZE)
-        .value1("vol1")
-        .value2("bucket1")
-        .value3(1024L);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    FileSizeCountKey key1 = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    Long count1 = reconFileMetadataManager.getFileSizeCount(key1);
+    assertNotNull(count1, "Expected RocksDB bin vol1/bucket1/1024 to exist");
+    assertEquals(2L, count1.longValue(), "Expected RocksDB bin vol1/bucket1/1024 to have count 2");
 
     // For volume "vol1", bucket "bucket1", the bin with upper bound 131072L should have a count of 2.
-    recordToFind.value3(131072L);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    FileSizeCountKey key2 = new FileSizeCountKey("vol1", "bucket1", 131072L);
+    Long count2 = reconFileMetadataManager.getFileSizeCount(key2);
+    assertNotNull(count2, "Expected RocksDB bin vol1/bucket1/131072 to exist");
+    assertEquals(2L, count2.longValue(), "Expected RocksDB bin vol1/bucket1/131072 to have count 2");
 
     // For volume "vol1", bucket "bucket500", the highest bin (upper bound Long.MAX_VALUE) should have a count of 2.
-    recordToFind.value2("bucket500");
-    recordToFind.value3(Long.MAX_VALUE);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    FileSizeCountKey key3 = new FileSizeCountKey("vol1", "bucket500", Long.MAX_VALUE);
+    Long count3 = reconFileMetadataManager.getFileSizeCount(key3);
+    assertNotNull(count3, "Expected RocksDB bin vol1/bucket500/Long.MAX_VALUE to exist");
+    assertEquals(2L, count3.longValue(), "Expected RocksDB bin vol1/bucket500/Long.MAX_VALUE to have count 2");
   }
 
   @Test
-  public void testProcessAtScale() {
+  public void testProcessAtScale() throws IOException {
     // Write 10000 keys.
     List<OMDBUpdateEvent> omDbEventList = new ArrayList<>();
     List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
@@ -398,23 +426,20 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
     fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
-    // Verify 2 keys are in correct bins.
-    assertEquals(10000, fileCountBySizeDao.count());
-    Record3<String, String, Long> recordToFind = dslContext
-        .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
-            FILE_COUNT_BY_SIZE.BUCKET,
-            FILE_COUNT_BY_SIZE.FILE_SIZE)
-        .value1("vol1")
-        .value2("bucket1")
-        .value3(2048L);
-    assertEquals(1L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
-    recordToFind.value1("vol10");
-    recordToFind.value2("bucket100");
-    // file size upper bound for 10000L is 16384L (next highest power of 2)
-    recordToFind.value3(16384L);
-    assertEquals(1L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    // Verify initial data is correctly stored in RocksDB bins.
+    // 10 volumes * 100 buckets * 10 keys = 10000 total records processed
+    
+    // Verify RocksDB bin for key data size 1000L -> upper bound 2048L
+    FileSizeCountKey initialKey1 = new FileSizeCountKey("vol1", "bucket1", 2048L);
+    Long initialCount1 = reconFileMetadataManager.getFileSizeCount(initialKey1);
+    assertNotNull(initialCount1, "Expected RocksDB bin vol1/bucket1/2048 to exist");
+    assertEquals(1L, initialCount1.longValue(), "Expected RocksDB bin vol1/bucket1/2048 to have count 1");
+    
+    // Verify RocksDB bin for key data size 10000L -> upper bound 16384L
+    FileSizeCountKey initialKey2 = new FileSizeCountKey("vol10", "bucket100", 16384L);
+    Long initialCount2 = reconFileMetadataManager.getFileSizeCount(initialKey2);
+    assertNotNull(initialCount2, "Expected RocksDB bin vol10/bucket100/16384 to exist");
+    assertEquals(1L, initialCount2.longValue(), "Expected RocksDB bin vol10/bucket100/16384 to have count 1");
 
     // Process 500 deletes and 500 updates
     omDbEventList = new ArrayList<>();
@@ -475,56 +500,32 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
     fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
-    assertEquals(10000, fileCountBySizeDao.count());
-    recordToFind = dslContext
-        .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
-            FILE_COUNT_BY_SIZE.BUCKET,
-            FILE_COUNT_BY_SIZE.FILE_SIZE)
-        .value1("vol1")
-        .value2("bucket1")
-        .value3(1024L);
-    // The update events on keys 6-10 should now put them under first bin 1024L
-    assertEquals(5, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
-    recordToFind.value2("bucket100");
-    assertEquals(5, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
-    recordToFind.value3(2048L);
-    assertEquals(0, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
+    // Verify RocksDB data after updates and deletes
+    // The update events on keys 6-10 should now put them under first bin 1024L (data size 100L)
+    FileSizeCountKey updateKey1 = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    Long updateCount1 = reconFileMetadataManager.getFileSizeCount(updateKey1);
+    assertNotNull(updateCount1, "Expected RocksDB bin vol1/bucket1/1024 to exist after updates");
+    assertEquals(5L, updateCount1.longValue(), "Expected RocksDB bin vol1/bucket1/1024 to have count 5 after updates");
+
+    FileSizeCountKey updateKey2 = new FileSizeCountKey("vol1", "bucket100", 1024L);
+    Long updateCount2 = reconFileMetadataManager.getFileSizeCount(updateKey2);
+    assertNotNull(updateCount2, "Expected RocksDB bin vol1/bucket100/1024 to exist after updates");
+    assertEquals(5L, updateCount2.longValue(),
+        "Expected RocksDB bin vol1/bucket100/1024 to have count 5 after updates");
+
+    // Verify bin 2048L should be 0 after deletions
+    FileSizeCountKey deleteKey = new FileSizeCountKey("vol1", "bucket100", 2048L);
+    Long deleteCount = reconFileMetadataManager.getFileSizeCount(deleteKey);
+    // Count should be null or 0 after deletion
+    Long expectedDeleteCount = deleteCount != null ? deleteCount : 0L;
+    assertEquals(0L, expectedDeleteCount.longValue(),
+        "Expected RocksDB bin vol1/bucket100/2048 to have count 0 after deletions");
+
     // Volumes 2 - 10 should not be affected by this process
-    recordToFind.value1("vol2");
-    assertEquals(1, fileCountBySizeDao.findById(recordToFind)
-        .getCount().longValue());
+    FileSizeCountKey unaffectedKey = new FileSizeCountKey("vol2", "bucket1", 2048L);
+    Long unaffectedCount = reconFileMetadataManager.getFileSizeCount(unaffectedKey);
+    assertNotNull(unaffectedCount, "Expected RocksDB bin vol2/bucket1/2048 to remain unaffected");
+    assertEquals(1L, unaffectedCount.longValue(),
+        "Expected RocksDB bin vol2/bucket1/2048 to have count 1 (unaffected)");
   }
-
-  @Test
-  public void testTruncateTableExceptionPropagation() {
-    // Mock DSLContext and FileCountBySizeDao
-    DSLContext mockDslContext = mock(DSLContext.class);
-    FileCountBySizeDao mockDao = mock(FileCountBySizeDao.class);
-
-    // Mock schema definition and ensure it returns our mocked DSLContext
-    UtilizationSchemaDefinition mockSchema = mock(UtilizationSchemaDefinition.class);
-    when(mockSchema.getDSLContext()).thenReturn(mockDslContext);
-
-    // Mock delete operation to throw an exception
-    when(mockDslContext.delete(FILE_COUNT_BY_SIZE))
-        .thenThrow(new RuntimeException("Simulated DB failure"));
-
-    // Create instances of FileSizeCountTaskOBS and FileSizeCountTaskFSO using mocks
-    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
-    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
-
-    // Mock OMMetadataManager
-    OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-
-    // Verify that an exception is thrown from reprocess() for both tasks.
-    assertThrows(RuntimeException.class, () -> fileSizeCountTaskOBS.reprocess(omMetadataManager),
-        "Expected reprocess to propagate exception but it didn't.");
-
-    assertThrows(RuntimeException.class, () -> fileSizeCountTaskFSO.reprocess(omMetadataManager),
-        "Expected reprocess to propagate exception but it didn't.");
-  }
-
 }

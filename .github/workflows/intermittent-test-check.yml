@@ -95,7 +95,7 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   build:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
@@ -129,7 +129,7 @@ jobs:
           java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
-          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
@@ -149,7 +149,7 @@ jobs:
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
   run-test:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
@@ -199,7 +199,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
+          args="-DexcludedGroups=native|slow|unhealthy -DskipShade -Drocks_tools_native"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"

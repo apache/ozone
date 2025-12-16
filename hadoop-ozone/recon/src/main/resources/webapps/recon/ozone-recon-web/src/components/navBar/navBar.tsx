@@ -82,7 +82,7 @@ class NavBar extends React.Component<INavBarProps> {
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -141,10 +141,10 @@ class NavBar extends React.Component<INavBarProps> {
         </Menu.Item>
       </Menu.SubMenu>
     ), (
-      <Menu.Item key='/DiskUsage'
+      <Menu.Item key='/NamespaceUsage'
         icon={<PieChartOutlined />}>
         <span>Namespace Usage</span>
-        <Link to='/DiskUsage' />
+        <Link to='/NamespaceUsage' />
       </Menu.Item>
     ), (
       isHeatmapEnabled
