@@ -555,6 +555,7 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
       if (omKeyLocationInfoList != null) {
+        this.omKeyLocationInfoGroups.clear();
         this.omKeyLocationInfoGroups.addAll(omKeyLocationInfoList);
       }
       return this;
