@@ -126,13 +126,14 @@ public final class DiskBalancerVolumeCalculation {
     }
   }
 
-  public static double computeUtilization(HddsVolume volume, long delta) {
-    return computeUtilization(volume.getCurrentUsage(), volume.getCommittedBytes(), delta);
+  public static double computeUtilization(HddsVolume volume, long required) {
+    return computeUtilization(volume.getCurrentUsage(), volume.getCommittedBytes(), required);
   }
 
-  private static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long delta) {
-    assertTrue(usage.getCapacity() > 0);
-    return 1 - (usage.getAvailable() + committed + delta) / (double) usage.getCapacity();
+  private static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long required) {
+    final long capacity = usage.getCapacity();
+    assertTrue(capacity > 0);
+    return (capacity - usage.getAvailable() + committed + required) / (double) capacity;
   }
 
   /** {@link HddsVolume} with a {@link SpaceUsageSource.Fixed} usage. */
