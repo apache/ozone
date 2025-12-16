@@ -90,7 +90,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
           setKeyParentID(keyInfo);
 
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          handlePutKeyEventReprocess(keyInfo, nsSummaryMap);
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;

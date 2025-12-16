@@ -62,9 +62,48 @@ public class NSSummaryTaskDbEventHandler {
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      // Read-Modify-Write for each entry to prevent race conditions
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
-          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
+          Long parentId = entry.getKey();
+          NSSummary deltaSummary = entry.getValue();
+          
+          // Step 1: READ existing value from DB
+          NSSummary existingSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+          
+          if (existingSummary == null) {
+            // First time - just write the delta as-is
+            existingSummary = deltaSummary;
+          } else {
+            // Step 2: MODIFY - merge delta into existing
+            existingSummary.setNumOfFiles(existingSummary.getNumOfFiles() + deltaSummary.getNumOfFiles());
+            existingSummary.setSizeOfFiles(existingSummary.getSizeOfFiles() + deltaSummary.getSizeOfFiles());
+            existingSummary.setReplicatedSizeOfFiles(
+                existingSummary.getReplicatedSizeOfFiles() + deltaSummary.getReplicatedSizeOfFiles());
+            
+            // Merge file size buckets
+            int[] existingBucket = existingSummary.getFileSizeBucket();
+            int[] deltaBucket = deltaSummary.getFileSizeBucket();
+            for (int i = 0; i < existingBucket.length; i++) {
+              existingBucket[i] += deltaBucket[i];
+            }
+            existingSummary.setFileSizeBucket(existingBucket);
+            
+            // Merge child directory sets
+            existingSummary.getChildDir().addAll(deltaSummary.getChildDir());
+            
+            // Preserve metadata if not set in existing
+            if ((existingSummary.getDirName() == null || existingSummary.getDirName().isEmpty()) &&
+                (deltaSummary.getDirName() != null && !deltaSummary.getDirName().isEmpty())) {
+              existingSummary.setDirName(deltaSummary.getDirName());
+            }
+            if (existingSummary.getParentId() == 0 && deltaSummary.getParentId() != 0) {
+              existingSummary.setParentId(deltaSummary.getParentId());
+            }
+          }
+          
+          // Step 3: WRITE merged result back to DB
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, parentId, existingSummary);
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
           throw e;
@@ -86,15 +125,14 @@ public class NSSummaryTaskDbEventHandler {
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
+    // Try to get from map
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
+      // Read from DB during delta updates (process method)
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
     if (nsSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
+      // Create new instance if not found
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
@@ -118,6 +156,42 @@ public class NSSummaryTaskDbEventHandler {
 
     // Propagate upwards to all parents in the parent chain
     propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
+  }
+
+  /**
+   * Handle PUT key event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
+      NSSummary> nsSummaryMap) throws IOException {
+    long parentObjectId = keyInfo.getParentObjectID();
+    // Get from map only, no DB reads during reprocess
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+    if (nsSummary == null) {
+      // Create new instance if not found
+      nsSummary = new NSSummary();
+    }
+    int[] fileBucket = nsSummary.getFileSizeBucket();
+
+    // Update immediate parent's totals (includes all descendant files)
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
+
+    ++fileBucket[binIndex];
+    nsSummary.setFileSizeBucket(fileBucket);
+    nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Propagate upwards using reprocess-specific method
+    propagateSizeUpwardsReprocess(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -176,6 +250,64 @@ public class NSSummaryTaskDbEventHandler {
       
       // Propagate to grandparents and beyond
       propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
+          existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+    } else {
+      nsSummaryMap.put(parentObjectId, parentNSSummary);
+    }
+  }
+
+  /**
+   * Handle PUT directory event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutDirEventReprocess(OmDirectoryInfo directoryInfo,
+                                            Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    long parentObjectId = directoryInfo.getParentObjectID();
+    long objectId = directoryInfo.getObjectID();
+    // write the dir name to the current directory
+    String dirName = directoryInfo.getName();
+
+    // Get or create the directory's NSSummary (no DB reads during reprocess)
+    NSSummary curNSSummary = nsSummaryMap.get(objectId);
+    
+    // Check if this directory already has content (files/subdirs) that need propagation
+    boolean directoryAlreadyExists = (curNSSummary != null);
+    long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
+    int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
+    long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
+
+    if (!directoryAlreadyExists) {
+      curNSSummary = new NSSummary();
+    }
+    curNSSummary.setDirName(dirName);
+    curNSSummary.setParentId(parentObjectId);
+    nsSummaryMap.put(objectId, curNSSummary);
+
+    // Get or create the parent's NSSummary (no DB reads during reprocess)
+    NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNSSummary == null) {
+      // Create new instance if not found
+      parentNSSummary = new NSSummary();
+    }
+
+    // Add child directory to parent
+    parentNSSummary.addChildDir(objectId);
+    
+    // If the directory already existed with content, update immediate parent's stats
+    if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
+      parentNSSummary.setNumOfFiles(parentNSSummary.getNumOfFiles() + existingNumOfFiles);
+      parentNSSummary.setSizeOfFiles(parentNSSummary.getSizeOfFiles() + existingSizeOfFiles);
+      
+      long parentReplSize = parentNSSummary.getReplicatedSizeOfFiles();
+      if (parentReplSize < 0) {
+        parentReplSize = 0;
+      }
+      parentNSSummary.setReplicatedSizeOfFiles(parentReplSize + existingReplicatedSizeOfFiles);
+      nsSummaryMap.put(parentObjectId, parentNSSummary);
+      
+      // Propagate to grandparents and beyond using reprocess-specific method
+      propagateSizeUpwardsReprocess(parentObjectId, existingSizeOfFiles,
           existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
     } else {
       nsSummaryMap.put(parentObjectId, parentNSSummary);
@@ -342,11 +474,22 @@ public class NSSummaryTaskDbEventHandler {
         parentSummary.setReplicatedSizeOfFiles(parentReplSize + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
-        
+
         // Recursively propagate to grandparents
         propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }
     }
+  }
+
+  /**
+   * Propagates size and count changes upwards through the parent chain during reprocess.
+   * Used by reprocess method - does NOT read from DB, only works with in-memory map.
+   * This method will be implemented to handle the specific requirements of reprocess operation.
+   */
+  protected void propagateSizeUpwardsReprocess(long objectId, long sizeChange, long replicatedSizeChange,
+                                               int countChange, Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    // TODO: Implementation will be added to handle reprocess-specific propagation logic
   }
 
 }

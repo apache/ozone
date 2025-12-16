@@ -287,14 +287,14 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                       .setObjectID(keyInfo.getObjectID())
                       .setParentObjectID(keyInfo.getParentObjectID())
                       .build();
-              handlePutDirEvent(directoryInfo, nsSummaryMap);
+              handlePutDirEventReprocess(directoryInfo, nsSummaryMap);
             } else {
-              handlePutKeyEvent(keyInfo, nsSummaryMap);
+              handlePutKeyEventReprocess(keyInfo, nsSummaryMap);
             }
           } else {
             // The LEGACY bucket is an object store bucket.
             setParentBucketId(keyInfo);
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
+            handlePutKeyEventReprocess(keyInfo, nsSummaryMap);
           }
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {

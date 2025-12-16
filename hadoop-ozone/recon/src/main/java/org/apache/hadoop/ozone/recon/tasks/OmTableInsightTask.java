@@ -211,7 +211,7 @@ public class OmTableInsightTask implements ReconOmTask {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
-          count.incrementAndGet();
+            count.incrementAndGet();
         }
         return null;
       });
