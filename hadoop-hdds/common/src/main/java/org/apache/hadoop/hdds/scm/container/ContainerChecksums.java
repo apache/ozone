@@ -26,17 +26,18 @@ import net.jcip.annotations.Immutable;
  */
 @Immutable
 public final class ContainerChecksums {
-
-  private static final ContainerChecksums UNKNOWN =
-      new ContainerChecksums(-1L, -1L);
-
   // Checksum of the data within the wrapper.
   private final long dataChecksum;
+  // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
   private static final long UNSET_DATA_CHECKSUM = -1;
 
   // Checksum of the metadata within the wrapper.
   private final long metadataChecksum;
+  // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
   private static final long UNSET_METADATA_CHECKSUM = -1;
+
+  private static final ContainerChecksums UNKNOWN =
+      new ContainerChecksums(UNSET_DATA_CHECKSUM, UNSET_METADATA_CHECKSUM);
 
   private ContainerChecksums(long dataChecksum, long metadataChecksum) {
     this.dataChecksum = dataChecksum;
@@ -52,7 +53,6 @@ public final class ContainerChecksums {
   }
 
   public long getDataChecksum() {
-    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
     if (needsDataChecksum()) {
       return 0;
     }
@@ -64,7 +64,6 @@ public final class ContainerChecksums {
   }
 
   public long getMetadataChecksum() {
-    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
     if (needsMetadataChecksum()) {
       return 0;
     }

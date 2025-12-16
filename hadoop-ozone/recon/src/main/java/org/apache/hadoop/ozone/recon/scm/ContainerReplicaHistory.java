@@ -49,7 +49,7 @@ public class ContainerReplicaHistory {
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
     this.state = state;
-    this.checksums = checksums;
+    setChecksums(checksums);
   }
 
   public long getBcsId() {
@@ -93,7 +93,7 @@ public class ContainerReplicaHistory {
   }
 
   public void setChecksums(ContainerChecksums checksums) {
-    this.checksums = checksums;
+    this.checksums = checksums != null ? checksums : ContainerChecksums.unknown();
   }
 
   public static ContainerReplicaHistory fromProto(
@@ -107,7 +107,7 @@ public class ContainerReplicaHistory {
     return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
         .setBcsId(bcsId).setState(state)
-        .setDataChecksum(checksums != null ? checksums.getDataChecksum() : 0L)
+        .setDataChecksum(checksums.getDataChecksum())
         .build();
   }
 }
