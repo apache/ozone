@@ -78,7 +78,7 @@ public final class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
-  public static class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
+  public static final class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
     private String name;
     private String owner;
 
@@ -87,7 +87,7 @@ public final class OmDirectoryInfo extends WithParentObjectId
 
     private final AclListBuilder acls;
 
-    public Builder() {
+    private Builder() {
       this(AclListBuilder.empty());
     }
 
