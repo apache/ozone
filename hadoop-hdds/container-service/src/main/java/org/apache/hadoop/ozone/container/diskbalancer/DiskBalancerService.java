@@ -636,10 +636,10 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
-    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet);
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaSizes);
 
     // Calculate volumeDataDensity
-    final double volumeDatadensity = calculateVolumeDataDensity(volumeUsages, deltaSizes);
+    final double volumeDataDensity = calculateVolumeDataDensity(volumeUsages);
 
     long bytesToMove = 0;
     if (this.operationalState == DiskBalancerRunningStatus.RUNNING) {
@@ -650,7 +650,7 @@ public class DiskBalancerService extends BackgroundService {
 
     return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
   }
 
   public long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet) {
@@ -660,7 +660,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     // Calculate actual threshold
-    final double actualThreshold = getIdealUsage(inputVolumeSet, deltaSizes) + threshold / 100.0;
+    final double actualThreshold = getIdealUsage(inputVolumeSet) + threshold / 100.0;
 
     long totalBytesToMove = 0;
 
@@ -671,7 +671,7 @@ public class DiskBalancerService extends BackgroundService {
         continue;
       }
 
-      final double excess = volumeUsage.computeUtilization(deltaSizes) - actualThreshold;
+      final double excess = volumeUsage.getUtilization() - actualThreshold;
       // Only consider volumes that exceed the threshold (source volumes)
       if (excess > 0) {
         // Calculate excess bytes that need to be moved from this volume

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 
 import java.util.Comparator;
 import java.util.List;
@@ -62,14 +63,14 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
 
       // Calculate usages and sort in ascending order of utilization
       final List<VolumeFixedUsage> volumeUsages = allVolumes.stream()
-          .map(VolumeFixedUsage::new)
-          .sorted(Comparator.comparingDouble(v -> v.computeUtilization(deltaMap)))
+          .map(v -> newVolumeFixedUsage(v, deltaMap))
+          .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization))
           .collect(Collectors.toList());
 
       // Calculate the actual threshold and check src
-      final double actualThreshold = getIdealUsage(volumeUsages, deltaMap) + thresholdPercentage / 100;
+      final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100;
       final VolumeFixedUsage src = volumeUsages.get(volumeUsages.size() - 1);
-      if (src.computeUtilization(deltaMap) < actualThreshold) {
+      if (src.getUtilization() < actualThreshold) {
         return null; // all volumes are under the threshold
       }
 

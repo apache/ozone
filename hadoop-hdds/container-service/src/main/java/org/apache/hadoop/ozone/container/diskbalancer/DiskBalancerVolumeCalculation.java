@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -51,13 +51,13 @@ public final class DiskBalancerVolumeCalculation {
   
   /**
    * Get an immutable snapshot of volumes from a MutableVolumeSet.
-   * 
+   *
    * @param volumeSet The MutableVolumeSet to create a snapshot from
    * @return a list of volumes and usages
    */
-  public static List<VolumeFixedUsage> getVolumeUsages(MutableVolumeSet volumeSet) {
+  public static List<VolumeFixedUsage> getVolumeUsages(MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltas) {
     return volumeSet.getVolumesList().stream()
-        .map(VolumeFixedUsage::new)
+        .map(v -> newVolumeFixedUsage(v, deltas))
         .collect(Collectors.toList());
   }
   
@@ -65,25 +65,18 @@ public final class DiskBalancerVolumeCalculation {
    * Get ideal usage from an immutable list of volumes.
    * 
    * @param volumes Immutable list of volumes
-   * @param deltaMap A map that tracks the total bytes which will be freed
    * from each source volume during container moves
    * @return Ideal usage as a ratio (used space / total capacity)
    * @throws IllegalArgumentException if total capacity is zero
    */
-  public static double getIdealUsage(List<VolumeFixedUsage> volumes, Map<HddsVolume, Long> deltaMap) {
+  public static double getIdealUsage(List<VolumeFixedUsage> volumes) {
     long totalCapacity = 0L, totalEffectiveUsed = 0L;
     
     for (VolumeFixedUsage volumeUsage : volumes) {
-      final HddsVolume volume = volumeUsage.getVolume();
-      final SpaceUsageSource.Fixed usage = volumeUsage.getUsage();
-      totalCapacity += usage.getCapacity();
-      long currentUsed = usage.getCapacity() - usage.getAvailable();
-      long delta = (deltaMap != null) ? deltaMap.getOrDefault(volume, 0L) : 0L;
-      long committed = volume.getCommittedBytes();
-      totalEffectiveUsed += (currentUsed + delta + committed);
+      totalCapacity += volumeUsage.getUsage().getCapacity();
+      totalEffectiveUsed += volumeUsage.getEffectiveUsed();
     }
     
-    Preconditions.checkArgument(totalCapacity != 0);
     return ((double) (totalEffectiveUsed)) / totalCapacity;
   }
   
@@ -91,11 +84,9 @@ public final class DiskBalancerVolumeCalculation {
    * Calculate VolumeDataDensity.
    * 
    * @param volumeSet The MutableVolumeSet containing all volumes
-   * @param deltaMap Map of volume to delta sizes (ongoing operations), can be null
    * @return VolumeDataDensity sum across all volumes
    */
-  public static double calculateVolumeDataDensity(List<VolumeFixedUsage> volumeSet,
-      Map<HddsVolume, Long> deltaMap) {
+  public static double calculateVolumeDataDensity(List<VolumeFixedUsage> volumeSet) {
     if (volumeSet == null) {
       LOG.warn("VolumeSet is null, returning 0.0 for VolumeDataDensity");
       return 0.0;
@@ -108,12 +99,12 @@ public final class DiskBalancerVolumeCalculation {
       }
 
       // Calculate ideal usage using the same immutable volume snapshot
-      double idealUsage = getIdealUsage(volumeSet, deltaMap);
+      final double idealUsage = getIdealUsage(volumeSet);
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot
       for (VolumeFixedUsage volumeUsage : volumeSet) {
-        final double currentUsage = volumeUsage.computeUtilization(deltaMap);
+        final double currentUsage = volumeUsage.getUtilization();
 
         // Calculate density as absolute difference from ideal usage
         double volumeDensity = Math.abs(currentUsage - idealUsage);
@@ -126,28 +117,34 @@ public final class DiskBalancerVolumeCalculation {
     }
   }
 
-  public static double computeUtilization(HddsVolume volume, long required) {
-    return computeUtilization(volume.getCurrentUsage(), volume.getCommittedBytes(), required);
+  public static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long required) {
+    final long capacity = usage.getCapacity();
+    assertTrue(capacity > 0, () -> "capacity = " + capacity + " <= 0");
+    return computeEffectiveUsage(usage, committed, required) / (double) capacity;
   }
 
-  private static double computeUtilization(SpaceUsageSource.Fixed usage, long committed, long required) {
-    final long capacity = usage.getCapacity();
-    assertTrue(capacity > 0);
-    return (capacity - usage.getAvailable() + committed + required) / (double) capacity;
+  private static long computeEffectiveUsage(SpaceUsageSource.Fixed usage, long committed, long required) {
+    return usage.getCapacity() - usage.getAvailable() + committed + required;
+  }
+
+  public static VolumeFixedUsage newVolumeFixedUsage(StorageVolume volume, Map<HddsVolume, Long> deltaMap) {
+    final HddsVolume v = assertInstanceOf(volume, HddsVolume.class);
+    final long delta = deltaMap == null ? 0 : deltaMap.getOrDefault(v, 0L);
+    return new VolumeFixedUsage(v, delta);
   }
 
   /** {@link HddsVolume} with a {@link SpaceUsageSource.Fixed} usage. */
   public static class VolumeFixedUsage {
     private final HddsVolume volume;
     private final SpaceUsageSource.Fixed usage;
+    private final long effectiveUsed;
+    private final Double utilization;
 
-    public VolumeFixedUsage(HddsVolume volume) {
+    private VolumeFixedUsage(HddsVolume volume, long delta) {
       this.volume = volume;
       this.usage = volume.getCurrentUsage();
-    }
-
-    public VolumeFixedUsage(StorageVolume volume) {
-      this(assertInstanceOf(volume, HddsVolume.class));
+      this.effectiveUsed = computeEffectiveUsage(usage, volume.getCommittedBytes(), delta);
+      this.utilization = usage.getCapacity() > 0 ? computeUtilization(usage, volume.getCommittedBytes(), delta) : null;
     }
 
     public HddsVolume getVolume() {
@@ -158,14 +155,17 @@ public final class DiskBalancerVolumeCalculation {
       return usage;
     }
 
-    public double computeUtilization(Map<HddsVolume, Long> deltas) {
-      final long delta = deltas == null ? 0L : deltas.getOrDefault(volume, 0L);
-      return DiskBalancerVolumeCalculation.computeUtilization(usage, volume.getCommittedBytes(), delta);
+    public long getEffectiveUsed() {
+      return effectiveUsed;
+    }
+
+    public double getUtilization() {
+      return Objects.requireNonNull(utilization,  "utilization == null");
     }
 
     public long computeUsableSpace() {
-      final long minFreeSpace = volume.getFreeSpaceToSpare(usage.getCapacity());
-      return VolumeUsage.getUsableSpace(usage.getAvailable(), volume.getCommittedBytes(), minFreeSpace);
+      final long spared = volume.getFreeSpaceToSpare(usage.getCapacity());
+      return VolumeUsage.getUsableSpace(usage.getAvailable(), volume.getCommittedBytes(), spared);
     }
   }
 }

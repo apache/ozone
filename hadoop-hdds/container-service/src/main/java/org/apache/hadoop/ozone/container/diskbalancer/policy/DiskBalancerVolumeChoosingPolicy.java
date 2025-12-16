@@ -30,11 +30,11 @@ public interface DiskBalancerVolumeChoosingPolicy {
    * Choose a pair of volumes for balancing.
    *
    * @param volumeSet - volumes to choose from.
-   * @param threshold - the threshold to choose source and dest volumes.
+   * @param thresholdPercentage the threshold percentage in range [0, 100] to choose the source volume.
    * @param deltaSizes - the sizes changes of inProgress balancing jobs.
    * @param containerSize - the estimated size of container to be moved.
    * @return Source volume and Dest volume.
    */
   Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaSizes, long containerSize);
+      double thresholdPercentage, Map<HddsVolume, Long> deltaSizes, long containerSize);
 }

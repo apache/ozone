@@ -253,7 +253,7 @@ public class TestDiskBalancerService {
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
-    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet);
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, null);
     // data precision loss due to double data involved in calculation
     assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeUsages)) <= 1);
   }

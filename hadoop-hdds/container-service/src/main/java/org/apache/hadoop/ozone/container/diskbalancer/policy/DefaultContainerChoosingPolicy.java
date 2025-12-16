@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -69,18 +71,20 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     }
 
     // Calculate the actual threshold
-    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet);
-    final double actualThreshold = getIdealUsage(volumeUsages, deltaMap) + thresholdPercentage / 100.0;
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
+    final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100.0;
 
     // Find container
+    final SpaceUsageSource.Fixed dstUsage = dst.getCurrentUsage();
+    final long dstCommittedBytes = dst.getCommittedBytes();
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
           ContainerID.valueOf(containerData.getContainerID())) &&
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
-        // This is a candidate container. Now, check if moving it would be productive.
-        if (computeUtilization(dst, containerData.getBytesUsed()) < actualThreshold) {
+        // Check if dst can accept the candidate container.
+        if (computeUtilization(dstUsage, dstCommittedBytes, containerData.getBytesUsed()) < actualThreshold) {
           return containerData;
         }
       }
