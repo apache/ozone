@@ -42,8 +42,7 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
   private final String jmxEndpoint;
   private ReconUtils reconUtils;
 
-  public JmxServiceProviderImpl(OzoneConfiguration configuration,
-                                ReconUtils reconUtils, String jmxEndpoint) {
+  public JmxServiceProviderImpl(OzoneConfiguration configuration, ReconUtils reconUtils, String jmxEndpoint) {
 
     connectionFactory = URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
     // Remove the trailing slash from endpoint url.

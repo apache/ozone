@@ -57,8 +57,7 @@ public class DataNodeMetricsService {
   
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
   private static final int MAX_POOL_SIZE = 500;
-  private static final int KEEP_ALIVE_TIME = 60;
-  private static final int QUEUE_CAPACITY = 500;
+  private static final int KEEP_ALIVE_TIME = 5;
   private static final int POLL_INTERVAL_MS = 200;
   private static final int PER_NODE_TIMEOUT_MS = 120000;
 
@@ -89,12 +88,10 @@ public class DataNodeMetricsService {
         TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime = 0;
-    
-    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
     this.executorService = new ThreadPoolExecutor(
-        corePoolSize, MAX_POOL_SIZE,
+        0, MAX_POOL_SIZE,
         KEEP_ALIVE_TIME, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(QUEUE_CAPACITY),
+        new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder()
             .setNameFormat("DataNodeMetricsCollector-%d")
             .build());
@@ -112,7 +109,7 @@ public class DataNodeMetricsService {
     
     // Check rate limit
     if (System.currentTimeMillis() - lastCollectionEndTime < minimumApiDelayMs) {
-      LOG.info("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
+      LOG.debug("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
       return;
     }
 
@@ -126,7 +123,7 @@ public class DataNodeMetricsService {
 
     // Set status immediately before starting async collection
     currentStatus = MetricCollectionStatus.IN_PROGRESS;
-    LOG.info("Starting metrics collection for {} datanodes", nodes.size());
+    LOG.debug("Starting metrics collection for {} datanodes", nodes.size());
     
     // Run collection asynchronously so status can be queried
     CompletableFuture.runAsync(() -> collectMetrics(nodes), executorService)
@@ -267,7 +264,7 @@ public class DataNodeMetricsService {
       lastCollectionEndTime = System.currentTimeMillis();
     }
 
-    LOG.info("Metrics collection completed. Queried: {}, Failed: {}",
+    LOG.debug("Metrics collection completed. Queried: {}, Failed: {}",
         context.totalQueried, context.failed);
   }
 

@@ -860,7 +860,7 @@ public class ReconUtils {
     return null;
   }
 
-  public static long extractMetricValue(Map<String, Object> metrics, String keyName) {
+  public static long extractLongMetricValue(Map<String, Object> metrics, String keyName) {
     if (metrics == null || StringUtils.isEmpty(keyName)) {
       return  -1;
     }
@@ -872,7 +872,7 @@ public class ReconUtils {
       try {
         return Long.parseLong((String) value);
       } catch (NumberFormatException e) {
-        // Not a number string, fall through to return -1
+        log.error("Failed to parse long value for key: {} with value: {}", keyName, value, e);
       }
     }
     return -1;

@@ -47,7 +47,8 @@ public class PendingDeletionEndpoint {
   private final StorageContainerLocationProtocol scmClient;
 
   @Inject
-  public PendingDeletionEndpoint(ReconGlobalMetricsService reconGlobalMetricsService,
+  public PendingDeletionEndpoint(
+      ReconGlobalMetricsService reconGlobalMetricsService,
       DataNodeMetricsService dataNodeMetricsService,
       StorageContainerLocationProtocol scmClient) {
     this.reconGlobalMetricsService = reconGlobalMetricsService;

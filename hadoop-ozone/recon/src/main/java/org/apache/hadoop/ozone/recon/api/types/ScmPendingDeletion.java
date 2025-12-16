@@ -27,7 +27,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class ScmPendingDeletion {
   @JsonProperty("totalBlocksize")
   private final long totalBlocksize;
-  @JsonProperty
+  @JsonProperty("totalReplicatedBlocksize")
   private final long totalReplicatedBlockSize;
   @JsonProperty("totalBlocksCount")
   private final long totalBlocksCount;
