@@ -36,6 +36,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -76,7 +77,7 @@ public class DataNodeMetricsService {
   private Long totalPendingDeletion = 0L;
   private int totalNodesQueried;
   private int totalNodesFailed;
-  private long lastCollectionEndTime;
+  private AtomicLong lastCollectionEndTime = new AtomicLong(0L);
 
   @Inject
   public DataNodeMetricsService(
@@ -93,7 +94,7 @@ public class DataNodeMetricsService {
     this.maximumTaskTimeout = (int) config.getTimeDuration(OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT,
         OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
-    this.lastCollectionEndTime = 0;
+    this.lastCollectionEndTime.set(-minimumApiDelayMs);
     int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
     this.executorService = new ThreadPoolExecutor(
         corePoolSize, MAX_POOL_SIZE,
@@ -109,13 +110,13 @@ public class DataNodeMetricsService {
    */
   public void startTask() {
     // Check if already running
-    if (isRunning.compareAndSet(false, true)) {
+    if (!isRunning.compareAndSet(false, true)) {
       LOG.warn("Metrics collection already in progress, skipping");
       return;
     }
     
     // Check rate limit
-    if (System.currentTimeMillis() - lastCollectionEndTime < minimumApiDelayMs) {
+    if (System.currentTimeMillis() - lastCollectionEndTime.get() < minimumApiDelayMs) {
       LOG.debug("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
       isRunning.set(false);
       return;
@@ -272,7 +273,7 @@ public class DataNodeMetricsService {
       totalNodesFailed = context.failed;
       currentStatus = MetricCollectionStatus.SUCCEEDED;
       isRunning.set(false);
-      lastCollectionEndTime = System.currentTimeMillis();
+      lastCollectionEndTime.set(System.currentTimeMillis());
     }
 
     LOG.debug("Metrics collection completed. Queried: {}, Failed: {}",

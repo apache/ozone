@@ -228,11 +228,12 @@ public class TestStorageDistributionEndpoint {
       StringBuilder urlBuilder = new StringBuilder();
       urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=om");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
-      Map<String, Integer> pendingDeletionMap = MAPPER.readValue(response, Map.class);
-      assertEquals(30, pendingDeletionMap.get("totalSize"));
-      assertEquals(30, pendingDeletionMap.get("pendingDirectorySize") + pendingDeletionMap.get("pendingKeySize"));
+      Map<String, Number> pendingDeletionMap = MAPPER.readValue(response, Map.class);
+      assertEquals(30L, pendingDeletionMap.get("totalSize"));
+      assertEquals(30L, pendingDeletionMap.get("pendingDirectorySize").longValue() +
+          pendingDeletionMap.get("pendingKeySize").longValue());
       return true;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);
       return false;
     }
@@ -248,7 +249,7 @@ public class TestStorageDistributionEndpoint {
       assertEquals(10, pendingDeletion.getTotalBlocksize());
       assertEquals(10, pendingDeletion.getTotalBlocksCount());
       return true;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);
       return false;
     }
@@ -270,7 +271,7 @@ public class TestStorageDistributionEndpoint {
         assertEquals(10, dn.getPendingBlockSize());
       });
       return true;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);
       return false;
     }

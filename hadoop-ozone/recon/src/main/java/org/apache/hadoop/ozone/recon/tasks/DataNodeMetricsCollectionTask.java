@@ -59,7 +59,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
     LOG.debug("Collecting pending deletion metrics from DataNode {}", nodeDetails.getHostName());
     try {
       List<Map<String, Object>> metrics = metricsServiceProvider.getMetrics(BEAN_NAME);
-      if (metrics == null) {
+      if (metrics == null || metrics.isEmpty()) {
         return new DatanodePendingDeletionMetrics(
             nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
       }
