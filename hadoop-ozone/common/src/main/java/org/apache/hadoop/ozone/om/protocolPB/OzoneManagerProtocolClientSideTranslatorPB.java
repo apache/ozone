@@ -2740,6 +2740,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(submitRequest(omRequest));
   }
 
+  @Override
+  public void suspendLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SuspendLifecycleServiceRequest
+        suspendLifecycleServiceRequest =
+        OzoneManagerProtocolProtos.SuspendLifecycleServiceRequest
+            .newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.SuspendLifecycleService)
+        .setSuspendLifecycleServiceRequest(suspendLifecycleServiceRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
   private SafeMode toProtoBuf(SafeModeAction action) {
     switch (action) {
     case ENTER:

@@ -1237,4 +1237,15 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
+
+  /**
+   * Suspends the lifecycle service.
+   * The service will remain suspended until OM restarts, at which point it will
+   * be re-enabled based on the configuration.
+   * @throws IOException
+   */
+  default void suspendLifecycleService() throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
 }

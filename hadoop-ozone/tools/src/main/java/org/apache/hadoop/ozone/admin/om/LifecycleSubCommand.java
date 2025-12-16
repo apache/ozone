@@ -31,6 +31,7 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     subcommands = {
         LifecycleStatusSubCommand.class,
+        LifecycleSuspendSubCommand.class,
     })
 public class LifecycleSubCommand implements AdminSubcommand {
 

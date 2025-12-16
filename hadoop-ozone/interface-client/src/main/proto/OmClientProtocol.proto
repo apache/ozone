@@ -160,6 +160,7 @@ enum Type {
   GetLifecycleConfiguration   = 151;
   DeleteLifecycleConfiguration = 152;
   GetLifecycleServiceStatus    = 153;
+  SuspendLifecycleService      = 154;
 }
 
 enum SafeMode {
@@ -313,6 +314,7 @@ message OMRequest {
   optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 152;
 
   optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 153;
+  optional SuspendLifecycleServiceRequest suspendLifecycleServiceRequest = 154;
 }
 
 message OMResponse {
@@ -452,6 +454,7 @@ message OMResponse {
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 152;
 
   optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 153;
+  optional SuspendLifecycleServiceResponse suspendLifecycleServiceResponse = 154;
 }
 
 enum Status {
@@ -2445,5 +2448,11 @@ message GetLifecycleServiceStatusResponse {
   required bool isEnabled = 1;
   required bool isRunning = 2;
   repeated string runningBuckets = 3;
+}
+
+message SuspendLifecycleServiceRequest {
+}
+
+message SuspendLifecycleServiceResponse {
 }
 
