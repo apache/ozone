@@ -65,15 +65,12 @@ public final class OmDirectoryInfo extends WithParentObjectId
     return CODEC;
   }
 
-  /**
-   * Returns new builder class that builds a OmPrefixInfo.
-   *
-   * @return Builder
-   */
-  public static OmDirectoryInfo.Builder newBuilder() {
-    return new OmDirectoryInfo.Builder();
+  /** @return new {@code Builder} with default values */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
+  /** @return new {@code Builder} with values set from this {@code OmDirectoryInfo} */
   public Builder toBuilder() {
     return new Builder(this);
   }
@@ -98,7 +95,7 @@ public final class OmDirectoryInfo extends WithParentObjectId
       this.acls = acls;
     }
 
-    public Builder(OmDirectoryInfo obj) {
+    private Builder(OmDirectoryInfo obj) {
       super(obj);
       this.name = obj.name;
       this.owner = obj.owner;
@@ -150,13 +147,6 @@ public final class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder addAcl(OzoneAcl ozoneAcl) {
-      if (ozoneAcl != null) {
-        this.acls.add(ozoneAcl);
-      }
-      return this;
-    }
-
     @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
@@ -202,56 +192,43 @@ public final class OmDirectoryInfo extends WithParentObjectId
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.
    */
   public DirectoryInfo getProtobuf() {
-    final DirectoryInfo.Builder pib =
-            DirectoryInfo.newBuilder().setName(name)
-                    .setCreationTime(creationTime)
-                    .setModificationTime(modificationTime)
-                    .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
-                    .setObjectID(getObjectID())
-                    .setUpdateID(getUpdateID())
-                    .setParentID(getParentObjectID());
+    final DirectoryInfo.Builder builder = DirectoryInfo.newBuilder()
+        .setName(name)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .addAllAcls(OzoneAclUtil.toProtobuf(acls))
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
+        .setParentID(getParentObjectID());
     if (owner != null) {
-      pib.setOwnerName(owner);
+      builder.setOwnerName(owner);
     }
-    if (acls != null) {
-      pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
-    }
-    return pib.build();
+    return builder.build();
   }
 
   /**
    * Parses DirectoryInfo protobuf and creates OmDirectoryInfo Builder.
-   * @param dirInfo
    * @return Builder instance
    */
   public static Builder builderFromProtobuf(DirectoryInfo dirInfo) {
-    OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
-            .setName(dirInfo.getName())
-            .setCreationTime(dirInfo.getCreationTime())
-            .setModificationTime(dirInfo.getModificationTime())
-            .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
-    if (dirInfo.getMetadataList() != null) {
-      opib.addAllMetadata(KeyValueUtil
-              .getFromProtobuf(dirInfo.getMetadataList()));
-    }
-    if (dirInfo.hasObjectID()) {
-      opib.setObjectID(dirInfo.getObjectID());
-    }
-    if (dirInfo.hasParentID()) {
-      opib.setParentObjectID(dirInfo.getParentID());
-    }
-    if (dirInfo.hasUpdateID()) {
-      opib.setUpdateID(dirInfo.getUpdateID());
-    }
+    Builder builder = OmDirectoryInfo.newBuilder()
+        .setName(dirInfo.getName())
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime())
+        .setObjectID(dirInfo.getObjectID())
+        .setUpdateID(dirInfo.getUpdateID())
+        .setParentObjectID(dirInfo.getParentID())
+        .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()))
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(dirInfo.getMetadataList()));
     if (dirInfo.hasOwnerName()) {
-      opib.setOwner(dirInfo.getOwnerName());
+      builder.setOwner(dirInfo.getOwnerName());
     }
-    return opib;
+    return builder;
   }
 
   /**
    * Parses DirectoryInfo protobuf and creates OmDirectoryInfo.
-   * @param dirInfo
    * @return instance of OmDirectoryInfo
    */
   public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
@@ -267,15 +244,15 @@ public final class OmDirectoryInfo extends WithParentObjectId
       return false;
     }
     OmDirectoryInfo omDirInfo = (OmDirectoryInfo) o;
-    return creationTime == omDirInfo.creationTime &&
-            modificationTime == omDirInfo.modificationTime &&
-            name.equals(omDirInfo.name) &&
-            Objects.equals(owner, omDirInfo.owner) &&
-            Objects.equals(getMetadata(), omDirInfo.getMetadata()) &&
-            Objects.equals(acls, omDirInfo.acls) &&
-            getObjectID() == omDirInfo.getObjectID() &&
-            getUpdateID() == omDirInfo.getUpdateID() &&
-            getParentObjectID() == omDirInfo.getParentObjectID();
+    return creationTime == omDirInfo.creationTime
+        && modificationTime == omDirInfo.modificationTime
+        && getObjectID() == omDirInfo.getObjectID()
+        && getUpdateID() == omDirInfo.getUpdateID()
+        && getParentObjectID() == omDirInfo.getParentObjectID()
+        && Objects.equals(name, omDirInfo.name)
+        && Objects.equals(owner, omDirInfo.owner)
+        && Objects.equals(getMetadata(), omDirInfo.getMetadata())
+        && Objects.equals(acls, omDirInfo.acls);
   }
 
   @Override
