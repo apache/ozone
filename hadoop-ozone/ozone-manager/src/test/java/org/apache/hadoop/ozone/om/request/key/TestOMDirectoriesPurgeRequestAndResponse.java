@@ -233,7 +233,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   }
 
   private PurgePathRequest createBucketDataAndGetPurgePathRequest(OmBucketInfo bucketInfo) throws Exception {
-    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
         .setName("dir1")
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -248,7 +248,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> subFileKeys = new ArrayList<>();
     List<String> subDirKeys = new ArrayList<>();
     for (int id = 1; id < 10; id++) {
-      OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo subdir = OmDirectoryInfo.newBuilder()
           .setName("subdir" + id)
           .setCreationTime(Time.now())
           .setModificationTime(Time.now())
@@ -372,7 +372,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     long purgeUsedNamespaceCountBeforePurge = bucketInfo.getSnapshotUsedNamespace();
-    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
         .setName("dir1")
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -389,7 +389,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> deletedSubDirKeys = new ArrayList<>();
     List<String> deletedSubFiles = new ArrayList<>();
     for (int id = 0; id < numberOfSubEntries; id++) {
-      OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo subdir = OmDirectoryInfo.newBuilder()
           .setName("subdir" + id)
           .setCreationTime(Time.now())
           .setModificationTime(Time.now())

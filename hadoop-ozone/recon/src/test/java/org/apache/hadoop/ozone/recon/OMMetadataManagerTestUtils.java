@@ -445,7 +445,7 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
             bucketObjectId, parentObjectId, dirName);
     omMetadataManager.getDirectoryTable().put(omKey,
-            new OmDirectoryInfo.Builder()
+            OmDirectoryInfo.newBuilder()
                     .setName(dirName)
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)

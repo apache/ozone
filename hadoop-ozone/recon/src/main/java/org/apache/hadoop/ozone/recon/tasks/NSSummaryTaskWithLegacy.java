@@ -180,7 +180,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         LOG.debug("Skipping DB update event for Key: {}", action);
       }
     } else {
-      OmDirectoryInfo updatedDirectoryInfo = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo updatedDirectoryInfo = OmDirectoryInfo.newBuilder()
           .setName(updatedKeyInfo.getKeyName())
           .setObjectID(updatedKeyInfo.getObjectID())
           .setParentObjectID(updatedKeyParentObjectID)
@@ -190,7 +190,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
       if (oldKeyInfo != null) {
         oldDirectoryInfo =
-            new OmDirectoryInfo.Builder()
+            OmDirectoryInfo.newBuilder()
                 .setName(oldKeyInfo.getKeyName())
                 .setObjectID(oldKeyInfo.getObjectID())
                 .setParentObjectID(oldKeyInfo.getParentObjectID())
@@ -282,7 +282,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
             if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
               OmDirectoryInfo directoryInfo =
-                  new OmDirectoryInfo.Builder()
+                  OmDirectoryInfo.newBuilder()
                       .setName(keyInfo.getKeyName())
                       .setObjectID(keyInfo.getObjectID())
                       .setParentObjectID(parentObjectID)
