@@ -245,7 +245,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       if (!processDirTableInParallel(omMetadataManager, dirFlusher)) {
         return false;
       }
-      // dirFlusher.close() drains queue and persists skeletons before files stage
+      // dirFlusher.close() drains queue and stops thread
     } catch (Exception ex) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB (dir phase).", ex);
       return false;
@@ -260,12 +260,12 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       // fileFlusher.close() drains queue and persists file deltas with propagation
     } catch (Exception ex) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB (file phase).", ex);
-              return false;
-            }
+      return false;
+    }
 
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
-      }
+  }
 
   /**
    * Process dirTable in parallel using per-worker maps with async flushing.
@@ -309,7 +309,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process dirTable in parallel", ex);
       return false;
     }
-    
+
     // Submit any remaining worker maps
     for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
       if (!remainingMap.isEmpty()) {

@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -37,15 +37,19 @@ import org.slf4j.LoggerFactory;
  */
 public class NSSummaryAsyncFlusher implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAsyncFlusher.class);
+
+  private enum FlushState {
+    RUNNING,
+    STOPPING,
+    STOPPED
+  }
   
   private final BlockingQueue<Map<Long, NSSummary>> flushQueue;
   private final Thread backgroundFlusher;
-  private final AtomicBoolean running = new AtomicBoolean(true);
+  private final AtomicReference<FlushState> state =
+      new AtomicReference<>(FlushState.RUNNING);
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final String taskName;
-  
-  // Sentinel value to signal shutdown
-  private static final Map<Long, NSSummary> SHUTDOWN_SIGNAL = new HashMap<>();
   
   public NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                 String taskName,
@@ -73,17 +77,12 @@ public class NSSummaryAsyncFlusher implements Closeable {
    * Background thread loop that processes flush queue.
    */
   private void flushLoop() {
-    while (running.get()) {
+    while (state.get() == FlushState.RUNNING || !flushQueue.isEmpty()) {
       try {
-        Map<Long, NSSummary> workerMap = flushQueue.poll(1, TimeUnit.SECONDS);
+        Map<Long, NSSummary> workerMap = flushQueue.poll(100, TimeUnit.MILLISECONDS);
         
         if (workerMap == null) {
           continue;  // Timeout, check running flag
-        }
-        
-        if (workerMap == SHUTDOWN_SIGNAL) {
-          LOG.info("{}: Received shutdown signal", taskName);
-          break;
         }
         
         // Process this batch
@@ -92,6 +91,14 @@ public class NSSummaryAsyncFlusher implements Closeable {
         LOG.debug("{}: Background thread finished batch", taskName);
         
       } catch (InterruptedException e) {
+        // If we're stopping, ignore interrupts and keep draining the queue.
+        // Otherwise, preserve interrupt and exit.
+        if (state.get() == FlushState.STOPPING) {
+          LOG.debug("{}: Flusher thread interrupted while stopping; continuing to drain queue",
+              taskName);
+          Thread.interrupted(); // clear interrupt flag
+          continue;
+        }
         LOG.info("{}: Flusher thread interrupted", taskName);
         Thread.currentThread().interrupt();
         break;
@@ -100,6 +107,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
         // Continue processing other batches
       }
     }
+    state.set(FlushState.STOPPED);
     LOG.info("{}: Async flusher stopped", taskName);
   }
   
@@ -120,7 +128,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
       if (actualParent == null) {
         actualParent = reconNamespaceSummaryManager.getNSSummary(immediateParentId);
       }
-      
+
       if (actualParent == null) {
         // Parent doesn't exist in DB yet - use delta as base (has metadata like dirName, parentId)
         actualParent = delta;
@@ -129,7 +137,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
         actualParent.setNumOfFiles(actualParent.getNumOfFiles() + delta.getNumOfFiles());
         actualParent.setSizeOfFiles(actualParent.getSizeOfFiles() + delta.getSizeOfFiles());
         actualParent.setReplicatedSizeOfFiles(actualParent.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
-        
+
         // Merge file size buckets
         int[] actualBucket = actualParent.getFileSizeBucket();
         int[] deltaBucket = delta.getFileSizeBucket();
@@ -144,9 +152,11 @@ public class NSSummaryAsyncFlusher implements Closeable {
 
       // Store updated ACTUAL parent in merged map
       mergedMap.put(immediateParentId, actualParent);
-      
-      // Propagate delta to ancestors (grandparent, great-grandparent, etc.)
-      propagateDeltaToAncestors(actualParent.getParentId(), delta, mergedMap);
+
+      if (delta.getSizeOfFiles() > 0 || delta.getNumOfFiles() > 0) {
+        // Propagate delta to ancestors (grandparent, great-grandparent, etc.)
+        propagateDeltaToAncestors(actualParent.getParentId(), delta, mergedMap);
+      }
     }
     
     // Write merged map to DB (simple batch write, no more R-M-W needed)
@@ -155,7 +165,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
   }
   
   /**
-   * Recursively propagate delta values up the ancestor chain.
+   * Recursively propagate delta values up the ancestor Id.
    * Pattern: Check merged map first (for updates in this batch), then DB, for ACTUAL value.
    */
   private void propagateDeltaToAncestors(long ancestorId, NSSummary delta, 
@@ -170,8 +180,8 @@ public class NSSummaryAsyncFlusher implements Closeable {
     if (actualAncestor == null) {
       actualAncestor = reconNamespaceSummaryManager.getNSSummary(ancestorId);
       if (actualAncestor == null) {
-        // Ancestor not in DB yet, create new
-        actualAncestor = new NSSummary();
+        // Ancestor not in DB yet return
+        return;
       }
     }
     
@@ -208,51 +218,10 @@ public class NSSummaryAsyncFlusher implements Closeable {
   @Override
   public void close() throws IOException {
     LOG.info("{}: Shutting down async flusher", taskName);
-    
-    // Wait for queue to drain before shutting down
-    long waitStart = System.currentTimeMillis();
-    while (!flushQueue.isEmpty() && (System.currentTimeMillis() - waitStart) < 10000) {
-      try {
-        Thread.sleep(100);  // Give background thread time to process
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      }
-    }
-    
-    running.set(false);
-    
     try {
-      // Send shutdown signal
-      flushQueue.offer(SHUTDOWN_SIGNAL, 5, TimeUnit.SECONDS);
-      
-      // Wait for background thread to finish
-      backgroundFlusher.join(30000);  // 30 second timeout
-      
-      if (backgroundFlusher.isAlive()) {
-        LOG.warn("{}: Background flusher did not stop gracefully, interrupting", taskName);
-        backgroundFlusher.interrupt();
-      }
-      
-      // Flush any remaining items
-      int remainingCount = flushQueue.size();
-      LOG.info("{}: Draining remaining {} items from queue", taskName, remainingCount);
-      Map<Long, NSSummary> remaining;
-      int processed = 0;
-      while ((remaining = flushQueue.poll()) != null) {
-        if (remaining != SHUTDOWN_SIGNAL) {
-          try {
-            LOG.info("{}: Draining item {} with {} entries", taskName, ++processed, remaining.size());
-            flushWithPropagation(remaining);
-            LOG.info("{}: Successfully flushed item {}", taskName, processed);
-          } catch (Exception e) {
-            LOG.error("{}: Error flushing item {} during drain", taskName, processed, e);
-            // Continue draining other items
-          }
-        }
-      }
-      LOG.info("{}: Finished draining, processed {} of {} items", taskName, processed, remainingCount);
-      
+      // Tell the background thread to stop once the queue is drained.
+      state.set(FlushState.STOPPING);
+      backgroundFlusher.join();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while shutting down async flusher", e);

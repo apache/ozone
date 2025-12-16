@@ -189,9 +189,6 @@ public class NSSummaryTaskDbEventHandler {
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
-
-    // Propagate upwards using reprocess-specific method
-    propagateSizeUpwardsReprocess(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -270,20 +267,13 @@ public class NSSummaryTaskDbEventHandler {
 
     // Get or create the directory's NSSummary (no DB reads during reprocess)
     NSSummary curNSSummary = nsSummaryMap.get(objectId);
-    
-    // Check if this directory already has content (files/subdirs) that need propagation
-    boolean directoryAlreadyExists = (curNSSummary != null);
-    long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
-    int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
-    long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
-
-    if (!directoryAlreadyExists) {
+    if (curNSSummary == null) {
       curNSSummary = new NSSummary();
     }
+
     curNSSummary.setDirName(dirName);
     curNSSummary.setParentId(parentObjectId);
     nsSummaryMap.put(objectId, curNSSummary);
-    LOG.info("Set dir metadata: objectId={}, dirName={}, parentId={}", objectId, dirName, parentObjectId);
 
     // Get or create the parent's NSSummary (no DB reads during reprocess)
     NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
@@ -296,23 +286,7 @@ public class NSSummaryTaskDbEventHandler {
     parentNSSummary.addChildDir(objectId);
     
     // If the directory already existed with content, update immediate parent's stats
-    if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
-      parentNSSummary.setNumOfFiles(parentNSSummary.getNumOfFiles() + existingNumOfFiles);
-      parentNSSummary.setSizeOfFiles(parentNSSummary.getSizeOfFiles() + existingSizeOfFiles);
-      
-      long parentReplSize = parentNSSummary.getReplicatedSizeOfFiles();
-      if (parentReplSize < 0) {
-        parentReplSize = 0;
-      }
-      parentNSSummary.setReplicatedSizeOfFiles(parentReplSize + existingReplicatedSizeOfFiles);
-      nsSummaryMap.put(parentObjectId, parentNSSummary);
-      
-      // Propagate to grandparents and beyond using reprocess-specific method
-      propagateSizeUpwardsReprocess(parentObjectId, existingSizeOfFiles,
-          existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
-    } else {
-      nsSummaryMap.put(parentObjectId, parentNSSummary);
-    }
+    nsSummaryMap.put(parentObjectId, parentNSSummary);
   }
 
   protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
