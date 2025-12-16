@@ -134,7 +134,7 @@ public final class DiskBalancerVolumeCalculation {
   }
 
   /** {@link HddsVolume} with a {@link SpaceUsageSource.Fixed} usage. */
-  public static class VolumeFixedUsage {
+  public static final class VolumeFixedUsage {
     private final HddsVolume volume;
     private final SpaceUsageSource.Fixed usage;
     private final long effectiveUsed;
