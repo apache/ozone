@@ -212,6 +212,9 @@ public final class ContainerUtils {
         try (InputStream in = Files.newInputStream(path.toPath())) {
           return DatanodeDetails.getFromProtoBuf(
               HddsProtos.DatanodeDetailsProto.parseFrom(in));
+        } catch (IOException io) {
+          throw new IOException("Failed to parse DatanodeDetails from "
+              + path.getAbsolutePath(), io);
         }
       }
     }
