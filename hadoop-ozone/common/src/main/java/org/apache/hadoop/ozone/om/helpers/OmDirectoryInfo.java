@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Objects;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -36,13 +35,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Directo
  * path. Also, it stores directory node related metadata details.
  */
 @Immutable
-public final class OmDirectoryInfo extends WithParentObjectId
-    implements CopyObject<OmDirectoryInfo> {
+public final class OmDirectoryInfo extends WithParentObjectId {
+
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
       OmDirectoryInfo::getFromProtobuf,
       OmDirectoryInfo::getProtobuf,
-      OmDirectoryInfo.class);
+      OmDirectoryInfo.class,
+      DelegatedCodec.CopyType.SHALLOW);
 
   private final String name; // directory name
   private final String owner;
@@ -254,10 +254,5 @@ public final class OmDirectoryInfo extends WithParentObjectId
   @Override
   public int hashCode() {
     return Objects.hash(getObjectID(), getParentObjectID(), name);
-  }
-
-  @Override
-  public OmDirectoryInfo copyObject() {
-    return this;
   }
 }
