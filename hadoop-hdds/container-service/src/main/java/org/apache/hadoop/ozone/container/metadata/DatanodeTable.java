@@ -69,12 +69,13 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException {
+  public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException, RocksDatabaseException {
     table.deleteWithBatch(batch, key);
   }
 
   @Override
-  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
+  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey)
+      throws CodecException, RocksDatabaseException {
     table.deleteRangeWithBatch(batch, beginKey, endKey);
   }
 

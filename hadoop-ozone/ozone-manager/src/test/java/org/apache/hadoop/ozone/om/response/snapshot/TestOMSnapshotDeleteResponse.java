@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -77,7 +78,7 @@ public class TestOMSnapshotDeleteResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws RocksDatabaseException {
     if (batchOperation != null) {
       batchOperation.close();
     }

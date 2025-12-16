@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -51,7 +52,7 @@ public class TestOMDelegationTokenResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws RocksDatabaseException {
     if (batchOperation != null) {
       batchOperation.close();
     }

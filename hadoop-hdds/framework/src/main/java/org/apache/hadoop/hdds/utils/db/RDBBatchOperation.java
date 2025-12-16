@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * Note that a {@link RDBBatchOperation} object only for one batch.
  * Also, this class is not threadsafe.
  */
-public class RDBBatchOperation implements BatchOperation {
+public class RDBBatchOperation implements AbstractRDBBatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
 
   private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
@@ -57,6 +57,8 @@ public class RDBBatchOperation implements BatchOperation {
   private final String name = "Batch-" + BATCH_COUNT.getAndIncrement();
 
   private final ManagedWriteBatch writeBatch;
+
+  private long batchSize;
 
   private final OpCache opCache = new OpCache();
 
@@ -491,22 +493,25 @@ public class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      private void deleteIfExist(Bytes key, boolean removeFromIndexMap) {
+      private int deleteIfExist(Bytes key, boolean removeFromIndexMap) {
         // remove previous first in order to call release()
+        int previousLength = 0;
         if (opsKeys.containsKey(key)) {
           int previousIndex = removeFromIndexMap ? opsKeys.remove(key) : opsKeys.get(key);
           final Operation previous = batchOps.remove(previousIndex);
           previous.close();
-          discardedSize += previous.totalLength();
+          previousLength = previous.totalLength();
+          discardedSize += previousLength;
           discardedCount++;
           debug(() -> String.format("%s overwriting a previous %s[valLen => %s]", this, previous.getOpType(),
               previous.valLen()));
         }
+        return previousLength;
       }
 
-      void overWriteOpIfExist(Bytes key, Operation operation) {
+      int overWriteOpIfExist(Bytes key, Operation operation) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
-        deleteIfExist(key, true);
+        int previousLength = deleteIfExist(key, true);
         batchSize += operation.totalLength();
         int newIndex = opIndex.getAndIncrement();
         final Integer overwritten = opsKeys.put(key, newIndex);
@@ -516,31 +521,36 @@ public class RDBBatchOperation implements BatchOperation {
             Op.DELETE == operation.getOpType() ? delString(operation.totalLength()) : putString(operation.keyLen(),
                 operation.valLen()),
             batchSizeDiscardedString(), key));
+        return operation.totalLength() - previousLength;
       }
 
-      void put(CodecBuffer key, CodecBuffer value) {
+      int put(CodecBuffer key, CodecBuffer value) {
         putCount++;
 
         // always release the key with the value
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new CodecBufferPutOperation(key, value, keyBytes));
+        return overWriteOpIfExist(keyBytes, new CodecBufferPutOperation(key, value, keyBytes));
       }
 
-      void put(byte[] key, byte[] value) {
+      int put(byte[] key, byte[] value) {
         putCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new ByteArrayPutOperation(key, value, keyBytes));
+        return overWriteOpIfExist(keyBytes, new ByteArrayPutOperation(key, value, keyBytes));
       }
 
-      void delete(byte[] key) {
+      int delete(byte[] key) {
         delCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new DeleteOperation(key, keyBytes));
+        return overWriteOpIfExist(keyBytes, new DeleteOperation(key, keyBytes));
       }
 
-      void deleteRange(byte[] startKey, byte[] endKey) {
+      int deleteRange(byte[] startKey, byte[] endKey) {
         delRangeCount++;
-        batchOps.put(opIndex.getAndIncrement(), new DeleteRangeOperation(startKey, endKey));
+        DeleteRangeOperation deleteRangeOperation = new DeleteRangeOperation(startKey, endKey);
+        batchOps.put(opIndex.getAndIncrement(), deleteRangeOperation);
+        int deleteRangeOperationLength = deleteRangeOperation.totalLength();
+        batchSize += deleteRangeOperationLength;
+        return deleteRangeOperationLength;
       }
 
       String putString(int keySize, int valueSize) {
@@ -565,35 +575,32 @@ public class RDBBatchOperation implements BatchOperation {
       }
     }
 
-    void put(ColumnFamily f, CodecBuffer key, CodecBuffer value) {
-      name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
-          .put(key, value);
+    private void put(ColumnFamily f, CodecBuffer key, CodecBuffer value) {
+      batchSize += name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f)).put(key, value);
     }
 
-    void put(ColumnFamily f, byte[] key, byte[] value) {
-      name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
-          .put(key, value);
+    private void put(ColumnFamily f, byte[] key, byte[] value) {
+      batchSize += name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f)).put(key, value);
     }
 
-    void delete(ColumnFamily family, byte[] key) {
-      name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
-          .delete(key);
+    private void delete(ColumnFamily family, byte[] key) {
+      batchSize += name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family)).delete(key);
     }
 
-    void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
-      name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
+    private void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
+      batchSize += name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
           .deleteRange(startKey, endKey);
     }
 
     /** Prepare batch write for the entire cache. */
-    UncheckedAutoCloseable prepareBatchWrite() throws RocksDatabaseException {
+    private UncheckedAutoCloseable prepareBatchWrite() throws RocksDatabaseException {
       for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
         e.getValue().prepareBatchWrite();
       }
       return this::clear;
     }
 
-    void clear() {
+    private void clear() {
       for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
         e.getValue().clear();
       }
@@ -629,10 +636,12 @@ public class RDBBatchOperation implements BatchOperation {
 
   public RDBBatchOperation() {
     writeBatch = new ManagedWriteBatch();
+    this.batchSize = 0;
   }
 
   public RDBBatchOperation(ManagedWriteBatch writeBatch) {
     this.writeBatch = writeBatch;
+    this.batchSize = 0;
   }
 
   @Override
@@ -663,18 +672,27 @@ public class RDBBatchOperation implements BatchOperation {
     opCache.clear();
   }
 
+  @Override
+  public long size() {
+    return batchSize;
+  }
+
+  @Override
   public void delete(ColumnFamily family, byte[] key) {
     opCache.delete(family, key);
   }
 
+  @Override
   public void put(ColumnFamily family, CodecBuffer key, CodecBuffer value) {
     opCache.put(family, key, value);
   }
 
+  @Override
   public void put(ColumnFamily family, byte[] key, byte[] value) {
     opCache.put(family, key, value);
   }
 
+  @Override
   public void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
     opCache.deleteRange(family, startKey, endKey);
   }
