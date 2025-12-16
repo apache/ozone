@@ -29,7 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -169,15 +168,13 @@ public class SCMSafeModeManager implements SafeModeManager {
       emitSafeModeStatus();
     }
 
-    if (validatedRules.size() == exitRules.size()) {
+    if (validatedRules.size() == exitRules.size()
+        && status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
       logSafeModeStatus();
-      
-      if (status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
-        // All rules are satisfied, we can exit safe mode.
-        LOG.info("ScmSafeModeManager, all rules are successfully validated");
-        LOG.info("SCM exiting safe mode.");
-        emitSafeModeStatus();
-      }
+      // All rules are satisfied, we can exit safe mode.
+      LOG.info("ScmSafeModeManager, all rules are successfully validated");
+      LOG.info("SCM exiting safe mode.");
+      emitSafeModeStatus();
     }
   }
 
@@ -264,34 +261,37 @@ public class SCMSafeModeManager implements SafeModeManager {
     LOG.info("Started periodic Safe Mode logging with interval {} ms", safeModeLogIntervalMs);
   }
 
-  private void logSafeModeStatus() {
+  private synchronized void logSafeModeStatus() {
+    SafeModeStatus safeModeStatus = status.get();
+    int validatedCount = validatedRules.size();
+    int preCheckValidatedCount = validatedPreCheckRules.size();
+    StringBuilder statusLog = new StringBuilder();
+    statusLog.append(String.format(
+        "\nSCM SafeMode Status | state=%s preCheckComplete=%s validatedPreCheckRules=%d/%d validatedRules=%d/%d",
+        safeModeStatus.isInSafeMode() ? 
+            (safeModeStatus.isPreCheckComplete() ? "PRE_CHECKS_PASSED" : "INITIAL") : "OUT_OF_SAFE_MODE",
+        safeModeStatus.isPreCheckComplete(), preCheckValidatedCount, preCheckRules.size(), validatedCount,
+        exitRules.size()));
+    
+    for (SafeModeExitRule<?> rule : exitRules.values()) {
+      String name = rule.getRuleName();
+      boolean isValidated = validatedRules.contains(name);
+      String statusText = rule.getStatusText();
+      
+      if (statusText.endsWith(";")) {
+        statusText = statusText.substring(0, statusText.length() - 1);
+      }
+
+      statusLog.append(String.format("\nSCM SafeMode Status | %s (%s) %s",
+          name,
+          isValidated ? "validated" : "waiting",
+          statusText));
+    }
+
+    LOG.info(statusLog.toString());
     if (!getInSafeMode()) {
       stopSafeModePeriodicLogger();
-      return;
     }
-    SafeModeStatus safeModeStatus = status.get();
-    int validatedCount;
-    int preCheckValidatedCount;
-    synchronized (this) {
-      validatedCount = validatedRules.size();
-      preCheckValidatedCount = validatedPreCheckRules.size();
-    }
-    String rules = exitRules.values().stream()
-        .map(rule -> {
-          String name = rule.getRuleName();
-          boolean isValidated;
-          synchronized (this) {
-            isValidated = validatedRules.contains(name);
-          }
-          return name + "(status=" + (isValidated ? "validated" : "waiting")
-              + ", " + rule.getStatusText() + ")";
-        })
-        .collect(Collectors.joining(", "));
-    LOG.info(
-        "SCM SafeMode periodic status: state={}, preCheckComplete={}, validatedRules={}/{}," +
-            " preCheckValidated={}/{}, rules=[{}]",
-        safeModeStatus, safeModeStatus.isPreCheckComplete(), validatedCount, exitRules.size(),
-        preCheckValidatedCount, preCheckRules.size(), rules);
   }
 
   private synchronized void stopSafeModePeriodicLogger() {
