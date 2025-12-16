@@ -116,8 +116,6 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
 
-      // Clear / delete the tags
-      // Set the UpdateId to the current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setTags(Collections.emptyMap())
           .setUpdateID(trxnLogIndex)

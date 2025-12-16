@@ -127,7 +127,6 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
 
-      // Set the tags
       omKeyInfo = omKeyInfo.toBuilder()
           .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .setUpdateID(trxnLogIndex)

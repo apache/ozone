@@ -116,7 +116,6 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
 
-      // Set the tags
       omKeyInfo = omKeyInfo.toBuilder()
           .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .setUpdateID(trxnLogIndex)

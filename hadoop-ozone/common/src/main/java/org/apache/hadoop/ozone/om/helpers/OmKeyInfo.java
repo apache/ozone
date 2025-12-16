@@ -488,15 +488,12 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
-    private MapBuilder<String, String> tags = MapBuilder.empty();
+    private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
 
     public Builder() {
-      this(AclListBuilder.empty());
-    }
-
-    private Builder(AclListBuilder acls) {
-      this.acls = acls;
+      this.acls = AclListBuilder.empty();
+      this.tags = MapBuilder.empty();
     }
 
     public Builder(OmKeyInfo obj) {
@@ -515,10 +512,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.tags = obj.tags.isEmpty()
-          ? MapBuilder.empty()
-          : MapBuilder.of(obj.tags);
-      this.acls.addAll(obj.getAcls());
+      this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
@@ -655,13 +649,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder setTags(Map<String, String> tags) {
-      if (tags == null || tags.isEmpty()) {
-        this.tags = MapBuilder.empty();
-      } else if (tags instanceof ImmutableMap) {
-        this.tags = MapBuilder.of((ImmutableMap<String, String>) tags);
-      } else {
-        this.tags = MapBuilder.copyOf(tags);
-      }
+      this.tags.set(tags);
       return this;
     }
 
@@ -671,9 +659,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder addAllTags(Map<String, String> keyTags) {
-      if (keyTags != null && !keyTags.isEmpty()) {
-        this.tags.putAll(keyTags);
-      }
+      this.tags.putAll(keyTags);
       return this;
     }
 
