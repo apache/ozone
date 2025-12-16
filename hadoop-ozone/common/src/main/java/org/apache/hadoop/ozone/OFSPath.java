@@ -365,17 +365,7 @@ public class OFSPath {
    * @return trash root for the given path.
    */
   public Path getTrashRoot() {
-    if (!this.isKey()) {
-      throw new RuntimeException("Recursive rm of volume or bucket with trash" +
-          " enabled is not permitted. Consider using the -skipTrash option.");
-    }
-    try {
-      final String username =
-              UserGroupInformation.getCurrentUser().getShortUserName();
-      return getTrashRoot(username);
-    } catch (IOException ex) {
-      throw new RuntimeException("getTrashRoot failed.", ex);
-    }
+    return getTrashRoot(null);
   }
 
   /**
