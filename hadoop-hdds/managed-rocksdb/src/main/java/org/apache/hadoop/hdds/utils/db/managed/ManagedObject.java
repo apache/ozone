@@ -20,13 +20,13 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 import org.apache.ratis.util.UncheckedAutoCloseable;
-import org.rocksdb.RocksObject;
+import org.rocksdb.AbstractNativeReference;
 
 /**
  * General template for a managed RocksObject.
  * @param <T>
  */
-class ManagedObject<T extends RocksObject> implements AutoCloseable {
+class ManagedObject<T extends AbstractNativeReference> implements AutoCloseable {
   private final T original;
   private final UncheckedAutoCloseable leakTracker = track(this);
 
