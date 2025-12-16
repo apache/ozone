@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -258,27 +257,6 @@ public class TestDiskBalancerService {
 
     // data precision loss due to double data involved in calculation
     assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(immutableVolumes)) <= 1);
-
-    // Test getDiskBalancerInfo() behavior with inProgressContainers check
-    // Set operational state to RUNNING
-    DiskBalancerInfo info = new DiskBalancerInfo(
-        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 1,
-        false, DiskBalancerVersion.DEFAULT_VERSION);
-    svc.refresh(info);
-
-    // When inProgressContainers is empty, bytesToMove should be 0
-    assertTrue(svc.getInProgressContainers().isEmpty());
-    DiskBalancerInfo diskBalancerInfo = svc.getDiskBalancerInfo();
-    assertEquals(0, diskBalancerInfo.getBytesToMove(),
-        "bytesToMove should be 0 when no containers are in progress");
-
-    // When inProgressContainers is not empty, bytesToMove should match expected value
-    svc.getInProgressContainers().add(ContainerID.valueOf(1L));
-    assertFalse(svc.getInProgressContainers().isEmpty());
-    diskBalancerInfo = svc.getDiskBalancerInfo();
-    // data precision loss due to double data involved in calculation
-    assertTrue(Math.abs(expectedBytesToMove - diskBalancerInfo.getBytesToMove()) <= 1,
-        "bytesToMove should match expected value when containers are in progress");
   }
 
   @Test

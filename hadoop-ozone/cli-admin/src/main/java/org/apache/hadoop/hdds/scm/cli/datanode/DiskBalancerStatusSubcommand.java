@@ -129,8 +129,11 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(estimatedTimeLeft >= 0 ? String.valueOf(estimatedTimeLeft) : "N/A");
     }
 
-    formatBuilder.append("%nNote: Estimated time left is calculated" +
-        " based on the estimated bytes to move and the configured disk bandwidth.");
+    formatBuilder.append("%nNote:%n");
+    formatBuilder.append("  - Estimated time left is calculated based on the estimated bytes" +
+        " to move and the configured disk bandwidth.%n");
+    formatBuilder.append("  - EstimatedBytesToMove may be non-zero even when no containers" +
+        " are being moved, especially if the threshold is very small.");
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));

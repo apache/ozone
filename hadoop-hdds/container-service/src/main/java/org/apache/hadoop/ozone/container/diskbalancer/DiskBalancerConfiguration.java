@@ -197,7 +197,7 @@ public final class DiskBalancerConfiguration {
   /**
    * Sets the threshold value for Disk Balancer.
    *
-   * @param threshold a percentage value in the range 0 to 100
+   * @param threshold a percentage value in the range (0 to 100) both exclusive
    */
   public void setThreshold(double threshold) {
     if (threshold <= 0d || threshold >= 100d) {

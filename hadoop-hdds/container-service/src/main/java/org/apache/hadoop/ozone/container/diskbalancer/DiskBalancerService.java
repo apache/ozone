@@ -639,11 +639,9 @@ public class DiskBalancerService extends BackgroundService {
     volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(immutableVolumeSet, deltaSizes);
 
     long bytesToMove = 0;
-    if (this.operationalState == DiskBalancerRunningStatus.RUNNING &&
-        !inProgressContainers.isEmpty()) {
+    if (this.operationalState == DiskBalancerRunningStatus.RUNNING) {
       // this calculates live changes in bytesToMove
       // calculate bytes to move if the balancer is in a running state
-      // and there are containers currently in progress, else 0.
       bytesToMove = calculateBytesToMove(immutableVolumeSet);
     }
 
