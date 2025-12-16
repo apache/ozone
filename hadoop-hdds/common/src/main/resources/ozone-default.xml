@@ -3514,6 +3514,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
