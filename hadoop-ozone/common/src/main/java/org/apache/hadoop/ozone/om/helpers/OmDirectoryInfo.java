@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -32,9 +33,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Directo
 /**
  * This class represents the directory information by keeping each component
  * in the user given path and a pointer to its parent directory element in the
- * path. Also, it stores directory node related metdata details.
+ * path. Also, it stores directory node related metadata details.
  */
-public class OmDirectoryInfo extends WithParentObjectId
+@Immutable
+public final class OmDirectoryInfo extends WithParentObjectId
     implements CopyObject<OmDirectoryInfo> {
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
@@ -43,14 +45,14 @@ public class OmDirectoryInfo extends WithParentObjectId
       OmDirectoryInfo.class);
 
   private final String name; // directory name
-  private String owner;
+  private final String owner;
 
   private final long creationTime;
   private final long modificationTime;
 
   private final ImmutableList<OzoneAcl> acls;
 
-  public OmDirectoryInfo(Builder builder) {
+  private OmDirectoryInfo(Builder builder) {
     super(builder);
     this.name = builder.name;
     this.owner = builder.owner;
@@ -281,11 +283,8 @@ public class OmDirectoryInfo extends WithParentObjectId
     return Objects.hash(getObjectID(), getParentObjectID(), name);
   }
 
-  /**
-   * Return a new copy of the object.
-   */
   @Override
   public OmDirectoryInfo copyObject() {
-    return toBuilder().build();
+    return this;
   }
 }
