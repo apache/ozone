@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -30,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,21 +52,12 @@ public class PrometheusServiceProviderImpl
   private final String prometheusEndpoint;
   private ReconUtils reconUtils;
 
-  public PrometheusServiceProviderImpl(OzoneConfiguration configuration,
-                                       ReconUtils reconUtils) {
+  public PrometheusServiceProviderImpl(
+      OzoneConfiguration configuration,
+      ReconUtils reconUtils,
+      URLConnectionFactory connectionFactory) {
 
-    int connectionTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
-        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
-        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    connectionFactory =
-        URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
-            connectionRequestTimeout, configuration);
+    this.connectionFactory = connectionFactory;
 
     String endpoint = configuration.getTrimmed(getEndpointConfigKey());
     // Remove the trailing slash from endpoint url.

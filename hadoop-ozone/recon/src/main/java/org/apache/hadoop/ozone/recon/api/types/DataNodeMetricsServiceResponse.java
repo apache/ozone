@@ -32,8 +32,8 @@ import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
 public class DataNodeMetricsServiceResponse {
   @JsonProperty("status")
   private DataNodeMetricsService.MetricCollectionStatus status;
-  @JsonProperty("totalPendingDeletion")
-  private Long totalPendingDeletion;
+  @JsonProperty("totalPendingDeletionSize")
+  private Long totalPendingDeletionSize;
   @JsonProperty("pendingDeletionPerDataNode")
   private List<DatanodePendingDeletionMetrics> pendingDeletionPerDataNode;
   @JsonProperty("totalNodesQueried")
@@ -43,7 +43,7 @@ public class DataNodeMetricsServiceResponse {
 
   public DataNodeMetricsServiceResponse(Builder builder) {
     this.status = builder.status;
-    this.totalPendingDeletion = builder.totalPendingDeletion;
+    this.totalPendingDeletionSize = builder.totalPendingDeletionSize;
     this.pendingDeletionPerDataNode = builder.pendingDeletion;
     this.totalNodesQueried = builder.totalNodesQueried;
     this.totalNodeQueryFailures = builder.totalNodeQueryFailures;
@@ -51,7 +51,7 @@ public class DataNodeMetricsServiceResponse {
 
   public DataNodeMetricsServiceResponse() {
     this.status = DataNodeMetricsService.MetricCollectionStatus.NOT_STARTED;
-    this.totalPendingDeletion = 0L;
+    this.totalPendingDeletionSize = 0L;
     this.pendingDeletionPerDataNode = null;
     this.totalNodesQueried = 0;
     this.totalNodeQueryFailures = 0;
@@ -61,8 +61,8 @@ public class DataNodeMetricsServiceResponse {
     return status;
   }
 
-  public Long getTotalPendingDeletion() {
-    return totalPendingDeletion;
+  public Long getTotalPendingDeletionSize() {
+    return totalPendingDeletionSize;
   }
 
   public List<DatanodePendingDeletionMetrics> getPendingDeletionPerDataNode() {
@@ -93,7 +93,7 @@ public class DataNodeMetricsServiceResponse {
    */
   public static final class Builder {
     private DataNodeMetricsService.MetricCollectionStatus status;
-    private Long totalPendingDeletion;
+    private Long totalPendingDeletionSize;
     private List<DatanodePendingDeletionMetrics> pendingDeletion;
     private int totalNodesQueried;
     private long totalNodeQueryFailures;
@@ -103,8 +103,8 @@ public class DataNodeMetricsServiceResponse {
       return this;
     }
 
-    public Builder setTotalPendingDeletion(Long totalPendingDeletion) {
-      this.totalPendingDeletion = totalPendingDeletion;
+    public Builder setTotalPendingDeletionSize(Long totalPendingDeletionSize) {
+      this.totalPendingDeletionSize = totalPendingDeletionSize;
       return this;
     }
 

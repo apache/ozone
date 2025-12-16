@@ -50,12 +50,13 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -188,7 +189,7 @@ public class TestStorageDistributionEndpoint {
     }
     waitForKeysCreated(replicationConfig);
     GenericTestUtils.waitFor(this::verifyStorageDistributionAfterKeyCreation, 1000, 30000);
-    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    closeAllContainers();
     fs.delete(dir1, true);
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOm, 1000, 30000);
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionScm, 2000, 30000);
@@ -225,7 +226,7 @@ public class TestStorageDistributionEndpoint {
     try {
       syncDataFromOM();
       StringBuilder urlBuilder = new StringBuilder();
-      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=om");
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=om");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
       Map<String, Integer> pendingDeletionMap = MAPPER.readValue(response, Map.class);
       assertEquals(30, pendingDeletionMap.get("totalSize"));
@@ -240,7 +241,7 @@ public class TestStorageDistributionEndpoint {
   private boolean verifyPendingDeletionAfterKeyDeletionScm() {
     try {
       StringBuilder urlBuilder = new StringBuilder();
-      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=scm");
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=scm");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
       ScmPendingDeletion pendingDeletion = MAPPER.readValue(response, ScmPendingDeletion.class);
       assertEquals(30, pendingDeletion.getTotalReplicatedBlockSize());
@@ -257,11 +258,11 @@ public class TestStorageDistributionEndpoint {
     try {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       StringBuilder urlBuilder = new StringBuilder();
-      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=dn");
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
       DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
       assertNotNull(pendingDeletion);
-      assertEquals(30, pendingDeletion.getTotalPendingDeletion());
+      assertEquals(30, pendingDeletion.getTotalPendingDeletionSize());
       assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
       assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
       assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
@@ -278,7 +279,7 @@ public class TestStorageDistributionEndpoint {
   private boolean verifyPendingDeletionAfterKeyDeletionOnDnFailure() {
     try {
       StringBuilder urlBuilder = new StringBuilder();
-      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT + "?component=dn");
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
       String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
       DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
       assertNotNull(pendingDeletion);
@@ -371,6 +372,14 @@ public class TestStorageDistributionEndpoint {
   public static void tear() {
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  private static void closeAllContainers() {
+    for (ContainerInfo container :
+        scm.getContainerManager().getContainers()) {
+      scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
+          container.containerID());
     }
   }
 }

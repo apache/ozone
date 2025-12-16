@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -77,10 +76,6 @@ public class PendingDeletionEndpoint {
   }
 
   private Response handleDataNodeMetrics() {
-    DataNodeMetricsService.MetricCollectionStatus status = dataNodeMetricsService.getTaskStatus();
-    if (status != DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS) {
-      CompletableFuture.runAsync(dataNodeMetricsService::startTask);
-    }
     DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
     if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED) {
       return Response.ok(response).build();
@@ -102,10 +97,9 @@ public class PendingDeletionEndpoint {
           summary.getTotalBlockCount());
       return Response.ok(pendingDeletion).build();
     } catch (Exception e) {
-      LOG.error("Error getting SCM pending deletion", e);
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity("Error retrieving SCM pending deletion: " + e.getMessage())
-          .build();
+      LOG.error("Failed to get pending deletion info from SCM", e);
+      ScmPendingDeletion pendingDeletion = new ScmPendingDeletion(-1L, -1L, -1L);
+      return Response.ok(pendingDeletion).build();
     }
   }
 

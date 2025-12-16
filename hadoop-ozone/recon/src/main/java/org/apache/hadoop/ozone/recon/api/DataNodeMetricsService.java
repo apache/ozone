@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -59,13 +62,14 @@ public class DataNodeMetricsService {
   private static final int MAX_POOL_SIZE = 500;
   private static final int KEEP_ALIVE_TIME = 5;
   private static final int POLL_INTERVAL_MS = 200;
-  private static final int PER_NODE_TIMEOUT_MS = 120000;
 
   private final ThreadPoolExecutor executorService;
   private final ReconNodeManager reconNodeManager;
   private final boolean httpsEnabled;
   private final int minimumApiDelayMs;
   private final MetricsServiceProviderFactory metricsServiceProviderFactory;
+  private final int maximumTaskTimeout;
+  private final AtomicBoolean isRunning = new AtomicBoolean(false);
   
   private MetricCollectionStatus currentStatus = MetricCollectionStatus.NOT_STARTED;
   private List<DatanodePendingDeletionMetrics> pendingDeletionList;
@@ -86,10 +90,13 @@ public class DataNodeMetricsService {
         OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY,
         OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.maximumTaskTimeout = (int) config.getTimeDuration(OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT,
+        OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime = 0;
+    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
     this.executorService = new ThreadPoolExecutor(
-        0, MAX_POOL_SIZE,
+        corePoolSize, MAX_POOL_SIZE,
         KEEP_ALIVE_TIME, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder()
@@ -100,9 +107,9 @@ public class DataNodeMetricsService {
   /**
    * Starts the metrics collection task if not already running and rate limit allows.
    */
-  public synchronized void startTask() {
+  public void startTask() {
     // Check if already running
-    if (currentStatus == MetricCollectionStatus.IN_PROGRESS) {
+    if (isRunning.compareAndSet(false, true)) {
       LOG.warn("Metrics collection already in progress, skipping");
       return;
     }
@@ -110,6 +117,7 @@ public class DataNodeMetricsService {
     // Check rate limit
     if (System.currentTimeMillis() - lastCollectionEndTime < minimumApiDelayMs) {
       LOG.debug("Rate limit active, skipping collection (delay: {}ms)", minimumApiDelayMs);
+      isRunning.set(false);
       return;
     }
 
@@ -118,6 +126,7 @@ public class DataNodeMetricsService {
       LOG.warn("No datanodes found to query");
       resetState();
       currentStatus = MetricCollectionStatus.SUCCEEDED;
+      isRunning.set(false);
       return;
     }
 
@@ -125,12 +134,13 @@ public class DataNodeMetricsService {
     currentStatus = MetricCollectionStatus.IN_PROGRESS;
     LOG.debug("Starting metrics collection for {} datanodes", nodes.size());
     
-    // Run collection asynchronously so status can be queried
+    // Run a collection asynchronously so status can be queried
     CompletableFuture.runAsync(() -> collectMetrics(nodes), executorService)
         .exceptionally(throwable -> {
           LOG.error("Metrics collection failed", throwable);
           synchronized (DataNodeMetricsService.this) {
             currentStatus = MetricCollectionStatus.SUCCEEDED;
+            isRunning.set(false);
           }
           return null;
         });
@@ -215,7 +225,7 @@ public class DataNodeMetricsService {
       DatanodePendingDeletionMetrics key, Future<DatanodePendingDeletionMetrics> future,
       CollectionContext context, long currentTime) {
     long elapsedTime = currentTime - context.submissionTimes.get(key);
-    if (elapsedTime > PER_NODE_TIMEOUT_MS && !future.isDone()) {
+    if (elapsedTime > maximumTaskTimeout && !future.isDone()) {
       LOG.warn("Task for datanode {} [{}] timed out after {}ms",
           key.getHostName(), key.getDatanodeUuid(), elapsedTime);
       future.cancel(true); // Interrupt the task
@@ -261,6 +271,7 @@ public class DataNodeMetricsService {
       totalNodesQueried = context.totalQueried;
       totalNodesFailed = context.failed;
       currentStatus = MetricCollectionStatus.SUCCEEDED;
+      isRunning.set(false);
       lastCollectionEndTime = System.currentTimeMillis();
     }
 
@@ -278,23 +289,20 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  public synchronized DataNodeMetricsServiceResponse getCollectedMetrics() {
-    if (currentStatus != MetricCollectionStatus.SUCCEEDED) {
+  public DataNodeMetricsServiceResponse getCollectedMetrics() {
+    CompletableFuture.runAsync(this::startTask);
+    if (currentStatus == MetricCollectionStatus.SUCCEEDED) {
       return DataNodeMetricsServiceResponse.newBuilder()
           .setStatus(currentStatus)
+          .setPendingDeletion(pendingDeletionList)
+          .setTotalPendingDeletionSize(totalPendingDeletion)
+          .setTotalNodesQueried(totalNodesQueried)
+          .setTotalNodeQueryFailures(totalNodesFailed)
           .build();
     }
     return DataNodeMetricsServiceResponse.newBuilder()
         .setStatus(currentStatus)
-        .setPendingDeletion(pendingDeletionList)
-        .setTotalPendingDeletion(totalPendingDeletion)
-        .setTotalNodesQueried(totalNodesQueried)
-        .setTotalNodeQueryFailures(totalNodesFailed)
         .build();
-  }
-
-  public MetricCollectionStatus getTaskStatus() {
-    return currentStatus;
   }
 
   @PreDestroy

@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
@@ -42,15 +41,17 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
   private final String jmxEndpoint;
   private ReconUtils reconUtils;
 
-  public JmxServiceProviderImpl(OzoneConfiguration configuration, ReconUtils reconUtils, String jmxEndpoint) {
-
-    connectionFactory = URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
+  public JmxServiceProviderImpl(
+      ReconUtils reconUtils,
+      String jmxEndpoint,
+      URLConnectionFactory connectionFactory) {
     // Remove the trailing slash from endpoint url.
     if (jmxEndpoint != null && jmxEndpoint.endsWith("/")) {
       jmxEndpoint = jmxEndpoint.substring(0, jmxEndpoint.length() - 1);
     }
     this.jmxEndpoint = jmxEndpoint;
     this.reconUtils = reconUtils;
+    this.connectionFactory = connectionFactory;
   }
 
   /**
