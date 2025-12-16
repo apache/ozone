@@ -544,9 +544,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
-                this::reconfOzoneKeyDeletingLimitPerTask)
-            .register(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-                this::reconfKeyLifecycleServiceEnabled);
+                this::reconfOzoneKeyDeletingLimitPerTask);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -3172,7 +3170,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return GetLifecycleServiceStatusResponse.newBuilder()
           .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
               OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
-          .setIsRunning(false)
           .build();
     }
     return keyLifecycleService.status();
@@ -5173,20 +5170,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     getKeyManager().getDeletingService()
         .setKeyLimitPerTask(Integer.parseInt(newVal));
-    return newVal;
-  }
-
-  private String reconfKeyLifecycleServiceEnabled(String newVal) {
-    boolean enabled = StringUtils.isEmpty(newVal) ?
-        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT : Boolean.parseBoolean(newVal);
-    KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
-    if (keyLifecycleService != null) {
-      keyLifecycleService.setServiceEnabled(enabled);
-    } else {
-      LOG.warn("Failed reconfiguration for '{}'. KeyLifecycleService is not initialized.",
-          OZONE_KEY_LIFECYCLE_SERVICE_ENABLED);
-    }
-    getConfiguration().setBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, enabled);
     return newVal;
   }
 

@@ -2446,8 +2446,7 @@ message GetLifecycleServiceStatusRequest {
 
 message GetLifecycleServiceStatusResponse {
   required bool isEnabled = 1;
-  required bool isRunning = 2;
-  repeated string runningBuckets = 3;
+  repeated string runningBuckets = 2;
 }
 
 message SuspendLifecycleServiceRequest {

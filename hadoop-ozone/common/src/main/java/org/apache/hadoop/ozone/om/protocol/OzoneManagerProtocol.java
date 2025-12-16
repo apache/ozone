@@ -1240,8 +1240,6 @@ public interface OzoneManagerProtocol
 
   /**
    * Suspends the lifecycle service.
-   * The service will remain suspended until OM restarts, at which point it will
-   * be re-enabled based on the configuration.
    * @throws IOException
    */
   default void suspendLifecycleService() throws IOException {

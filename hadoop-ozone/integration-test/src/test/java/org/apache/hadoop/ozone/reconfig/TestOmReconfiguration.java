@@ -21,7 +21,6 @@ import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,7 +51,6 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
         .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
-        .add(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED)
         .addAll(new OmConfig().reconfigurableProperties())
         .build();
 

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
-import java.io.IOException;
 import java.io.PrintStream;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -62,13 +61,12 @@ public class LifecycleStatusSubCommand implements Callable<Void> {
     return null;
   }
 
-  protected void output(GetLifecycleServiceStatusResponse status) throws IOException {
+  protected void output(GetLifecycleServiceStatusResponse status) {
     PrintStream out = out();
     out.println("========================================");
     out.println("          Lifecycle Service Status");
     out.println("========================================");
     out.printf("IsEnabled: %s%n", status.getIsEnabled());
-    out.printf("IsRunning: %s%n", status.getIsRunning());
 
     if (status.getRunningBucketsCount() > 0) {
       out.println("Running Buckets:");

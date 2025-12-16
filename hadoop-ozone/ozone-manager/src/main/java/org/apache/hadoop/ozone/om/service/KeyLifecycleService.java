@@ -221,6 +221,10 @@ public class KeyLifecycleService extends BackgroundService {
     suspended.set(false);
   }
 
+  /**
+   * Set isServiceEnabled.
+   * @param enabled whether enable the lifecycle Service
+   */
   public void setServiceEnabled(boolean enabled) {
     this.isServiceEnabled.set(enabled);
     LOG.info("KeyLifecycleService is {}", enabled ? "enabled" : "disabled");
@@ -232,10 +236,13 @@ public class KeyLifecycleService extends BackgroundService {
     KeyLifecycleServiceMetrics.unregister();
   }
 
+  /**
+   * Build a GetLifecycleServiceStatusResponse instance.
+   * @return GetLifecycleServiceStatusResponse instance
+   */
   public GetLifecycleServiceStatusResponse status() {
     Set<String> runningBuckets = new HashSet<>(inFlight.keySet());
     return GetLifecycleServiceStatusResponse.newBuilder()
-        .setIsRunning(!runningBuckets.isEmpty())
         .setIsEnabled(isServiceEnabled.get())
         .addAllRunningBuckets(runningBuckets)
         .build();
@@ -343,11 +350,6 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
           LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-          onSuccess(bucketKey);
-          return result;
-        }
-
-        if (!shouldRun()) {
           onSuccess(bucketKey);
           return result;
         }
@@ -492,7 +494,7 @@ public class KeyLifecycleService extends BackgroundService {
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
-          LOG.info("KeyLifecycleService is suspended or disabled." +
+          LOG.info("KeyLifecycleService is suspended or disabled. " +
               "Stopping LifecycleActionTask for bucket {}.", bucketName);
           return;
         }
@@ -725,6 +727,8 @@ public class KeyLifecycleService extends BackgroundService {
                keyTable.iterator(omMetadataManager.getBucketKey(volumeName, bucketName))) {
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
+            LOG.info("KeyLifecycleService is suspended or disabled. " +
+                "Stopping LifecycleActionTask for bucket {}.", bucketName);
             return;
           }
           Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();

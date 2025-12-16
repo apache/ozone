@@ -1841,14 +1841,13 @@ public class TestOzoneShellHA {
     execute(ozoneAdminShell, args);
     String output = out.toString(DEFAULT_ENCODING);
     assertThat(output).contains("IsEnabled:");
-    assertThat(output).contains("IsRunning:");
   }
 
   @Test
   public void testLifecycleSuspend() throws Exception {
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
     for (OzoneManager om : ozoneManagers) {
-      assertNotNull(om.getKeyManager().getKeyLifecycleService() );
+      assertNotNull(om.getKeyManager().getKeyLifecycleService());
       assertTrue(om.getLifecycleServiceStatus().getIsEnabled());
     }
 
@@ -1862,7 +1861,7 @@ public class TestOzoneShellHA {
     // Wait for the suspend command to propagate through Ratis to all OMs
     GenericTestUtils.waitFor(() -> {
       for (OzoneManager om : ozoneManagers) {
-        assertNotNull(om.getKeyManager().getKeyLifecycleService() );
+        assertNotNull(om.getKeyManager().getKeyLifecycleService());
         if (om.getLifecycleServiceStatus().getIsEnabled()) {
           return false;
         }

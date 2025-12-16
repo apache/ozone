@@ -1546,11 +1546,10 @@ class TestKeyLifecycleService extends OzoneTestBase {
       final String bucketName = uniqueObjectName("bucket");
       String prefix = "key";
       
-      //Sservice should be enabled but not running
+      //Service should be enabled but not running
       OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse status =
           om.getLifecycleServiceStatus();
       assertTrue(status.getIsEnabled());
-      assertFalse(status.getIsRunning());
       assertEquals(0, status.getRunningBucketsCount());
       
       // Create and inject for test
@@ -1564,19 +1563,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // Verify service is running and processing the bucket
       status = om.getLifecycleServiceStatus();
       assertTrue(status.getIsEnabled());
-      assertTrue(status.getIsRunning());
       assertEquals(1, status.getRunningBucketsCount());
       assertTrue(status.getRunningBucketsList().contains("/" + volumeName + "/" + bucketName));
       
       KeyLifecycleService.getInjector(0).resume();
       KeyLifecycleService.getInjector(1).resume();
-      GenericTestUtils.waitFor(() -> !om.getLifecycleServiceStatus().getIsRunning(),
+      GenericTestUtils.waitFor(() -> om.getLifecycleServiceStatus().getRunningBucketsCount() == 0,
           WAIT_CHECK_INTERVAL, 10000);
       
       // Verify service completed and is no longer running
       status = om.getLifecycleServiceStatus();
       assertTrue(status.getIsEnabled());
-      assertFalse(status.getIsRunning());
       assertEquals(0, status.getRunningBucketsCount());
       
       deleteLifecyclePolicy(volumeName, bucketName);
