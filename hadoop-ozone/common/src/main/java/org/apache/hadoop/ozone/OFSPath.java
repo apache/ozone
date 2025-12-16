@@ -365,13 +365,25 @@ public class OFSPath {
    * @return trash root for the given path.
    */
   public Path getTrashRoot() {
+    return getTrashRoot(null);
+  }
+
+  /**
+   * Return trash root for the given path and username.
+   * The username can be specified to use the proxy user instead of {@link UserGroupInformation#getCurrentUser()}.
+   * @param username the username used to get the trash root path. If it is not specified,
+   *                 will fall back to {@link UserGroupInformation#getCurrentUser()}.
+   * @return trash root for the given path and username.
+   */
+  public Path getTrashRoot(String username) {
     if (!this.isKey()) {
       throw new RuntimeException("Recursive rm of volume or bucket with trash" +
           " enabled is not permitted. Consider using the -skipTrash option.");
     }
     try {
-      final String username =
-              UserGroupInformation.getCurrentUser().getShortUserName();
+      if (StringUtils.isEmpty(username)) {
+        username = UserGroupInformation.getCurrentUser().getShortUserName();
+      }
       final Path pathRoot = new Path(
           OZONE_OFS_URI_SCHEME, authority, OZONE_URI_DELIMITER);
       final Path pathToVolume = new Path(pathRoot, volumeName);

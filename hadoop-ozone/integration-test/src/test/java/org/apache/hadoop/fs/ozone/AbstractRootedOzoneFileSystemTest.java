@@ -1719,6 +1719,14 @@ abstract class AbstractRootedOzoneFileSystemTest {
     res.forEach(e -> assertEquals(expectedOwner, e.getOwner()));
   }
 
+  @Test
+  void testGetTrashRoot() {
+    String testKeyName = "keyToBeDeleted";
+    Path keyPath1 = new Path(bucketPath, testKeyName);
+    assertEquals(new Path(rootPath + volumeName + "/" + bucketName + "/" +
+        TRASH_PREFIX + "/" +  USER1 + "/"), userOfs.getTrashRoot(keyPath1));
+  }
+
   /**
    * Test getTrashRoots() in OFS. Different from the existing test for o3fs.
    */
