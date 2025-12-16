@@ -2144,6 +2144,15 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
+  public void testOzoneManagerListLocatedStatusForZeroByteFile() throws IOException {
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+
+    OzoneFileSystemTests.listLocatedStatusForZeroByteFile(fs, path);
+  }
+
+  @Test
   void testOzoneManagerFileSystemInterface() throws IOException {
     String dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
 
