@@ -289,7 +289,7 @@ public class TestStorageDistributionEndpoint {
           .stream()
           .anyMatch(dn -> dn.getPendingBlockSize() == -1));
       return true;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       return false;
     }
   }

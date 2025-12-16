@@ -70,7 +70,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
           nodeDetails.getHostName(), nodeDetails.getUuidString(), pendingBlockSize);
 
     } catch (Exception e) {
-      LOG.error("Connection timeout while collecting metrics from DataNode {}", nodeDetails.getHostName(), e);
+      LOG.error("Failed to collect metrics from DataNode {}", nodeDetails.getHostName(), e);
       return new DatanodePendingDeletionMetrics(
           nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
     }

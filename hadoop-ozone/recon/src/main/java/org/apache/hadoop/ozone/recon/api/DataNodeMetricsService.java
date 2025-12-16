@@ -251,8 +251,8 @@ public class DataNodeMetricsService {
       LOG.debug("Processed result from {}", key.getHostName());
     } catch (ExecutionException | InterruptedException e) {
       String errorType = e instanceof InterruptedException ? "interrupted" : "execution failed";
-      LOG.error("Task {} for datanode {} [{}]: {}",
-          errorType, key.getHostName(), key.getDatanodeUuid(), e.getMessage());
+      LOG.error("Task {} for datanode {} [{}] failed",
+          errorType, key.getHostName(), key.getDatanodeUuid(), e);
       context.failed++;
       context.results.add(key);
       if (e instanceof InterruptedException) {
