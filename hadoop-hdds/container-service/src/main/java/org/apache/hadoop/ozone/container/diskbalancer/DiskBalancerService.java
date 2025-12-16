@@ -641,7 +641,7 @@ public class DiskBalancerService extends BackgroundService {
     long bytesToMove = 0;
     if (this.operationalState == DiskBalancerRunningStatus.RUNNING) {
       // this calculates live changes in bytesToMove
-      // calculate bytes to move if the balancer is in a running state
+      // calculate bytes to move if the balancer is in a running state, else 0.
       bytesToMove = calculateBytesToMove(immutableVolumeSet);
     }
 
