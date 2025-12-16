@@ -267,7 +267,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     int preCheckValidatedCount = validatedPreCheckRules.size();
     StringBuilder statusLog = new StringBuilder();
     statusLog.append(String.format(
-        "\nSCM SafeMode Status | state=%s preCheckComplete=%s validatedPreCheckRules=%d/%d validatedRules=%d/%d",
+        "%nSCM SafeMode Status | state=%s preCheckComplete=%s validatedPreCheckRules=%d/%d validatedRules=%d/%d",
         safeModeStatus.isInSafeMode() ? 
             (safeModeStatus.isPreCheckComplete() ? "PRE_CHECKS_PASSED" : "INITIAL") : "OUT_OF_SAFE_MODE",
         safeModeStatus.isPreCheckComplete(), preCheckValidatedCount, preCheckRules.size(), validatedCount,
@@ -282,7 +282,7 @@ public class SCMSafeModeManager implements SafeModeManager {
         statusText = statusText.substring(0, statusText.length() - 1);
       }
 
-      statusLog.append(String.format("\nSCM SafeMode Status | %s (%s) %s",
+      statusLog.append(String.format("%nSCM SafeMode Status | %s (%s) %s",
           name,
           isValidated ? "validated" : "waiting",
           statusText));
