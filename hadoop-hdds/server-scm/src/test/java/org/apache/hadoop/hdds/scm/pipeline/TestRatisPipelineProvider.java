@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.commons.collections.CollectionUtils.intersection;
+import static org.apache.commons.collections4.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;

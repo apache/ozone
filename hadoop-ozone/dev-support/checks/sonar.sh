@@ -23,8 +23,8 @@ if [ ! "$SONAR_TOKEN" ]; then
   exit 1
 fi
 
+: "${SONAR_MAVEN_PLUGIN_VERSION:=5.1.0.4751}"
 
-mvn -V -B -DskipShade -DskipTests -DskipRecon --no-transfer-progress \
+mvn -V -B -DskipDocs -DskipShade -DskipTests -DskipRecon --no-transfer-progress \
   -Dsonar.coverage.jacoco.xmlReportPaths="$(pwd)/target/coverage/all.xml" \
-  -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone \
-  verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar
+  verify "org.sonarsource.scanner.maven:sonar-maven-plugin:${SONAR_MAVEN_PLUGIN_VERSION}:sonar"

@@ -89,8 +89,9 @@ public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   @Inject
-  private SignatureInfo signatureInfo;
+  protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
 
@@ -297,8 +298,8 @@ public abstract class EndpointBase implements Auditor {
 
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
-              if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
-                      !excludeMetadataFields.contains(
+              if (k.toLowerCase().startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
+                  !excludeMetadataFields.contains(
                         k.substring(
                           CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
@@ -499,6 +500,11 @@ public abstract class EndpointBase implements Auditor {
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
+  }
+
+  @VisibleForTesting
+  public void setSignatureInfo(SignatureInfo signatureInfo) {
+    this.signatureInfo = signatureInfo;
   }
 
   public OzoneClient getClient() {

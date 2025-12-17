@@ -125,5 +125,8 @@
     <name>ozone.client.datastream.window.size</name>
     <value>8MB</value>
   </property>
-
+  <property>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>5GB</value>
+  </property>
 </configuration>

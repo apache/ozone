@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import axios, { AxiosResponse } from 'axios';
-import { Layout, Menu, Spin } from 'antd';
+import React, {useEffect} from 'react';
+import {Layout, Menu} from 'antd';
 import {
   BarChartOutlined,
   ClusterOutlined,
@@ -31,12 +30,12 @@ import {
   LayoutOutlined,
   PieChartOutlined
 } from '@ant-design/icons';
-import { useLocation, Link } from 'react-router-dom';
+import {Link, useLocation} from 'react-router-dom';
 
 
 import logo from '@/logo.png';
-import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {showDataFetchError} from '@/utils/common';
+import {useApiData} from '@/v2/hooks/useAPIData.hook';
 
 import './navBar.less';
 
@@ -51,34 +50,17 @@ const NavBar: React.FC<NavBarProps> = ({
   collapsed = false,
   onCollapse = () => { }
 }) => {
-  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(false);
-  const cancelDisabledFeatureSignal = useRef<AbortController>();
   const location = useLocation();
-
-  const fetchDisabledFeatures = async () => {
-    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
-    const { request, controller } = AxiosGetHelper(
-      disabledfeaturesEndpoint,
-      cancelDisabledFeatureSignal.current
-    )
-    cancelDisabledFeatureSignal.current = controller;
-    try {
-      const response: AxiosResponse<string[]> = await request;
-      const heatmapDisabled = response?.data?.includes('HEATMAP')
-      setIsHeatmapEnabled(!heatmapDisabled);
-    } catch (error: unknown) {
-      showDataFetchError((error as Error).toString())
+  
+  const { data: disabledFeatures, error } = useApiData<string[]>(
+    '/api/v1/features/disabledFeatures',
+    [],
+    {
+      onError: (error) => showDataFetchError(error)
     }
-  }
+  );
 
-
-  useEffect(() => {
-    fetchDisabledFeatures();
-    // Component will unmount
-    return (() => {
-      cancelRequests([cancelDisabledFeatureSignal.current!])
-    })
-  }, [])
+  const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
 
   const menuItems = [(
     <Menu.Item key='/Overview'
@@ -132,10 +114,10 @@ const NavBar: React.FC<NavBarProps> = ({
       </Menu.Item>
     </Menu.SubMenu>
   ), (
-    <Menu.Item key='/DiskUsage'
+    <Menu.Item key='/NamespaceUsage'
       icon={<PieChartOutlined />}>
-      <span>Disk Usage</span>
-      <Link to='/DiskUsage' />
+      <span>Namespace Usage</span>
+      <Link to='/NamespaceUsage' />
     </Menu.Item>
   ), (
     isHeatmapEnabled &&

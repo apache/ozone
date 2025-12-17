@@ -16,19 +16,22 @@
  * limitations under the License.
  */
 
-import React, { HTMLAttributes, useMemo } from 'react';
+import React, { HTMLAttributes, useMemo, useState } from 'react';
 import filesize from 'filesize';
-import { Card, Row, Col, Table, Tag } from 'antd';
+import { Card, Row, Col, Table, Tag, Modal } from 'antd';
 
 import EChart from '@/v2/components/eChart/eChart';
-import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
+import { InfoCircleFilled } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
   loading?: boolean;
   storageReport: StorageReport;
+  error?: string | null;
 }
 
 const size = filesize.partial({ round: 1 });
@@ -73,8 +76,15 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
     used: 0,
     remaining: 0,
     committed: 0
-  }
+  },
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title='Cluster Capacity' />
+  }
+
+  const [isInfoOpen, setInfoOpen] = useState<boolean>(false);
 
   const {
     ozoneUsedPercentage,
@@ -170,78 +180,132 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
     ]
   }
 
-  const cardChildren = (
-    <Card
-      size='small'
-      className={'overview-card'}
-      loading={loading}
-      hoverable={false}
-      title='Cluster Capacity'
-      headStyle={cardHeadStyle}
-      bodyStyle={cardBodyStyle}
-      style={(usagePercentage > 79) ? {...cardStyle, ...cardErrorStyle} : cardStyle} >
-      <Row justify='space-between'>
-        <Col
-          className='echart-col'
-          xs={24} sm={24} md={12} lg={12} xl={12}>
-          <EChart
-            option={eChartOptions}
-            style={eChartStyle} />
-        </Col>
-        <Col xs={24} sm={24} md={12} lg={12} xl={12}>
-          <Table
-            size='small'
-            pagination={false}
-            columns={[
-              {
-                title: 'Usage',
-                dataIndex: 'usage',
-                key: 'usage'
-              },
-              {
-                title: 'Size',
-                dataIndex: 'size',
-                key: 'size',
-                align: 'right'
-              },
-            ]}
-            dataSource={[
-              {
-                key: 'ozone-used',
-                usage: <Tag key='ozone-used' color='green'>Ozone Used</Tag>,
-                size: size(storageReport.used)
-              },
-              {
-                key: 'non-ozone-used',
-                usage: <Tag key='non-ozone-used' color='blue'>Non Ozone Used</Tag>,
-                size: size(storageReport.capacity - storageReport.remaining - storageReport.used)
-              },
-              {
-                key: 'remaining',
-                usage: <Tag key='remaining' color='#E6EBF8'>
-                  <span style={{ color: '#4c7cf5' }}>Remaining</span>
-                </Tag>,
-                size: size(storageReport.remaining)
-              },
-              {
-                key: 'pre-allocated',
-                usage: <Tag key='pre-allocated' color='red'>Container Pre-allocated</Tag>,
-                size: size(storageReport.committed)
-              }
-            ]}
-            onRow={(record) => ({
-              'data-testid': `capacity-${record.key}`
-            }) as HTMLAttributes<HTMLElement>} />
-        </Col>
-      </Row>
-    </Card>
+  const showInfo = () => {
+    setInfoOpen(true);
+  }
+
+  const closeInfo = () => {
+    setInfoOpen(false);
+  }
+
+  const titleElement = (
+    <div className='card-title-div'>
+      <div>
+        <InfoCircleFilled
+          onClick={showInfo}
+          style={{ paddingRight: '12px', color: '#1da57a' }} />
+        Cluster Capacity
+      </div>
+      <Link
+        to={{ pathname: '/NamespaceUsage' }}
+        style={{
+          fontWeight: 400
+        }}> View Usage </Link>
+    </div>
   )
 
+  const tableData = [
+    {
+      key: 'ozone-used',
+      usage: <Tag key='ozone-used' color='green'>Ozone Used</Tag>,
+      size: size(storageReport.used),
+      desc: 'Size of Data used by Ozone for storing actual files in the Datanodes'
+    },
+    {
+      key: 'non-ozone-used',
+      usage: <Tag key='non-ozone-used' color='blue'>Non Ozone Used</Tag>,
+      size: size(storageReport.capacity - storageReport.remaining - storageReport.used),
+      desc: 'Size of data used by Ozone for other files like logs, DB data etc.'
+    },
+    {
+      key: 'remaining',
+      usage: <Tag key='remaining' color='#E6EBF8'>
+        <span style={{ color: '#4c7cf5' }}>Remaining</span>
+      </Tag>,
+      size: size(storageReport.remaining),
+      desc: 'Space which is free after considering replication and Non-Ozone used space'
+    },
+    {
+      key: 'pre-allocated',
+      usage: <Tag key='pre-allocated' color='red'>Container Pre-allocated</Tag>,
+      size: size(storageReport.committed),
+      desc: 'Space which is pre-allocated for containers'
+    }
+  ];
+
   return (
-    <OverviewCardWrapper
-      linkToUrl={'/DiskUsage'}
-      title='Report'
-      children={cardChildren} />
+    <>
+      <Modal
+        title='Cluster Capacity Info'
+        visible={isInfoOpen}
+        onOk={closeInfo}
+        onCancel={closeInfo}
+        footer={null}
+        centered={true}
+        width={700}
+        data-testid='capacity-info-modal'>
+        <p>Cluster capacity fetches the data from Datanode reports that Recon receives.</p>
+        <p>
+          The displayed sizes <strong>include</strong> the replicated data size.<br />
+          Ex: A <strong>1KB key will display 3KB</strong> in <strong>RATIS (THREE)</strong> replication
+        </p>
+        <Table
+          size='small'
+          pagination={false}
+          columns={[{
+            title: 'Label',
+            dataIndex: 'usage',
+            key: 'label'
+          }, {
+            title: 'Description',
+            dataIndex: 'desc',
+            key: 'desc',
+            align: 'left'
+          }]}
+          dataSource={tableData} />
+      </Modal>
+      <Card
+        size='small'
+        className={'overview-card'}
+        loading={loading}
+        hoverable={false}
+        title={titleElement}
+        headStyle={cardHeadStyle}
+        bodyStyle={cardBodyStyle}
+        style={(usagePercentage > 79) ? { ...cardStyle, ...cardErrorStyle } : cardStyle} >
+        <Row justify='space-between'>
+          <Col
+            className='echart-col'
+            xs={24} sm={24} md={12} lg={12} xl={12}>
+            <EChart
+              option={eChartOptions}
+              style={eChartStyle} />
+          </Col>
+          <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+            <Table
+              size='small'
+              pagination={false}
+              columns={[
+                {
+                  title: 'Usage',
+                  dataIndex: 'usage',
+                  key: 'usage'
+                },
+                {
+                  title: 'Size',
+                  dataIndex: 'size',
+                  key: 'size',
+                  align: 'right'
+                },
+              ]}
+              dataSource={tableData}
+              onRow={(record) => ({
+                'data-testid': `capacity-${record.key}`
+              }) as HTMLAttributes<HTMLElement>} />
+          </Col>
+        </Row>
+      </Card>
+    </>
   )
 }
 

@@ -140,9 +140,9 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
+  boolean apply(OmKeyInfo.Builder builder, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    return omKeyInfo.addAcl(ozoneAcls.get(0));
+    return builder.acls().add(ozoneAcls.get(0));
   }
 
   @Override

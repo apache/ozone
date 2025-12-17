@@ -28,6 +28,7 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -85,13 +86,28 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
-  public static ManagedRocksDB open(
-      final String path,
+  /**
+   * Open a RocksDB option with the latest options. Other than {@link ManagedConfigOptions} and
+   * path, the other options and handles should be empty since it will be populated with
+   * loadLatestOptions. Nevertheless, the caller is still responsible in cleaning up / closing the resources.
+   * @param configOptions Config options.
+   * @param options DBOptions. This would be modified based on the latest options.
+   * @param path DB path.
+   * @param columnFamilyDescriptors Column family descriptors. These would be modified based on the latest options.
+   * @param columnFamilyHandles Column family handles of the underlying column family
+   * @return A RocksDB instance.
+   * @throws RocksDBException thrown if error happens in underlying native library.
+   */
+  public static ManagedRocksDB openWithLatestOptions(
+      final ManagedConfigOptions configOptions,
+      final DBOptions options, final String path,
       final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
       final List<ColumnFamilyHandle> columnFamilyHandles)
       throws RocksDBException {
+    // Preserve all the previous DB options
+    OptionsUtil.loadLatestOptions(configOptions, path, options, columnFamilyDescriptors);
     return new ManagedRocksDB(
-        RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
+        RocksDB.open(options, path, columnFamilyDescriptors, columnFamilyHandles)
     );
   }
 

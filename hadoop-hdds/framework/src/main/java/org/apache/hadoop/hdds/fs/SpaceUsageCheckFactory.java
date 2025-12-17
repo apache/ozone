@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.Config;
@@ -52,6 +53,15 @@ public interface SpaceUsageCheckFactory {
    * resolved
    */
   SpaceUsageCheckParams paramsFor(File dir);
+
+  /**
+   * Creates configuration for the HDDS volume rooted at {@code dir} with exclusion path for du.
+   *
+   * @throws UncheckedIOException if canonical path for {@code dir} cannot be resolved
+   */
+  default SpaceUsageCheckParams paramsFor(File dir, Supplier<File> exclusionProvider) {
+    return paramsFor(dir);
+  }
 
   /**
    * Updates the factory with global configuration.
@@ -108,8 +118,8 @@ public interface SpaceUsageCheckFactory {
     return instance.setConfiguration(config);
   }
 
-  static DUFactory defaultImplementation() {
-    return new DUFactory();
+  static SpaceUsageCheckFactory defaultImplementation() {
+    return new DUOptimizedFactory();
   }
 
   /**
@@ -121,7 +131,7 @@ public interface SpaceUsageCheckFactory {
     private static final String CLASSNAME_KEY = "classname";
 
     @Config(
-        key = CLASSNAME_KEY,
+        key = "hdds.datanode.du.factory.classname",
         defaultValue = "",
         tags = { ConfigTag.DATANODE },
         description = "The fully qualified name of the factory class that "

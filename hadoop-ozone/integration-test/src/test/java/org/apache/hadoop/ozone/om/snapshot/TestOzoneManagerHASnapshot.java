@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -42,7 +43,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -206,8 +206,7 @@ public class TestOzoneManagerHASnapshot {
         String snapshotPrefix = OM_KEY_PREFIX + volumeName +
             OM_KEY_PREFIX + bucketName;
         SnapshotInfo snapshotInfo = null;
-        try (TableIterator<String, ?
-            extends Table.KeyValue<String, SnapshotInfo>>
+        try (Table.KeyValueIterator<String, SnapshotInfo>
                  iterator = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable().iterator(snapshotPrefix)) {
           while (iterator.hasNext()) {
@@ -314,7 +313,8 @@ public class TestOzoneManagerHASnapshot {
    * and purgeSnapshot in same batch.
    */
   @Test
-  public void testKeyAndSnapshotDeletionService() throws IOException, InterruptedException, TimeoutException {
+  public void testKeyAndSnapshotDeletionService()
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
     OzoneManager omLeader = cluster.getOMLeader();
     OzoneManager omFollower;
 
@@ -345,10 +345,15 @@ public class TestOzoneManagerHASnapshot {
     String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
     createSnapshot(volumeName, bucketName, snapshotName);
 
-    store.deleteSnapshot(volumeName, bucketName, snapshotName);
-
+    // Wait for double buffer flush on follower to ensure that
+    // the key deletion and snapshot creation are flushed to the DB.
+    OzoneManagerDoubleBuffer omFollowerDoubleBuffer =
+        omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+    omFollowerDoubleBuffer.awaitFlush();
     // Pause double buffer on follower node to accumulate all the key purge, snapshot delete and purge transactions.
-    omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer().stopDaemon();
+    omFollowerDoubleBuffer.stopDaemon();
+
+    store.deleteSnapshot(volumeName, bucketName, snapshotName);
 
     long keyDeleteServiceCount = omLeader.getKeyManager().getDeletingService().getRunCount().get();
     omLeader.getKeyManager().getDeletingService().resume();
@@ -367,15 +372,13 @@ public class TestOzoneManagerHASnapshot {
     String tableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
     checkSnapshotIsPurgedFromDB(omLeader, tableKey);
 
-    // Resume the DoubleBuffer and flush the pending transactions.
-    OzoneManagerDoubleBuffer omDoubleBuffer =
-        omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-    omDoubleBuffer.resume();
+    // Resume the DoubleBuffer on the follower and flush the pending transactions.
+    omFollowerDoubleBuffer.resume();
     CompletableFuture.supplyAsync(() -> {
-      omDoubleBuffer.flushTransactions();
+      omFollowerDoubleBuffer.flushTransactions();
       return null;
     });
-    omDoubleBuffer.awaitFlush();
+    omFollowerDoubleBuffer.awaitFlush();
     checkSnapshotIsPurgedFromDB(omFollower, tableKey);
   }
 
@@ -407,7 +410,7 @@ public class TestOzoneManagerHASnapshot {
 
     String tableKey = SnapshotInfo.getTableKey(volName, buckName, snapName);
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(cluster.getOMLeader(), tableKey);
-    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("Snapshot directory doesn't exist");

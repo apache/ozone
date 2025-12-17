@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -72,33 +73,20 @@ import org.junit.jupiter.api.Test;
  * Class to test CommitWatcher functionality.
  */
 public class TestCommitWatcher {
+  private static final int CHUNK_SIZE = (int)(1 * MB);
+  private static final long FLUSH_SIZE = (long) 2 * CHUNK_SIZE;
+  private static final long MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final long BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+  private static final String VOLUME_NAME = "testblockoutputstream";
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
-  private ObjectStore objectStore;
-  private int chunkSize;
-  private long flushSize;
-  private long maxFlushSize;
-  private long blockSize;
-  private String volumeName;
-  private String bucketName;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
-    chunkSize = (int)(1 * OzoneConsts.MB);
-    flushSize = (long) 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
             10, TimeUnit.SECONDS);
@@ -127,10 +115,10 @@ public class TestCommitWatcher {
     conf.setFromObject(clientConfig);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     conf.setQuietMode(false);
@@ -142,18 +130,13 @@ public class TestCommitWatcher {
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
-    objectStore = client.getObjectStore();
-    volumeName = "testblockoutputstream";
-    bucketName = volumeName;
-    objectStore.createVolume(volumeName);
-    objectStore.getVolume(volumeName).createBucket(bucketName);
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(VOLUME_NAME);
+    objectStore.getVolume(VOLUME_NAME).createBucket(VOLUME_NAME);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -165,7 +148,7 @@ public class TestCommitWatcher {
   @Test
   public void testReleaseBuffers() throws Exception {
     int capacity = 2;
-    BufferPool bufferPool = new BufferPool(chunkSize, capacity);
+    BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
       ContainerWithPipeline container = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -184,7 +167,7 @@ public class TestCommitWatcher {
         for (int i = 0; i < capacity; i++) {
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
-                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+                  .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
           // add the data to the buffer pool
           final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
           byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -217,10 +200,10 @@ public class TestCommitWatcher {
             getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(CHUNK_SIZE);
         watcher.watchOnLastIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(1).getLogIndex());
-        assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
+        assertEquals(2 * CHUNK_SIZE, watcher.getTotalAckDataLength());
         assertThat(watcher.getCommitIndexMap()).isEmpty();
       }
     } finally {
@@ -231,7 +214,7 @@ public class TestCommitWatcher {
   @Test
   public void testReleaseBuffersOnException() throws Exception {
     int capacity = 2;
-    BufferPool bufferPool = new BufferPool(chunkSize, capacity);
+    BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
       ContainerWithPipeline container = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -250,7 +233,7 @@ public class TestCommitWatcher {
         for (int i = 0; i < capacity; i++) {
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
-                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+                  .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
           // add the data to the buffer pool
           final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
           byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -283,7 +266,7 @@ public class TestCommitWatcher {
         assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(CHUNK_SIZE);
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
         // just watch for a higher index so as to ensure, it does an actual
@@ -305,10 +288,10 @@ public class TestCommitWatcher {
             "Unexpected exception: " + t.getClass());
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
-          assertEquals(chunkSize, watcher.getTotalAckDataLength());
+          assertEquals(CHUNK_SIZE, watcher.getTotalAckDataLength());
           assertEquals(1, watcher.getCommitIndexMap().size());
         } else {
-          assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
+          assertEquals(2 * CHUNK_SIZE, watcher.getTotalAckDataLength());
           assertThat(watcher.getCommitIndexMap()).isEmpty();
         }
       }

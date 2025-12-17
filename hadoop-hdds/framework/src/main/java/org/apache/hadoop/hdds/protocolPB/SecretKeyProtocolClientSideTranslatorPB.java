@@ -42,9 +42,9 @@ import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
 
 /**
  * This class is the client-side translator that forwards requests for
@@ -58,13 +58,12 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final BlockingInterface rpcProxy;
-  private SecretKeyProtocolFailoverProxyProvider failoverProxyProvider;
 
   public SecretKeyProtocolClientSideTranslatorPB(
       SecretKeyProtocolFailoverProxyProvider<? extends BlockingInterface>
           proxyProvider, Class<? extends BlockingInterface> proxyClazz) {
     Preconditions.checkState(proxyProvider != null);
-    this.failoverProxyProvider = proxyProvider;
+    SecretKeyProtocolFailoverProxyProvider failoverProxyProvider = proxyProvider;
     this.rpcProxy = (BlockingInterface) RetryProxy.create(
         proxyClazz, failoverProxyProvider,
         failoverProxyProvider.getRetryPolicy());

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -51,27 +51,25 @@ public class PipelineReportHandler implements
   private final PipelineManager pipelineManager;
   private final SafeModeManager scmSafeModeManager;
   private final SCMContext scmContext;
-  private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
                                PipelineManager pipelineManager,
                                SCMContext scmContext,
                                ConfigurationSource conf) {
-    Preconditions.checkNotNull(pipelineManager);
+    Objects.requireNonNull(pipelineManager, "pipelineManager == null");
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
-    this.metrics = SCMPipelineMetrics.create();
   }
 
   @Override
   public void onMessage(PipelineReportFromDatanode pipelineReportFromDatanode,
       EventPublisher publisher) {
-    Preconditions.checkNotNull(pipelineReportFromDatanode);
+    Objects.requireNonNull(pipelineReportFromDatanode, "pipelineReportFromDatanode == null");
     DatanodeDetails dn = pipelineReportFromDatanode.getDatanodeDetails();
     PipelineReportsProto pipelineReport =
         pipelineReportFromDatanode.getReport();
-    Preconditions.checkNotNull(dn,
+    Objects.requireNonNull(dn,
         "Pipeline Report is missing DatanodeDetails.");
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Processing pipeline report for dn: {}", dn);
@@ -154,7 +152,6 @@ public class PipelineReportHandler implements
         RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
             ReplicationFactor.ONE)) {
       pipeline.setLeaderId(dn.getID());
-      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }
 

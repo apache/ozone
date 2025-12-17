@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
@@ -27,6 +27,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -48,17 +49,21 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -158,28 +163,38 @@ public abstract class AbstractReclaimableFilterTest {
   }
 
   private void mockOzoneManager(BucketLayout bucketLayout) throws IOException {
-    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    OmMetadataManagerImpl metadataManager = mock(OmMetadataManagerImpl.class);
+    BucketManager bucketManager = mock(BucketManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getBucketManager()).thenReturn(bucketManager);
+    when(metadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
     long volumeCount = 0;
-    long bucketCount = 0;
     for (String volume : volumes) {
       when(metadataManager.getVolumeId(eq(volume))).thenReturn(volumeCount);
-      for (String bucket : buckets) {
-        when(ozoneManager.getBucketInfo(eq(volume), eq(bucket)))
-            .thenReturn(OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
-                .setObjectID(bucketCount).setBucketLayout(bucketLayout).build());
-        bucketCount++;
-      }
       volumeCount++;
     }
+
+    when(bucketManager.getBucketInfo(anyString(), anyString())).thenAnswer(i -> {
+      String volume = i.getArgument(0, String.class);
+      String bucket = i.getArgument(1, String.class);
+      if (!volumes.contains(volume)) {
+        throw new OMException("Volume " + volume + " doesn't exist", OMException.ResultCodes.VOLUME_NOT_FOUND);
+      }
+      if (!buckets.contains(bucket)) {
+        throw new OMException("Bucket " + bucket + " doesn't exist", OMException.ResultCodes.BUCKET_NOT_FOUND);
+      }
+      return OmBucketInfo.newBuilder().setVolumeName(volume).setBucketName(bucket)
+          .setObjectID((long) volumes.indexOf(volume) * buckets.size() + buckets.indexOf(bucket))
+          .setBucketLayout(bucketLayout).build();
+    });
   }
 
   private void mockOmSnapshotManager(OzoneManager om) throws RocksDBException, IOException {
     try (MockedStatic<ManagedRocksDB> rocksdb = Mockito.mockStatic(ManagedRocksDB.class);
          MockedConstruction<SnapshotDiffManager> mockedSnapshotDiffManager =
-             Mockito.mockConstruction(SnapshotDiffManager.class, (mock, context) ->
+             mockConstruction(SnapshotDiffManager.class, (mock, context) ->
                  doNothing().when(mock).close());
-         MockedConstruction<SnapshotCache> mockedCache = Mockito.mockConstruction(SnapshotCache.class,
+         MockedConstruction<SnapshotCache> mockedCache = mockConstruction(SnapshotCache.class,
              (mock, context) -> {
                Map<UUID, UncheckedAutoCloseableSupplier<OmSnapshot>> map = new HashMap<>();
                when(mock.get(any(UUID.class))).thenAnswer(i -> {
@@ -226,13 +241,16 @@ public abstract class AbstractReclaimableFilterTest {
       conf.set(OZONE_METADATA_DIRS, testDir.toAbsolutePath().toFile().getAbsolutePath());
       when(om.getConfiguration()).thenReturn(conf);
       when(om.isFilesystemSnapshotEnabled()).thenReturn(true);
-      this.omSnapshotManager = new OmSnapshotManager(om);
+      try (MockedConstruction<OmSnapshotLocalDataManager> ignored =
+               mockConstruction(OmSnapshotLocalDataManager.class)) {
+        this.omSnapshotManager = new OmSnapshotManager(om);
+      }
     }
   }
 
   protected List<SnapshotInfo> getLastSnapshotInfos(
       String volume, String bucket, int numberOfSnapshotsInChain, int index) {
-    List<SnapshotInfo> infos = getSnapshotInfos().get(getKey(volume, bucket));
+    List<SnapshotInfo> infos = getSnapshotInfos().getOrDefault(getKey(volume, bucket), Collections.emptyList());
     int endIndex = Math.min(index - 1, infos.size() - 1);
     return IntStream.range(endIndex - numberOfSnapshotsInChain + 1, endIndex + 1).mapToObj(i -> i >= 0 ?
         infos.get(i) : null).collect(Collectors.toList());

@@ -28,11 +28,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -97,7 +98,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private File tmpDir;
   private File diskCheckDir;
 
-  private final Optional<VolumeUsage> volumeUsage;
+  private final VolumeUsage volumeUsage;
 
   private final VolumeSet volumeSet;
 
@@ -148,8 +149,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(volumeRoot);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
-      SpaceUsageCheckParams checkParams = getSpaceUsageCheckParams(b);
-      volumeUsage = Optional.of(new VolumeUsage(checkParams, b.conf));
+      SpaceUsageCheckParams checkParams = getSpaceUsageCheckParams(b, this::getContainerDirsPath);
+      checkParams.setContainerUsedSpace(this::containerUsedSpace);
+      volumeUsage = new VolumeUsage(checkParams, b.conf);
       this.volumeSet = b.volumeSet;
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
@@ -164,7 +166,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
-      volumeUsage = Optional.empty();
+      volumeUsage = null;
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
@@ -176,11 +178,29 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     this.storageDirStr = storageDir.getAbsolutePath();
   }
 
+  protected long containerUsedSpace() {
+    // container used space applicable only for HddsVolume
+    return 0;
+  }
+
+  public File getContainerDirsPath() {
+    // container dir path applicable only for HddsVolume
+    return null;
+  }
+
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    // Operation only for HddsVolume which have container data
+  }
+
   public void format(String cid) throws IOException {
-    Preconditions.checkNotNull(cid, "clusterID cannot be null while " +
-        "formatting Volume");
-    this.clusterID = cid;
+    this.clusterID = Objects.requireNonNull(cid, "clusterID == null");
     initialize();
+  }
+
+  public void start() throws IOException {
+    if (volumeUsage != null) {
+      volumeUsage.start();
+    }
   }
 
   /**
@@ -322,12 +342,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   private void writeVersionFile() throws IOException {
-    Preconditions.checkNotNull(this.storageID,
-        "StorageID cannot be null in Version File");
-    Preconditions.checkNotNull(this.clusterID,
-        "ClusterID cannot be null in Version File");
-    Preconditions.checkNotNull(this.datanodeUuid,
-        "DatanodeUUID cannot be null in Version File");
+    Objects.requireNonNull(storageID, "storageID == null");
+    Objects.requireNonNull(clusterID, "clusterID == null");
+    Objects.requireNonNull(datanodeUuid, "datanodeUuid == null");
     Preconditions.checkArgument(this.cTime > 0,
         "Creation Time should be positive");
     Preconditions.checkArgument(this.layoutVersion ==
@@ -451,9 +468,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   /** Get current usage of the volume. */
-  public SpaceUsageSource getCurrentUsage() {
-    return volumeUsage.map(VolumeUsage::getCurrentUsage)
-        .orElse(SpaceUsageSource.UNKNOWN);
+  public SpaceUsageSource.Fixed getCurrentUsage() {
+    return volumeUsage != null ? volumeUsage.getCurrentUsage() : SpaceUsageSource.UNKNOWN;
   }
 
   protected StorageLocationReport.Builder reportBuilder() {
@@ -464,10 +480,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
         .setStorageType(storageType);
 
     if (!builder.isFailed()) {
-      SpaceUsageSource usage = getCurrentUsage();
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
       builder.setCapacity(usage.getCapacity())
           .setRemaining(usage.getAvailable())
-          .setScmUsed(usage.getUsedSpace());
+          .setScmUsed(usage.getUsedSpace())
+          .setReserved(volumeUsage.getReservedInBytes());
     }
 
     return builder;
@@ -495,22 +512,26 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   public void refreshVolumeUsage() {
-    volumeUsage.ifPresent(VolumeUsage::refreshNow);
+    if (volumeUsage != null) {
+      volumeUsage.refreshNow();
+    }
   }
 
   /** @see #getCurrentUsage() */
-  public Optional<VolumeUsage> getVolumeUsage() {
+  public VolumeUsage getVolumeUsage() {
     return volumeUsage;
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    volumeUsage.ifPresent(usage -> usage
-            .incrementUsedSpace(usedSpace));
+    if (volumeUsage != null) {
+      volumeUsage.incrementUsedSpace(usedSpace);
+    }
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    volumeUsage.ifPresent(usage -> usage
-            .decrementUsedSpace(reclaimedSpace));
+    if (volumeUsage != null) {
+      volumeUsage.decrementUsedSpace(reclaimedSpace);
+    }
   }
 
   public VolumeSet getVolumeSet() {
@@ -563,12 +584,16 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
   public void failVolume() {
     setState(VolumeState.FAILED);
-    volumeUsage.ifPresent(VolumeUsage::shutdown);
+    if (volumeUsage != null) {
+      volumeUsage.shutdown();
+    }
   }
 
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
-    volumeUsage.ifPresent(VolumeUsage::shutdown);
+    if (volumeUsage != null) {
+      volumeUsage.shutdown();
+    }
     cleanTmpDiskCheckDir();
   }
 
@@ -723,7 +748,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return getStorageDir().toString();
   }
 
-  private static SpaceUsageCheckParams getSpaceUsageCheckParams(Builder b) throws IOException {
+  private static SpaceUsageCheckParams getSpaceUsageCheckParams(Builder b, Supplier<File> exclusionProvider)
+      throws IOException {
     File root = new File(b.volumeRootStr);
 
     boolean succeeded = root.isDirectory() || root.mkdirs();
@@ -738,6 +764,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
     }
 
-    return usageCheckFactory.paramsFor(root);
+    return usageCheckFactory.paramsFor(root, exclusionProvider);
   }
 }

@@ -17,52 +17,47 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import net.jcip.annotations.Immutable;
 
 /**
  * Mixin class to handle custom metadata.
  */
+@Immutable
 public abstract class WithMetadata {
 
-  private Map<String, String> metadata;
+  private final ImmutableMap<String, String> metadata;
 
   protected WithMetadata() {
-    metadata = new ConcurrentHashMap<>();
+    metadata = ImmutableMap.of();
   }
 
   protected WithMetadata(Builder b) {
-    metadata = b.metadata;
+    metadata = b.metadata.build();
   }
 
   protected WithMetadata(WithMetadata other) {
-    metadata = new ConcurrentHashMap<>(other.getMetadata());
+    metadata = other.getMetadata();
   }
 
   /**
    * Custom key value metadata.
    */
-  public final Map<String, String> getMetadata() {
+  public final ImmutableMap<String, String> getMetadata() {
     return metadata;
-  }
-
-  /**
-   * Set custom key value metadata.
-   */
-  public final void setMetadata(Map<String, String> metadata) {
-    this.metadata = metadata;
   }
 
   /** Builder for {@link WithMetadata}. */
   public static class Builder {
-    private final Map<String, String> metadata;
+    private final MapBuilder<String, String> metadata;
 
     protected Builder() {
-      metadata = new ConcurrentHashMap<>();
+      metadata = MapBuilder.empty();
     }
 
-    protected Builder(WithObjectID obj) {
-      metadata = new ConcurrentHashMap<>(obj.getMetadata());
+    protected Builder(WithMetadata obj) {
+      metadata = MapBuilder.of(obj.getMetadata());
     }
 
     public Builder addMetadata(String key, String value) {
@@ -78,12 +73,11 @@ public abstract class WithMetadata {
     }
 
     public Builder setMetadata(Map<String, String> map) {
-      metadata.clear();
-      addAllMetadata(map);
+      metadata.set(map);
       return this;
     }
 
-    protected Map<String, String> getMetadata() {
+    public MapBuilder<String, String> metadata() {
       return metadata;
     }
   }

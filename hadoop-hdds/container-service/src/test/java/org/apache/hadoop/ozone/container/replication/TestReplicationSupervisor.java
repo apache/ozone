@@ -35,10 +35,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -51,6 +53,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
@@ -82,6 +85,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -103,6 +108,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -144,6 +150,8 @@ public class TestReplicationSupervisor {
   private StateContext context;
   private TestClock clock;
   private DatanodeDetails datanode;
+  private DNContainerOperationClient mockClient;
+  private ContainerController mockController;
 
   private VolumeChoosingPolicy volumeChoosingPolicy;
 
@@ -158,6 +166,8 @@ public class TestReplicationSupervisor {
         stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
+    mockClient = mock(DNContainerOperationClient.class);
+    mockController = mock(ContainerController.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
@@ -379,7 +389,8 @@ public class TestReplicationSupervisor {
         ContainerLayoutVersion.FILE_PER_BLOCK, containerMaxSize, "test", "test");
     HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
     containerData.setVolume(vol1);
-    containerData.incrBytesUsed(containerUsedSize);
+    // the container is not yet in HDDS, so only set its own size, leaving HddsVolume with used=0
+    containerData.getStatistics().updateWrite(100, false);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(1);
@@ -407,7 +418,9 @@ public class TestReplicationSupervisor {
     // Initially volume has 0 used space
     assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
-    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerMaxSize * 3;
+    long minFreeSpace =
+        conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(vol1.getCurrentUsage().getCapacity());
+    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerMaxSize * 3 - minFreeSpace;
     vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
@@ -656,6 +669,56 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testReconciliationTaskMetrics(ContainerLayoutVersion layout) throws IOException {
+    this.layoutVersion = layout;
+    // GIVEN
+    ReplicationSupervisor replicationSupervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+    ReplicationSupervisorMetrics replicationMetrics =
+        ReplicationSupervisorMetrics.create(replicationSupervisor);
+
+    try {
+      //WHEN
+      replicationSupervisor.addTask(createReconciliationTask(1L));
+      replicationSupervisor.addTask(createReconciliationTask(2L));
+
+      ReconcileContainerTask reconciliationTask = createReconciliationTask(6L);
+      clock.fastForward(15000);
+      replicationSupervisor.addTask(reconciliationTask);
+      doThrow(IOException.class).when(mockController).reconcileContainer(any(), anyLong(), any());
+      replicationSupervisor.addTask(createReconciliationTask(7L));
+
+      //THEN
+      assertEquals(2, replicationSupervisor.getReplicationSuccessCount());
+
+      assertEquals(2, replicationSupervisor.getReplicationSuccessCount(
+          reconciliationTask.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationFailureCount());
+      assertEquals(1, replicationSupervisor.getReplicationFailureCount(
+          reconciliationTask.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount());
+      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount(
+          reconciliationTask.getMetricName()));
+      assertEquals(4, replicationSupervisor.getReplicationRequestCount());
+      assertEquals(4, replicationSupervisor.getReplicationRequestCount(
+          reconciliationTask.getMetricName()));
+
+
+      assertTrue(replicationSupervisor.getReplicationRequestTotalTime(
+          reconciliationTask.getMetricName()) > 0);
+      assertTrue(replicationSupervisor.getReplicationRequestAvgTime(
+          reconciliationTask.getMetricName()) > 0);
+
+      MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
+      replicationMetrics.getMetrics(replicationMetricsCollector, true);
+      assertEquals(1, replicationMetricsCollector.getRecords().size());
+    } finally {
+      replicationMetrics.unRegister();
+      replicationSupervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testPriorityOrdering(ContainerLayoutVersion layout)
       throws InterruptedException {
     this.layoutVersion = layout;
@@ -723,6 +786,61 @@ public class TestReplicationSupervisor {
         supervisor.getInFlightReplications(OrderedTask.class));
     assertEquals(0,
         supervisor.getInFlightReplications(BlockingTask.class));
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReconcileContainerCommandDeduplication() throws Exception {
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .build();
+
+    try {
+      final long containerID = 10L;
+
+      // Create reconcile commands with the same container ID but different peers
+      ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      command1.setTerm(1);
+      ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      command2.setTerm(1);
+      assertEquals(command1, command2);
+
+      // Create a controller that blocks the execution of reconciliation until the latch is counted down from the test.
+      ContainerController blockingController = mock(ContainerController.class);
+      CountDownLatch latch = new CountDownLatch(1);
+      doAnswer(arg -> {
+        latch.await();
+        return null;
+      }).when(blockingController).reconcileContainer(any(), anyLong(), any());
+
+      ReconcileContainerTask task1 = new ReconcileContainerTask(
+          blockingController,
+          mock(DNContainerOperationClient.class),
+          command1);
+      ReconcileContainerTask task2 = new ReconcileContainerTask(
+          // The second task should be discarded as a duplicate. It does not need to block.
+          mock(ContainerController.class),
+          mock(DNContainerOperationClient.class),
+          command2);
+
+      // Add first task - should be accepted
+      supervisor.addTask(task1);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Add second task with same container ID but different peers - should be deduplicated
+      supervisor.addTask(task2);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Now the task has been unblocked. The supervisor should finish execution of the one blocked task.
+      latch.countDown();
+      GenericTestUtils.waitFor(() ->
+          supervisor.getTotalInFlightReplications() == 0 && supervisor.getReplicationQueuedCount() == 0, 500, 5000);
+    } finally {
+      supervisor.stop();
+    }
   }
 
   private static class BlockingTask extends AbstractReplicationTask {
@@ -833,6 +951,15 @@ public class TestReplicationSupervisor {
     return new ReplicationTask(cmd, replicatorRef.get());
   }
 
+  private ReconcileContainerTask createReconciliationTask(long containerId) {
+    ReconcileContainerCommand reconcileContainerCommand =
+        new ReconcileContainerCommand(containerId, Collections.singleton(datanode));
+    reconcileContainerCommand.setTerm(CURRENT_TERM);
+    reconcileContainerCommand.setDeadline(clock.millis() + 10000);
+    return new ReconcileContainerTask(mockController, mockClient,
+        reconcileContainerCommand);
+  }
+
   private ECReconstructionCoordinatorTask createECTask(long containerId) {
     return new ECReconstructionCoordinatorTask(null,
         createReconstructionCmdInfo(containerId));
@@ -873,7 +1000,7 @@ public class TestReplicationSupervisor {
     List<DatanodeDetails> target = singletonList(
         MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(containerId, sources, target,
-        Proto2Utils.unsafeByteString(missingIndexes),
+        ProtoUtils.unsafeByteString(missingIndexes),
         new ECReplicationConfig(3, 2));
     cmd.setTerm(CURRENT_TERM);
     return cmd;

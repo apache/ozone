@@ -25,6 +25,4 @@ import java.util.Map;
 public interface WithTags {
 
   Map<String, String> getTags();
-
-  void setTags(Map<String, String> tags);
 }

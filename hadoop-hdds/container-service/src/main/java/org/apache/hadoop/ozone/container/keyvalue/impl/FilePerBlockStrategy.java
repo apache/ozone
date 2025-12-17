@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
@@ -37,6 +38,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -124,7 +126,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     if (info.getLen() <= 0) {
@@ -145,7 +147,7 @@ public class FilePerBlockStrategy implements ChunkManager {
         .getContainerData();
 
     final File chunkFile = getChunkFile(container, blockID);
-    long len = info.getLen();
+    long chunkLength = info.getLen();
     long offset = info.getOffset();
 
     HddsVolume volume = containerData.getVolume();
@@ -170,10 +172,27 @@ public class FilePerBlockStrategy implements ChunkManager {
       ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
     }
 
-    ChunkUtils
-        .writeData(channel, chunkFile.getName(), data, offset, len, volume);
+    long fileLengthBeforeWrite;
+    try {
+      fileLengthBeforeWrite = channel.size();
+    } catch (IOException e) {
+      throw new StorageContainerException("Encountered an error while getting the file size for "
+          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+    }
 
-    containerData.updateWriteStats(len, overwrite);
+    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
+
+    // When overwriting, update the bytes used if the new length is greater than the old length
+    // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
+    // with a larger chunk at the end of the block.
+    if (overwrite) {
+      long fileLengthAfterWrite = offset + chunkLength;
+      if (fileLengthAfterWrite > fileLengthBeforeWrite) {
+        containerData.getStatistics().updateWrite(fileLengthAfterWrite - fileLengthBeforeWrite, false);
+      }
+    }
+
+    containerData.updateWriteStats(chunkLength, overwrite);
   }
 
   @Override
@@ -256,7 +275,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       throws StorageContainerException {
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
 
     final File file = getChunkFile(container, blockID);
 
@@ -269,8 +288,6 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
 
     if (verifyLength) {
-      Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
-          "chunk delete");
       checkFullDelete(info, file);
     }
 
@@ -284,6 +301,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
+    Objects.requireNonNull(info, "info == null");
     long fileLength = chunkFile.length();
     if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
       String msg = String.format(

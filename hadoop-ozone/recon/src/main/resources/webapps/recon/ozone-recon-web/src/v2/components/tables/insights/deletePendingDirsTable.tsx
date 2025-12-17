@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import { AxiosError } from 'axios';
+import React, { useState, useEffect } from 'react';
 import Table, {
   ColumnsType,
   TablePaginationConfig
@@ -26,10 +25,10 @@ import { ValueType } from 'react-select';
 
 import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { getFormattedTime } from '@/v2/utils/momentUtils';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import { DeletedDirInfo } from '@/v2/types/insights.types';
@@ -40,6 +39,10 @@ type DeletePendingDirTableProps = {
   limit: Option;
   handleLimitChange: (arg0: ValueType<Option, false>) => void;
 }
+
+const DEFAULT_DELETE_PENDING_DIRS_RESPONSE = {
+  deletedDirInfo: []
+};
 
 //-----Constants------
 const COLUMNS: ColumnsType<DeletedDirInfo> = [{
@@ -73,43 +76,39 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
   paginationConfig,
   handleLimitChange
 }) => {
+  const [data, setData] = useState<DeletedDirInfo[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [data, setData] = React.useState<DeletedDirInfo[]>();
-  const [searchTerm, setSearchTerm] = React.useState<string>('');
-
-  const cancelSignal = React.useRef<AbortController>();
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Use the modern hooks pattern
+  const deletePendingDirsData = useApiData<{ deletedDirInfo: DeletedDirInfo[] }>(
+    `/api/v1/keys/deletePending/dirs?limit=${limit.value}`,
+    DEFAULT_DELETE_PENDING_DIRS_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  // Process data when it changes
+  useEffect(() => {
+    if (deletePendingDirsData.data && deletePendingDirsData.data.deletedDirInfo) {
+      setData(deletePendingDirsData.data.deletedDirInfo);
+    }
+  }, [deletePendingDirsData.data]);
+
+  // Refetch when limit changes
+  useEffect(() => {
+    deletePendingDirsData.refetch();
+  }, [limit.value]);
 
   function filterData(data: DeletedDirInfo[] | undefined) {
     return data?.filter(
       (data: DeletedDirInfo) => data.key.includes(debouncedSearch)
     );
   }
-
-  function loadData() {
-    setLoading(true);
-
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/keys/deletePending/dirs?limit=${limit.value}`,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      setData(response?.data?.deletedDirInfo ?? []);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
-
-  React.useEffect(() => {
-    loadData();
-
-    return (() => cancelSignal.current && cancelSignal.current.abort());
-  }, [limit.value]);
 
   return (<>
     <div className='table-header-section'>
@@ -129,7 +128,7 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
         onChange={() => { }} />
     </div>
     <Table
-      loading={loading}
+      loading={deletePendingDirsData.loading}
       dataSource={filterData(data)}
       columns={COLUMNS}
       pagination={paginationConfig}

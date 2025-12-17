@@ -117,7 +117,6 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -403,6 +402,19 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Recursive delete with DeleteIterator
     assertTrue(fs.delete(grandparent, true));
+  }
+
+  @Test
+  void testListLocatedStatusForZeroByteFile() throws Exception {
+    Path parent = new Path(bucketPath, "testListLocatedStatusForZeroByteFile");
+    Path path = new Path(parent, "key1");
+
+    try {
+      OzoneFileSystemTests.listLocatedStatusForZeroByteFile(fs, path);
+    } finally {
+      // Cleanup
+      fs.delete(parent, true);
+    }
   }
 
   @Test
@@ -1707,6 +1719,14 @@ abstract class AbstractRootedOzoneFileSystemTest {
     res.forEach(e -> assertEquals(expectedOwner, e.getOwner()));
   }
 
+  @Test
+  void testGetTrashRoot() {
+    String testKeyName = "keyToBeDeleted";
+    Path keyPath1 = new Path(bucketPath, testKeyName);
+    assertEquals(new Path(rootPath + volumeName + "/" + bucketName + "/" +
+        TRASH_PREFIX + "/" +  USER1 + "/"), userOfs.getTrashRoot(keyPath1));
+  }
+
   /**
    * Test getTrashRoots() in OFS. Different from the existing test for o3fs.
    */
@@ -1869,7 +1889,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
-        isAssignableFrom(TrashPolicyOzone.class));
+        isAssignableFrom(OzoneTrashPolicy.class));
 
     long prevNumTrashDeletes = getOMMetrics().getNumTrashDeletes();
     long prevNumTrashFileDeletes = getOMMetrics().getNumTrashFilesDeletes();

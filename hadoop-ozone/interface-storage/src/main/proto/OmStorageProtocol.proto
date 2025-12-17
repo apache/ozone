@@ -64,3 +64,18 @@ message PersistedUserVolumeInfo {
   optional uint64 objectID = 2;
   optional uint64 updateID = 3;
 }
+
+message GlobalStatsValueProto {
+    required int64 value = 1;
+}
+
+message FileSizeCountKeyProto {
+    required string volume = 1;
+    required string bucket = 2;
+    required int64 fileSizeUpperBound = 3;
+}
+
+message SnapDiffObjectInfo {
+  optional uint64 objectID = 1;
+  optional string keyName = 2;
+}

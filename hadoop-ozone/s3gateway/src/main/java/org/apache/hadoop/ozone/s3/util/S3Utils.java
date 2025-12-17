@@ -164,9 +164,13 @@ public final class S3Utils {
     }
   }
 
-  public static String validateSignatureHeader(HttpHeaders headers, String resource) throws OS3Exception {
+  public static String validateSignatureHeader(HttpHeaders headers, String resource, boolean isSignedPayload)
+      throws OS3Exception {
     String xAmzContentSha256Header = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
     if (xAmzContentSha256Header == null) {
+      if (!isSignedPayload) {
+        return UNSIGNED_PAYLOAD;
+      }
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
       ex.setErrorMessage("An error occurred (InvalidArgument): " +
           "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");
@@ -196,6 +200,26 @@ public final class S3Utils {
    */
   public static String generateCanonicalUserId(String input) {
     return DigestUtils.sha256Hex(input);
+  }
+
+  /**
+   * Strips leading and trailing double quotes from the given string.
+   *
+   * @param value the input string
+   * @return the string without leading and trailing double quotes
+   */
+  public static String stripQuotes(String value) {
+    return StringUtils.strip(value, "\"");
+  }
+
+  /**
+   * Wraps the given string in double quotes.
+   *
+   * @param value the input string
+   * @return the string wrapped in double quotes
+   */
+  public static String wrapInQuotes(String value) {
+    return StringUtils.wrap(value, '\"');
   }
 
 }

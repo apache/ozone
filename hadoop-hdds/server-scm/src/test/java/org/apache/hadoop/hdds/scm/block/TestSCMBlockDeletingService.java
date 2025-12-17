@@ -72,7 +72,7 @@ public class TestSCMBlockDeletingService {
     nodeManager = mock(NodeManager.class);
     eventPublisher = mock(EventPublisher.class);
     conf = new OzoneConfiguration();
-    metrics = ScmBlockDeletingServiceMetrics.create();
+    metrics = ScmBlockDeletingServiceMetrics.create(mock(BlockManager.class));
     when(nodeManager.getTotalDatanodeCommandCount(any(),
         any())).thenReturn(0);
     SCMServiceManager scmServiceManager = mock(SCMServiceManager.class);
@@ -130,7 +130,7 @@ public class TestSCMBlockDeletingService {
         metrics.getNumBlockDeletionCommandSent());
     // Echo Command has one Transaction
     assertEquals(datanodeDetails.size() * 1,
-        metrics.getNumBlockDeletionTransactionSent());
+        metrics.getNumBlockDeletionTransactionsOnDatanodes());
   }
 
   private void callDeletedBlockTransactionScanner() throws Exception {

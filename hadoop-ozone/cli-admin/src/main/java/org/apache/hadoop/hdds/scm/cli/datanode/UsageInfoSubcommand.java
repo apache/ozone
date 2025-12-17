@@ -58,7 +58,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   }
 
   @CommandLine.ArgGroup(multiplicity = "1")
-  private ExclusiveArguments exclusiveArguments;
+  private NodeSelectionArguments exclusiveArguments;
 
   @CommandLine.Option(names = {"-c", "--count"}, description = "Number of " +
       "datanodes to display (Default: ${DEFAULT-VALUE}).",
@@ -72,16 +72,21 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    String hostnameOrIp =
+        !Strings.isNullOrEmpty(exclusiveArguments.getIp()) ? exclusiveArguments.getIp()
+            : !Strings.isNullOrEmpty(exclusiveArguments.getHostname()) ? exclusiveArguments.getHostname()
+            : exclusiveArguments.address; //Fallback to deprecated --address for backward compatibility with older CLI.
+    
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
     if (count < 1) {
       throw new IOException("Count must be an integer greater than 0.");
     }
 
     // fetch info by ip or hostname or uuid
-    if (!Strings.isNullOrEmpty(exclusiveArguments.address) ||
-        !Strings.isNullOrEmpty(exclusiveArguments.uuid)) {
-      infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.address,
-          exclusiveArguments.uuid);
+    if (!Strings.isNullOrEmpty(hostnameOrIp) ||
+        !Strings.isNullOrEmpty(exclusiveArguments.getNodeId())) {
+      infoList = scmClient.getDatanodeUsageInfo(hostnameOrIp,
+          exclusiveArguments.getNodeId());
     } else { // get info of most used or least used nodes
       infoList = scmClient.getDatanodeUsageInfo(exclusiveArguments.mostUsed,
           count);
@@ -92,7 +97,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         .collect(Collectors.toList());
 
     if (json) {
-      System.out.print(
+      System.out.println(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(usageList));
       return;
     }
@@ -142,9 +147,13 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     System.out.printf("%-24s: %s (%s) %n", "Remaining Allocatable",
         (info.getRemaining() - info.getCommitted()) + " B",
         StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
-    System.out.printf("%-24s: %s (%s) %n%n", "Free Space To Spare",
+    System.out.printf("%-24s: %s (%s) %n", "Free Space To Spare",
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
+    System.out.printf("%-13s: %s (%s) %n", "Reserved",
+        info.getReserved() + " B", 
+        StringUtils.byteDesc(info.getReserved()));
+    System.out.println();
   }
 
   /**
@@ -173,6 +182,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     private long freeSpaceToSpare = 0;
     private long containerCount = 0;
     private long pipelineCount = 0;
+    private long reserved = 0;
 
     DatanodeUsage(HddsProtos.DatanodeUsageInfoProto proto) {
       if (proto.hasNode()) {
@@ -198,6 +208,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       }
       if (proto.hasFreeSpaceToSpare()) {
         freeSpaceToSpare = proto.getFreeSpaceToSpare();
+      }
+      if (proto.hasReserved()) { 
+        reserved = proto.getReserved();
       }
     }
 
@@ -266,17 +279,19 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     public long getPipelineCount() {
       return pipelineCount;
     }
+
+    public long getReserved() { 
+      return reserved;
+    }
   }
 
-  private static class ExclusiveArguments {
+  private static class NodeSelectionArguments extends NodeSelectionMixin {
+    @Deprecated
     @CommandLine.Option(names = {"--address"}, paramLabel = "ADDRESS",
         description = "Show info by datanode ip or hostname address.",
-        defaultValue = "")
+        defaultValue = "",
+        hidden = true)
     private String address;
-
-    @CommandLine.Option(names = {"--uuid"}, paramLabel = "UUID", description =
-        "Show info by datanode UUID.", defaultValue = "")
-    private String uuid;
 
     @CommandLine.Option(names = {"-m", "--most-used"},
         description = "Show the most used datanodes.",

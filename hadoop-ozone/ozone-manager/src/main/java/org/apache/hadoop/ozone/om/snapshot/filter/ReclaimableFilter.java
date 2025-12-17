@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -89,7 +90,8 @@ public abstract class ReclaimableFilter<V>
     this.omSnapshotManager = omSnapshotManager;
     this.currentSnapshotInfo = currentSnapshotInfo;
     this.snapshotChainManager = snapshotChainManager;
-    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, false);
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, false,
+        numberOfPreviousSnapshotsFromChain + 1);
     this.keyManager = keyManager;
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
@@ -167,11 +169,21 @@ public abstract class ReclaimableFilter<V>
           previousOmSnapshots.add(null);
           previousSnapshotInfos.add(null);
         }
-
-        // NOTE: Getting volumeId and bucket from active OM.
-        // This would be wrong on volume & bucket renames support.
-        bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
+      }
+      // NOTE: Getting volumeId and bucket from active OM.
+      // This would be wrong on volume & bucket renames support.
+      try {
+        bucketInfo = ozoneManager.getBucketManager().getBucketInfo(volume, bucket);
         volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
+      } catch (OMException e) {
+        // If Volume or bucket has been deleted then all keys should be reclaimable as no snapshots would exist.
+        if (OMException.ResultCodes.VOLUME_NOT_FOUND == e.getResult() ||
+            OMException.ResultCodes.BUCKET_NOT_FOUND == e.getResult()) {
+          bucketInfo = null;
+          volumeId = null;
+          return;
+        }
+        throw e;
       }
     } catch (IOException e) {
       this.cleanup();
@@ -187,7 +199,7 @@ public abstract class ReclaimableFilter<V>
     if (!validateExistingLastNSnapshotsInChain(volume, bucket) || !snapshotIdLocks.isLockAcquired()) {
       initializePreviousSnapshotsFromChain(volume, bucket);
     }
-    boolean isReclaimable = isReclaimable(keyValue);
+    boolean isReclaimable = (bucketInfo == null) || isReclaimable(keyValue);
     // This is to ensure the reclamation ran on the same previous snapshot and no change occurred in the chain
     // while processing the entry.
     return isReclaimable && validateExistingLastNSnapshotsInChain(volume, bucket);

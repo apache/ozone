@@ -58,10 +58,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -75,6 +76,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
@@ -92,9 +94,9 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -104,6 +106,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +126,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
+   * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc_.RPC.Server}.
    * @param conf configuration
    * @param protocol Protocol interface
    * @param service service that implements the protocol
@@ -422,7 +425,7 @@ public final class HddsServerUtil {
 
     if (rawLocations.isEmpty()) {
       rawLocations = new ArrayList<>(1);
-      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf, NodeType.DATANODE));
     }
     return rawLocations;
   }
@@ -617,14 +620,12 @@ public final class HddsServerUtil {
    * @param checkpoint    checkpoint file
    * @param destination   destination output stream.
    * @param toExcludeList the files to be excluded
-   * @param excludedList  the files excluded
    * @throws IOException
    */
   public static void writeDBCheckpointToStream(
       DBCheckpoint checkpoint,
       OutputStream destination,
-      List<String> toExcludeList,
-      List<String> excludedList)
+      Set<String> toExcludeList)
       throws IOException {
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination);
         Stream<Path> files =
@@ -636,8 +637,6 @@ public final class HddsServerUtil {
             String fileName = fileNamePath.toString();
             if (!toExcludeList.contains(fileName)) {
               includeFile(path.toFile(), fileName, archiveOutputStream);
-            } else {
-              excludedList.add(fileName);
             }
           }
         }
@@ -680,7 +679,7 @@ public final class HddsServerUtil {
     final String className = clazz.getSimpleName();
 
     if (log.isInfoEnabled()) {
-      log.info(createStartupShutdownMessage(versionInfo, className, hostname,
+      log.info(createStartupMessage(versionInfo, className, hostname,
           args, HddsUtils.processForLogging(conf)));
     }
 
@@ -720,19 +719,42 @@ public final class HddsServerUtil {
    * @param args Command arguments
    * @return a string to log.
    */
-  public static String createStartupShutdownMessage(VersionInfo versionInfo,
+  private static String createStartupMessage(VersionInfo versionInfo,
       String className, String hostname, String[] args,
       Map<String, String> conf) {
     return toStartupShutdownString("STARTUP_MSG: ",
         "Starting " + className,
-        "  host = " + hostname,
-        "  args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
-        "  version = " + versionInfo.getVersion(),
+        "       host = " + hostname,
+        "    version = " + versionInfo.getVersion(),
+        "      build = " + versionInfo.getUrl() + "/" + versionInfo.getRevision(),
+        "       java = " + System.getProperty("java.version"),
+        "       args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
         "  classpath = " + System.getProperty("java.class.path"),
-        "  build = " + versionInfo.getUrl() + "/"
-            + versionInfo.getRevision(),
-        "  java = " + System.getProperty("java.version"),
-        "  conf = " + conf);
+        "       conf = " + conf);
+  }
+
+  public static void setPoolSize(ThreadPoolExecutor executor, int size, Logger logger) {
+    Preconditions.assertTrue(size > 0, () -> "Pool size must be positive: " + size);
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    String change = "unchanged";
+    if (size > currentCorePoolSize) {
+      change = "increased";
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else if (size < currentCorePoolSize) {
+      change = "decreased";
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
+    if (logger != null) {
+      logger.info("pool size {} from {} to {}", change, currentCorePoolSize, size);
+    }
   }
 
 }

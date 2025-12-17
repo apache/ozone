@@ -203,8 +203,14 @@ public class WritableECContainerProvider
 
     Pipeline newPipeline = pipelineManager.createPipeline(repConfig,
         excludedNodes, Collections.emptyList());
+    // the returned ContainerInfo should not be null (due to not enough space in the Datanodes specifically) because
+    // this is a new pipeline and pipeline creation checks for sufficient space in the Datanodes
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
+    if (container == null) {
+      // defensive null handling
+      throw new IOException("Could not allocate a new container");
+    }
     pipelineManager.openPipeline(newPipeline.getId());
     LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
@@ -271,7 +277,7 @@ public class WritableECContainerProvider
 
     private static final String PREFIX = "ozone.scm.ec";
 
-    @Config(key = "pipeline.minimum",
+    @Config(key = "ozone.scm.ec.pipeline.minimum",
         defaultValue = "5",
         reconfigurable = true,
         type = ConfigType.INT,
@@ -287,7 +293,7 @@ public class WritableECContainerProvider
     private static final String EC_PIPELINE_PER_VOLUME_FACTOR_KEY =
         PREFIX + "." + PIPELINE_PER_VOLUME_FACTOR_KEY;
 
-    @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
+    @Config(key = "ozone.scm.ec.pipeline.per.volume.factor",
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
         reconfigurable = true,

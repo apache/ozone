@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-interface-server</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone HDDS Server Interface</name>
   <description>Apache Ozone Distributed Data Store Server interface</description>
@@ -46,6 +46,12 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
+    <dependency>
+      <!-- for generated sources, Java 11+ -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -63,11 +69,9 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-3</id>
+            <id>compile-proto-for-ratis</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -75,32 +79,30 @@
               <goal>test-compile-custom</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <includes>
                 <include>InterSCMProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
               </includes>
-              <outputDirectory>target/generated-sources/java</outputDirectory>
+              <outputDirectory>target/generated-sources/proto-java-for-ratis</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
             </configuration>
           </execution>
           <execution>
-            <id>compile-protoc-2</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
               </excludes>
-              <outputDirectory>target/generated-sources/java</outputDirectory>
+              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
@@ -117,9 +119,10 @@
             <phase>generate-sources</phase>
             <configuration>
               <target>
-                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
-                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
-                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <!-- use grpc, guava, protobuf from ratis-thirdparty -->
+                <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="target/generated-sources/proto-java-for-ratis" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
               </target>
             </configuration>
           </execution>

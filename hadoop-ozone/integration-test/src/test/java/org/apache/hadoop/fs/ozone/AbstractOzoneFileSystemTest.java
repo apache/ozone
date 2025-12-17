@@ -111,7 +111,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -1685,7 +1684,7 @@ abstract class AbstractOzoneFileSystemTest {
     ContractTestUtils.touch(fs, path);
     assertTrue(trash.getConf().getClass(
         "fs.trash.classname", TrashPolicy.class).
-        isAssignableFrom(TrashPolicyOzone.class));
+        isAssignableFrom(OzoneTrashPolicy.class));
     assertEquals(TRASH_INTERVAL, trash.getConf().
         getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
 
@@ -1889,7 +1888,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
-        "org.apache.hadoop.ipc.ProcessingDetails");
+        "org.apache.hadoop.ipc_.ProcessingDetails");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
@@ -2142,6 +2141,15 @@ abstract class AbstractOzoneFileSystemTest {
     FileStatus[] fileStatuses = fs.listStatus(path.getParent());
     assertEquals(1, fileStatuses.length);
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  @Test
+  public void testOzoneManagerListLocatedStatusForZeroByteFile() throws IOException {
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+
+    OzoneFileSystemTests.listLocatedStatusForZeroByteFile(fs, path);
   }
 
   @Test

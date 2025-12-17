@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -26,14 +24,19 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.slf4j.Logger;
@@ -93,7 +96,7 @@ public class ContainerController {
         warning = "The Container is not found. ContainerID: " + containerId;
       }
       LOG.warn(warning);
-      throw new ContainerNotFoundException(warning);
+      throw new ContainerNotFoundException(ContainerID.valueOf(containerId));
     } else {
       if (container.getContainerState() == State.OPEN) {
         getHandler(container).markContainerForClose(container);
@@ -108,14 +111,36 @@ public class ContainerController {
    * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public void markContainerUnhealthy(final long containerId, ScanResult reason)
+  public boolean markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
-    Container container = containerSet.getContainer(containerId);
-    if (container != null) {
-      getHandler(container).markContainerUnhealthy(container, reason);
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip marking UNHEALTHY", containerId);
+      return false;
+    } else if (container.getContainerState() == State.UNHEALTHY) {
+      LOG.debug("Container {} is already UNHEALTHY, skip marking UNHEALTHY", containerId);
+      return false;
     } else {
-      LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
-          containerId);
+      getHandler(container).markContainerUnhealthy(container, reason);
+      return true;
+    }
+  }
+
+  /**
+   * Updates the container checksum information on disk and in memory.
+   *
+   * @param containerId The ID of the container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated.
+   */
+  public void updateContainerChecksum(long containerId, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip updating checksums", containerId);
+    } else {
+      getHandler(container).updateContainerChecksum(container, treeWriter);
     }
   }
 
@@ -188,8 +213,14 @@ public class ContainerController {
   public void exportContainer(final ContainerType type,
       final long containerId, final OutputStream outputStream,
       final TarContainerPacker packer) throws IOException {
-    handlers.get(type).exportContainer(
-        containerSet.getContainer(containerId), outputStream, packer);
+    try {
+      handlers.get(type).exportContainer(
+          containerSet.getContainer(containerId), outputStream, packer);
+    } catch (IOException e) {
+      // If export fails, then trigger a scan for the container
+      containerSet.scanContainer(containerId, "Export failed");
+      throw e;
+    }
   }
 
   /**
@@ -203,6 +234,16 @@ public class ContainerController {
     final Container container = containerSet.getContainer(containerId);
     if (container != null) {
       getHandler(container).deleteContainer(container, force);
+    }
+  }
+
+  public void reconcileContainer(DNContainerOperationClient dnClient, long containerID, Set<DatanodeDetails> peers)
+      throws IOException {
+    Container<?> container = containerSet.getContainer(containerID);
+    if (container == null) {
+      LOG.warn("Container {} to reconcile not found on this datanode.", containerID);
+    } else {
+      getHandler(container).reconcileContainer(dnClient, container, peers);
     }
   }
 

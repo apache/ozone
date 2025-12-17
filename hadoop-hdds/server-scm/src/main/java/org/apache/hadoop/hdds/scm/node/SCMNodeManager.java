@@ -22,10 +22,12 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -40,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +52,7 @@ import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -82,8 +84,9 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -122,6 +125,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMNodeMetrics metrics;
   // Node manager MXBean
   private ObjectName nmInfoBean;
+  private final OzoneConfiguration conf;
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
   private final Function<String, String> nodeResolver;
@@ -152,7 +156,6 @@ public class SCMNodeManager implements NodeManager {
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(
-
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
@@ -171,6 +174,7 @@ public class SCMNodeManager implements NodeManager {
       SCMContext scmContext,
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
+    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, scmContext);
@@ -533,7 +537,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
                                            CommandQueueReportProto queueReport) {
-    Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
+    Objects.requireNonNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
@@ -547,9 +551,9 @@ public class SCMNodeManager implements NodeManager {
     writeLock().lock();
     try {
       Map<SCMCommandProto.Type, Integer> summary =
-          commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
+          commandQueue.getDatanodeCommandSummary(datanodeDetails.getID());
       List<SCMCommand<?>> commands =
-          commandQueue.getCommand(datanodeDetails.getUuid());
+          commandQueue.getCommand(datanodeDetails.getID());
 
       // Update the SCMCommand of deleteBlocksCommand Status
       for (SCMCommand<?> command : commands) {
@@ -853,7 +857,7 @@ public class SCMNodeManager implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType) {
     readLock().lock();
     try {
       return commandQueue.getDatanodeCommandCount(dnID, cmdType);
@@ -885,7 +889,7 @@ public class SCMNodeManager implements NodeManager {
             ". Assuming zero", datanodeDetails, cmdType);
         dnCount = 0;
       }
-      return getCommandQueueCount(datanodeDetails.getUuid(), cmdType) + dnCount;
+      return getCommandQueueCount(datanodeDetails.getID(), cmdType) + dnCount;
     } finally {
       readLock().unlock();
     }
@@ -1024,6 +1028,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
+      usageInfo.setReserved(getTotalReserved(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1274,6 +1279,8 @@ public class SCMNodeManager implements NodeManager {
     nodeStateStatistics(nodeStatistics);
     // Statistics node space
     nodeSpaceStatistics(nodeStatistics);
+    // Statistics node readOnly
+    nodeOutOfSpaceStatistics(nodeStatistics);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
@@ -1359,6 +1366,45 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(SpaceStatistics.SCM_USED.getLabel(), scmUsed);
     nodeStatics.put(SpaceStatistics.REMAINING.getLabel(), remaining);
     nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
+  }
+
+  private void nodeOutOfSpaceStatistics(Map<String, String> nodeStatics) {
+    List<DatanodeInfo> allNodes = getAllNodes();
+    long blockSize = (long) conf.getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    long minRatisVolumeSizeBytes = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+        StorageUnit.BYTES);
+    long containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+
+    int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
+        .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
+            && !hasEnoughCommittedVolumeSpace(dn, blockSize))
+        .count();
+
+    nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
+  }
+  
+  /**
+   * Check if any volume in the datanode has committed space >= blockSize.
+   *
+   * @return true if any volume has committed space >= blockSize, false otherwise
+   */
+  private boolean hasEnoughCommittedVolumeSpace(DatanodeInfo dnInfo, long blockSize) {
+    for (StorageReportProto reportProto : dnInfo.getStorageReports()) {
+      if (reportProto.getCommitted() >= blockSize) {
+        return true;
+      }
+    }
+    LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
+        dnInfo.getID(), blockSize);
+    return false;
   }
 
   /**
@@ -1490,7 +1536,7 @@ public class SCMNodeManager implements NodeManager {
                 getHealthyVolumeCount());
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getUuid());
+                dn.getID());
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
@@ -1525,7 +1571,7 @@ public class SCMNodeManager implements NodeManager {
       }
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          dn.getUuid());
+          dn.getID());
     }
     return 0;
   }
@@ -1546,7 +1592,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
     HashSet<DatanodeDetails> dns = new HashSet<>();
-    Preconditions.checkNotNull(dn);
+    Objects.requireNonNull(dn, "dn == null");
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();
@@ -1645,12 +1691,23 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getPipelinesCount(datanodeDetails);
   }
 
+  public long getTotalReserved(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    long reserved = 0L;
+    final DatanodeInfo di = nodeStateManager.getNode(datanodeDetails);
+    for (StorageReportProto r : di.getStorageReports()) {
+      if (r.hasReserved()) {
+        reserved += r.getReserved();
+      }
+    }
+    return reserved;
+  }
+
   @Override
   public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
-    final UUID dnId = datanodeID.getUuid();
     writeLock().lock();
     try {
-      this.commandQueue.addCommand(dnId, command);
+      this.commandQueue.addCommand(datanodeID, command);
     } finally {
       writeLock().unlock();
     }
@@ -1690,7 +1747,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(DatanodeID dnID) {
     // Getting the queue actually clears it and returns the commands, so this
     // is a write operation and not a read as the method name suggests.
     writeLock().lock();
@@ -1713,6 +1770,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
+  }
+
+  @Override
+  @Nullable
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    if (datanodeDetails == null) {
+      return null;
+    }
+    return getNode(datanodeDetails.getID());
   }
 
   /**
@@ -1836,7 +1902,7 @@ public class SCMNodeManager implements NodeManager {
         }
         nodeStateManager.removeNode(datanodeDetails.getID());
         removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
-        final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
+        final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getID());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
       } else {
         LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);

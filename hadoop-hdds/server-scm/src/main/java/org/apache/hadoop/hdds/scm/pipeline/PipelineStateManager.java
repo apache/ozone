@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -61,22 +63,14 @@ public interface PipelineStateManager {
   void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
       HddsProtos.PipelineState newState) throws IOException;
 
-  void addContainerToPipeline(
-      PipelineID pipelineID,
-      ContainerID containerID
-  ) throws IOException;
+  void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException;
 
   /**
    * Adds container to SCM Pipeline without checking whether pipeline
    * is closed.
-   * @param pipelineID
-   * @param containerID
-   * @throws IOException
    */
-  void addContainerToPipelineForce(
-      PipelineID pipelineID,
-      ContainerID containerID
-  ) throws IOException;
+  void addContainerToPipelineForce(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException;
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
@@ -103,17 +97,14 @@ public interface PipelineStateManager {
       Pipeline.PipelineState state
   );
 
-  NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
-      throws IOException;
+  NavigableSet<ContainerID> getContainers(PipelineID pipelineID) throws PipelineNotFoundException;
 
-  int getNumberOfContainers(PipelineID pipelineID) throws IOException;
+  int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException;
 
-  void removeContainerFromPipeline(PipelineID pipelineID,
-                                   ContainerID containerID) throws IOException;
+  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID);
 
-  void close() throws Exception;
+  void close();
 
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException;
-
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException;
 }

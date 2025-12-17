@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -42,8 +42,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,7 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
   private ReconService recon;
+  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -132,15 +134,21 @@ public class TestReconWithOzoneManagerHA {
     // Sync data to Recon
     impl.syncDataFromOM();
 
-    ReconContainerMetadataManager reconContainerMetadataManager =
-        recon.getReconServer().getReconContainerMetadataManager();
-    try (TableIterator iterator =
-        reconContainerMetadataManager.getContainerTableIterator()) {
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
+    CompletableFuture<Void> completableFuture =
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
+
+    final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
+        (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
+    try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
+        = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
       String reconKeyPrefix = null;
       while (iterator.hasNext()) {
-        Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
-            (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
-        reconKeyPrefix = keyValue.getKey().getKeyPrefix();
+        reconKeyPrefix = iterator.next().getKey().getKeyPrefix();
       }
       assertEquals(
           String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),

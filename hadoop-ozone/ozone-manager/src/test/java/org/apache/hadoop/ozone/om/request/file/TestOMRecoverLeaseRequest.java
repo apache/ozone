@@ -22,11 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -369,7 +369,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
         .build();
 
     List<OmKeyLocationInfo> locationInfoList = keyArgs.getLocationInfoList();
-    Preconditions.checkNotNull(locationInfoList);
+    Objects.requireNonNull(locationInfoList, "locationInfoList == null");
     KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -560,15 +560,15 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   String addToOpenFileTable(List<OmKeyLocationInfo> locationList, boolean hsyncFlag)
       throws Exception {
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
-    omKeyInfo.appendNewBlocks(locationList, false);
+        .setParentObjectID(parentId);
     if (hsyncFlag) {
-      omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+      keyInfoBuilder.addMetadata(OzoneConsts.HSYNC_CLIENT_ID,
           String.valueOf(clientID));
     }
+    OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+    omKeyInfo.appendNewBlocks(locationList, false);
 
     OMRequestTestUtils.addFileToKeyTable(
         true, false, omKeyInfo.getFileName(),
@@ -585,15 +585,15 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   String addToFileTable(List<OmKeyLocationInfo> locationList, boolean hsyncFlag)
       throws Exception {
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
-    omKeyInfo.appendNewBlocks(locationList, false);
+        .setParentObjectID(parentId);
     if (hsyncFlag) {
-      omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+      keyInfoBuilder.addMetadata(OzoneConsts.HSYNC_CLIENT_ID,
           String.valueOf(clientID));
     }
+    OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+    omKeyInfo.appendNewBlocks(locationList, false);
 
     OMRequestTestUtils.addFileToKeyTable(
         false, false, omKeyInfo.getFileName(),

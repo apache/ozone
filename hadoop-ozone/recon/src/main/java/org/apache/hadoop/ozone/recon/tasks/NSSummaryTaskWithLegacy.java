@@ -153,44 +153,44 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                            OMDBUpdateEvent.OMDBUpdateAction action,
                                            Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    setKeyParentID(updatedKeyInfo);
+    long updatedKeyParentObjectID = setKeyParentID(updatedKeyInfo);
 
     if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
       switch (action) {
       case PUT:
-        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
         break;
 
       case DELETE:
-        handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+        handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
         break;
 
       case UPDATE:
         if (oldKeyInfo != null) {
-          setKeyParentID(oldKeyInfo);
-          handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+          long oldKeyParentObjectID = setKeyParentID(oldKeyInfo);
+          handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyParentObjectID);
         } else {
           LOG.warn("Update event does not have the old keyInfo for {}.",
               updatedKeyInfo.getKeyName());
         }
-        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
         break;
 
       default:
         LOG.debug("Skipping DB update event for Key: {}", action);
       }
     } else {
-      OmDirectoryInfo updatedDirectoryInfo = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo updatedDirectoryInfo = OmDirectoryInfo.newBuilder()
           .setName(updatedKeyInfo.getKeyName())
           .setObjectID(updatedKeyInfo.getObjectID())
-          .setParentObjectID(updatedKeyInfo.getParentObjectID())
+          .setParentObjectID(updatedKeyParentObjectID)
           .build();
 
       OmDirectoryInfo oldDirectoryInfo = null;
 
       if (oldKeyInfo != null) {
         oldDirectoryInfo =
-            new OmDirectoryInfo.Builder()
+            OmDirectoryInfo.newBuilder()
                 .setName(oldKeyInfo.getKeyName())
                 .setObjectID(oldKeyInfo.getObjectID())
                 .setParentObjectID(oldKeyInfo.getParentObjectID())
@@ -227,26 +227,26 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                             OMDBUpdateEvent.OMDBUpdateAction action,
                                             Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    setParentBucketId(updatedKeyInfo);
+    long updatedKeyParentObjectID = setParentBucketId(updatedKeyInfo);
 
     switch (action) {
     case PUT:
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
       break;
 
     case DELETE:
-      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
       break;
 
     case UPDATE:
       if (oldKeyInfo != null) {
-        setParentBucketId(oldKeyInfo);
-        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+        long oldKeyParentObjectID = setParentBucketId(oldKeyInfo);
+        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyParentObjectID);
       } else {
         LOG.warn("Update event does not have the old keyInfo for {}.",
             updatedKeyInfo.getKeyName());
       }
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyParentObjectID);
       break;
 
     default:
@@ -278,23 +278,23 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           if (enableFileSystemPaths) {
             // The LEGACY bucket is a file system bucket.
-            setKeyParentID(keyInfo);
+            long parentObjectID = setKeyParentID(keyInfo);
 
             if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
               OmDirectoryInfo directoryInfo =
-                  new OmDirectoryInfo.Builder()
+                  OmDirectoryInfo.newBuilder()
                       .setName(keyInfo.getKeyName())
                       .setObjectID(keyInfo.getObjectID())
-                      .setParentObjectID(keyInfo.getParentObjectID())
+                      .setParentObjectID(parentObjectID)
                       .build();
               handlePutDirEvent(directoryInfo, nsSummaryMap);
             } else {
-              handlePutKeyEvent(keyInfo, nsSummaryMap);
+              handlePutKeyEvent(keyInfo, nsSummaryMap, parentObjectID);
             }
           } else {
             // The LEGACY bucket is an object store bucket.
-            setParentBucketId(keyInfo);
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
+            long parentObjectID = setParentBucketId(keyInfo);
+            handlePutKeyEvent(keyInfo, nsSummaryMap, parentObjectID);
           }
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
@@ -321,11 +321,11 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   /**
    * KeyTable entries don't have the parentId set.
    * In order to reuse the existing FSO methods that rely on
-   * the parentId, we have to set it explicitly.
+   * the parentId, we have to look it up.
    * @param keyInfo
    * @throws IOException
    */
-  private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
+  private long setKeyParentID(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
     // If the path contains only one key then keyPath.length
@@ -344,7 +344,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           .getSkipCache(fullParentKeyName);
 
       if (parentKeyInfo != null) {
-        keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
+        return parentKeyInfo.getObjectID();
       } else {
         LOG.warn("ParentKeyInfo is null for key: {} in volume: {}, bucket: {}. Full Parent Key: {}",
             keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName(), fullParentKeyName);
@@ -352,16 +352,14 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                 keyInfo.getKeyName());
       }
     } else {
-      setParentBucketId(keyInfo);
+      return setParentBucketId(keyInfo);
     }
   }
 
   /**
-   * Set the parent object ID for a bucket.
-   *@paramkeyInfo
-   *@throwsIOException
+   * Look up the parent object ID for a bucket.
    */
-  private void setParentBucketId(OmKeyInfo keyInfo)
+  private long setParentBucketId(OmKeyInfo keyInfo)
       throws IOException {
     String bucketKey = getReconOMMetadataManager()
         .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
@@ -369,7 +367,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
 
     if (parentBucketInfo != null) {
-      keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
+      return parentBucketInfo.getObjectID();
     } else {
       LOG.warn("ParentBucketInfo is null for key: {} in volume: {}, bucket: {}",
           keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName());

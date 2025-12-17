@@ -18,15 +18,16 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -36,9 +37,9 @@ import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -106,9 +107,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
     loadOMClientConfigs(conf, omServiceId);
-    Preconditions.checkNotNull(omProxies);
-    Preconditions.checkNotNull(omNodeIDList);
-    Preconditions.checkNotNull(omNodeAddressMap);
+    Objects.requireNonNull(omProxies, "omProxies == null");
+    Objects.requireNonNull(omNodeIDList, "omNodeIDList == null");
+    Objects.requireNonNull(omNodeAddressMap, "omNodeAddressMap == null");
 
     nextProxyIndex = 0;
     nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
@@ -445,7 +446,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   }
 
   protected synchronized void setOmNodeIDList(List<String> omNodeIDList) {
-    this.omNodeIDList = omNodeIDList;
+    Collections.shuffle(omNodeIDList);
+    this.omNodeIDList = Collections.unmodifiableList(omNodeIDList);
   }
 
   protected synchronized List<String> getOmNodeIDList() {

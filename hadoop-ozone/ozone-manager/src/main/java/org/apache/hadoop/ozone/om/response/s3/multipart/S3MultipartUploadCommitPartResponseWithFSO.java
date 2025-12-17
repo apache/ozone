@@ -17,25 +17,27 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for S3MultipartUploadCommitPartWithFSO request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE})
+    MULTIPART_INFO_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadCommitPartResponseWithFSO
         extends S3MultipartUploadCommitPartResponse {
 
@@ -43,25 +45,18 @@ public class S3MultipartUploadCommitPartResponseWithFSO
    * Regular response.
    * 1. Update MultipartKey in MultipartInfoTable with new PartKeyInfo
    * 2. Delete openKey from OpenKeyTable
-   * 3. If old PartKeyInfo exists, put it in DeletedKeyTable
-   * @param omResponse
-   * @param multipartKey
-   * @param openKey
-   * @param omMultipartKeyInfo
-   * @param oldPartKeyInfo
-   * @param openPartKeyInfoToBeDeleted
-   * @param omBucketInfo
+   * 3. If old key or uncommitted (pseudo) key exists, put it in DeletedTable
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponseWithFSO(
       @Nonnull OMResponse omResponse, String multipartKey, String openKey,
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      @Nullable Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
+      @Nonnull OmBucketInfo omBucketInfo, long bucketId, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, openKey, omMultipartKeyInfo,
-            oldPartKeyInfo, openPartKeyInfoToBeDeleted,
-            omBucketInfo, bucketLayout);
+            keyToDeleteMap, openPartKeyInfoToBeDeleted,
+            omBucketInfo, bucketId, bucketLayout);
   }
 }

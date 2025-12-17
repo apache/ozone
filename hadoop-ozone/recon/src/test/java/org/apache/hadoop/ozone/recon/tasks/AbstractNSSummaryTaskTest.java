@@ -208,7 +208,6 @@ public abstract class AbstractNSSummaryTaskTest {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setFileName(fileName)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
         .setObjectID(objectID)
         .setParentObjectID(parentObjectId)
@@ -233,7 +232,6 @@ public abstract class AbstractNSSummaryTaskTest {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setFileName(fileName)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
         .setObjectID(objectID)
         .setParentObjectID(parentObjectId)
@@ -241,7 +239,7 @@ public abstract class AbstractNSSummaryTaskTest {
   }
 
   protected static OmDirectoryInfo buildOmDirInfo(String dirName, long objectId, long parentObjectId) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setObjectID(objectId)
         .setParentObjectID(parentObjectId)
@@ -267,7 +265,6 @@ public abstract class AbstractNSSummaryTaskTest {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setFileName(fileName)
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))

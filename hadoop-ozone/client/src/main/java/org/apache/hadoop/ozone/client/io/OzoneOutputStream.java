@@ -139,36 +139,28 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   public OutputStream getOutputStream() {
     return outputStream;
   }
-
+  
   public KeyOutputStream getKeyOutputStream() {
-    if (outputStream instanceof KeyOutputStream) {
-      return ((KeyOutputStream) outputStream);
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream) wrappedStream);
-      }
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      OutputStream wrappedStream =
-          ((CipherOutputStreamOzone) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream)wrappedStream);
-      }
-    }
-    // Otherwise return null.
-    return null;
+    OutputStream base = unwrap(outputStream);
+    return base instanceof KeyOutputStream ? (KeyOutputStream) base : null;
   }
 
   @Override
   public Map<String, String> getMetadata() {
-    if (outputStream instanceof CryptoOutputStream) {
-      return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
-          .getWrappedStream()).getMetadata();
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      return ((KeyMetadataAware)((CipherOutputStreamOzone) outputStream)
-          .getWrappedStream()).getMetadata();
+    OutputStream base = unwrap(outputStream);
+    if (base instanceof KeyMetadataAware) {
+      return ((KeyMetadataAware) base).getMetadata();
     }
-    return ((KeyMetadataAware) outputStream).getMetadata();
+    throw new IllegalStateException(
+        "OutputStream is not KeyMetadataAware: " + base.getClass());
+  }
+
+  private static OutputStream unwrap(OutputStream out) {
+    if (out instanceof CryptoOutputStream) {
+      return ((CryptoOutputStream) out).getWrappedStream();
+    } else if (out instanceof CipherOutputStreamOzone) {
+      return ((CipherOutputStreamOzone) out).getWrappedStream();
+    }
+    return out;
   }
 }

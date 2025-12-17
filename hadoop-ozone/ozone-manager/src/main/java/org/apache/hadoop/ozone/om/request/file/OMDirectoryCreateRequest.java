@@ -24,13 +24,14 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -93,12 +94,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
         super.preExecute(ozoneManager).getCreateDirectoryRequest();
-    Preconditions.checkNotNull(createDirectoryRequest);
+    Objects.requireNonNull(createDirectoryRequest, "createDirectoryRequest == null");
 
     KeyArgs keyArgs = createDirectoryRequest.getKeyArgs();
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setSnapshotReservedWord(keyArgs.getKeyName()).build();
-    validateKey(ozoneManager, validateArgs);
+
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());

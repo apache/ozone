@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -92,11 +92,8 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     DatanodeDetails dni = context.getParent().getDatanodeDetails();
     HddsProtos.NodeOperationalState state =
         setNodeCmdProto.getNodeOperationalState();
-    dni.setPersistedOpState(state);
-    dni.setPersistedOpStateExpiryEpochSec(
-        setNodeCmd.getStateExpiryEpochSeconds());
     try {
-      persistDatanodeDetails(dni);
+      persistUpdatedDatanodeDetails(dni, state, setNodeCmd.getStateExpiryEpochSeconds());
     } catch (IOException ioe) {
       LOG.error("Failed to persist the datanode state", ioe);
       // TODO - this should probably be raised, but it will break the command
@@ -106,12 +103,23 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }
 
+  private void persistUpdatedDatanodeDetails(
+      DatanodeDetails dnDetails, HddsProtos.NodeOperationalState state, long stateExpiryEpochSeconds)
+      throws IOException {
+    DatanodeDetails persistedDni = new DatanodeDetails(dnDetails);
+    persistedDni.setPersistedOpState(state);
+    persistedDni.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
+    persistDatanodeDetails(persistedDni);
+    dnDetails.setPersistedOpState(state);
+    dnDetails.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
+  }
+
   // TODO - this duplicates code in HddsDatanodeService and InitDatanodeState
   //        Need to refactor.
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
