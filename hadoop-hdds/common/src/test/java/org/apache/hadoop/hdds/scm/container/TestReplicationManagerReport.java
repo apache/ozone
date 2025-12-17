@@ -150,7 +150,7 @@ class TestReplicationManagerReport {
     for (int i = 0; i < expectedSampleSize * 2; i++) {
       testReport.increment(ContainerHealthState.UNDER_REPLICATED);
     }
-    assertEquals(expectedSampleSize * 2, 
+    assertEquals((long) expectedSampleSize * 2, 
         testReport.getStat(ContainerHealthState.UNDER_REPLICATED));
   }
 
