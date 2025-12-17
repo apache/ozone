@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Enum representing container health states.
@@ -119,8 +116,7 @@ public enum ContainerHealthState {
    */
   UNHEALTHY_UNDER_REPLICATED((short) 100,
       "Inconsistent states with insufficient replicas",
-      "UnhealthyUnderReplicatedContainers",
-      UNHEALTHY, UNDER_REPLICATED),
+      "UnhealthyUnderReplicatedContainers"),
 
   /**
    * Container is unhealthy AND over-replicated.
@@ -129,8 +125,7 @@ public enum ContainerHealthState {
    */
   UNHEALTHY_OVER_REPLICATED((short) 101,
       "Inconsistent states with excess replicas",
-      "UnhealthyOverReplicatedContainers",
-      UNHEALTHY, OVER_REPLICATED),
+      "UnhealthyOverReplicatedContainers"),
 
   /**
    * Container is missing AND under-replicated.
@@ -139,8 +134,7 @@ public enum ContainerHealthState {
    */
   MISSING_UNDER_REPLICATED((short) 102,
       "No online replicas with offline indexes needing replication",
-      "MissingUnderReplicatedContainers",
-      MISSING, UNDER_REPLICATED),
+      "MissingUnderReplicatedContainers"),
 
   /**
    * Container is quasi-closed-stuck AND under-replicated.
@@ -149,8 +143,7 @@ public enum ContainerHealthState {
    */
   QUASI_CLOSED_STUCK_UNDER_REPLICATED((short) 103,
       "Stuck in quasi-closed state with insufficient replicas",
-      "QuasiClosedStuckUnderReplicatedContainers",
-      QUASI_CLOSED_STUCK, UNDER_REPLICATED),
+      "QuasiClosedStuckUnderReplicatedContainers"),
 
   /**
    * Container is quasi-closed-stuck AND over-replicated.
@@ -159,15 +152,13 @@ public enum ContainerHealthState {
    */
   QUASI_CLOSED_STUCK_OVER_REPLICATED((short) 104,
       "Stuck in quasi-closed state with excess replicas",
-      "QuasiClosedStuckOverReplicatedContainers",
-      QUASI_CLOSED_STUCK, OVER_REPLICATED);
+      "QuasiClosedStuckOverReplicatedContainers");
 
   // ========== Enum Fields ==========
 
   private final short value;
   private final String description;
   private final String metricName;
-  private final Set<ContainerHealthState> individualStates;
 
   // Static lookup map for efficient fromValue()
   private static final Map<Short, ContainerHealthState> VALUE_MAP = new HashMap<>();
@@ -178,32 +169,11 @@ public enum ContainerHealthState {
     }
   }
 
-  // Individual states constructor
+  // Constructor for all states
   ContainerHealthState(short value, String description, String metricName) {
     this.value = value;
     this.description = description;
     this.metricName = metricName;
-    // Initialize with HashSet to avoid enum initialization issues
-    this.individualStates = new HashSet<>();
-    this.individualStates.add(this);
-  }
-
-  // Combination states constructor
-  ContainerHealthState(short value, String description, String metricName,
-                       ContainerHealthState... components) {
-    this.value = value;
-    this.description = description;
-    this.metricName = metricName;
-    // Initialize with HashSet to avoid enum initialization issues
-    this.individualStates = new HashSet<>();
-    for (ContainerHealthState component : components) {
-      if (component.isIndividual()) {
-        this.individualStates.add(component);
-      } else {
-        // If component is itself a combination, add its individual states
-        this.individualStates.addAll(component.individualStates);
-      }
-    }
   }
 
   public short getValue() {
@@ -222,112 +192,6 @@ public enum ContainerHealthState {
    */
   public String getMetricName() {
     return metricName;
-  }
-
-  /**
-   * Check if this is an individual state (value 0-99).
-   *
-   * @return true if individual state, false if combination
-   */
-  public boolean isIndividual() {
-    return value >= 0 && value <= 99;
-  }
-
-  /**
-   * Check if this is a combination state (value 100+).
-   *
-   * @return true if combination state
-   */
-  public boolean isCombination() {
-    return value >= 100;
-  }
-
-  // ========== Query Methods ==========
-
-  /**
-   * Check if this health state contains a specific individual state.
-   *
-   * @param individualState An individual health state to check
-   * @return true if this state contains the individual state
-   *
-   * <p>Example:
-   * <pre>
-   * UNDER_REPLICATED_EMPTY.contains(UNDER_REPLICATED) → true
-   * UNDER_REPLICATED_EMPTY.contains(MISSING) → false
-   * </pre>
-   */
-  public boolean contains(ContainerHealthState individualState) {
-    if (!individualState.isIndividual()) {
-      throw new IllegalArgumentException(
-          "Argument must be an individual state, not: " + individualState);
-    }
-    return this.individualStates.contains(individualState);
-  }
-
-  /**
-   * Check if this health state contains ALL of the specified states.
-   *
-   * @param states Set of health states to check
-   * @return true if this state contains all specified states
-   */
-  public boolean containsAll(Set<ContainerHealthState> states) {
-    Set<ContainerHealthState> flatStates = new HashSet<>();
-    for (ContainerHealthState state : states) {
-      if (state.isIndividual()) {
-        flatStates.add(state);
-      } else {
-        flatStates.addAll(state.individualStates);
-      }
-    }
-    return this.individualStates.containsAll(flatStates);
-  }
-
-  /**
-   * Check if this health state contains ANY of the specified states.
-   *
-   * @param states Set of health states to check
-   * @return true if this state contains at least one specified state
-   */
-  public boolean containsAny(Set<ContainerHealthState> states) {
-    for (ContainerHealthState state : states) {
-      if (state.isIndividual()) {
-        if (this.individualStates.contains(state)) {
-          return true;
-        }
-      } else {
-        // Check if any of the combination's individual states overlap
-        for (ContainerHealthState individual : state.individualStates) {
-          if (this.individualStates.contains(individual)) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Get all individual health states present in this state.
-   *
-   * @return Set of individual health states
-   *
-   * <p>Example:
-   * <pre>
-   * UNDER_REPLICATED_EMPTY.getIndividualStates()
-   *   → {UNDER_REPLICATED, EMPTY}
-   * </pre>
-   */
-  public Set<ContainerHealthState> getIndividualStates() {
-    return EnumSet.copyOf(individualStates);
-  }
-
-  /**
-   * Count how many individual health states are present.
-   *
-   * @return Number of individual health issues
-   */
-  public int getHealthIssueCount() {
-    return individualStates.size();
   }
 
   /**
@@ -354,122 +218,4 @@ public enum ContainerHealthState {
     return state != null ? state : HEALTHY;
   }
 
-  /**
-   * Find the best matching named constant for a set of individual states.
-   * First tries to find an exact combination match.
-   * If not found, returns the most critical individual state.
-   *
-   * @param states Set of individual health states
-   * @return Best matching ContainerHealthState
-   */
-  public static ContainerHealthState findBestMatch(Set<ContainerHealthState> states) {
-    if (states == null || states.isEmpty()) {
-      return HEALTHY;
-    }
-
-    // Single state - return it directly
-    if (states.size() == 1) {
-      return states.iterator().next();
-    }
-
-    // Try to find exact combination match
-    // Check for UNHEALTHY + UNDER_REPLICATED
-    if (states.contains(UNHEALTHY) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
-      return UNHEALTHY_UNDER_REPLICATED;
-    }
-
-    // Check for UNHEALTHY + OVER_REPLICATED
-    if (states.contains(UNHEALTHY) && states.contains(OVER_REPLICATED) && states.size() == 2) {
-      return UNHEALTHY_OVER_REPLICATED;
-    }
-
-    // Check for MISSING + UNDER_REPLICATED
-    if (states.contains(MISSING) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
-      return MISSING_UNDER_REPLICATED;
-    }
-
-    // Check for QUASI_CLOSED_STUCK + UNDER_REPLICATED
-    if (states.contains(QUASI_CLOSED_STUCK) && states.contains(UNDER_REPLICATED) && states.size() == 2) {
-      return QUASI_CLOSED_STUCK_UNDER_REPLICATED;
-    }
-
-    // Check for QUASI_CLOSED_STUCK + OVER_REPLICATED
-    if (states.contains(QUASI_CLOSED_STUCK) && states.contains(OVER_REPLICATED) && states.size() == 2) {
-      return QUASI_CLOSED_STUCK_OVER_REPLICATED;
-    }
-
-    // No exact match - return most critical individual state by priority
-    // Priority: MISSING > OPEN_WITHOUT_PIPELINE > QUASI_CLOSED_STUCK >
-    //          UNDER_REPLICATED > UNHEALTHY > OPEN_UNHEALTHY >
-    //          MIS_REPLICATED > OVER_REPLICATED > EMPTY
-    if (states.contains(MISSING)) {
-      return MISSING;
-    }
-    if (states.contains(OPEN_WITHOUT_PIPELINE)) {
-      return OPEN_WITHOUT_PIPELINE;
-    }
-    if (states.contains(QUASI_CLOSED_STUCK)) {
-      return QUASI_CLOSED_STUCK;
-    }
-    if (states.contains(UNDER_REPLICATED)) {
-      return UNDER_REPLICATED;
-    }
-    if (states.contains(UNHEALTHY)) {
-      return UNHEALTHY;
-    }
-    if (states.contains(OPEN_UNHEALTHY)) {
-      return OPEN_UNHEALTHY;
-    }
-    if (states.contains(MIS_REPLICATED)) {
-      return MIS_REPLICATED;
-    }
-    if (states.contains(OVER_REPLICATED)) {
-      return OVER_REPLICATED;
-    }
-    if (states.contains(EMPTY)) {
-      return EMPTY;
-    }
-
-    return HEALTHY;
-  }
-
-  /**
-   * Combine multiple individual health states into one.
-   * Returns a named constant if one exists for this exact combination.
-   * Otherwise returns the most critical individual state.
-   *
-   * @param states Set of individual health states
-   * @return Combined health state or most critical individual
-   */
-  public static ContainerHealthState combine(Set<ContainerHealthState> states) {
-    return findBestMatch(states);
-  }
-
-  // ========== String Representation ==========
-
-  @Override
-  public String toString() {
-    if (isHealthy()) {
-      return "HEALTHY";
-    }
-
-    if (isIndividual()) {
-      return name();
-    }
-
-    // For combinations, show the individual states
-    StringBuilder sb = new StringBuilder(name());
-    sb.append(" [");
-    boolean first = true;
-    for (ContainerHealthState state : individualStates) {
-      if (!first) {
-        sb.append(", ");
-      }
-      sb.append(state.name());
-      first = false;
-    }
-    sb.append(']');
-
-    return sb.toString();
-  }
 }
