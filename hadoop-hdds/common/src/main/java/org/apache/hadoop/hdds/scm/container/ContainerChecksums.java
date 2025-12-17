@@ -23,21 +23,18 @@ import net.jcip.annotations.Immutable;
 /**
  * Wrapper for container checksums (data, metadata, etc.).
  * Provides equality, hash, and hex string rendering.
+ * A value of 0 indicates an unknown or unset checksum.
  */
 @Immutable
 public final class ContainerChecksums {
   // Checksum of the data within the wrapper.
   private final long dataChecksum;
-  // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
-  private static final long UNSET_DATA_CHECKSUM = -1;
 
   // Checksum of the metadata within the wrapper.
   private final long metadataChecksum;
-  // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
-  private static final long UNSET_METADATA_CHECKSUM = -1;
 
   private static final ContainerChecksums UNKNOWN =
-      new ContainerChecksums(UNSET_DATA_CHECKSUM, UNSET_METADATA_CHECKSUM);
+      new ContainerChecksums(0L, 0L);
 
   private ContainerChecksums(long dataChecksum, long metadataChecksum) {
     this.dataChecksum = dataChecksum;
@@ -47,31 +44,21 @@ public final class ContainerChecksums {
   public static ContainerChecksums unknown() {
     return UNKNOWN;
   }
-  
+
+  public static ContainerChecksums of(long dataChecksum) {
+    return new ContainerChecksums(dataChecksum, 0L);
+  }
+
   public static ContainerChecksums of(long dataChecksum, long metadataChecksum) {
     return new ContainerChecksums(dataChecksum, metadataChecksum);
   }
 
   public long getDataChecksum() {
-    if (needsDataChecksum()) {
-      return 0;
-    }
     return dataChecksum;
   }
 
-  public boolean needsDataChecksum() {
-    return dataChecksum == UNSET_DATA_CHECKSUM;
-  }
-
   public long getMetadataChecksum() {
-    if (needsMetadataChecksum()) {
-      return 0;
-    }
     return metadataChecksum;
-  }
-
-  public boolean needsMetadataChecksum() {
-    return metadataChecksum == UNSET_METADATA_CHECKSUM;
   }
 
   @Override
@@ -83,8 +70,8 @@ public final class ContainerChecksums {
       return false;
     }
     ContainerChecksums that = (ContainerChecksums) obj;
-    return getDataChecksum() == that.getDataChecksum() &&
-        getMetadataChecksum() == that.getMetadataChecksum();
+    return dataChecksum == that.dataChecksum &&
+        metadataChecksum == that.metadataChecksum;
   }
 
   @Override
