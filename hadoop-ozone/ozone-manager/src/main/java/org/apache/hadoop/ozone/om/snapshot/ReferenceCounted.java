@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Add reference counter to an object instance.
  */
-class ReferenceCounted<T> {
+public class ReferenceCounted<T> {
 
   /**
    * Object that is being reference counted. e.g. OmSnapshot
