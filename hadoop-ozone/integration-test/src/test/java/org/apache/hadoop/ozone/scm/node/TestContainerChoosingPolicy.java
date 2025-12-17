@@ -273,6 +273,10 @@ public class TestContainerChoosingPolicy {
 
       containerData.setState(isOpen ? ContainerDataProto.State.OPEN : ContainerDataProto.State.CLOSED);
       containerData.setVolume(volume);
+      // Set some bytes used for containers so they can be chosen for disk balancing
+      // Use a small non-zero value to ensure containers are not skipped
+      long bytesUsed = isOpen ? 0 : (i % 1000 + 1) * 1024L; // 1KB to 1MB for closed containers
+      containerData.getStatistics().setBlockBytesForTesting(bytesUsed);
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       try {
