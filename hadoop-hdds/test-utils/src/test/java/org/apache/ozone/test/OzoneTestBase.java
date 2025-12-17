@@ -18,6 +18,9 @@
 package org.apache.ozone.test;
 
 import java.lang.reflect.Method;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.TestInfo;
  */
 public abstract class OzoneTestBase {
 
+  private static final AtomicInteger OBJECT_COUNTER = new AtomicInteger();
   private TestInfo info;
 
   @BeforeEach
@@ -40,4 +44,16 @@ public abstract class OzoneTestBase {
         .orElse("unknown");
   }
 
+  /** @return unique lowercase name of maximum 60 characters, including (some of) the current test's name */
+  protected String uniqueObjectName() {
+    return uniqueObjectName(getTestName());
+  }
+
+  /** @return unique lowercase name of maximum 60 characters, including (some of) {@code prefix} */
+  public static String uniqueObjectName(String prefix) {
+    return Objects.requireNonNull(prefix, "prefix == null")
+        .substring(0, Math.min(prefix.length(), 50))
+        .toLowerCase(Locale.ROOT)
+        + String.format("%010d", OBJECT_COUNTER.getAndIncrement());
+  }
 }
