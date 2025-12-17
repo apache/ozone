@@ -28,12 +28,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
@@ -48,11 +50,16 @@ public class TestSTSSecurityUtil {
   private static final String SECRET_ACCESS_KEY = "test-secret-access-key";
   private static final String SESSION_POLICY = "test-session-policy";
   private static final int DURATION_SECONDS = 3600;
+  private static final byte[] ENCRYPTION_KEY = new byte[5];
 
   private final SecretKeyTestClient secretKeyClient = new SecretKeyTestClient();
   private final STSTokenSecretManager tokenSecretManager = new STSTokenSecretManager(secretKeyClient);
   private final UUID secretKeyId = secretKeyClient.getCurrentSecretKey().getId();
   private final TestClock clock = new TestClock(Instant.ofEpochMilli(1764819000), ZoneOffset.UTC);
+
+  {
+    ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
+  }
 
   @Test
   public void testConstructValidateAndDecryptSTSTokenInvalidProtobuf() throws IOException {
@@ -314,5 +321,54 @@ public class TestSTSSecurityUtil {
     assertThat(result2.getOwnerId()).isEqualTo("temp-key-2");
     assertThat(result2.getOriginalAccessKeyId()).isEqualTo("orig-key-2");
   }
-}
 
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingExpiry() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, null, SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - expiry is null");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingTempAccessKeyId() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        null, ORIGINAL_ACCESS_KEY, ROLE_ARN, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - tempAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingRoleArn() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, null, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - roleArn is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingOriginalAccessKeyId() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, null, ROLE_ARN, clock.instant(), SECRET_ACCESS_KEY, SESSION_POLICY, ENCRYPTION_KEY);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - originalAccessKeyId is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInTokenMissingSecretAccessKey() {
+    final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, clock.instant(), null, SESSION_POLICY, ENCRYPTION_KEY);
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - secretAccessKey is null/empty");
+  }
+}

@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 import com.google.protobuf.ServiceException;
@@ -25,7 +27,9 @@ import java.time.Clock;
 import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -34,6 +38,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.token.SecretManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class which holds methods required for parse/validation of
@@ -44,6 +50,7 @@ import org.apache.hadoop.security.token.SecretManager;
 public final class S3SecurityUtil {
 
   private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
+  private static final Logger LOG = LoggerFactory.getLogger(S3SecurityUtil.class);
 
   private S3SecurityUtil() {
   }
@@ -64,6 +71,13 @@ public final class S3SecurityUtil {
         if (!token.isEmpty()) {
           final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
               token, ozoneManager.getSecretKeyClient(), CLOCK);
+
+          // Ensure the token is not revoked
+          if (isRevokedStsTempAccessKeyId(stsTokenIdentifier, ozoneManager)) {
+            LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
+            throw new OMException("STS token has been revoked", REVOKED_TOKEN);
+          }
+
           // HMAC signature and expiration were validated above.  Now validate AWS signature.
           validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
           OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
@@ -123,5 +137,36 @@ public final class S3SecurityUtil {
     }
     throw new OMException(
         "STS token validation failed for token: " + omRequest.getS3Authentication().getSessionToken(), INVALID_TOKEN);
+  }
+
+  /**
+   * Returns true if the STS token's temporary access key ID is present in the revoked STS token table.
+   */
+  private static boolean isRevokedStsTempAccessKeyId(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+      throws OMException {
+    try {
+      final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+      if (metadataManager == null) {
+        final String msg = "Could not determine STS revocation: metadataManager is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
+      }
+
+      final Table<String, String> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
+      if (revokedStsTokenTable == null) {
+        final String msg = "Could not determine STS revocation: revokedStsTokenTable is null";
+        LOG.warn(msg);
+        throw new OMException(msg, INTERNAL_ERROR);
+      }
+
+      // When the STSTokenIdentifier is validated, it ensures the temp access key id is not null/empty
+      final String tempAccessKeyId = stsTokenIdentifier.getTempAccessKeyId();
+
+      return revokedStsTokenTable.getIfExist(tempAccessKeyId) != null;
+    } catch (Exception e) {
+      final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
+      LOG.warn(msg, e);
+      throw new OMException(msg, e, INTERNAL_ERROR);
+    }
   }
 }
