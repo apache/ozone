@@ -76,9 +76,7 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
     } else {
       LOG.debug("Container {} cannot be force closed and is stuck in " +
               "QUASI_CLOSED", containerInfo);
-      ContainerHealthState healthState = ContainerHealthState.QUASI_CLOSED_STUCK;
-      request.getReport().incrementAndSample(healthState, containerInfo.containerID());
-      containerInfo.setHealthState(healthState);
+      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK, containerInfo);
     }
     // Always return false, even if commands were sent. That way, under and
     // over replication handlers can to check for other issues in the container.

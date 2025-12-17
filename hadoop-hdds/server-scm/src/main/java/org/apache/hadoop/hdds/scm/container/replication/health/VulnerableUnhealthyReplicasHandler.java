@@ -84,9 +84,7 @@ public class VulnerableUnhealthyReplicasHandler extends AbstractCheck {
     if (!vulnerableUnhealthy.isEmpty()) {
       LOG.info("Found vulnerable UNHEALTHY replicas {} for container {}.", vulnerableUnhealthy, container);
       ReplicationManagerReport report = request.getReport();
-      ContainerHealthState healthState = ContainerHealthState.UNDER_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.UNDER_REPLICATED, container);
       if (!request.isReadOnly()) {
         ContainerHealthResult.UnderReplicatedHealthResult underRepResult =
             replicaCount.toUnderHealthResult();

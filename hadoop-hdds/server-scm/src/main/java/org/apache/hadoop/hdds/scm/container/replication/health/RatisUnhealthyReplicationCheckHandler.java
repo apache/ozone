@@ -75,9 +75,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       // Container is UNHEALTHY + UNDER_REPLICATED
-      ContainerHealthState healthState = ContainerHealthState.UNHEALTHY_UNDER_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, container);
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
               " is [{}]. isUnrecoverable is [{}]. hasHealthyReplicas is [{}].",
           container,
@@ -93,9 +91,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       // Container is UNHEALTHY + OVER_REPLICATED
-      ContainerHealthState healthState = ContainerHealthState.UNHEALTHY_OVER_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, container);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +

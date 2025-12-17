@@ -84,8 +84,9 @@ public class ReplicationManagerReport {
     increment(stat.name());
   }
 
-  public void incrementAndSample(ContainerHealthState stat, ContainerID container) {
-    incrementAndSample(stat.name(), container);
+  public void incrementAndSample(ContainerHealthState stat, ContainerInfo containerInfo) {
+    incrementAndSample(stat.name(), containerInfo.containerID());
+    containerInfo.setHealthState(stat);
   }
 
   public void increment(HddsProtos.LifeCycleState stat) {

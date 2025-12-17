@@ -56,9 +56,7 @@ public class EmptyContainerHandler extends AbstractCheck {
     Set<ContainerReplica> replicas = request.getContainerReplicas();
 
     if (isContainerEmptyAndClosed(containerInfo, replicas)) {
-      ContainerHealthState healthState = ContainerHealthState.EMPTY;
-      request.getReport().incrementAndSample(healthState, containerInfo.containerID());
-      containerInfo.setHealthState(healthState);
+      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
       if (!request.isReadOnly()) {
         LOG.debug("Container {} is empty and closed, marking as DELETING",
             containerInfo);
@@ -78,9 +76,7 @@ public class EmptyContainerHandler extends AbstractCheck {
       // information to delete the container, so we just log it as EMPTY,
       // leaving it as CLOSED and return true, otherwise, it will end up marked
       // as missing in the replication check handlers.
-      ContainerHealthState healthState = ContainerHealthState.EMPTY;
-      request.getReport().incrementAndSample(healthState, containerInfo.containerID());
-      containerInfo.setHealthState(healthState);
+      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
       LOG.debug("Container {} appears empty and is closed, but cannot be " +
               "deleted because it has no replicas. Marking as EMPTY.",
           containerInfo);

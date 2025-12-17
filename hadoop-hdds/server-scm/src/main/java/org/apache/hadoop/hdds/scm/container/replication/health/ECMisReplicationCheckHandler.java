@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -62,15 +61,12 @@ public class ECMisReplicationCheckHandler extends AbstractCheck {
 
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
-    ContainerID containerID = container.containerID();
     LOG.debug("Checking container {} for mis replication.", container);
 
     ContainerHealthResult health = checkMisReplication(request);
     if (health.getHealthState() ==
         ContainerHealthResult.HealthState.MIS_REPLICATED) {
-      ContainerHealthState healthState = ContainerHealthState.MIS_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.MIS_REPLICATED, container);
       ContainerHealthResult.MisReplicatedHealthResult misRepHealth
           = ((ContainerHealthResult.MisReplicatedHealthResult) health);
       if (!misRepHealth.isReplicatedOkAfterPending()) {

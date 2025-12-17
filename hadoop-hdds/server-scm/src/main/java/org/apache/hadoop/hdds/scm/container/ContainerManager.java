@@ -80,23 +80,6 @@ public interface ContainerManager {
    */
   List<ContainerInfo> getContainers(LifeCycleState state);
 
-  /**
-   * Returns all containers that match the health state filter.
-   *
-   * @param filter Health state filter for exact matching
-   * @return List of ContainerInfo matching the filter
-   */
-  List<ContainerInfo> getContainersByHealthState(HealthStateFilter filter);
-
-  /**
-   * Returns containers that match the health state filter along with
-   * their health states.
-   *
-   * @param filter Health state filter for exact matching
-   * @return Map of ContainerInfo to their ContainerHealthState
-   */
-  Map<ContainerInfo, ContainerHealthState> getContainersWithHealthState(
-      HealthStateFilter filter);
 
   /**
    * Returns containers under certain conditions.

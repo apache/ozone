@@ -374,6 +374,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         break;
       }
       report.increment(c.getState());
+      // Set container as HEALTHY initially; will be overwritten if handler finds issues
+      c.setHealthState(ContainerHealthState.HEALTHY);
       try {
         processContainer(c, newRepQueue, report);
         // TODO - send any commands contained in the health result
@@ -879,13 +881,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
-        // If no handler processed the container, it passed all health checks
-        // and should be marked as HEALTHY. Update if:
-        // - Never been set (null), OR  
-        // - Currently in non-HEALTHY state (was unhealthy but now fixed)
-        if (!ContainerHealthState.HEALTHY.equals(containerInfo.getHealthState())) {
-          containerInfo.setHealthState(ContainerHealthState.HEALTHY);
-        }
+        // Container remains HEALTHY (set at start of loop)
       }
 
       return handled;

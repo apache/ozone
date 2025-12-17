@@ -117,14 +117,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           underHealth.isUnrecoverable(), underHealth.hasHealthyReplicas());
 
       if (underHealth.isUnrecoverable()) {
-        ContainerHealthState healthState = ContainerHealthState.MISSING;
-        report.incrementAndSample(healthState, container.containerID());
-        container.setHealthState(healthState);
+        report.incrementAndSample(ContainerHealthState.MISSING, container);
         return true;
       }
-      ContainerHealthState healthState = ContainerHealthState.UNDER_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.UNDER_REPLICATED, container);
 
       if (!underHealth.isReplicatedOkAfterPending() &&
           underHealth.hasHealthyReplicas()) {
@@ -142,9 +138,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     */
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      ContainerHealthState healthState = ContainerHealthState.OVER_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, container);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending() &&
@@ -172,9 +166,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
 
     if (health.getHealthState() ==
         ContainerHealthResult.HealthState.MIS_REPLICATED) {
-      ContainerHealthState healthState = ContainerHealthState.MIS_REPLICATED;
-      report.incrementAndSample(healthState, container.containerID());
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.MIS_REPLICATED, container);
       ContainerHealthResult.MisReplicatedHealthResult misRepHealth
           = ((ContainerHealthResult.MisReplicatedHealthResult) health);
       if (!misRepHealth.isReplicatedOkAfterPending()) {

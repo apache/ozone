@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -52,7 +51,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     }
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
-    ContainerID containerID = container.containerID();
     ContainerHealthResult health = checkHealth(request);
     LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
@@ -86,12 +84,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
             healthState = ContainerHealthState.UNHEALTHY;
           }
         }
-        report.incrementAndSample(healthState, container.containerID());
-        container.setHealthState(healthState);
+        report.incrementAndSample(healthState, container);
       } else {
         healthState = ContainerHealthState.UNDER_REPLICATED;
-        report.incrementAndSample(healthState, container.containerID());
-        container.setHealthState(healthState);
+        report.incrementAndSample(healthState, container);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
@@ -107,9 +103,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      ContainerHealthState healthState = ContainerHealthState.OVER_REPLICATED;
-      report.increment(healthState);
-      container.setHealthState(healthState);
+      report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, container);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending()) {

@@ -63,11 +63,10 @@ public class OpenContainerHandler extends AbstractCheck {
         LOG.info("Container {} is open but {}. Triggering close.",
             containerInfo, noPipeline ? "has no Pipeline" : "unhealthy");
 
-        ContainerHealthState healthState = noPipeline ?
+        request.getReport().incrementAndSample(noPipeline ?
                 ContainerHealthState.OPEN_WITHOUT_PIPELINE :
-                ContainerHealthState.OPEN_UNHEALTHY;
-        request.getReport().incrementAndSample(healthState, containerInfo.containerID());
-        containerInfo.setHealthState(healthState);
+                ContainerHealthState.OPEN_UNHEALTHY,
+            containerInfo);
 
         if (!request.isReadOnly()) {
           replicationManager
