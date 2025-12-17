@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
@@ -49,6 +51,12 @@ public class EndpointBuilder<T extends EndpointBase> {
     this.identifier = new RequestIdentifier();
     this.signatureInfo = mock(SignatureInfo.class);
     when(signatureInfo.isSignPayload()).thenReturn(true);
+
+    requestContext = mock(ContainerRequestContext.class);
+    UriInfo uriInfo = mock(UriInfo.class);
+    when(requestContext.getUriInfo()).thenReturn(uriInfo);
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
   }
 
   public EndpointBuilder<T> setBase(T base) {
@@ -93,6 +101,11 @@ public class EndpointBuilder<T extends EndpointBase> {
       endpoint.setClient(ozoneClient);
     }
 
+    final OzoneConfiguration config = getConfig();
+    endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
+
+    endpoint.setContext(requestContext);
+    endpoint.setHeaders(httpHeaders);
     endpoint.setRequestIdentifier(identifier);
     endpoint.setSignatureInfo(signatureInfo);
 
@@ -128,10 +141,10 @@ public class EndpointBuilder<T extends EndpointBase> {
   }
 
   public static EndpointBuilder<BucketEndpoint> newBucketEndpointBuilder() {
-    return new BucketEndpointBuilder();
+    return new EndpointBuilder<>(BucketEndpoint::new);
   }
 
   public static EndpointBuilder<ObjectEndpoint> newObjectEndpointBuilder() {
-    return new ObjectEndpointBuilder();
+    return new EndpointBuilder<>(ObjectEndpoint::new);
   }
 }
