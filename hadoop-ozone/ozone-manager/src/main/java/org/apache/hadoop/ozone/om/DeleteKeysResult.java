@@ -32,9 +32,11 @@ public class DeleteKeysResult {
   private List<ExclusiveRange> keyRanges;
 
   DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
-    this.keysToDelete = Collections.unmodifiableList(keysToDelete);
+    this.keysToDelete =
+        Collections.unmodifiableList(java.util.Objects.requireNonNull(keysToDelete, "keysToDelete must not be null"));
+    this.keyRanges =
+        Collections.unmodifiableList(java.util.Objects.requireNonNull(keyRanges, "keyRanges must not be null"));
     this.processedKeys = processedKeys;
-    this.keyRanges = Collections.unmodifiableList(keyRanges);
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
@@ -58,8 +60,8 @@ public class DeleteKeysResult {
     private final String exclusiveEndKey;
 
     public ExclusiveRange(String startKey, String exclusiveEndKey) {
-      this.startKey = startKey;
-      this.exclusiveEndKey = exclusiveEndKey;
+      this.startKey = java.util.Objects.requireNonNull(startKey, "startKey must not be null");
+      this.exclusiveEndKey = java.util.Objects.requireNonNull(exclusiveEndKey, "exclusiveEndKey must not be null");
     }
 
     public String getExclusiveEndKey() {
