@@ -150,30 +150,41 @@ For failing requests, they still incur the cost of a write RPC and Raft log entr
 ##### S3 Gateway Layer
 
 1. Parse `If-Match: "<etag>"` header.
-3. Populate `KeyArgs` with the parsed `expectedETag`.
-4. Send the write request (CreateKey/OpenKey) to OM.
+2. Populate `KeyArgs` with the parsed `expectedETag`.
+3. Send the write request (CreateKey) to OM.
 
-##### OM Layer (Validation Logic)
+##### OM Create Phase
 
 Validation is performed within the `validateAndUpdateCache` method to ensure atomicity within the Ratis state machine application.
 
 1. **Locking**: The OM acquires the write lock for the bucket/key.
 2. **Key Lookup**: Retrieve the existing key from `KeyTable`.
 3. **Validation**:
-
     - **Key Not Found**: If the key does not exist, throw `KEY_NOT_FOUND` (maps to S3 412).
-    - **No ETag Metadata**: If the existing key (e.g., uploaded via OFS) does not have an ETag property, skip ETag validation and allow the operation to proceed. This ensures compatibility with mixed access patterns (OFS and S3A) where S3 Conditional Writes are primarily intended for pure S3 use cases. We do **not** calculate ETag on the spot to avoid performance overhead on the applier thread.
+    - **No ETag Metadata**: If the existing key (e.g., uploaded via OFS) does not have an ETag property, throw `ETAG_NOT_AVAILABLE` (maps to S3 412). The precondition cannot be evaluated, so we must fail rather than silently proceed.
     - **ETag Mismatch**: Compare `existingKey.ETag` with `expectedETag`. If they do not match, throw `ETAG_MISMATCH` (maps to S3 412).
+4. **Extract Generation**: If ETag matches, extract `existingKey.updateID`.
+5. **Create Open Key**: Create open key entry with `expectedDataGeneration = existingKey.updateID`.
 
-4. **Execution**: If validation passes, proceed with the operation (adding to OpenKeyTable).
+##### OM Commit Phase
+
+The commit phase reuses the existing atomic-rewrite validation logic from HDDS-10656:
+
+1. Read open key entry (contains `expectedDataGeneration` set during create phase).
+2. Read current committed key from `KeyTable`.
+3. Validate `currentKey.updateID == openKey.expectedDataGeneration`.
+4. If match, commit succeeds. If mismatch (concurrent modification), throw `KEY_NOT_FOUND` (maps to S3 412).
+
+This approach ensures end-to-end atomicity: even if another client modifies the key between Create and Commit phases, the commit will fail.
 
 #### Error Mapping
 
 |   |   |   |   |
 |---|---|---|---|
 |**OM Error**|**S3 Status**|**S3 Error Code**|**Scenario**|
-|`KEY_GENERATION_MISMATCH`|412|PreconditionFailed|If-None-Match failed|
-|`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed (key missing)|
+|`KEY_ALREADY_EXISTS`|412|PreconditionFailed|If-None-Match failed (key exists)|
+|`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed (key missing or concurrent modification)|
+|`ETAG_NOT_AVAILABLE`|412|PreconditionFailed|If-Match failed (key has no ETag, e.g., created via OFS)|
 |`ETAG_MISMATCH`|412|PreconditionFailed|If-Match failed (ETag mismatch)|
 
 ## AWS S3 Conditional Read Implementation
