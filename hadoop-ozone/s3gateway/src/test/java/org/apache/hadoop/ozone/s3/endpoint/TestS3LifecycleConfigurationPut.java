@@ -108,6 +108,17 @@ public class TestS3LifecycleConfigurationPut {
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
   }
 
+  @Test
+  public void testPutLifecycleConfigurationWithoutStatus() throws Exception {
+    try {
+      bucketEndpoint.put("bucket1", null, "", null, withoutStatus());
+      fail("Expected an OS3Exception to be thrown");
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+      assertEquals(MALFORMED_XML.getCode(), ex.getCode());
+    }
+  }
+
   private void testInvalidLifecycleConfiguration(Supplier<InputStream> inputStream,
       int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
@@ -195,6 +206,19 @@ public class TestS3LifecycleConfigurationPut {
         "<ID>remove logs after 30 days</ID>" +
         "<Prefix>prefix/</Prefix>" +
         "<Status>Enabled</Status>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>");
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withoutStatus() {
+    String xml = (
+        "<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
+        ".com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>remove logs after 30 days</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Expiration><Days>30</Days></Expiration>" +
         "</Rule>" +
         "</LifecycleConfiguration>");
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
