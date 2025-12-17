@@ -335,10 +335,11 @@ public class DataNodeMetricsService {
     private long totalPending = 0L;
     private int failed = 0;
 
-    CollectionContext(int totalQueried,
-                      Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
-                      Map<DatanodePendingDeletionMetrics, Long> submissionTimes,
-                      List<DatanodePendingDeletionMetrics> results) {
+    CollectionContext(
+        int totalQueried,
+        Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
+        Map<DatanodePendingDeletionMetrics, Long> submissionTimes,
+        List<DatanodePendingDeletionMetrics> results) {
       this.totalQueried = totalQueried;
       this.futures = futures;
       this.submissionTimes = submissionTimes;

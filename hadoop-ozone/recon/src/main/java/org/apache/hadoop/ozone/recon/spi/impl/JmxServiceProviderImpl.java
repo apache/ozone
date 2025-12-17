@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.Collections;
@@ -25,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
@@ -104,13 +104,12 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
         getMetricsResponse(api, queryString);
     if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
         .getFamily() == Response.Status.Family.SUCCESSFUL) {
-      InputStream inputStream = urlConnection.getInputStream();
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> jsonMap = mapper.readValue(inputStream, Map.class);
-      inputStream.close();
-      Object beansObj = jsonMap.get("beans");
-      if (beansObj instanceof List) {
-        return (List<Map<String, Object>>) beansObj;
+      try (InputStream inputStream = urlConnection.getInputStream()) {
+        Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
+        Object beansObj = jsonMap.get("beans");
+        if (beansObj instanceof List) {
+          return (List<Map<String, Object>>) beansObj;
+        }
       }
     }
     return Collections.emptyList();
