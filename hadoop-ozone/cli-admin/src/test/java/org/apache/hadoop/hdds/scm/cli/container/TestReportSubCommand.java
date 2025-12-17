@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -162,10 +163,13 @@ public class TestReportSubCommand {
 
     // Add samples
     counter = SEED;
-    for (ContainerHealthState state
-        : ContainerHealthState.values()) {
+    for (ContainerHealthState state : ContainerHealthState.values()) {
       for (int i = 0; i < counter; i++) {
-        report.incrementAndSample(state, ContainerID.valueOf(i));
+        // Create mock ContainerInfo for testing
+        ContainerInfo mockContainer = mock(ContainerInfo.class);
+        when(mockContainer.containerID()).thenReturn(ContainerID.valueOf(i));
+        when(mockContainer.getHealthState()).thenReturn(state);
+        report.incrementAndSample(state, mockContainer);
       }
       counter++;
     }
