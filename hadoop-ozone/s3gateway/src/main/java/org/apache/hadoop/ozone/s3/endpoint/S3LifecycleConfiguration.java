@@ -265,6 +265,8 @@ public class S3LifecycleConfiguration {
       }
 
       return builder.buildAndValid();
+    } catch (OS3Exception ex) {
+      throw ex;
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
@@ -279,7 +281,12 @@ public class S3LifecycleConfiguration {
    * @param rule the S3 lifecycle rule
    * @return OmLCRule internal rule representation
    */
-  private OmLCRule convertToOmRule(Rule rule) throws OMException {
+  private OmLCRule convertToOmRule(Rule rule) throws OMException, OS3Exception {
+    if (rule.getStatus() == null || rule.getStatus().isEmpty()) {
+      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML,
+          "The Status element is required in LifecycleConfiguration");
+    }
+
     OmLCRule.Builder builder = new OmLCRule.Builder()
         .setEnabled("Enabled".equals(rule.getStatus()))
         .setId(rule.getId())

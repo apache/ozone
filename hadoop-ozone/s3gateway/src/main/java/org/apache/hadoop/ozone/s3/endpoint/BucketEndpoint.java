@@ -807,6 +807,8 @@ public class BucketEndpoint extends EndpointBase {
       OmLifecycleConfiguration lcc =
           s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
       ozoneBucket.setLifecycleConfiguration(lcc);
+    } catch (OS3Exception ex) {
+      throw ex;
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {
