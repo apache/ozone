@@ -264,7 +264,7 @@ public class TestStorageDistributionEndpoint {
       DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
       assertNotNull(pendingDeletion);
       assertEquals(30, pendingDeletion.getTotalPendingDeletionSize());
-      assertEquals(DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED, pendingDeletion.getStatus());
+      assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
       assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
       assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
       pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {

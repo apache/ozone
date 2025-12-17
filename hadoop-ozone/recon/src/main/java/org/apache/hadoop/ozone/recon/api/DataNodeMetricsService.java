@@ -126,7 +126,7 @@ public class DataNodeMetricsService {
     if (nodes.isEmpty()) {
       LOG.warn("No datanodes found to query");
       resetState();
-      currentStatus = MetricCollectionStatus.SUCCEEDED;
+      currentStatus = MetricCollectionStatus.FINISHED;
       isRunning.set(false);
       return;
     }
@@ -140,7 +140,7 @@ public class DataNodeMetricsService {
         .exceptionally(throwable -> {
           LOG.error("Metrics collection failed", throwable);
           synchronized (DataNodeMetricsService.this) {
-            currentStatus = MetricCollectionStatus.SUCCEEDED;
+            currentStatus = MetricCollectionStatus.FINISHED;
             isRunning.set(false);
           }
           return null;
@@ -271,7 +271,7 @@ public class DataNodeMetricsService {
       totalPendingDeletion = context.totalPending;
       totalNodesQueried = context.totalQueried;
       totalNodesFailed = context.failed;
-      currentStatus = MetricCollectionStatus.SUCCEEDED;
+      currentStatus = MetricCollectionStatus.FINISHED;
       isRunning.set(false);
       lastCollectionEndTime.set(System.currentTimeMillis());
     }
@@ -292,7 +292,7 @@ public class DataNodeMetricsService {
 
   public DataNodeMetricsServiceResponse getCollectedMetrics() {
     CompletableFuture.runAsync(this::startTask);
-    if (currentStatus == MetricCollectionStatus.SUCCEEDED) {
+    if (currentStatus == MetricCollectionStatus.FINISHED) {
       return DataNodeMetricsServiceResponse.newBuilder()
           .setStatus(currentStatus)
           .setPendingDeletion(pendingDeletionList)
@@ -324,7 +324,7 @@ public class DataNodeMetricsService {
    * Status of metric collection task.
    */
   public enum MetricCollectionStatus {
-    NOT_STARTED, IN_PROGRESS, SUCCEEDED
+    NOT_STARTED, IN_PROGRESS, FINISHED
   }
 
   private static class CollectionContext {

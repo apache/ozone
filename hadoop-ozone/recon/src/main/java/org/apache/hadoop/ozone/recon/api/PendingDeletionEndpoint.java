@@ -77,7 +77,7 @@ public class PendingDeletionEndpoint {
 
   private Response handleDataNodeMetrics() {
     DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
-    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.SUCCEEDED) {
+    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.ok(response).build();
     } else {
       return Response.accepted(response).build();
