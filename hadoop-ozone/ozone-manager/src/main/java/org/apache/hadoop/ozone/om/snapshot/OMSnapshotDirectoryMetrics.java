@@ -92,6 +92,7 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
    * @return if the update was successful.
    * Updates all metrics synchronously - both aggregate and per-checkpoint-directory.
    */
+  @Override
   protected boolean updateMetrics() {
     DBStore store = metadataManager.getStore();
     if (!(store instanceof RDBStore)) {
