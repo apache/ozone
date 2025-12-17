@@ -468,7 +468,7 @@ public enum ContainerHealthState {
       sb.append(state.name());
       first = false;
     }
-    sb.append("]");
+    sb.append(']');
 
     return sb.toString();
   }
