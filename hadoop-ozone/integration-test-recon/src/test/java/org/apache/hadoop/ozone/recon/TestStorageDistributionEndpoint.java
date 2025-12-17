@@ -197,6 +197,7 @@ public class TestStorageDistributionEndpoint {
             Objects.requireNonNull(scm.getClientProtocolServer().getDeletedBlockSummary()).getTotalBlockCount() == 0,
         1000, 30000);
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionDn, 2000, 60000);
+    GenericTestUtils.waitFor(this::verifyPendingDeletionClearsAtDn, 2000, 60000);
     cluster.getHddsDatanodes().get(0).stop();
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOnDnFailure, 2000, 60000);
   }
@@ -269,6 +270,28 @@ public class TestStorageDistributionEndpoint {
       assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
       pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
         assertEquals(10, dn.getPendingBlockSize());
+      });
+      return true;
+    } catch (Throwable e) {
+      LOG.debug("Waiting for storage distribution assertions to pass", e);
+      return false;
+    }
+  }
+
+  private boolean verifyPendingDeletionClearsAtDn() {
+    try {
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+      StringBuilder urlBuilder = new StringBuilder();
+      urlBuilder.append(getReconWebAddress(conf)).append(PENDING_DELETION_ENDPOINT).append("?component=dn");
+      String response = TestReconEndpointUtil.makeHttpCall(conf, urlBuilder);
+      DataNodeMetricsServiceResponse pendingDeletion = MAPPER.readValue(response, DataNodeMetricsServiceResponse.class);
+      assertNotNull(pendingDeletion);
+      assertEquals(0, pendingDeletion.getTotalPendingDeletionSize());
+      assertEquals(DataNodeMetricsService.MetricCollectionStatus.FINISHED, pendingDeletion.getStatus());
+      assertEquals(pendingDeletion.getTotalNodesQueried(), pendingDeletion.getPendingDeletionPerDataNode().size());
+      assertEquals(0, pendingDeletion.getTotalNodeQueryFailures());
+      pendingDeletion.getPendingDeletionPerDataNode().forEach(dn -> {
+        assertEquals(0, dn.getPendingBlockSize());
       });
       return true;
     } catch (Throwable e) {
