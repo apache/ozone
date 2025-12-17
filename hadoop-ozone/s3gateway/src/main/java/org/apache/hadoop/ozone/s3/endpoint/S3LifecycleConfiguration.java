@@ -265,8 +265,6 @@ public class S3LifecycleConfiguration {
       }
 
       return builder.buildAndValid();
-    } catch (OS3Exception ex) {
-      throw ex;
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
