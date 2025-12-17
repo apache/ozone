@@ -2433,7 +2433,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       stopTrashEmptier();
       metadataManager.stop();
       omSnapshotManager.close();
-      metrics.stopSnapshotDirectoryMetrics();
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
       unregisterMXBean();

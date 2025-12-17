@@ -100,8 +100,7 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
       return false;
     }
 
-    RDBStore rdbStore = (RDBStore) store;
-    String snapshotsParentDir = rdbStore.getSnapshotsParentDir();
+    String snapshotsParentDir = store.getSnapshotsParentDir();
 
     if (snapshotsParentDir == null) {
       resetMetrics();

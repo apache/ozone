@@ -265,18 +265,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   /**
-   * @return an instance of OMSnapshotDirectoryMetrics.
-   * @throws IllegalStateException if the metric is null
-   */
-  public OMSnapshotDirectoryMetrics getSnapshotDirectoryMetrics() throws IllegalStateException {
-    if (snapshotDirectoryMetrics == null) {
-      throw new IllegalStateException(
-          "SnapshotDirectoryMetrics not initialized. Call startSnapshotDirectoryMetrics() first.");
-    }
-    return snapshotDirectoryMetrics;
-  }
-
-  /**
    * Starts periodic updates for snapshot directory metrics.
    * Creates the metrics instance if it doesn't exist.
    *
@@ -1538,6 +1526,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public void unRegister() {
     if (dbCheckpointMetrics != null) {
       dbCheckpointMetrics.unRegister();
+    }
+    if (snapshotDirectoryMetrics != null) {
+      snapshotDirectoryMetrics.unRegister();
     }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
