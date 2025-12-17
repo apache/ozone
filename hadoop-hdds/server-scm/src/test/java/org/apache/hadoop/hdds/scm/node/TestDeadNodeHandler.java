@@ -85,10 +85,8 @@ public class TestDeadNodeHandler {
   private DeadNodeHandler deadNodeHandler;
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
-  private EventQueue eventQueue;
   @TempDir
   private File storageDir;
-  private SCMContext scmContext;
   private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
@@ -100,13 +98,13 @@ public class TestDeadNodeHandler {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir.getPath());
-    eventQueue = new EventQueue();
+    EventQueue eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    scmContext = new SCMContext.Builder()
-        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
-        .setLeader(true)
-        .setSCM(scm).build();
+    SCMContext scmContext = new SCMContext.Builder()
+                                .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
+                                .setLeader(true)
+                                .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
     pipelineManager.setScmContext(scmContext);

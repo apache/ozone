@@ -40,9 +40,9 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ipc.Server.Call;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ipc_.Server.Call;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -97,7 +97,6 @@ public class TestS3GetSecretRequest {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
-  private AuditLogger auditLogger;
   private OmMetadataManagerImpl omMetadataManager;
 
   // Multi-tenant related vars
@@ -112,7 +111,6 @@ public class TestS3GetSecretRequest {
   private UserGroupInformation ugiCarol;
 
   private OMMultiTenantManager omMultiTenantManager;
-  private Tenant tenant;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -154,13 +152,13 @@ public class TestS3GetSecretRequest {
     );
     when(ozoneManager.getS3SecretManager()).thenReturn(secretManager);
 
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     // Multi-tenant related initializations
     omMultiTenantManager = mock(OMMultiTenantManager.class);
-    tenant = mock(Tenant.class);
+    Tenant tenant = mock(Tenant.class);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());

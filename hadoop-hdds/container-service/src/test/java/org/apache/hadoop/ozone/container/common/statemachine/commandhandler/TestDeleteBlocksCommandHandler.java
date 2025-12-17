@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -90,9 +91,6 @@ import org.mockito.stubbing.Answer;
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
-  private OzoneConfiguration conf;
-  private ContainerLayoutVersion layout;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private DeleteBlocksCommandHandler handler;
   private String schemaVersion;
@@ -101,20 +99,37 @@ public class TestDeleteBlocksCommandHandler {
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
   }
 
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    return volume;
+  }
+
   private void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     containerSet = newContainerSet();
-    volume1 = mock(HddsVolume.class);
-    when(volume1.getStorageID()).thenReturn("uuid-1");
+    volume1 = mockHddsVolume("uuid-1");
     for (int i = 0; i <= 10; i++) {
       KeyValueContainerData data =
           new KeyValueContainerData(i,
@@ -396,6 +411,76 @@ public class TestDeleteBlocksCommandHandler {
         ((KeyValueContainerData) container.getContainerData()).getNumPendingDeletionBlocks());
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDuplicateTxFromSCMHandledByDeleteBlocksCommandHandler(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
+    assertThat(containerSet.containerCount()).isGreaterThan(0);
+    Container<?> container = containerSet.getContainerIterator(volume1).next();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+
+    // Create a delete transaction with specific block count and size
+    DeletedBlocksTransaction transaction = DeletedBlocksTransaction.newBuilder()
+        .setContainerID(container.getContainerData().getContainerID())
+        .setCount(0)
+        .addLocalID(1L)
+        .addLocalID(2L)
+        .addLocalID(3L) // 3 blocks
+        .setTxID(100)
+        .setTotalBlockSize(768L) // 3 blocks * 256 bytes each
+        .build();
+
+    // Record initial state
+    long initialPendingBlocks = containerData.getNumPendingDeletionBlocks();
+    long initialPendingBytes = containerData.getBlockPendingDeletionBytes();
+
+    // Execute the first transaction - should succeed
+    List<DeleteBlockTransactionResult> results1 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction));
+
+    // Verify first execution succeeded
+    assertEquals(1, results1.size());
+    assertTrue(results1.get(0).getSuccess());
+
+    // Verify pending block count and size increased
+    long afterFirstPendingBlocks = containerData.getNumPendingDeletionBlocks();
+    long afterFirstPendingBytes = containerData.getBlockPendingDeletionBytes();
+    assertEquals(initialPendingBlocks + 3, afterFirstPendingBlocks);
+    assertEquals(initialPendingBytes + 768L, afterFirstPendingBytes);
+
+    // Execute the same transaction again (duplicate) - should be handled as duplicate
+    List<DeleteBlockTransactionResult> results2 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction));
+
+    // Verify duplicate execution succeeded but didn't change counters
+    assertEquals(1, results2.size());
+    assertTrue(results2.get(0).getSuccess());
+
+    // Verify pending block count and size remained the same (no double counting)
+    assertEquals(afterFirstPendingBlocks, containerData.getNumPendingDeletionBlocks());
+    assertEquals(afterFirstPendingBytes, containerData.getBlockPendingDeletionBytes());
+
+    long afterSecondPendingBlocks = containerData.getNumPendingDeletionBlocks();
+    long afterSecondPendingBytes = containerData.getBlockPendingDeletionBytes();
+    DeletedBlocksTransaction transaction2 = DeletedBlocksTransaction.newBuilder()
+        .setContainerID(container.getContainerData().getContainerID())
+        .setCount(0)
+        .addLocalID(1L)
+        .addLocalID(2L)
+        .addLocalID(3L) // 3 blocks
+        .setTxID(90)
+        .setTotalBlockSize(768L) // 3 blocks * 256 bytes each
+        .build();
+
+    List<DeleteBlockTransactionResult> results3 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction2));
+    assertEquals(1, results3.size());
+    assertTrue(results3.get(0).getSuccess());
+    // Verify pending block count and size increased since its processed.
+    assertEquals(afterSecondPendingBlocks + 3, containerData.getNumPendingDeletionBlocks());
+    assertEquals(afterSecondPendingBytes + 768L, containerData.getBlockPendingDeletionBytes());
+  }
+
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
       long containerID) {
     return DeletedBlocksTransaction.newBuilder()
@@ -413,7 +498,7 @@ public class TestDeleteBlocksCommandHandler {
       if (DeleteBlocksCommandHandler.isDuplicateTransaction(containerData.getContainerID(), containerData, tx, null)) {
         return;
       }
-      containerData.incrPendingDeletionBlocks(tx.getLocalIDCount());
+      containerData.incrPendingDeletionBlocks(tx.getLocalIDCount(), tx.getLocalIDCount() * 256L);
       containerData.updateDeleteTransactionId(tx.getTxID());
     }
   }

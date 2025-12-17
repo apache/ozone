@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -72,7 +73,6 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.assertj.core.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +83,8 @@ public class MockNodeManager implements NodeManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MockNodeManager.class);
+
+  private static final int NUM_RAFT_LOG_DISKS_PER_DATANODE = 1;
 
   public static final int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private static final NodeData[] NODES = {
@@ -109,7 +111,6 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
-  private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
 
   {
@@ -144,8 +145,7 @@ public class MockNodeManager implements NodeManager {
     }
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -170,8 +170,7 @@ public class MockNodeManager implements NodeManager {
 
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -204,8 +203,7 @@ public class MockNodeManager implements NodeManager {
 
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
-    numRaftLogDisksPerDatanode = 1;
-    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+    numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
@@ -522,7 +520,7 @@ public class MockNodeManager implements NodeManager {
   public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
     if (commandMap.containsKey(datanodeID)) {
       List<SCMCommand<?>> commandList = commandMap.get(datanodeID);
-      Preconditions.checkNotNull(commandList);
+      Objects.requireNonNull(commandList, "commandList == null");
       commandList.add(command);
     } else {
       List<SCMCommand<?>> commandList = new LinkedList<>();
@@ -907,10 +905,6 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
-  }
-
-  public void setNumMetaDataVolumes(int value) {
-    numRaftLogDisksPerDatanode = value;
   }
 
   /**

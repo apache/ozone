@@ -68,13 +68,12 @@ public class TestTypedRDBTableStore {
           "Sixth", "Seven", "Eighth",
           "Ninth", "Ten");
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = new ManagedDBOptions();
+    ManagedDBOptions options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
@@ -233,7 +232,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null, Table.KeyValueIterator.Type.KEY_AND_VALUE))
+    when(rdbTable.iterator((CodecBuffer) null, IteratorType.KEY_AND_VALUE))
         .thenThrow(new RocksDatabaseException());
     final Table<String, String> testTable = new TypedTable<>(rdbTable,
         StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);

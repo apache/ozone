@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -48,7 +49,6 @@ public class OneReplicaPipelineSafeModeRule extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
-  private static final String NAME = "AtleastOneDatanodeReportedRule";
 
   private int thresholdCount;
   private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
@@ -59,7 +59,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
-    super(safeModeManager, NAME, eventQueue);
+    super(safeModeManager, eventQueue);
 
     pipelinePercent =
         configuration.getDouble(
@@ -90,7 +90,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized void process(PipelineReportFromDatanode report) {
-    Preconditions.checkNotNull(report);
+    Objects.requireNonNull(report, "report == null");
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
       try {

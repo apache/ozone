@@ -35,12 +35,11 @@ import org.junit.jupiter.api.Test;
 public class TestBucketHead {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @BeforeEach
   public void setup() throws Exception {
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub

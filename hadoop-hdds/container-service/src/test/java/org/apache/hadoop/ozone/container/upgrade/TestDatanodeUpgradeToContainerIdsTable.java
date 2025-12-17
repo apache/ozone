@@ -33,8 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -55,7 +54,6 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   private Path tempFolder;
 
   private DatanodeStateMachine dsm;
-  private ContainerDispatcher dispatcher;
   private OzoneConfiguration conf;
   private static final String CLUSTER_ID = "clusterID";
 
@@ -93,7 +91,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
@@ -103,7 +101,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));
@@ -129,7 +127,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
@@ -139,7 +137,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));

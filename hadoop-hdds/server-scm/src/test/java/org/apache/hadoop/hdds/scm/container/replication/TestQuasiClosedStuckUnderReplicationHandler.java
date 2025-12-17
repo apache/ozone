@@ -65,8 +65,6 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
-  private ReplicationManagerMetrics metrics;
-  private PlacementPolicy policy;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckUnderReplicationHandler handler;
 
@@ -78,7 +76,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
     nodeManager = mock(NodeManager.class);
     conf = SCMTestUtils.getConf(testDir);
-    policy = ReplicationTestUtil
+    PlacementPolicy policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -86,8 +84,9 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
-    metrics = ReplicationManagerMetrics.create(replicationManager);
+    ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(mock(ContainerReplicaPendingOps.class));
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -133,8 +132,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getUnderReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -177,7 +176,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
 
-    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager, conf);
+    PlacementPolicy policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager, conf);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
 
     assertThrows(SCMException.class, () ->
@@ -192,7 +191,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE));
 
-    policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
+    PlacementPolicy policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
 
     assertThrows(InsufficientDatanodesException.class, () ->

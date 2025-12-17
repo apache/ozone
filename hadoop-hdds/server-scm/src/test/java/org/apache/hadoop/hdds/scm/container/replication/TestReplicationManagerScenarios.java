@@ -103,7 +103,6 @@ public class TestReplicationManagerScenarios {
   private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
-  private ReplicationManager replicationManager;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -184,7 +183,7 @@ public class TestReplicationManagerScenarios {
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -222,6 +221,7 @@ public class TestReplicationManagerScenarios {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -250,7 +250,7 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), null, Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE, 5L, clock.millis());
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), null, Long.MAX_VALUE);
@@ -261,14 +261,14 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
-    ReplicationManagerReport repReport = new ReplicationManagerReport();
     ReplicationQueue repQueue = new ReplicationQueue();
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
     conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
-    replicationManager = createReplicationManager();
+    ReplicationManager replicationManager = createReplicationManager();
+    ReplicationManagerReport repReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
 
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
@@ -296,7 +296,7 @@ public class TestReplicationManagerScenarios {
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
-    ReplicationManagerReport roReport = new ReplicationManagerReport();
+    ReplicationManagerReport roReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, roReport);
     assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);

@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.NavigableMap;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -30,9 +29,9 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
 
   private Iterator<Table.KeyValue<String, V>> itr;
   private final String prefix;
-  private final TreeMap<String, V> values;
+  private final NavigableMap<String, V> values;
 
-  public MapBackedTableIterator(TreeMap<String, V> values, String prefix) {
+  public MapBackedTableIterator(NavigableMap<String, V> values, String prefix) {
     this.prefix = prefix;
     this.values = values;
     this.seekToFirst();
@@ -42,25 +41,20 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   public void seekToFirst() {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .map(e -> {
-          V value = e.getValue();
-          int size = value != null ? value.toString().getBytes(StandardCharsets.UTF_8).length : 0;
-          return Table.newKeyValue(e.getKey(), value, size);
-        })
-        .iterator();
+        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
   }
 
   @Override
   public void seekToLast() {
-
+    this.seek(this.values.lastKey());
   }
 
   @Override
   public Table.KeyValue<String, V> seek(String s) {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .filter(e -> e.getKey().compareTo(s) >= 0).map(e -> Table.newKeyValue(e.getKey(), e.getValue(),
-            e.getValue().toString().getBytes(StandardCharsets.UTF_8).length)).iterator();
+        .filter(e -> e.getKey().compareTo(s) >= 0)
+        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
     Map.Entry<String, V> firstEntry = values.ceilingEntry(s);
     return firstEntry == null ? null : Table.newKeyValue(firstEntry.getKey(), firstEntry.getValue());
   }

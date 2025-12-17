@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -92,7 +93,6 @@ public final class TestSecretKeySnapshot {
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
-  private String host;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -134,9 +134,7 @@ public final class TestSecretKeySnapshot {
   @AfterEach
   public void stop() {
     miniKdc.stop();
-    if (cluster != null) {
-      cluster.stop();
-    }
+    IOUtils.closeQuietly(cluster);
   }
 
   private void createCredentialsInKDC() throws Exception {
@@ -160,8 +158,8 @@ public final class TestSecretKeySnapshot {
 
   private void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 

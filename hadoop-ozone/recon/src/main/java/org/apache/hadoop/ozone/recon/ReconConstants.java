@@ -46,6 +46,8 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_QUERY_START_PREFIX = "startPrefix";
+  public static final String RECON_QUERY_MAX_CONTAINER_ID = "maxContainerId";
+  public static final String RECON_QUERY_MIN_CONTAINER_ID = "minContainerId";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
   public static final String RECON_OM_INSIGHTS_DEFAULT_START_PREFIX = "/";
@@ -91,7 +93,9 @@ public final class ReconConstants {
   // For file-size count reprocessing: ensure only one task truncates the table.
   public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
 
-  public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+  // For container key mapper reprocessing: ensure only one task performs initialization
+  // (truncates tables + clears shared map)
+  public static final AtomicBoolean CONTAINER_KEY_MAPPER_INITIALIZED = new AtomicBoolean(false);
 
   private ReconConstants() {
     // Never Constructed
@@ -103,6 +107,6 @@ public final class ReconConstants {
    */
   public static void resetTableTruncatedFlags() {
     FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
-    CONTAINER_KEY_TABLES_TRUNCATED.set(false);
+    CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
   }
 }

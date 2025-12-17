@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -110,7 +110,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-    Preconditions.checkNotNull(setBucketPropertyRequest);
+    Objects.requireNonNull(setBucketPropertyRequest, "setBucketPropertyRequest == null");
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -295,7 +295,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
       totalBucketQuota = quotaInBytes;
-      if (quotaInBytes < dbBucketInfo.getUsedBytes()) {
+      if (quotaInBytes < dbBucketInfo.getTotalBucketSpace()) {
         throw new OMException("Cannot update bucket quota. Requested " +
             "spaceQuota less than used spaceQuota.",
             OMException.ResultCodes.QUOTA_ERROR);
@@ -344,7 +344,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     
     if (quotaInNamespace != OzoneConsts.QUOTA_RESET
-        && quotaInNamespace < dbBucketInfo.getUsedNamespace()) {
+        && quotaInNamespace < dbBucketInfo.getTotalBucketNamespace()) {
       throw new OMException("Cannot update bucket quota. NamespaceQuota " +
           "requested is less than used namespaceQuota.",
           OMException.ResultCodes.QUOTA_ERROR);

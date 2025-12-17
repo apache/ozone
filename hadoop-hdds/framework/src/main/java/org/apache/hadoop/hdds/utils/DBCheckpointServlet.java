@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +97,7 @@ public class DBCheckpointServlet extends HttpServlet
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
-    lock = new Lock();
+    lock = new NoOpLock();
 
     // Create a directory for temp bootstrap data
     File dbLocation = dbStore.getDbLocation();
@@ -213,7 +215,7 @@ public class DBCheckpointServlet extends HttpServlet
     Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
     DBCheckpoint checkpoint = null;
     Path tmpdir = null;
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireWriteLock()) {
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
           "bootstrap-data-");
       checkpoint = getCheckpoint(tmpdir, flush);
@@ -277,7 +279,18 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
-  protected static Set<String> extractSstFilesToExclude(String[] sstParam) {
+  protected static Set<String> extractSstFilesToExclude(String[] filesInExclusionParam) {
+    Set<String> sstFilesToExclude = new HashSet<>();
+    if (filesInExclusionParam != null) {
+      sstFilesToExclude.addAll(
+          Arrays.stream(filesInExclusionParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct().collect(Collectors.toList()));
+      logSstFileList(sstFilesToExclude, "Received list of {} SST files to be excluded{}: {}", 5);
+    }
+    return sstFilesToExclude;
+  }
+
+  protected static Set<String> extractFilesToExclude(String[] sstParam) {
     Set<String> receivedSstFiles = new HashSet<>();
     if (sstParam != null) {
       receivedSstFiles.addAll(
@@ -381,18 +394,22 @@ public class DBCheckpointServlet extends HttpServlet
   /**
    * This lock is a no-op but can overridden by child classes.
    */
-  public static class Lock extends BootstrapStateHandler.Lock {
-    public Lock() {
+  public static class NoOpLock extends BootstrapStateHandler.Lock {
+    private static final UncheckedAutoCloseable NOOP_LOCK = () -> {
+    };
+
+    public NoOpLock() {
+      super((readLock) -> NOOP_LOCK);
     }
 
     @Override
-    public BootstrapStateHandler.Lock lock()
-        throws InterruptedException {
-      return this;
+    public UncheckedAutoCloseable acquireReadLock() {
+      return NOOP_LOCK;
     }
 
     @Override
-    public void unlock() {
+    public UncheckedAutoCloseable acquireWriteLock() {
+      return NOOP_LOCK;
     }
   }
 }

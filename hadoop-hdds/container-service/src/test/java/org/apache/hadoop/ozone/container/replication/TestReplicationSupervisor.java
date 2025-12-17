@@ -35,11 +35,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -787,6 +788,61 @@ public class TestReplicationSupervisor {
         supervisor.getInFlightReplications(BlockingTask.class));
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReconcileContainerCommandDeduplication() throws Exception {
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .build();
+
+    try {
+      final long containerID = 10L;
+
+      // Create reconcile commands with the same container ID but different peers
+      ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      command1.setTerm(1);
+      ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      command2.setTerm(1);
+      assertEquals(command1, command2);
+
+      // Create a controller that blocks the execution of reconciliation until the latch is counted down from the test.
+      ContainerController blockingController = mock(ContainerController.class);
+      CountDownLatch latch = new CountDownLatch(1);
+      doAnswer(arg -> {
+        latch.await();
+        return null;
+      }).when(blockingController).reconcileContainer(any(), anyLong(), any());
+
+      ReconcileContainerTask task1 = new ReconcileContainerTask(
+          blockingController,
+          mock(DNContainerOperationClient.class),
+          command1);
+      ReconcileContainerTask task2 = new ReconcileContainerTask(
+          // The second task should be discarded as a duplicate. It does not need to block.
+          mock(ContainerController.class),
+          mock(DNContainerOperationClient.class),
+          command2);
+
+      // Add first task - should be accepted
+      supervisor.addTask(task1);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Add second task with same container ID but different peers - should be deduplicated
+      supervisor.addTask(task2);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Now the task has been unblocked. The supervisor should finish execution of the one blocked task.
+      latch.countDown();
+      GenericTestUtils.waitFor(() ->
+          supervisor.getTotalInFlightReplications() == 0 && supervisor.getReplicationQueuedCount() == 0, 500, 5000);
+    } finally {
+      supervisor.stop();
+    }
+  }
+
   private static class BlockingTask extends AbstractReplicationTask {
 
     private final CountDownLatch runningLatch;
@@ -944,7 +1000,7 @@ public class TestReplicationSupervisor {
     List<DatanodeDetails> target = singletonList(
         MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(containerId, sources, target,
-        Proto2Utils.unsafeByteString(missingIndexes),
+        ProtoUtils.unsafeByteString(missingIndexes),
         new ECReplicationConfig(3, 2));
     cmd.setTerm(CURRENT_TERM);
     return cmd;

@@ -19,9 +19,6 @@ package org.apache.hadoop.hdds.tracing;
 
 import static java.util.Collections.emptyMap;
 
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -67,10 +64,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
         method.getName());
     }
 
-    Span span = GlobalTracer.get().buildSpan(
-        name + "." + method.getName())
-        .start();
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
@@ -79,8 +73,6 @@ public class TraceAllMethod<T> implements InvocationHandler {
         } else {
           throw ex;
         }
-      } finally {
-        span.finish();
       }
     }
   }

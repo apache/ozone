@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
@@ -38,8 +38,7 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.debug.segmentparser.OMRatisLogParser;
-import org.apache.hadoop.ozone.debug.segmentparser.SCMRatisLogParser;
+import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -101,7 +100,7 @@ class TestOzoneHARatisLogParser {
         cluster.getOMLeader().getConfiguration();
 
     StorageContainerManager scm = cluster.getActiveSCM();
-    Preconditions.checkNotNull(scm);
+    Objects.requireNonNull(scm, "scm == null");
     OzoneConfiguration leaderSCMConfig = scm.getConfiguration();
 
     cluster.stop();
@@ -123,7 +122,7 @@ class TestOzoneHARatisLogParser {
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     assertThat(logFile).isFile();
 
-    OMRatisLogParser omRatisLogParser = new OMRatisLogParser();
+    RatisLogParser omRatisLogParser = new RatisLogParser();
     omRatisLogParser.setSegmentFile(logFile);
     omRatisLogParser.parseRatisLogs(OMRatisHelper::smProtoToString);
 
@@ -151,7 +150,7 @@ class TestOzoneHARatisLogParser {
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     assertThat(logFile).isFile();
 
-    SCMRatisLogParser scmRatisLogParser = new SCMRatisLogParser();
+    RatisLogParser scmRatisLogParser = new RatisLogParser();
     scmRatisLogParser.setSegmentFile(logFile);
     scmRatisLogParser.parseRatisLogs(SCMRatisRequest::smProtoToString);
 

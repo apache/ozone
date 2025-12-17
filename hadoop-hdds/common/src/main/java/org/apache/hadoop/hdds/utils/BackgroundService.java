@@ -77,11 +77,11 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public ExecutorService getExecutorService() {
+  public synchronized ExecutorService getExecutorService() {
     return this.exec;
   }
 
-  public void setPoolSize(int size) {
+  public synchronized void setPoolSize(int size) {
     if (size <= 0) {
       throw new IllegalArgumentException("Pool size must be positive.");
     }
@@ -108,6 +108,7 @@ public abstract class BackgroundService {
     while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
+    execTaskCompletion();
   }
 
   // start service
@@ -131,13 +132,24 @@ public abstract class BackgroundService {
 
   public abstract BackgroundTaskQueue getTasks();
 
+  protected void execTaskCompletion() { }
+
   /**
    * Run one or more background tasks concurrently.
    * Wait until all tasks to return the result.
    */
   public class PeriodicalTask implements Runnable {
     @Override
-    public synchronized void run() {
+    public void run() {
+      // wait for previous set of tasks to complete
+      try {
+        future.join();
+      } catch (RuntimeException e) {
+        LOG.error("Background service execution failed.", e);
+      } finally {
+        execTaskCompletion();
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
@@ -150,35 +162,36 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-
-      while (!tasks.isEmpty()) {
-        BackgroundTask task = tasks.poll();
-        future = future.thenCombine(CompletableFuture.runAsync(() -> {
-          long startTime = System.nanoTime();
-          try {
-            BackgroundTaskResult result = task.call();
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("task execution result size {}", result.getSize());
+      synchronized (BackgroundService.this) {
+        while (!tasks.isEmpty()) {
+          BackgroundTask task = tasks.poll();
+          future = future.thenCombine(CompletableFuture.runAsync(() -> {
+            long startTime = System.nanoTime();
+            try {
+              BackgroundTaskResult result = task.call();
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("task execution result size {}", result.getSize());
+              }
+            } catch (Throwable e) {
+              LOG.error("Background task execution failed", e);
+              if (e instanceof Error) {
+                throw (Error) e;
+              }
+            } finally {
+              long endTime = System.nanoTime();
+              if (endTime - startTime > serviceTimeoutInNanos) {
+                LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+                    serviceName, endTime - startTime, serviceTimeoutInNanos);
+              }
             }
-          } catch (Throwable e) {
-            LOG.error("Background task execution failed", e);
-            if (e instanceof Error) {
-              throw (Error) e;
-            }
-          } finally {
-            long endTime = System.nanoTime();
-            if (endTime - startTime > serviceTimeoutInNanos) {
-              LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
-                  serviceName, endTime - startTime, serviceTimeoutInNanos);
-            }
-          }
-        }, exec), (Void1, Void) -> null);
+          }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+        }
       }
     }
   }
 
   // shutdown and make sure all threads are properly released.
-  public void shutdown() {
+  public synchronized void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
     exec.shutdown();
     try {
@@ -203,5 +216,9 @@ public abstract class BackgroundService {
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
     exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+  }
+
+  protected String getServiceName() {
+    return serviceName;
   }
 }
