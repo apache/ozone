@@ -160,8 +160,6 @@ public class DiskBalancerService extends BackgroundService {
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
-
-    constructTmpDir();
   }
 
   /**
@@ -176,10 +174,32 @@ public class DiskBalancerService extends BackgroundService {
   private void constructTmpDir() throws IOException {
     for (HddsVolume volume:
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-      Path tmpDir = getDiskBalancerTmpDir(volume);
+      // Ensure the tmp directory structure exists before creating diskBalancer subdirectory
+      File volumeTmpDir = volume.getTmpDir();
+      if (volumeTmpDir == null) {
+        // If tmpDir is not yet initialized, create it
+        String clusterId = volume.getClusterID();
+        if (clusterId == null) {
+          LOG.warn("ClusterID is not set for volume {}, skipping diskBalancer tmp dir creation",
+              volume.getStorageDir());
+          continue;
+        }
+        File hddsRootDir = volume.getHddsRootDir();
+        File clusterIdDir = new File(hddsRootDir, clusterId);
+        volumeTmpDir = new File(clusterIdDir, StorageVolume.TMP_DIR_NAME);
+        // Create the tmp directory if it doesn't exist
+        if (!volumeTmpDir.exists()) {
+          Files.createDirectories(volumeTmpDir.toPath());
+        }
+      }
+      
+      Path diskBalancerTmpDir = getDiskBalancerTmpDir(volume);
       try {
-        FileUtils.deleteDirectory(tmpDir.toFile());
-        FileUtils.forceMkdir(tmpDir.toFile());
+        // Clean up any existing diskBalancer directory and recreate it
+        if (diskBalancerTmpDir.toFile().exists()) {
+          FileUtils.deleteDirectory(diskBalancerTmpDir.toFile());
+        }
+        FileUtils.forceMkdir(diskBalancerTmpDir.toFile());
       } catch (IOException ex) {
         LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
             ex);
@@ -334,6 +354,18 @@ public class DiskBalancerService extends BackgroundService {
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
+  }
+
+  @Override
+  public synchronized void start() {
+    // Ensure tmp directories are properly constructed before starting the service
+    try {
+      constructTmpDir();
+    } catch (IOException e) {
+      LOG.error("Failed to construct diskBalancer tmp directories before starting service", e);
+      throw new RuntimeException("Failed to initialize diskBalancer tmp directories", e);
+    }
+    super.start();
   }
 
   @Override
@@ -687,8 +719,21 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    return Paths.get(hddsVolume.getVolumeRootDir())
-        .resolve(StorageVolume.TMP_DIR_NAME).resolve(DISK_BALANCER_DIR);
+    // Use getTmpDir() which returns the correct tmp directory path:
+    // hdds/<cluster-id>/tmp/diskBalancer
+    File tmpDir = hddsVolume.getTmpDir();
+    if (tmpDir == null) {
+      // If tmpDir is not yet initialized, construct it properly
+      // tmp directory should be at: hdds/<cluster-id>/tmp
+      File hddsRootDir = hddsVolume.getHddsRootDir();
+      String clusterId = hddsVolume.getClusterID();
+      if (clusterId == null) {
+        throw new IllegalStateException("ClusterID is not set for volume " +
+            hddsVolume.getStorageDir());
+      }
+      tmpDir = new File(new File(hddsRootDir, clusterId), StorageVolume.TMP_DIR_NAME);
+    }
+    return tmpDir.toPath().resolve(DISK_BALANCER_DIR);
   }
 
   public DiskBalancerServiceMetrics getMetrics() {
