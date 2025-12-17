@@ -1369,7 +1369,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private void nodeOutOfSpaceStatistics(Map<String, String> nodeStatics) {
-    List<DatanodeInfo> allNodes = getAllNodes();
     long blockSize = (long) conf.getStorageSize(
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1383,9 +1382,18 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
-    int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
-        .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
-            && !hasEnoughCommittedVolumeSpace(dn, blockSize))
+    int nodeOutOfSpaceCount = (int) getAllNodes().parallelStream()
+        .filter(dn -> {
+          try {
+            if (!dn.getNodeStatus().isNodeWritable()) {
+              return true;
+            }
+            return !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
+                && !hasEnoughCommittedVolumeSpace(dn, blockSize);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        })
         .count();
 
     nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
