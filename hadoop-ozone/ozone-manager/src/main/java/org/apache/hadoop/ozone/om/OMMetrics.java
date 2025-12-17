@@ -286,9 +286,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public void startSnapshotDirectoryMetrics(OzoneConfiguration configuration,
       OMMetadataManager metadataManager) {
     if (snapshotDirectoryMetrics == null) {
-      snapshotDirectoryMetrics = OMSnapshotDirectoryMetrics.create("OM Metrics", metadataManager);
+      snapshotDirectoryMetrics = OMSnapshotDirectoryMetrics.create(configuration,
+          "OM Metrics", metadataManager);
     }
-    snapshotDirectoryMetrics.start(configuration);
+    snapshotDirectoryMetrics.start();
   }
 
   public void stopSnapshotDirectoryMetrics() {

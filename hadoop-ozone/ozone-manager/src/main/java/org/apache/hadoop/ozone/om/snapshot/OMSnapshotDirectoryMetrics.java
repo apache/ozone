@@ -26,20 +26,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -54,6 +47,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.ha.OMPeriodicMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 @Metrics(about = "OM Snapshot Directory Metrics", context = OzoneConsts.OZONE)
-public final class OMSnapshotDirectoryMetrics implements MetricsSource {
+public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implements MetricsSource {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotDirectoryMetrics.class);
   private static final String SOURCE_NAME =
@@ -75,120 +69,35 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
   private @Metric MutableGaugeLong totalSstFilesCount;
   private @Metric MutableGaugeLong numSnapshots;
 
-  private final AtomicLong lastUpdateTime = new AtomicLong(0);
   private final OMMetadataManager metadataManager;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
 
-  // Per-checkpoint-directory metrics storage
-  private volatile Map<String, CheckpointMetrics> checkpointMetricsMap = new HashMap<>();
-  private ScheduledExecutorService updateExecutor;
-  private ScheduledFuture<?> updateTask;
-
-  /**
-   * Starts the periodic metrics update task.
-   *
-   * @param conf OzoneConfiguration for reading update interval
-   */
-  public void start(OzoneConfiguration conf) {
-    long updateInterval = conf.getTimeDuration(OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL,
+  OMSnapshotDirectoryMetrics(ConfigurationSource conf,
+      OMMetadataManager metadataManager) {
+    super("OMSnapshotDirectoryMetrics",
+        conf.getTimeDuration(OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL,
         OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    updateExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-      Thread t = new Thread(r, "OMSnapshotDirectoryMetricsUpdate");
-      t.setDaemon(true);
-      return t;
-    });
-
-    // Schedule periodic updates
-    updateTask = updateExecutor.scheduleWithFixedDelay(() -> {
-      try {
-        updateMetrics();
-        lastUpdateTime.set(System.currentTimeMillis());
-      } catch (Exception e) {
-        LOG.warn("Failed to update snapshot directory metrics", e);
-      }
-    }, 0, updateInterval, TimeUnit.MILLISECONDS);
-  }
-
-  /**
-   * Stops the periodic metrics update task.
-   */
-  public void stop() {
-    if (updateTask != null) {
-      updateTask.cancel(false); // Don't interrupt if running
-      updateTask = null;
-    }
-
-    if (updateExecutor != null) {
-      updateExecutor.shutdown();
-      try {
-        // Wait for any running updateMetrics() to complete (with timeout)
-        if (!updateExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
-          LOG.warn("Metrics update executor did not terminate in time, forcing shutdown");
-          updateExecutor.shutdownNow();
-          // Wait a bit more for cancellation to take effect
-          if (!updateExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-            LOG.error("Metrics update executor did not terminate after force shutdown");
-          }
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        updateExecutor.shutdownNow();
-      }
-      updateExecutor = null;
-    }
-  }
-
-  public void unRegister() {
-    stop();
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
-  /**
-   * Internal class to store per-checkpoint metrics.
-   */
-  private static class CheckpointMetrics {
-    private final long size;
-    private final int sstFileCount;
-
-    CheckpointMetrics(long size, int sstFileCount) {
-      this.size = size;
-      this.sstFileCount = sstFileCount;
-    }
-
-    public long getSize() {
-      return size;
-    }
-
-    public int getSstFileCount() {
-      return sstFileCount;
-    }
-  }
-
-  private OMSnapshotDirectoryMetrics(OMMetadataManager metadataManager) {
+            TimeUnit.MILLISECONDS));
     this.metadataManager = metadataManager;
   }
 
-  public static OMSnapshotDirectoryMetrics create(String parent,
-      OMMetadataManager metadataManager) {
+  public static OMSnapshotDirectoryMetrics create(ConfigurationSource conf,
+      String parent, OMMetadataManager metadataManager) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        parent,
-        new OMSnapshotDirectoryMetrics(metadataManager));
+    return ms.register(SOURCE_NAME, parent,
+        new OMSnapshotDirectoryMetrics(conf, metadataManager));
   }
 
   /**
+   * @return if the update was successful.
    * Updates all metrics synchronously - both aggregate and per-checkpoint-directory.
    */
-  @VisibleForTesting
-  void updateMetrics() throws IOException {
+  protected boolean updateMetrics() {
     DBStore store = metadataManager.getStore();
     if (!(store instanceof RDBStore)) {
       LOG.debug("Store is not RDBStore, skipping snapshot directory metrics update");
       resetMetrics();
-      return;
+      return false;
     }
 
     RDBStore rdbStore = (RDBStore) store;
@@ -196,115 +105,77 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
 
     if (snapshotsParentDir == null) {
       resetMetrics();
-      return;
+      return false;
     }
 
     File snapshotsDir = new File(snapshotsParentDir);
     if (!snapshotsDir.exists() || !snapshotsDir.isDirectory()) {
       resetMetrics();
-      return;
+      return false;
     }
 
     try {
-      // Check for interruption before expensive operations
-      if (Thread.currentThread().isInterrupted()) {
-        LOG.info("Metrics update interrupted, skipping");
-        return;
-      }
-
       // Calculate aggregate metrics
-      long totalSize = calculateDirSizeAccountingForHardlinks(snapshotsDir);
-      dbSnapshotsDirSize.set(totalSize);
-
-      // Calculate per-checkpoint-directory metrics and aggregate totals
-      File[] checkpointDirs = snapshotsDir.listFiles(File::isDirectory);
-      int totalSstCount = 0;
-      int snapshotCount = 0;
-      Map<String, CheckpointMetrics> newCheckpointMetricsMap = new HashMap<>();
-
-      if (checkpointDirs != null) {
-        snapshotCount = checkpointDirs.length;
-
-        for (File checkpointDir : checkpointDirs) {
-          String checkpointDirName = checkpointDir.getName();
-          long checkpointSize = 0;
-          int sstFileCount = 0;
-
-          try {
-            checkpointSize = calculateDirSizeAccountingForHardlinks(checkpointDir);
-            File[] sstFiles = checkpointDir.listFiles((dir, name) ->
-                name.toLowerCase().endsWith(ROCKSDB_SST_SUFFIX));
-            if (sstFiles != null) {
-              sstFileCount = sstFiles.length;
-            }
-          } catch (Exception e) {
-            LOG.debug("Error calculating metrics for checkpoint directory {}",
-                checkpointDirName, e);
-            // Continue with other directories even if one fails
-            continue;
-          }
-
-          totalSstCount += sstFileCount;
-          newCheckpointMetricsMap.put(checkpointDirName,
-              new CheckpointMetrics(checkpointSize, sstFileCount));
-        }
-      }
-
-      // Update aggregate metrics
-      totalSstFilesCount.set(totalSstCount);
-      numSnapshots.set(snapshotCount);
-
-      // Atomically update per-checkpoint metrics map
-      checkpointMetricsMap = Collections.unmodifiableMap(newCheckpointMetricsMap);
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Updated snapshot directory metrics: size={}, sstFiles={}, snapshots={}",
-            totalSize, totalSstCount, snapshotCount);
-      }
-
+      calculateAndUpdateMetrics(snapshotsDir);
     } catch (Exception e) {
       LOG.warn("Error calculating snapshot directory metrics", e);
       resetMetrics();
+      return false;
     }
+    return true;
   }
 
   /**
-   * Calculates directory size accounting for hardlinks.
+   * Calculates & updates directory size metrics accounting for hardlinks.
    * (only counts each inode once).
-   * Uses Files.getAttribute to get the inode number and tracks
-   * visited inodes.
+   * Uses Files.getAttribute to get the inode number and tracks visited inodes.
    *
-   * @param directory the directory to calculate size for
-   * @return total size in bytes, counting each inode only once
+   * @param directory the directory containing all checkpointDirs.
    */
-  private long calculateDirSizeAccountingForHardlinks(File directory)
-      throws IOException {
+  private void calculateAndUpdateMetrics(File directory) throws IOException {
     Set<Object> visitedInodes = new HashSet<>();
     long totalSize = 0;
-    try (Stream<Path> paths = Files.walk(directory.toPath())) {
-      for (Path path : paths.collect(Collectors.toList())) {
-        if (Files.isRegularFile(path)) {
-          try {
-            // Get inode number
-            Object fileKey = IOUtils.getINode(path);
-            if (fileKey == null) {
-              // Fallback: use file path + size as unique identifier
-              fileKey = path.toAbsolutePath() + ":" + Files.size(path);
+    long sstFileCount = 0;
+    int snapshotCount = 0;
+    try (Stream<Path> checkpointDirs = Files.list(directory.toPath())) {
+      for (Path checkpointDir : checkpointDirs.collect(Collectors.toList())) {
+        snapshotCount++;
+        try (Stream<Path> files = Files.list(checkpointDir)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (Files.isRegularFile(path)) {
+              try {
+                // Get inode number
+                Object fileKey = IOUtils.getINode(path);
+                if (fileKey == null) {
+                  // Fallback: use file path + size as unique identifier
+                  fileKey = path.toAbsolutePath() + ":" + Files.size(path);
+                }
+                // Only count this file if we haven't seen this inode before
+                if (visitedInodes.add(fileKey)) {
+                  if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
+                    sstFileCount++;
+                  }
+                  totalSize += Files.size(path);
+                }
+              } catch (UnsupportedOperationException | IOException e) {
+                // Fallback: if we can't get inode, just count the file size.
+                LOG.error("Could not get inode for {}, using file size directly: {}",
+                    path, e.getMessage());
+                totalSize += Files.size(path);
+              }
             }
-            // Only count this file if we haven't seen this inode before
-            if (visitedInodes.add(fileKey)) {
-              totalSize += Files.size(path);
-            }
-          } catch (UnsupportedOperationException | IOException e) {
-            // Fallback: if we can't get inode, just count the file size.
-            LOG.error("Could not get inode for {}, using file size directly: {}",
-                path, e.getMessage());
-            totalSize += Files.size(path);
           }
         }
       }
     }
-    return totalSize;
+    numSnapshots.set(snapshotCount);
+    totalSstFilesCount.set(sstFileCount);
+    dbSnapshotsDirSize.set(totalSize);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Updated snapshot directory metrics: size={}, sstFiles={}, snapshots={}",
+          totalSize, sstFileCount, snapshotCount);
+    }
   }
 
   /**
@@ -314,7 +185,6 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
     dbSnapshotsDirSize.set(0);
     totalSstFilesCount.set(0);
     numSnapshots.set(0);
-    checkpointMetricsMap = new HashMap<>();
   }
 
   /**
@@ -328,20 +198,8 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
         .setContext("Snapshot Directory Metrics")
         .addGauge(SnapshotMetricsInfo.DbSnapshotsDirSize, dbSnapshotsDirSize.value())
         .addGauge(SnapshotMetricsInfo.TotalSstFilesCount, totalSstFilesCount.value())
-        .addGauge(SnapshotMetricsInfo.NumSnapshots, numSnapshots.value());
-
-    // Add per-checkpoint-directory metrics from cached map
-    Map<String, CheckpointMetrics> currentMetrics = checkpointMetricsMap;
-    for (Map.Entry<String, CheckpointMetrics> entry : currentMetrics.entrySet()) {
-      String checkpointDirName = entry.getKey();
-      CheckpointMetrics metrics = entry.getValue();
-
-      collector.addRecord(SOURCE_NAME)
-          .setContext("Per-Checkpoint Directory Metrics")
-          .tag(SnapshotMetricsInfo.CheckpointDirName, checkpointDirName)
-          .addGauge(SnapshotMetricsInfo.CheckpointDirSize, metrics.getSize())
-          .addGauge(SnapshotMetricsInfo.CheckpointSstFilesCount, metrics.getSstFileCount());
-    }
+        .addGauge(SnapshotMetricsInfo.NumSnapshots, numSnapshots.value())
+        .addGauge(SnapshotMetricsInfo.LastUpdateTime, getLastUpdateTime());
   }
 
   @VisibleForTesting
@@ -359,14 +217,10 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
     return numSnapshots.value();
   }
 
-  @VisibleForTesting
-  public long getLastUpdateTime() {
-    return lastUpdateTime.get();
-  }
-
-  @VisibleForTesting
-  public Map<String, CheckpointMetrics> getCheckpointMetricsMap() {
-    return Collections.unmodifiableMap(checkpointMetricsMap);
+  public void unRegister() {
+    stop();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
   }
 
   /**
@@ -377,13 +231,7 @@ public final class OMSnapshotDirectoryMetrics implements MetricsSource {
     DbSnapshotsDirSize("Total size of db.snapshots directory in bytes"),
     TotalSstFilesCount("Total number of SST files across all snapshots"),
     NumSnapshots("Total number of snapshot checkpoint directories"),
-
-    // Per-checkpoint-directory metric tag
-    CheckpointDirName("Checkpoint directory name"),
-
-    // Per-checkpoint-directory metrics
-    CheckpointDirSize("Size of checkpoint directory in bytes"),
-    CheckpointSstFilesCount("Number of SST files in checkpoint directory");
+    LastUpdateTime("Time stamp when the snapshot directory metrics were last updated");
 
     private final String desc;
 
