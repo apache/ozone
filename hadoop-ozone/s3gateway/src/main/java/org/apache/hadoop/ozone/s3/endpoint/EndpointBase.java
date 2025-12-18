@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -84,7 +83,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Basic helpers for all the REST endpoints.
  */
-public abstract class EndpointBase implements Auditor {
+public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
 
@@ -107,7 +106,7 @@ public abstract class EndpointBase implements Auditor {
   @Context
   private HttpHeaders headers;
 
-  private Set<String> excludeMetadataFields =
+  private final Set<String> excludeMetadataFields =
       new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
@@ -456,8 +455,8 @@ public abstract class EndpointBase implements Auditor {
     return Collections.unmodifiableMap(tags);
   }
 
-  private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
-      Map<String, String> auditMap) {
+  protected AuditMessage.Builder auditMessageFor(AuditAction op) {
+    Map<String, String> auditMap = getAuditParameters();
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
     
@@ -475,29 +474,15 @@ public abstract class EndpointBase implements Auditor {
     return builder;
   }
 
-  @Override
-  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-      Map<String, String> auditMap) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+  protected AuditMessage.Builder auditMessageForSuccess(AuditAction op) {
+    return auditMessageFor(op)
         .withResult(AuditEventStatus.SUCCESS);
-    return builder.build();
   }
 
-  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-      Map<String, String> auditMap, PerformanceStringBuilder performance) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
-        .withResult(AuditEventStatus.SUCCESS);
-    builder.setPerformance(performance);
-    return builder.build();
-  }
-
-  @Override
-  public AuditMessage buildAuditMessageForFailure(AuditAction op,
-      Map<String, String> auditMap, Throwable throwable) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+  protected AuditMessage.Builder auditMessageForFailure(AuditAction op, Throwable throwable) {
+    return auditMessageFor(op)
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable);
-    return builder.build();
   }
 
   @VisibleForTesting
@@ -556,14 +541,28 @@ public abstract class EndpointBase implements Auditor {
     return AuditUtils.getAuditParameters(context);
   }
 
+  protected void auditWriteSuccess(AuditAction action, PerformanceStringBuilder perf) {
+    AUDIT.logWriteSuccess(auditMessageForSuccess(action).setPerformance(perf).build());
+  }
+
+  protected void auditWriteSuccess(AuditAction action) {
+    AUDIT.logWriteSuccess(auditMessageForSuccess(action).build());
+  }
+
+  protected void auditReadSuccess(AuditAction action, PerformanceStringBuilder perf) {
+    AUDIT.logReadSuccess(auditMessageForSuccess(action).setPerformance(perf).build());
+  }
+
+  protected void auditReadSuccess(AuditAction action) {
+    AUDIT.logReadSuccess(auditMessageForSuccess(action).build());
+  }
+
   protected void auditWriteFailure(AuditAction action, Throwable ex) {
-    AUDIT.logWriteFailure(
-        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logWriteFailure(auditMessageForFailure(action, ex).build());
   }
 
   protected void auditReadFailure(AuditAction action, Exception ex) {
-    AUDIT.logReadFailure(
-        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logReadFailure(auditMessageForFailure(action, ex).build());
   }
 
   protected boolean isAccessDenied(OMException ex) {
