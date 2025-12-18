@@ -93,6 +93,7 @@ public class TestPermissionCheck {
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
   }
 
   /**
