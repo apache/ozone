@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +45,6 @@ import org.junit.jupiter.api.Test;
 public class TestListParts {
 
   private ObjectEndpoint rest;
-  private String uploadID;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -67,8 +67,9 @@ public class TestListParts {
         OzoneConsts.KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    uploadID = multipartUploadInitiateResponse.getUploadID();
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+    assertNotNull(uploadID);
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
 
     assertEquals(200, response.getStatus());
 
@@ -76,25 +77,25 @@ public class TestListParts {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, null, null, body);
+        content.length(), 1, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 2, uploadID, null, null, body);
+        content.length(), 2, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 3, uploadID, null, null, body);
+        content.length(), 3, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
   }
 
   @Test
   public void testListParts() throws Exception {
-    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 3, "0", null);
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.PART_NUMBER_MARKER, "0");
+    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, 3);
 
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
@@ -106,8 +107,8 @@ public class TestListParts {
 
   @Test
   public void testListPartsContinuation() throws Exception {
-    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 2, "0", null);
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.PART_NUMBER_MARKER, "0");
+    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, 2);
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
 
@@ -115,8 +116,9 @@ public class TestListParts {
     assertEquals(2, listPartsResponse.getPartList().size());
 
     // Continue
-    response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, uploadID, 2,
-        Integer.toString(listPartsResponse.getNextPartNumberMarker()), null);
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.PART_NUMBER_MARKER,
+        Integer.toString(listPartsResponse.getNextPartNumberMarker()));
+    response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, 2);
     listPartsResponse = (ListPartsResponse) response.getEntity();
 
     assertFalse(listPartsResponse.getTruncated());
@@ -126,9 +128,10 @@ public class TestListParts {
 
   @Test
   public void testListPartsWithUnknownUploadID() throws Exception {
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.PART_NUMBER_MARKER, "0");
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, "no-such-upload");
     try {
-      rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-          uploadID, 2, "0", null);
+      rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, 2);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
           ex.getErrorMessage());

@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -106,8 +107,9 @@ public class TestMultipartUploadComplete {
       content) throws IOException, OS3Exception {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = rest.put(OzoneConsts.S3_BUCKET, key, content.length(),
-        partNumber, uploadID, null, null, body);
+        partNumber, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
@@ -120,8 +122,9 @@ public class TestMultipartUploadComplete {
   private void completeMultipartUpload(String key,
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
       String uploadID) throws IOException, OS3Exception {
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
-        uploadID, completeMultipartUploadRequest);
+        completeMultipartUploadRequest);
 
     assertEquals(200, response.getStatus());
 

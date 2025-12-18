@@ -261,8 +261,9 @@ public class TestPermissionCheck {
         .setConfig(conf)
         .build();
 
+    objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.PART_NUMBER_MARKER, "marker");
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.get(
-        "bucketName", "keyPath", 0, null, 1000, "marker", null));
+        "bucketName", "keyPath", 0, 1000));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -279,7 +280,7 @@ public class TestPermissionCheck {
         .build();
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "bucketName", "keyPath", 1024, 0, null, null, null,
+        "bucketName", "keyPath", 1024, 0,
         new ByteArrayInputStream(new byte[]{})));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
@@ -297,7 +298,7 @@ public class TestPermissionCheck {
         .build();
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.delete("bucketName", "keyPath", null, null));
+        objectEndpoint.delete("bucketName", "keyPath"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -341,18 +342,18 @@ public class TestPermissionCheck {
 
     InputStream tagInput = new ByteArrayInputStream(xml.getBytes(UTF_8));
 
+    objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         objectEndpoint.put("bucketName", "keyPath", 0, 1,
-            null, "", null, tagInput));
+            tagInput));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
 
     e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.delete("bucketName", "keyPath", "", ""));
+        objectEndpoint.delete("bucketName", "keyPath"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
 
     e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.get("bucketName", "keyPath", 0, null,
-            0, null, ""));
+        objectEndpoint.get("bucketName", "keyPath", 0, 0));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 }

@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -72,13 +73,15 @@ public class TestObjectTaggingGet {
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
+        1, body);
+
+    rest.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
   }
 
   @Test
   public void testGetTagging() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get(BUCKET_NAME, KEY_WITH_TAG,  0, null, 0, null, "");
+    Response response = rest.get(BUCKET_NAME, KEY_WITH_TAG,  0, 0);
 
     assertEquals(HTTP_OK, response.getStatus());
     S3Tagging s3Tagging = (S3Tagging) response.getEntity();
@@ -99,7 +102,7 @@ public class TestObjectTaggingGet {
   @Test
   public void testGetTaggingNoKeyFound() throws Exception {
     try {
-      rest.get(BUCKET_NAME, "nonexistent",  0, null, 0, null, "");
+      rest.get(BUCKET_NAME, "nonexistent",  0, 0);
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -110,7 +113,7 @@ public class TestObjectTaggingGet {
   @Test
   public void testGetTaggingNoBucketFound() throws Exception {
     try {
-      rest.get("nonexistent", "nonexistent", 0, null, 0, null, "");
+      rest.get("nonexistent", "nonexistent", 0, 0);
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
