@@ -221,7 +221,6 @@ public class StorageDistributionEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     try {
       SCMNodeMetric nodeMetric = nodeManager.getNodeStat(datanode);
-      long reservedSpace = nodeManager.getTotalReserved(datanode);
       if (nodeMetric == null) {
         LOG.warn("Node statistics not available for datanode: {}", datanode);
         return null; // Return null for unavailable nodes
@@ -238,6 +237,7 @@ public class StorageDistributionEndpoint {
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
       long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
+      long reservedSpace = nodeStat.getReserved() != null ? nodeStat.getReserved().get() : 0L;
 
       return DatanodeStorageReport.newBuilder()
           .setCapacity(capacity)
