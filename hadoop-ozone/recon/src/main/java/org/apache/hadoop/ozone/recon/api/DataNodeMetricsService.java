@@ -171,7 +171,6 @@ public class DataNodeMetricsService {
     List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
     // Submit all collection tasks
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
-    Map<DatanodePendingDeletionMetrics, Long> submissionTimes = new HashMap<>();
 
     long submissionTime = System.currentTimeMillis();
     for (DatanodeDetails node : nodes) {
