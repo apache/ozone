@@ -80,8 +80,6 @@ public class TestUploadWithStream {
         .setHeaders(headers)
         .setConfig(conf)
         .build();
-
-    rest.init();
   }
 
   @Test

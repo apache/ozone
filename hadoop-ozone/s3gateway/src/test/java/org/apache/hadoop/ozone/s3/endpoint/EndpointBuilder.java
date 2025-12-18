@@ -27,6 +27,7 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 
@@ -97,8 +98,8 @@ public class EndpointBuilder<T extends EndpointBase> {
   public T build() {
     T endpoint = base != null ? base : constructor.get();
 
-    if (ozoneClient != null) {
-      endpoint.setClient(ozoneClient);
+    if (endpoint.getClient() == null) {
+      endpoint.setClient(getClient());
     }
 
     final OzoneConfiguration config = getConfig();
@@ -109,10 +110,15 @@ public class EndpointBuilder<T extends EndpointBase> {
     endpoint.setRequestIdentifier(identifier);
     endpoint.setSignatureInfo(signatureInfo);
 
+    endpoint.initialization();
+
     return endpoint;
   }
 
   protected OzoneClient getClient() {
+    if (ozoneClient == null) {
+      ozoneClient = new OzoneClientStub();
+    }
     return ozoneClient;
   }
 
