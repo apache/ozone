@@ -21,6 +21,8 @@ import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,9 +79,17 @@ class TestReplicationManagerReport {
     report.increment(HddsProtos.LifeCycleState.CLOSED);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
 
-    report.increment(ContainerHealthState.UNDER_REPLICATED);
-    report.increment(ContainerHealthState.UNDER_REPLICATED);
-    report.increment(ContainerHealthState.OVER_REPLICATED);
+    // Use mock ContainerInfo for testing incrementAndSample
+    ContainerInfo mockContainer1 = mock(ContainerInfo.class);
+    when(mockContainer1.containerID()).thenReturn(ContainerID.valueOf(1));
+    ContainerInfo mockContainer2 = mock(ContainerInfo.class);
+    when(mockContainer2.containerID()).thenReturn(ContainerID.valueOf(2));
+    ContainerInfo mockContainer3 = mock(ContainerInfo.class);
+    when(mockContainer3.containerID()).thenReturn(ContainerID.valueOf(3));
+    
+    report.incrementAndSample(ContainerHealthState.UNDER_REPLICATED, mockContainer1);
+    report.incrementAndSample(ContainerHealthState.UNDER_REPLICATED, mockContainer2);
+    report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, mockContainer3);
     report.setComplete();
 
     String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(report);

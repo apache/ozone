@@ -150,13 +150,14 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .build();
 
     assertTrue(handler.handle(request));
+    // Handler sets UNHEALTHY_OVER_REPLICATED (not just OVER_REPLICATED)
     assertEquals(1, request.getReport().getStat(
-        ContainerHealthState.OVER_REPLICATED));
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
 
     assertTrue(handler.handle(readRequest));
     // Same report object is incremented again
     assertEquals(2, request.getReport().getStat(
-        ContainerHealthState.OVER_REPLICATED));
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
 
     // Only a single delete should be sent, as the read request should not have
     // triggered one.

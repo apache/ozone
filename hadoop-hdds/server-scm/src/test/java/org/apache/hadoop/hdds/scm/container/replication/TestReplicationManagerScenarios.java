@@ -531,6 +531,30 @@ public class TestReplicationManagerScenarios {
       stateCounts.put(ContainerHealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
+    public void setQuasiClosedStuckUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckMissing(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, count);
+    }
+
+    public void setUnhealthyUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, count);
+    }
+
+    public void setUnhealthyOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, count);
+    }
+
+    public void setMissingUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.MISSING_UNDER_REPLICATED, count);
+    }
+
     public int getExpected(ContainerHealthState state) {
       return stateCounts.getOrDefault(state, 0);
     }

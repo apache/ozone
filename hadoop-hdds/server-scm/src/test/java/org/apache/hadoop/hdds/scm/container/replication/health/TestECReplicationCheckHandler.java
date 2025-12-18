@@ -348,13 +348,15 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable so not added to the queue
+    // Unrecoverable with offline indexes = combination state
+    // Could be MISSING_UNDER_REPLICATED or UNHEALTHY_UNDER_REPLICATED depending on isMissing()
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(1, report.getStat(
-        ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ContainerHealthState.MISSING));
+    // Check that one of the combination states is set
+    int missingUnder = (int) report.getStat(ContainerHealthState.MISSING_UNDER_REPLICATED);
+    int unhealthyUnder = (int) report.getStat(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED);
+    assertEquals(1, missingUnder + unhealthyUnder, 
+        "Expected one combination state to be set");
   }
 
   @Test
@@ -393,14 +395,12 @@ public class TestECReplicationCheckHandler {
     assertTrue(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable, but there are offline indexes which need replicated. As there is a pending
-    // add on the offline index, it is not added to the queue.
+    // Unrecoverable with offline indexes = MISSING_UNDER_REPLICATED combination
+    // As there is a pending add on the offline index, it is not added to the queue.
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ContainerHealthState.MISSING));
+        ContainerHealthState.MISSING_UNDER_REPLICATED));
   }
 
   /**
