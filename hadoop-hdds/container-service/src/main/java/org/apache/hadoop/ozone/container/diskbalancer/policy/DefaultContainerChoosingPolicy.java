@@ -74,7 +74,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
-      if (containerData.getBytesUsed() != 0 &&
+      if (containerData.getBytesUsed() > 0 &&
           !inProgressContainerIDs.contains(ContainerID.valueOf(containerData.getContainerID())) &&
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
