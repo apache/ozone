@@ -21,6 +21,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
@@ -526,6 +531,12 @@ public class TestSstFilteringService {
     testConf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     testConf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     testConf.setQuietMode(false);
+    // Configure dynamic ports to avoid conflicts with the OzoneManager instance from @BeforeAll
+    testConf.set(OZONE_OM_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.set(OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.set(OZONE_OM_HTTPS_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.setInt(OZONE_OM_RATIS_PORT_KEY, 0);
+    testConf.setInt(OZONE_OM_GRPC_PORT_KEY, 0);
 
     OmTestManagers testManagers = new OmTestManagers(testConf);
     KeyManager testKeyManager = testManagers.getKeyManager();
