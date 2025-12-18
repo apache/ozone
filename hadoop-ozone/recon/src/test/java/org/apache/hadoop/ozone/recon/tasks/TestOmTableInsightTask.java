@@ -869,7 +869,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testSequentialProcessingWithCodecBuffer_CountVerified()
+  public void testSequentialProcessingWithCodecBuffer()
       throws Exception {
     OmTableInsightTask task =
         new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager) {
