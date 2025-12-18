@@ -63,9 +63,12 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
     try {
       DiskBalancerConfigurationProto config = buildConfigProto();
       diskBalancerProxy.startDiskBalancer(config);
-      
+
+      // Get hostname for consistent JSON output
+      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
+
       Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", hostName);
+      result.put("datanode", dnHostname);
       result.put("action", "start");
       result.put("status", "success");
       Map<String, Object> configMap = getConfigurationMap();

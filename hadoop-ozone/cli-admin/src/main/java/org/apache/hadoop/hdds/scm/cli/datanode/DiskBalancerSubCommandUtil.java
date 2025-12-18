@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.net.NetUtils;
@@ -118,6 +119,33 @@ final class DiskBalancerSubCommandUtil {
     }
 
     return addresses;
+  }
+
+  /**
+   * Gets the hostname of a datanode by querying its DiskBalancer info.
+   * This ensures consistent hostname display in output, even when connecting via IP address.
+   * 
+   * @param address the datanode address (can be IP:port or hostname:port)
+   * @return the hostname of the datanode, or the original address if hostname cannot be retrieved
+   */
+  public static String getDatanodeHostname(String address) {
+    DiskBalancerProtocol diskBalancerProxy = null;
+    try {
+      diskBalancerProxy = getSingleNodeDiskBalancerProxy(address);
+      DatanodeDiskBalancerInfoProto status = diskBalancerProxy.getDiskBalancerInfo();
+      return status.getNode().getHostName();
+    } catch (IOException e) {
+      // If we can't get the hostname, fall back to the original address
+      return address;
+    } finally {
+      if (diskBalancerProxy != null) {
+        try {
+          diskBalancerProxy.close();
+        } catch (IOException e) {
+          // Ignore close errors
+        }
+      }
+    }
   }
 }
 

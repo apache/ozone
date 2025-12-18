@@ -73,8 +73,11 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       HddsProtos.DiskBalancerConfigurationProto config = buildConfigProto();
       diskBalancerProxy.updateDiskBalancerConfiguration(config);
       
+      // Get hostname for consistent JSON output
+      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
+      
       Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", hostName);
+      result.put("datanode", dnHostname);
       result.put("action", "update");
       result.put("status", "success");
       Map<String, Object> configMap = getConfigurationMap();

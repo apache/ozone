@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -40,8 +41,12 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
       diskBalancerProxy.stopDiskBalancer();
-      Map<String, Object> result = new java.util.LinkedHashMap<>();
-      result.put("datanode", hostName);
+      
+      // Get hostname for consistent JSON output
+      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
+      
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("datanode", dnHostname);
       result.put("action", "stop");
       result.put("status", "success");
       return result;

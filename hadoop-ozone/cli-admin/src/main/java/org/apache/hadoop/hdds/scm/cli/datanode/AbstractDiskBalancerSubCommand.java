@@ -86,12 +86,16 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     for (String dn : targetDatanodes) {
       try {
         Object result = executeCommand(dn);
-        successNodes.add(dn);
+        // Get hostname for display (fallback to original address if it fails)
+        String hostname = DiskBalancerSubCommandUtil.getDatanodeHostname(dn);
+        successNodes.add(hostname);
         if (options.isJson()) {
           jsonResults.add(result);
         }
       } catch (Exception e) {
-        failedNodes.add(dn);
+        // Get hostname for error display (fallback to original address if it fails)
+        String hostname = DiskBalancerSubCommandUtil.getDatanodeHostname(dn);
+        failedNodes.add(hostname);
         String errorMsg = e.getMessage();
         if (errorMsg != null && errorMsg.contains("\n")) {
           errorMsg = errorMsg.split("\n", 2)[0];
@@ -101,11 +105,11 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
         }
         if (options.isJson()) {
           // Create error result object in JSON format
-          Map<String, Object> errorResult = createErrorResult(dn, errorMsg);
+          Map<String, Object> errorResult = createErrorResult(hostname, errorMsg);
           jsonResults.add(errorResult);
         } else {
           // Print error messages in non-JSON mode
-          System.err.printf("Error on node [%s]: %s%n", dn, errorMsg);
+          System.err.printf("Error on node [%s]: %s%n", hostname, errorMsg);
         }
       }
     }
