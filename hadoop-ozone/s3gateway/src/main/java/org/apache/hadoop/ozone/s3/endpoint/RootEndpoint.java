@@ -73,17 +73,11 @@ public class RootEndpoint extends EndpointBase {
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(S3GAction.LIST_S3_BUCKETS,
-              getAuditParameters(), ex)
-      );
+      auditReadFailure(S3GAction.LIST_S3_BUCKETS, ex);
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(S3GAction.LIST_S3_BUCKETS,
-                getAuditParameters())
-        );
+        auditReadSuccess(S3GAction.LIST_S3_BUCKETS);
       }
     }
   }
