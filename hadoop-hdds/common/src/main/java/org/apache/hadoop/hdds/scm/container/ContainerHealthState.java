@@ -152,7 +152,16 @@ public enum ContainerHealthState {
    */
   QUASI_CLOSED_STUCK_OVER_REPLICATED((short) 104,
       "Stuck in quasi-closed state with excess replicas",
-      "QuasiClosedStuckOverReplicatedContainers");
+      "QuasiClosedStuckOverReplicatedContainers"),
+
+  /**
+   * Container is quasi-closed-stuck AND missing (no replicas).
+   * Occurs when QuasiClosedContainerHandler marks as QUASI_CLOSED_STUCK,
+   * then QuasiClosedStuckReplicationCheck finds no replicas.
+   */
+  QUASI_CLOSED_STUCK_MISSING((short) 105,
+      "Stuck in quasi-closed state with no replicas",
+      "QuasiClosedStuckMissingContainers");
 
   // ========== Enum Fields ==========
 
@@ -194,17 +203,7 @@ public enum ContainerHealthState {
     return metricName;
   }
 
-  /**
-   * Check if container is healthy (no issues).
-   *
-   * @return true if this is HEALTHY
-   */
-  public boolean isHealthy() {
-    return this == HEALTHY;
-  }
-
   // ========== Factory Methods ==========
-
   /**
    * Create health state from short value.
    * If value matches a named constant, returns that constant.

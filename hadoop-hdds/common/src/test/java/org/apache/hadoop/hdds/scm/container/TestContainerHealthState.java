@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_UNH
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OPEN_WITHOUT_PIPELINE;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OVER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK_MISSING;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED;
@@ -68,6 +69,7 @@ public class TestContainerHealthState {
     assertEquals(102, MISSING_UNDER_REPLICATED.getValue());
     assertEquals(103, QUASI_CLOSED_STUCK_UNDER_REPLICATED.getValue());
     assertEquals(104, QUASI_CLOSED_STUCK_OVER_REPLICATED.getValue());
+    assertEquals(105, ContainerHealthState.QUASI_CLOSED_STUCK_MISSING.getValue());
   }
 
   @Test
@@ -83,14 +85,6 @@ public class TestContainerHealthState {
     assertEquals("UnderReplicatedContainers", UNDER_REPLICATED.getMetricName());
     assertEquals("MissingContainers", MISSING.getMetricName());
     assertEquals("UnhealthyUnderReplicatedContainers", UNHEALTHY_UNDER_REPLICATED.getMetricName());
-  }
-
-  @Test
-  public void testIsHealthy() {
-    assertTrue(HEALTHY.isHealthy());
-    assertFalse(UNDER_REPLICATED.isHealthy());
-    assertFalse(MISSING.isHealthy());
-    assertFalse(UNHEALTHY_UNDER_REPLICATED.isHealthy());
   }
 
   // ========== FromValue Tests ==========
@@ -116,6 +110,7 @@ public class TestContainerHealthState {
     assertEquals(MISSING_UNDER_REPLICATED, ContainerHealthState.fromValue((short) 102));
     assertEquals(QUASI_CLOSED_STUCK_UNDER_REPLICATED, ContainerHealthState.fromValue((short) 103));
     assertEquals(QUASI_CLOSED_STUCK_OVER_REPLICATED, ContainerHealthState.fromValue((short) 104));
+    assertEquals(QUASI_CLOSED_STUCK_MISSING, ContainerHealthState.fromValue((short) 105));
   }
 
   @Test
@@ -150,11 +145,11 @@ public class TestContainerHealthState {
 
   @Test
   public void testCombinationStateCount() {
-    // Should have 5 combination states (100-104)
+    // Should have 6 combination states (100-105)
     long combinationCount = java.util.Arrays.stream(ContainerHealthState.values())
         .filter(s -> s.getValue() >= 100)
         .count();
-    assertEquals(5, combinationCount, "Expected 5 combination states");
+    assertEquals(6, combinationCount, "Expected 6 combination states");
   }
 
   @Test
@@ -169,8 +164,8 @@ public class TestContainerHealthState {
 
   @Test
   public void testNoGapsInCombinationValues() {
-    // Combination states should be sequential: 100-104
-    for (short i = 100; i <= 104; i++) {
+    // Combination states should be sequential: 100-105
+    for (short i = 100; i <= 105; i++) {
       ContainerHealthState state = ContainerHealthState.fromValue(i);
       assertTrue(state.getValue() >= 100,
           "Value " + i + " should map to a combination state");

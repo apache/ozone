@@ -64,8 +64,9 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     }
 
     if (request.getContainerReplicas().isEmpty()) {
-      // If there are no replicas, then mark as missing and return.
-      request.getReport().incrementAndSample(ContainerHealthState.MISSING, request.getContainerInfo());
+      // If there are no replicas, mark as QUASI_CLOSED_STUCK + MISSING combination
+      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, 
+          request.getContainerInfo());
       return true;
     }
 

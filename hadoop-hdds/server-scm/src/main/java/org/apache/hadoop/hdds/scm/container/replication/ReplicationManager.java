@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -374,8 +373,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         break;
       }
       report.increment(c.getState());
-      // Set container as HEALTHY initially; will be overwritten if handler finds issues
-      c.setHealthState(ContainerHealthState.HEALTHY);
+      // Reset report's health state to HEALTHY for this container
+      report.resetContainerHealthState();
       try {
         processContainer(c, newRepQueue, report);
         // TODO - send any commands contained in the health result
@@ -883,7 +882,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "check chain", containerInfo.containerID());
         // Container remains HEALTHY (set at start of loop)
       }
-
+      containerInfo.setHealthState(report.getContainerHealthState());
       return handled;
     }
   }
