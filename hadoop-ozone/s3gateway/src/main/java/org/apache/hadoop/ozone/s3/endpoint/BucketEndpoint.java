@@ -53,6 +53,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -138,8 +140,7 @@ public class BucketEndpoint extends EndpointBase {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
         getMetrics().updateGetAclSuccessStats(startNanos);
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+        auditReadSuccess(s3GAction);
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
@@ -175,8 +176,7 @@ public class BucketEndpoint extends EndpointBase {
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
     } catch (OMException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       getMetrics().updateGetBucketFailureStats(startNanos);
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
@@ -188,8 +188,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       getMetrics().updateGetBucketFailureStats(startNanos);
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
 
@@ -298,8 +297,7 @@ public class BucketEndpoint extends EndpointBase {
     getMetrics().incListKeyCount(keyCount);
     perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters(), perf));
+    auditReadSuccess(s3GAction, perf);
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }
@@ -320,28 +318,15 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
-      // Build map of query parameters
-      Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("acl", aclMarker);
-      // Future handlers: queryParams.put("lifecycle", lifecycleMarker);
-
-      // Check for subresource operations using handlers
-      String queryParam = HANDLER_FACTORY.findFirstSupportedQueryParam(queryParams);
-
-      if (queryParam != null) {
-        BucketOperationHandler handler = HANDLER_FACTORY.getHandler(queryParam);
-        // Delegate to specific handler
-        s3GAction = getActionForQueryParam(queryParam);
-        Response response = handler.handlePutRequest(
-            bucketName, body, getHeaders(), getBucketContext(), startNanos);
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      if (aclMarker != null) {
+        s3GAction = S3GAction.PUT_ACL;
+        Response response =  putAcl(bucketName, body);
+        auditWriteSuccess(s3GAction);
         return response;
       }
 
       String location = createS3Bucket(bucketName);
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
@@ -353,8 +338,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       throw exception;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
   }
@@ -413,22 +397,18 @@ public class BucketEndpoint extends EndpointBase {
               upload.getCreationTime(),
               S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
           )));
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-          getAuditParameters()));
+      auditReadSuccess(s3GAction);
       getMetrics().updateListMultipartUploadsSuccessStats(startNanos);
       return Response.ok(result).build();
     } catch (OMException exception) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(),
-              exception));
+      auditReadFailure(s3GAction, exception);
       getMetrics().updateListMultipartUploadsFailureStats(startNanos);
       if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
     } catch (Exception ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
   }
@@ -447,13 +427,11 @@ public class BucketEndpoint extends EndpointBase {
     try {
       OzoneBucket bucket = getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      AUDIT.logReadSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      auditReadSuccess(s3GAction);
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
     } catch (Exception e) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), e));
+      auditReadFailure(s3GAction, e);
       throw e;
     }
   }
@@ -477,8 +455,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       getMetrics().updateDeleteBucketFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
@@ -490,13 +467,11 @@ public class BucketEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
 
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
+    auditWriteSuccess(s3GAction);
     getMetrics().updateDeleteBucketSuccessStats(startNanos);
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
@@ -555,15 +530,16 @@ public class BucketEndpoint extends EndpointBase {
       }
     }
 
-    Map<String, String> auditMap = getAuditParameters();
-    auditMap.put("failedDeletes", deleteKeys.toString());
+    AuditMessage.Builder message = auditMessageFor(s3GAction);
+    message.getParams().put("failedDeletes", deleteKeys.toString());
+
     if (!result.getErrors().isEmpty()) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
-          auditMap, new Exception("MultiDelete Exception")));
+      AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
+          .withException(new Exception("MultiDelete Exception")).build());
     } else {
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditMap));
+      AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
+
     return result;
   }
 

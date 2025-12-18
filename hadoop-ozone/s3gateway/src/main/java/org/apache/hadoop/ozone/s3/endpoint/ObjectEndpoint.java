@@ -387,8 +387,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
         perf.appendOpLatencyNanos(opLatencyNs);
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
-            getAuditParameters(), perf));
+        auditWriteSuccess(s3GAction, perf);
       }
     }
   }
@@ -430,8 +429,7 @@ public class ObjectEndpoint extends EndpointBase {
         int partMarker = parsePartNumberMarker(partNumberMarker);
         Response response = listParts(bucket, keyPath, uploadId,
             partMarker, maxParts, perf);
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-            getAuditParameters(), perf));
+        auditReadSuccess(s3GAction, perf);
         return response;
       }
 
@@ -469,8 +467,7 @@ public class ObjectEndpoint extends EndpointBase {
           }
           long opLatencyNs =  getMetrics().updateGetKeySuccessStats(startNanos);
           perf.appendOpLatencyNanos(opLatencyNs);
-          AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
-              getAuditParameters(), perf));
+          auditReadSuccess(S3GAction.GET_KEY, perf);
         };
         responseBuilder = Response
             .ok(output)
@@ -493,8 +490,7 @@ public class ObjectEndpoint extends EndpointBase {
           }
           long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
           perf.appendOpLatencyNanos(opLatencyNs);
-          AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
-              getAuditParameters(), perf));
+          auditReadSuccess(S3GAction.GET_KEY, perf);
         };
         responseBuilder = Response
             .status(Status.PARTIAL_CONTENT)
@@ -549,9 +545,7 @@ public class ObjectEndpoint extends EndpointBase {
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       return responseBuilder.build();
     } catch (OMException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
-      );
+      auditReadFailure(s3GAction, ex);
       if (taggingMarker != null) {
         getMetrics().updateGetObjectTaggingFailureStats(startNanos);
       } else if (uploadId != null) {
@@ -569,9 +563,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
-      );
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
   }
@@ -622,8 +614,7 @@ public class ObjectEndpoint extends EndpointBase {
       isFile(keyPath, key);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       getMetrics().updateHeadKeyFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
@@ -636,8 +627,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
 
@@ -665,8 +655,7 @@ public class ObjectEndpoint extends EndpointBase {
     addLastModifiedDate(response, key);
     addCustomMetadataHeaders(response, key);
     getMetrics().updateHeadKeySuccessStats(startNanos);
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
+    auditReadSuccess(s3GAction);
     return response.build();
   }
 
@@ -754,8 +743,7 @@ public class ObjectEndpoint extends EndpointBase {
       getClientProtocol().deleteKey(volume.getName(), bucketName,
           keyPath, false);
     } catch (OMException ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       if (uploadId != null && !uploadId.equals("")) {
         getMetrics().updateAbortMultipartUploadFailureStats(startNanos);
       } else {
@@ -780,8 +768,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       if (taggingMarker != null) {
         getMetrics().updateDeleteObjectTaggingFailureStats(startNanos);
       } else if (uploadId != null && !uploadId.equals("")) {
@@ -792,8 +779,7 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     }
     getMetrics().updateDeleteKeySuccessStats(startNanos);
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
+    auditWriteSuccess(s3GAction);
     return Response
         .status(Status.NO_CONTENT)
         .build();
@@ -839,8 +825,7 @@ public class ObjectEndpoint extends EndpointBase {
       multipartUploadInitiateResponse.setKey(key);
       multipartUploadInitiateResponse.setUploadID(multipartInfo.getUploadID());
 
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      auditWriteSuccess(s3GAction);
       getMetrics().updateInitMultipartUploadSuccessStats(startNanos);
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
@@ -852,8 +837,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
       throw ex;
     }
@@ -908,8 +892,7 @@ public class ObjectEndpoint extends EndpointBase {
           wrapInQuotes(omMultipartUploadCompleteInfo.getHash()));
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      auditWriteSuccess(s3GAction);
       getMetrics().updateCompleteMultipartUploadSuccessStats(startNanos);
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
