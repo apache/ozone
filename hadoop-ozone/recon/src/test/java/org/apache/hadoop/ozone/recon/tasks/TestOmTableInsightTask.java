@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
@@ -48,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -55,9 +57,13 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -860,5 +866,42 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         .setDataSize(100L)
         .setObjectID(objectID)
         .build();
+  }
+
+  @Test
+  public void testSequentialProcessingWithCodecBuffer_CountVerified()
+      throws Exception {
+    OmTableInsightTask task =
+        new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager) {
+          @Override
+          public Collection<String> getTaskTables() {
+            return Collections.singletonList(DELEGATION_TOKEN_TABLE);
+          }
+        };
+    OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(omMetadataManager.getStore()).thenReturn(store);
+    @SuppressWarnings("unchecked")
+    Table<CodecBuffer, CodecBuffer> table =
+        (Table<CodecBuffer, CodecBuffer>) mock(Table.class);
+    @SuppressWarnings("unchecked")
+    TableIterator<CodecBuffer, CodecBuffer> iterator =
+        (TableIterator<CodecBuffer, CodecBuffer>) mock(TableIterator.class);
+    when(store.getTable(
+        eq(DELEGATION_TOKEN_TABLE),
+        any(CodecBufferCodec.class),
+        any(CodecBufferCodec.class),
+        eq(TableCache.CacheType.NO_CACHE)))
+        .thenReturn((Table) table);
+    when(table.keyIterator()).thenReturn(iterator);
+    when(iterator.hasNext()).thenReturn(true, true, true, false);
+    ReconOmTask.TaskResult result = task.reprocess(omMetadataManager);
+    assertTrue(result.isTaskSuccess(),
+        "Sequential processing should succeed");
+    String countKey =
+        OmTableInsightTask.getTableCountKeyFromTable(DELEGATION_TOKEN_TABLE);
+    Long count = task.initializeCountMap().get(countKey);
+    assertEquals(3L, count,
+        "Sequential iterator must count all keys");
   }
 }
