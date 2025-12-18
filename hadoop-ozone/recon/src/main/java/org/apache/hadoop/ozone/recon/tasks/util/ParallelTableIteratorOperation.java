@@ -55,8 +55,8 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   private final Codec<K> keyCodec;
 
   // Thread Pools
-  private final ExecutorService iteratorExecutor; // 5
-  private final ExecutorService valueExecutors; // 20
+  private final ExecutorService iteratorExecutor;
+  private final ExecutorService valueExecutors;
 
   private final int maxNumberOfVals;
   private final OMMetadataManager metadataManager;
@@ -72,19 +72,19 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     this.table = table;
     this.keyCodec = keyCodec;
     this.metadataManager = metadataManager;
-    this.maxIteratorTasks = 2 * iteratorCount;  // Allow up to 10 pending iterator tasks
-    this.maxWorkerTasks = workerCount * 2;      // Allow up to 40 pending worker tasks
+    this.maxIteratorTasks = 2 * iteratorCount;
+    this.maxWorkerTasks = workerCount * 2;
 
-    // Create team of 5 iterator threads with UNLIMITED queue
+    // Create team of iterator threads with UNLIMITED queue
     // LinkedBlockingQueue() with no size = can hold infinite pending tasks
     this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
                     new LinkedBlockingQueue<>());
 
-    // Create team of 20 worker threads with UNLIMITED queue
+    // Create team of worker threads with UNLIMITED queue
     this.valueExecutors = new ThreadPoolExecutor(workerCount, workerCount, 1, TimeUnit.MINUTES,
             new LinkedBlockingQueue<>());
 
-    // Calculate batch size per worker (e.g., 2000 / 20 = 100 keys per batch per worker)
+    // Calculate batch size per worker
     this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
     this.logCountThreshold = logThreshold;
   }
@@ -163,10 +163,10 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
     // ===== PARALLEL PROCESSING SETUP =====
 
-    // Queue to track iterator threads (5 threads creating work)
+    // Queue to track iterator threads
     Queue<Future<?>> iterFutures = new LinkedList<>();
 
-    // Queue to track worker threads (20 threads doing work)
+    // Queue to track worker threads
     Queue<Future<?>> workerFutures = new ConcurrentLinkedQueue<>();
 
     AtomicLong keyCounter = new AtomicLong();
@@ -214,7 +214,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                 break;
               }
 
-              // If batch is full (2000 keys), stop collecting
+              // If batch is full, stop collecting
               if (keyValues.size() >= maxNumberOfVals) {
                 break;
               }
@@ -235,7 +235,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
                   synchronized (logLock) {
                     if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
                       long cnt = keyCounter.get();
-                      LOG.info("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
+                      LOG.debug("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
                       prevLogCounter.set(cnt);
                     }
                   }
@@ -264,12 +264,11 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     }
 
     // ===== STEP 7: WAIT FOR EVERYONE TO FINISH =====
-    // Wait for all 5 iterator threads to finish reading
+    // Wait for all iterator threads to finish reading
     waitForQueueSize(iterFutures, 0);
-    // Wait for all 20 worker threads to finish processing
+    // Wait for all worker threads to finish processing
     waitForQueueSize(workerFutures, 0);
     
-    // Log final stats
     LOG.info("{}: Parallel iteration completed - Total keys processed: {}", taskName, keyCounter.get());
   }
 

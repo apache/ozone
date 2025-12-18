@@ -25,6 +25,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -79,10 +80,11 @@ public class NSSummaryAsyncFlusher implements Closeable {
   private void flushLoop() {
     while (state.get() == FlushState.RUNNING || !flushQueue.isEmpty()) {
       try {
+        // Attempt to retrieve one batch from the queue, If queue empty → waits 100ms, then returns null
         Map<Long, NSSummary> workerMap = flushQueue.poll(100, TimeUnit.MILLISECONDS);
         
         if (workerMap == null) {
-          continue;  // Timeout, check running flag
+          continue;
         }
         
         // Process this batch
@@ -110,56 +112,65 @@ public class NSSummaryAsyncFlusher implements Closeable {
     state.set(FlushState.STOPPED);
     LOG.info("{}: Async flusher stopped", taskName);
   }
-  
+
   /**
    * Flush worker map with propagation to ancestors.
    */
   private void flushWithPropagation(Map<Long, NSSummary> workerMap) throws IOException {
-    LOG.debug("{}: Flush starting with {} entries", taskName, workerMap.size());
+
     Map<Long, NSSummary> mergedMap = new HashMap<>();
-    
-    // For each immediate parent in worker map
+
+    // For each object in worker map (could be either a directory or bucket)
     for (Map.Entry<Long, NSSummary> entry : workerMap.entrySet()) {
-      long immediateParentId = entry.getKey();
+      long currentObjectId = entry.getKey();  // ← RENAMED from immediateParentId
       NSSummary delta = entry.getValue();
-      
-      // Get actual parent (check merged map first, then DB)
-      NSSummary actualParent = mergedMap.get(immediateParentId);
-      if (actualParent == null) {
-        actualParent = reconNamespaceSummaryManager.getNSSummary(immediateParentId);
+
+      // Get actual UpToDate nssummary (check merged map first, then DB)
+      NSSummary existingNSSummary = mergedMap.get(currentObjectId);
+      if (existingNSSummary == null) {
+        existingNSSummary = reconNamespaceSummaryManager.getNSSummary(currentObjectId);
       }
 
-      if (actualParent == null) {
-        // Parent doesn't exist in DB yet - use delta as base (has metadata like dirName, parentId)
-        actualParent = delta;
+      if (existingNSSummary == null) {
+        // Object doesn't exist in DB yet - use delta as base (has metadata like dirName, parentId)
+        existingNSSummary = delta;
       } else {
-        // Parent exists in DB - merge delta into it
-        actualParent.setNumOfFiles(actualParent.getNumOfFiles() + delta.getNumOfFiles());
-        actualParent.setSizeOfFiles(actualParent.getSizeOfFiles() + delta.getSizeOfFiles());
-        actualParent.setReplicatedSizeOfFiles(actualParent.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
+        // Object exists in DB - merge delta into it
+        existingNSSummary.setNumOfFiles(existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
+        existingNSSummary.setSizeOfFiles(existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
+        existingNSSummary.setReplicatedSizeOfFiles(existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
 
         // Merge file size buckets
-        int[] actualBucket = actualParent.getFileSizeBucket();
+        // Question - Should we remove this? discuss with sumit
+        int[] actualBucket = existingNSSummary.getFileSizeBucket();
         int[] deltaBucket = delta.getFileSizeBucket();
         for (int i = 0; i < actualBucket.length; i++) {
           actualBucket[i] += deltaBucket[i];
         }
-        actualParent.setFileSizeBucket(actualBucket);
-        
+
         // Merge child dirs
-        actualParent.getChildDir().addAll(delta.getChildDir());
+        existingNSSummary.getChildDir().addAll(delta.getChildDir());
+
+        // Repair dirName if existing entry is missing it and delta has the value
+        if (StringUtils.isEmpty(existingNSSummary.getDirName()) && StringUtils.isNotEmpty(delta.getDirName())) {
+          existingNSSummary.setDirName(delta.getDirName());
+        }
+        // Repair parentId if existing entry is missing it and delta has the value
+        if (existingNSSummary.getParentId() == 0 && delta.getParentId() != 0) {
+          existingNSSummary.setParentId(delta.getParentId());
+        }
       }
 
-      // Store updated ACTUAL parent in merged map
-      mergedMap.put(immediateParentId, actualParent);
+      // Store updated object in merged map
+      mergedMap.put(currentObjectId, existingNSSummary);
 
       if (delta.getSizeOfFiles() > 0 || delta.getNumOfFiles() > 0) {
-        // Propagate delta to ancestors (grandparent, great-grandparent, etc.)
-        propagateDeltaToAncestors(actualParent.getParentId(), delta, mergedMap);
+        // Propagate delta to ancestors (parent, grandparent, etc.)
+        propagateDeltaToAncestors(existingNSSummary.getParentId(), delta, mergedMap);  // ← RENAMED
       }
     }
-    
-    // Write merged map to DB (simple batch write, no more R-M-W needed)
+
+    // Write merged map to DB
     writeToDb(mergedMap);
     LOG.debug("{}: Flush completed, wrote {} entries", taskName, mergedMap.size());
   }
@@ -170,7 +181,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
    */
   private void propagateDeltaToAncestors(long ancestorId, NSSummary delta, 
                                           Map<Long, NSSummary> mergedMap) throws IOException {
-    // Base case: reached root
+    // Base case: reached above bucket level
     if (ancestorId == 0) {
       return;
     }

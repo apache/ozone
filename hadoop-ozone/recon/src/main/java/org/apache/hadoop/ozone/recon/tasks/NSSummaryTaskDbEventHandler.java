@@ -62,48 +62,9 @@ public class NSSummaryTaskDbEventHandler {
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      // Read-Modify-Write for each entry to prevent race conditions
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
-          Long parentId = entry.getKey();
-          NSSummary deltaSummary = entry.getValue();
-          
-          // Step 1: READ existing value from DB
-          NSSummary existingSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
-          
-          if (existingSummary == null) {
-            // First time - just write the delta as-is
-            existingSummary = deltaSummary;
-          } else {
-            // Step 2: MODIFY - merge delta into existing
-            existingSummary.setNumOfFiles(existingSummary.getNumOfFiles() + deltaSummary.getNumOfFiles());
-            existingSummary.setSizeOfFiles(existingSummary.getSizeOfFiles() + deltaSummary.getSizeOfFiles());
-            existingSummary.setReplicatedSizeOfFiles(
-                existingSummary.getReplicatedSizeOfFiles() + deltaSummary.getReplicatedSizeOfFiles());
-            
-            // Merge file size buckets
-            int[] existingBucket = existingSummary.getFileSizeBucket();
-            int[] deltaBucket = deltaSummary.getFileSizeBucket();
-            for (int i = 0; i < existingBucket.length; i++) {
-              existingBucket[i] += deltaBucket[i];
-            }
-            existingSummary.setFileSizeBucket(existingBucket);
-            
-            // Merge child directory sets
-            existingSummary.getChildDir().addAll(deltaSummary.getChildDir());
-            
-            // Preserve metadata if not set in existing
-            if ((existingSummary.getDirName() == null || existingSummary.getDirName().isEmpty()) &&
-                (deltaSummary.getDirName() != null && !deltaSummary.getDirName().isEmpty())) {
-              existingSummary.setDirName(deltaSummary.getDirName());
-            }
-            if (existingSummary.getParentId() == 0 && deltaSummary.getParentId() != 0) {
-              existingSummary.setParentId(deltaSummary.getParentId());
-            }
-          }
-          
-          // Step 3: WRITE merged result back to DB
-          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, parentId, existingSummary);
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
           throw e;
@@ -125,14 +86,15 @@ public class NSSummaryTaskDbEventHandler {
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    // Try to get from map
+    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
-      // Read from DB during delta updates (process method)
+      // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
     if (nsSummary == null) {
-      // Create new instance if not found
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
@@ -165,7 +127,7 @@ public class NSSummaryTaskDbEventHandler {
   protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
-    // Get from map only, no DB reads during reprocess
+    // Get from local thread map only, no DB reads during reprocess
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
       // Create new instance if not found
@@ -454,17 +416,6 @@ public class NSSummaryTaskDbEventHandler {
         propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }
     }
-  }
-
-  /**
-   * Propagates size and count changes upwards through the parent chain during reprocess.
-   * Used by reprocess method - does NOT read from DB, only works with in-memory map.
-   * This method will be implemented to handle the specific requirements of reprocess operation.
-   */
-  protected void propagateSizeUpwardsReprocess(long objectId, long sizeChange, long replicatedSizeChange,
-                                               int countChange, Map<Long, NSSummary> nsSummaryMap)
-      throws IOException {
-    // TODO: Implementation will be added to handle reprocess-specific propagation logic
   }
 
 }
