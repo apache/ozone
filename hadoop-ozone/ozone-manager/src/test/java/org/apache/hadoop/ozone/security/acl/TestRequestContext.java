@@ -131,4 +131,70 @@ public class TestRequestContext {
             UserGroupInformation.createRemoteUser(username), null, null,
             type, ownerName).build();
   }
+
+  @Test
+  public void testToBuilderWithNoModifications() {
+    // Create a RequestContext with all fields set
+    final UserGroupInformation ugi = UserGroupInformation.createRemoteUser("testUser");
+    final String host = "testHost";
+    final String serviceId = "testServiceId";
+    final String ownerName = "testOwner";
+    final String sessionPolicy = "{\"Statement\":[{\"Effect\":\"Allow\"}]}";
+
+    final RequestContext original = new RequestContext(
+        host, null, ugi, serviceId, IAccessAuthorizer.ACLIdentityType.USER, IAccessAuthorizer.ACLType.READ, ownerName,
+        true, sessionPolicy);
+
+    // Use toBuilder to create a new builder
+    final RequestContext.Builder builder = original.toBuilder();
+    final RequestContext requestCtxFromToBuilder = builder.build();
+
+    // Verify all fields are preserved
+    assertEquals(original.getHost(), requestCtxFromToBuilder.getHost(), "Host should be preserved");
+    assertNull(original.getIp(), "IP should be preserved");
+    assertEquals(original.getClientUgi(), requestCtxFromToBuilder.getClientUgi(), "ClientUgi should be preserved");
+    assertEquals(original.getServiceId(), requestCtxFromToBuilder.getServiceId(), "ServiceId should be preserved");
+    assertEquals(original.getAclType(), requestCtxFromToBuilder.getAclType(), "AclType should be preserved");
+    assertEquals(original.getAclRights(), requestCtxFromToBuilder.getAclRights(), "AclRights should be preserved");
+    assertEquals(original.getOwnerName(), requestCtxFromToBuilder.getOwnerName(), "OwnerName should be preserved");
+    assertTrue(original.isRecursiveAccessCheck(), "RecursiveAccessCheck should be preserved");
+    assertEquals(original.getSessionPolicy(), requestCtxFromToBuilder.getSessionPolicy(),
+        "SessionPolicy should be preserved");
+  }
+
+  @Test
+  public void testToBuilderWithModifications() {
+    // Create an original RequestContext
+    final UserGroupInformation originalUgi = UserGroupInformation.createRemoteUser("user1");
+    final RequestContext original = new RequestContext(
+        "host1", null, originalUgi, "service1", IAccessAuthorizer.ACLIdentityType.USER, IAccessAuthorizer.ACLType.READ,
+        "owner1", false, null);
+
+    // Use toBuilder and modify some fields
+    final UserGroupInformation newUgi = UserGroupInformation.createRemoteUser("user2");
+    final RequestContext modified = original.toBuilder()
+        .setHost("host2")
+        .setClientUgi(newUgi)
+        .setAclRights(IAccessAuthorizer.ACLType.WRITE)
+        .setOwnerName("owner2")
+        .setRecursiveAccessCheck(true)
+        .setSessionPolicy("{\"Statement\":[]}")
+        .build();
+
+    // Verify original is unchanged
+    assertEquals("host1", original.getHost(), "Original should be unchanged");
+    assertEquals(originalUgi, original.getClientUgi(), "Original UGI should be unchanged");
+    assertEquals(IAccessAuthorizer.ACLType.READ, original.getAclRights(), "Original ACL rights should be unchanged");
+    assertEquals("owner1", original.getOwnerName(), "Original owner name should be unchanged");
+    assertFalse(original.isRecursiveAccessCheck(), "Original recursive flag should be unchanged");
+    assertNull(original.getSessionPolicy(), "Original session policy should be unchanged");
+
+    // Verify modified has new values
+    assertEquals("host2", modified.getHost(), "Modified host should be updated");
+    assertEquals(newUgi, modified.getClientUgi(), "Modified UGI should be updated");
+    assertEquals(IAccessAuthorizer.ACLType.WRITE, modified.getAclRights(), "Modified ACL rights should be updated");
+    assertEquals("owner2", modified.getOwnerName(), "Modified owner should be updated");
+    assertTrue(modified.isRecursiveAccessCheck(), "Modified recursive flag should be updated");
+    assertEquals("{\"Statement\":[]}", modified.getSessionPolicy(), "Modified session policy should be updated");
+  }
 }

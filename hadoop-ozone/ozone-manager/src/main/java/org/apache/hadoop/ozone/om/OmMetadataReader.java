@@ -630,18 +630,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return context;
     }
 
-    final String sessionPolicy = stsTokenIdentifier.getSessionPolicy();
-
-    return RequestContext.newBuilder()
-        .setHost(context.getHost())
-        .setIp(context.getIp())
-        .setClientUgi(context.getClientUgi())
-        .setServiceId(context.getServiceId())
-        .setAclType(context.getAclType())
-        .setAclRights(context.getAclRights())
-        .setOwnerName(context.getOwnerName())
-        .setRecursiveAccessCheck(context.isRecursiveAccessCheck())
-        .setSessionPolicy(sessionPolicy)
+    return context.toBuilder()
+        .setSessionPolicy(stsTokenIdentifier.getSessionPolicy())
         .build();
   }
 
