@@ -90,7 +90,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isEmpty() throws RocksDatabaseException {
-    try (KeyValueIterator<byte[], byte[]> keyIter = iterator((byte[])null, KeyValueIterator.Type.NEITHER)) {
+    try (KeyValueIterator<byte[], byte[]> keyIter = iterator((byte[])null, IteratorType.NEITHER)) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }
@@ -213,14 +213,14 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, KeyValueIterator.Type type)
+  public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
         prefix, type);
   }
 
   KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
-      CodecBuffer prefix, KeyValueIterator.Type type) throws RocksDatabaseException {
+      CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
         this, prefix, type);
   }
@@ -252,7 +252,7 @@ class RDBTable implements Table<byte[], byte[]> {
         CodecBufferCodec.get(true).fromPersistedFormat(prefix);
     KeyValueIterator<CodecBuffer, CodecBuffer> iter;
     try {
-      iter = iterator(prefixBuffer, KeyValueIterator.Type.KEY_AND_VALUE);
+      iter = iterator(prefixBuffer, IteratorType.KEY_AND_VALUE);
     } catch (RocksDatabaseException e) {
       if (prefixBuffer != null) {
         prefixBuffer.close();

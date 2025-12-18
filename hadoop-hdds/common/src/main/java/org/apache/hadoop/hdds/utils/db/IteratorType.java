@@ -15,28 +15,41 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.awssdk.v1;
-
-import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+package org.apache.hadoop.hdds.utils.db;
 
 /**
- * Tests the AWS S3 SDK basic operations with OM Ratis enabled.
+ * The iterator type.
  */
-public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
+public enum IteratorType {
 
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    startCluster(conf);
+  /**
+   * Neither read key nor value.
+   */
+  NEITHER(0),
+  /**
+   * Read key only.
+   */
+  KEY_ONLY(1),
+  /**
+   * Read value only.
+   */
+  VALUE_ONLY(2),
+  /**
+   * Read both key and value.
+   */
+  KEY_AND_VALUE(3);
+
+  private final int mask;
+
+  IteratorType(int mask) {
+    this.mask = mask;
   }
 
-  @AfterAll
-  public static void shutdown() throws IOException {
-    shutdownCluster();
+  public boolean readKey() {
+    return (this.mask & KEY_ONLY.mask) != 0;
+  }
+
+  public boolean readValue() {
+    return (this.mask & VALUE_ONLY.mask) != 0;
   }
 }

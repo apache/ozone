@@ -56,7 +56,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -66,11 +65,11 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -172,39 +171,28 @@ import software.amazon.awssdk.utils.IoUtils;
  *   - https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/crt-based-s3-client.html
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static S3Client s3Client = null;
-  private static S3AsyncClient s3AsyncClient = null;
+  private MiniOzoneCluster cluster;
+  private S3Client s3Client;
+  private S3AsyncClient s3AsyncClient;
 
-  /**
-   * Create a MiniOzoneCluster with S3G enabled for testing.
-   * @param conf Configurations to start the cluster
-   * @throws Exception exception thrown when waiting for the cluster to be ready.
-   */
-  static void startCluster(OzoneConfiguration conf) throws Exception {
-    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .addService(s3g)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    S3ClientFactory s3Factory = new S3ClientFactory(s3g.getConf());
+  @BeforeAll
+  void createClient() throws Exception {
+    cluster = cluster();
+    S3ClientFactory s3Factory = new S3ClientFactory(cluster.getConf());
     s3Client = s3Factory.createS3ClientV2();
     s3AsyncClient = s3Factory.createS3AsyncClientV2();
   }
 
-  /**
-   * Shutdown the MiniOzoneCluster.
-   */
-  static void shutdownCluster() throws IOException {
+  @AfterAll
+  void closeClient() {
     if (s3Client != null) {
       s3Client.close();
     }
-    if (cluster != null) {
-      cluster.shutdown();
+    if (s3AsyncClient != null) {
+      s3AsyncClient.close();
     }
   }
 
@@ -461,7 +449,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   class PresignedUrlTests {
     private static final String CONTENT = "bar";
-    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String BUCKET_NAME = "v2-presigned-url-bucket";
     private final SdkHttpClient sdkHttpClient = ApacheHttpClient.create();
     // The URL will expire in 10 minutes.
     private final Duration duration = Duration.ofMinutes(10);
@@ -1079,7 +1067,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   }
 
   private String getBucketName(String suffix) {
-    return (getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+    return ("v2-" + getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
   }
 
   private String getKeyName() {

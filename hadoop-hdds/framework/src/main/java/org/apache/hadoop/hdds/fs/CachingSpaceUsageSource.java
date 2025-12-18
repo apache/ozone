@@ -50,7 +50,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   private long cachedUsedSpace;
   private long cachedAvailable;
   private long cachedCapacity;
-  private SpaceUsageSource cachedUsage;
+  private Fixed cachedUsage;
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -102,7 +102,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   @Override
-  public SpaceUsageSource snapshot() {
+  public Fixed snapshot() {
     try (AutoCloseableLock ignored = lock.readLock(null, null)) {
       if (cachedUsage != null) {
         return cachedUsage;

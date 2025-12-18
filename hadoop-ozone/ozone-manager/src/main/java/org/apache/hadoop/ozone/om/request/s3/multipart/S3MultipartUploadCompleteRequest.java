@@ -26,6 +26,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -521,7 +522,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
       builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
-        builder.setMetadata(dbOpenKeyInfo.getMetadata());
+        // make modifiable because ETAG needs to be added
+        builder.setMetadata(new LinkedHashMap<>(dbOpenKeyInfo.getMetadata()));
       }
       builder.addMetadata(OzoneConsts.ETAG, multipartHash);
       if (dbOpenKeyInfo.getTags() != null) {

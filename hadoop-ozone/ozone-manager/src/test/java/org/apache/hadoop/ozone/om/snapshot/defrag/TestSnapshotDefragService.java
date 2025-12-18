@@ -60,6 +60,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -240,11 +241,11 @@ public class TestSnapshotDefragService {
     WritableOmSnapshotLocalDataProvider provider = mock(WritableOmSnapshotLocalDataProvider.class);
     OmSnapshotLocalData localData = mock(OmSnapshotLocalData.class);
     OmSnapshotLocalData previousLocalData = mock(OmSnapshotLocalData.class);
-
+    Optional<OmSnapshotLocalData> optionalPreviousLocalData = Optional.of(previousLocalData);
     when(snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotInfo)).thenReturn(provider);
     when(provider.needsDefrag()).thenReturn(false);
     when(provider.getSnapshotLocalData()).thenReturn(localData);
-    when(provider.getPreviousSnapshotLocalData()).thenReturn(previousLocalData);
+    when(provider.getPreviousSnapshotLocalData()).thenReturn(optionalPreviousLocalData);
     when(localData.getVersion()).thenReturn(1);
     when(previousLocalData.getVersion()).thenReturn(0);
 

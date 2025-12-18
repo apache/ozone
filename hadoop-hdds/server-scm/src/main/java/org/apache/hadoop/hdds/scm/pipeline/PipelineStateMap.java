@@ -64,7 +64,7 @@ class PipelineStateMap {
    * @param pipeline - Pipeline to add
    * @throws IOException if pipeline with provided pipelineID already exists
    */
-  void addPipeline(Pipeline pipeline) throws IOException {
+  void addPipeline(Pipeline pipeline) throws DuplicatedPipelineIdException {
     Objects.requireNonNull(pipeline, "Pipeline cannot be null");
     Preconditions.checkArgument(
         pipeline.getNodes().size() == pipeline.getReplicationConfig()
@@ -90,10 +90,9 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
-   * @throws IOException if pipeline is not in open state or does not exist
    */
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
-      throws IOException {
+      throws InvalidPipelineStateException, PipelineNotFoundException {
     Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
     Objects.requireNonNull(containerID,
@@ -113,8 +112,8 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
    */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
+  void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     Objects.requireNonNull(pipelineID,
             "Pipeline Id cannot be null");
     Objects.requireNonNull(containerID,
@@ -334,9 +333,8 @@ class PipelineStateMap {
    * Remove pipeline from the data structures.
    *
    * @param pipelineID - PipelineID of the pipeline to be removed
-   * @throws IOException if the pipeline is not empty or does not exist
    */
-  Pipeline removePipeline(PipelineID pipelineID) throws IOException {
+  Pipeline removePipeline(PipelineID pipelineID) throws PipelineNotFoundException, InvalidPipelineStateException {
     Objects.requireNonNull(pipelineID, "Pipeline Id cannot be null");
 
     Pipeline pipeline = getPipeline(pipelineID);
@@ -356,10 +354,8 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline from which container needs
    *                   to be removed
    * @param containerID - ContainerID of the container to remove
-   * @throws IOException if pipeline does not exist
    */
-  void removeContainerFromPipeline(PipelineID pipelineID,
-      ContainerID containerID) throws IOException {
+  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException {
     Objects.requireNonNull(pipelineID,
         "Pipeline Id cannot be null");
     Objects.requireNonNull(containerID,

@@ -52,6 +52,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -88,6 +89,9 @@ public abstract class EndpointBase implements Auditor {
   protected static final String ETAG_CUSTOM = "etag-custom";
 
   @Inject
+  private OzoneConfiguration ozoneConfiguration;
+
+  @Inject
   private OzoneClient client;
   @SuppressWarnings("checkstyle:VisibilityModifier")
   @Inject
@@ -96,8 +100,12 @@ public abstract class EndpointBase implements Auditor {
   private RequestIdentifier requestIdentifier;
 
   private S3Auth s3Auth;
+
   @Context
   private ContainerRequestContext context;
+
+  @Context
+  private HttpHeaders headers;
 
   private Set<String> excludeMetadataFields =
       new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
@@ -497,6 +505,22 @@ public abstract class EndpointBase implements Auditor {
     this.client = ozoneClient;
   }
 
+  protected ContainerRequestContext getContext() {
+    return context;
+  }
+
+  void setContext(ContainerRequestContext context) {
+    this.context = context;
+  }
+
+  protected HttpHeaders getHeaders() {
+    return headers;
+  }
+
+  void setHeaders(HttpHeaders headers) {
+    this.headers = headers;
+  }
+
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
@@ -513,6 +537,14 @@ public abstract class EndpointBase implements Auditor {
 
   protected ClientProtocol getClientProtocol() {
     return getClient().getProxy();
+  }
+
+  void setOzoneConfiguration(OzoneConfiguration conf) {
+    ozoneConfiguration = conf;
+  }
+
+  protected OzoneConfiguration getOzoneConfiguration() {
+    return ozoneConfiguration;
   }
 
   @VisibleForTesting
@@ -539,5 +571,4 @@ public abstract class EndpointBase implements Auditor {
     return result == ResultCodes.PERMISSION_DENIED
         || result == ResultCodes.INVALID_TOKEN;
   }
-
 }

@@ -15,24 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
-
 /**
- * Builder for BucketEndpoint in tests.
+ * Helper classes for computing the delta between two snapshots.
  */
-public class BucketEndpointBuilder extends
-    EndpointBuilder<BucketEndpoint> {
-
-  public BucketEndpointBuilder() {
-    super(BucketEndpoint::new);
-  }
-
-  @Override
-  public BucketEndpoint build() {
-    BucketEndpoint endpoint = super.build();
-    endpoint.setOzoneConfiguration(getConfig());
-    endpoint.setHeaders(getHeaders());
-
-    return endpoint;
-  }
-}
+package org.apache.hadoop.ozone.om.snapshot.diff.helper;

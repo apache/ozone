@@ -39,6 +39,7 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.TestUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
@@ -153,7 +154,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     Pair<SortedMap<String, Integer>, List<Path>> data = createDummyData(numberOfFiles);
     List<Path> files = data.getRight();
     SortedMap<String, Integer> keys = data.getLeft();
@@ -194,7 +195,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     Pair<SortedMap<String, Integer>, List<Path>> data =
         createDummyData(numberOfFiles);
@@ -234,7 +235,7 @@ class TestSstFileSetReader {
    */
   @ParameterizedTest
   @ValueSource(ints = {2, 3, 5})
-  public void testMinHeapWithOverlappingSstFiles(int numberOfFiles) throws RocksDBException {
+  public void testMinHeapWithOverlappingSstFiles(int numberOfFiles) throws RocksDBException, CodecException {
     assumeTrue(numberOfFiles >= 2);
 
     // Create overlapping SST files with some duplicate keys
@@ -306,7 +307,7 @@ class TestSstFileSetReader {
   @ParameterizedTest
   @ValueSource(ints = {3, 4, 5})
   public void testDuplicateKeyHandlingWithLatestFilePrecedence(int numberOfFiles)
-      throws RocksDBException {
+      throws RocksDBException, CodecException {
     assumeTrue(numberOfFiles >= 3);
 
     List<Path> files = new ArrayList<>();
