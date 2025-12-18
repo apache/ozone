@@ -191,7 +191,7 @@ public class TestSnapshotRequestAndResponse {
   }
 
   @AfterEach
-  public void stop() {
+  public void stop() throws IOException {
     omMetrics.unRegister();
     omSnapshotIntMetrics.unregister();
     framework().clearInlineMocks();

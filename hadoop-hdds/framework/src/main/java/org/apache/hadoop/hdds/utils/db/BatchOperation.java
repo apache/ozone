@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
+
 /**
  * Class represents a batch operation, collects multiple db operation.
  */
-public interface BatchOperation extends AutoCloseable {
+public interface BatchOperation extends Closeable {
 
-  @Override
-  void close();
 }

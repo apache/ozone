@@ -161,7 +161,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void batchPut() throws Exception {
     final Table<String, String> testTable = createTypedTable("Fourth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       String key =
           RandomStringUtils.secure().next(10);
@@ -180,7 +180,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void batchDelete() throws Exception {
     final Table<String, String> testTable = createTypedTable("Fourth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
 
       //given
       String key =

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -42,7 +43,7 @@ public interface SCMHADBTransactionBuffer
 
   AtomicReference<SnapshotInfo> getLatestSnapshotRef();
 
-  void flush() throws RocksDatabaseException, CodecException;
+  void flush() throws IOException;
 
   boolean shouldFlush(long snapshotWaitTime);
 

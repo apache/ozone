@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -106,7 +107,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
           OmSnapshot nextOmSnapshot = rcOmNextSnapshot.get();
           RDBStore nextSnapshotStore = (RDBStore) nextOmSnapshot.getMetadataManager().getStore();
           // Init Batch Operation for snapshot db.
-          try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
+          try (RDBBatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
             addKeysToNextSnapshot(writeBatch, nextOmSnapshot.getMetadataManager());
             nextSnapshotStore.commitBatchOperation(writeBatch);
             nextSnapshotStore.getDb().flushWal(true);
@@ -120,7 +121,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
 
       // Update From Snapshot Deleted Table.
       RDBStore fromSnapshotStore = (RDBStore) fromOmSnapshot.getMetadataManager().getStore();
-      try (BatchOperation fromSnapshotBatchOp = fromSnapshotStore.initBatchOperation()) {
+      try (RDBBatchOperation fromSnapshotBatchOp = fromSnapshotStore.initBatchOperation()) {
         deleteKeysFromSnapshot(fromSnapshotBatchOp, fromOmSnapshot.getMetadataManager());
         fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
         fromSnapshotStore.getDb().flushWal(true);

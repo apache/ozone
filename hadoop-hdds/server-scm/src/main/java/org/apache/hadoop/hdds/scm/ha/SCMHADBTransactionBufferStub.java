@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -49,7 +50,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initBatchOperation();
       } else {
-        currentBatchOperation = new RDBBatchOperation();
+        currentBatchOperation = RDBBatchOperation.newAtomicOperation();
       }
     }
     return currentBatchOperation;
@@ -67,7 +68,8 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws CodecException {
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
+      throws CodecException, RocksDatabaseException {
     rwLock.readLock().lock();
     try {
       table.deleteWithBatch(getCurrentBatchOperation(), key);
@@ -102,7 +104,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void flush() throws RocksDatabaseException {
+  public void flush() throws IOException {
     rwLock.writeLock().lock();
     try {
       if (dbStore != null) {
@@ -127,7 +129,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void close() throws RocksDatabaseException {
+  public void close() throws IOException {
     flush();
   }
 }

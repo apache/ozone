@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.bucket;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,7 +59,7 @@ public class TestOMBucketDeleteResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (batchOperation != null) {
       batchOperation.close();
     }

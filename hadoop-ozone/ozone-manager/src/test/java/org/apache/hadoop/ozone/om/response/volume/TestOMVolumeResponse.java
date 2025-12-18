@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -47,7 +48,7 @@ public class TestOMVolumeResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (batchOperation != null) {
       batchOperation.close();
     }

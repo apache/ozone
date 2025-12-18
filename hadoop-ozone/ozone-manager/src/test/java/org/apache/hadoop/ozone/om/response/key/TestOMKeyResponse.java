@@ -124,7 +124,7 @@ public class TestOMKeyResponse {
   }
 
   @AfterEach
-  public void stop() {
+  public void stop() throws IOException {
     framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();

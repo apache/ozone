@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
@@ -273,14 +274,21 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public BatchOperation initBatchOperation() {
-    return new RDBBatchOperation();
+  public RDBBatchOperation initBatchOperation() {
+    return RDBBatchOperation.newAtomicOperation();
+  }
+
+  public RDBBatchOperation initBatchOperation(ManagedWriteBatch writeBatch) {
+    return RDBBatchOperation.newAtomicOperation(writeBatch);
   }
 
   @Override
-  public void commitBatchOperation(BatchOperation operation)
-      throws RocksDatabaseException {
-    ((RDBBatchOperation) operation).commit(db);
+  public void commitBatchOperation(BatchOperation operation) throws IOException {
+    ((RDBBatchOperation)operation).commit(db);
+  }
+
+  public void commitBatchOperation(RDBBatchOperation operation, ManagedWriteOptions writeOptions) throws IOException {
+    operation.commit(db, writeOptions);
   }
 
   @Override

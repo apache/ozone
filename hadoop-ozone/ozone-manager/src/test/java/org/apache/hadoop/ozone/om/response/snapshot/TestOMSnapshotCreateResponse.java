@@ -85,7 +85,7 @@ public class TestOMSnapshotCreateResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (batchOperation != null) {
       batchOperation.close();
     }

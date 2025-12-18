@@ -70,7 +70,7 @@ class RDBTable implements Table<byte[], byte[]> {
     db.put(family, key, value);
   }
 
-  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) {
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) throws RocksDatabaseException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -80,7 +80,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) {
+  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) throws RocksDatabaseException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -194,7 +194,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, byte[] key) {
+  public void deleteWithBatch(BatchOperation batch, byte[] key) throws RocksDatabaseException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).delete(family, key);
     } else {
@@ -204,7 +204,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void deleteRangeWithBatch(BatchOperation batch, byte[] beginKey, byte[] endKey) {
+  public void deleteRangeWithBatch(BatchOperation batch, byte[] beginKey, byte[] endKey) throws RocksDatabaseException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).deleteRange(family, beginKey, endKey);
     } else {

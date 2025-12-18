@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -99,7 +100,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           RDBStore nextSnapshotStore =
               (RDBStore) nextOmSnapshot.getMetadataManager().getStore();
           // Init Batch Operation for snapshot db.
-          try (BatchOperation writeBatch =
+          try (RDBBatchOperation writeBatch =
               nextSnapshotStore.initBatchOperation()) {
             processKeys(writeBatch, nextOmSnapshot.getMetadataManager());
             processDirs(writeBatch, nextOmSnapshot.getMetadataManager(),
@@ -118,7 +119,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       // Update From Snapshot Deleted Table.
       RDBStore fromSnapshotStore =
           (RDBStore) fromOmSnapshot.getMetadataManager().getStore();
-      try (BatchOperation fromSnapshotBatchOp =
+      try (RDBBatchOperation fromSnapshotBatchOp =
           fromSnapshotStore.initBatchOperation()) {
         processReclaimKeys(fromSnapshotBatchOp,
             fromOmSnapshot.getMetadataManager());

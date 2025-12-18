@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -78,7 +79,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws CodecException {
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
+      throws CodecException, RocksDatabaseException {
     rwLock.readLock().lock();
     try {
       txFlushPending.getAndIncrement();
@@ -121,7 +123,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void flush() throws RocksDatabaseException, CodecException {
+  public void flush() throws IOException {
     rwLock.writeLock().lock();
     try {
       // write latest trx info into trx table in the same batch
@@ -190,7 +192,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     if (currentBatchOperation != null) {
       currentBatchOperation.close();
     }
