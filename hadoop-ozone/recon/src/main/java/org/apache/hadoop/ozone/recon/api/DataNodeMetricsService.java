@@ -151,9 +151,15 @@ public class DataNodeMetricsService {
    * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
   private void collectMetrics(Set<DatanodeDetails> nodes) {
-    CollectionContext context = submitMetricsCollectionTasks(nodes);
-    processCollectionFutures(context);
-    updateFinalState(context);
+    try {
+      CollectionContext context = submitMetricsCollectionTasks(nodes);
+      processCollectionFutures(context);
+      updateFinalState(context);
+    } catch (Exception e) {
+      resetState();
+      currentStatus = MetricCollectionStatus.FAILED;
+      isRunning.set(false);
+    }
   }
 
   /**
@@ -174,11 +180,10 @@ public class DataNodeMetricsService {
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(
           node.getHostName(), node.getUuidString(), -1L); // -1 is used as placeholder/failed status
       futures.put(key, executorService.submit(task));
-      submissionTimes.put(key, submissionTime);
     }
     int totalQueried = futures.size();
     LOG.debug("Submitted {} collection tasks", totalQueried);
-    return new CollectionContext(totalQueried, futures, submissionTimes, results);
+    return new CollectionContext(totalQueried, futures, submissionTime, results);
   }
 
   /**
@@ -225,7 +230,7 @@ public class DataNodeMetricsService {
   private boolean checkAndHandleTimeout(
       DatanodePendingDeletionMetrics key, Future<DatanodePendingDeletionMetrics> future,
       CollectionContext context, long currentTime) {
-    long elapsedTime = currentTime - context.submissionTimes.get(key);
+    long elapsedTime = currentTime - context.submissionTime;
     if (elapsedTime > maximumTaskTimeout && !future.isDone()) {
       LOG.warn("Task for datanode {} [{}] timed out after {}ms",
           key.getHostName(), key.getDatanodeUuid(), elapsedTime);
@@ -291,7 +296,7 @@ public class DataNodeMetricsService {
   }
 
   public DataNodeMetricsServiceResponse getCollectedMetrics() {
-    CompletableFuture.runAsync(this::startTask);
+    startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
       return DataNodeMetricsServiceResponse.newBuilder()
           .setStatus(currentStatus)
@@ -324,25 +329,25 @@ public class DataNodeMetricsService {
    * Status of metric collection task.
    */
   public enum MetricCollectionStatus {
-    NOT_STARTED, IN_PROGRESS, FINISHED
+    NOT_STARTED, IN_PROGRESS, FINISHED, FAILED
   }
 
   private static class CollectionContext {
     private final int totalQueried;
     private final Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures;
-    private final Map<DatanodePendingDeletionMetrics, Long> submissionTimes;
     private final List<DatanodePendingDeletionMetrics> results;
+    private final long submissionTime;
     private long totalPending = 0L;
     private int failed = 0;
 
     CollectionContext(
         int totalQueried,
         Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures,
-        Map<DatanodePendingDeletionMetrics, Long> submissionTimes,
+        long submissionTime,
         List<DatanodePendingDeletionMetrics> results) {
       this.totalQueried = totalQueried;
       this.futures = futures;
-      this.submissionTimes = submissionTimes;
+      this.submissionTime = submissionTime;
       this.results = results;
     }
   }
