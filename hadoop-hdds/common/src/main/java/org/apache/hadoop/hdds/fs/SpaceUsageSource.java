@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface SpaceUsageSource {
-  SpaceUsageSource UNKNOWN = new Fixed(0, 0, 0);
+  Fixed UNKNOWN = new Fixed(0, 0, 0);
 
   /**
    * @return space usage in bytes
@@ -41,7 +41,7 @@ public interface SpaceUsageSource {
 
   long getAvailable();
 
-  default SpaceUsageSource snapshot() {
+  default Fixed snapshot() {
     return new Fixed(getCapacity(), getAvailable(), getUsedSpace());
   }
 
@@ -77,7 +77,7 @@ public interface SpaceUsageSource {
     }
 
     @Override
-    public SpaceUsageSource snapshot() {
+    public Fixed snapshot() {
       return this; // immutable
     }
 

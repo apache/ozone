@@ -24,14 +24,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -124,5 +128,38 @@ public final class OzoneFileSystemTests {
     try (FileSystem fileSystem = FileSystem.get(uri, conf)) {
       ContractTestUtils.touch(fileSystem, keyPath);
     }
+  }
+
+  public static void listLocatedStatusForZeroByteFile(FileSystem fs, Path path) throws IOException {
+    // create empty file
+    ContractTestUtils.touch(fs, path);
+
+    RemoteIterator<LocatedFileStatus> listLocatedStatus = fs.listLocatedStatus(path);
+    int count = 0;
+
+    while (listLocatedStatus.hasNext()) {
+      LocatedFileStatus locatedFileStatus = listLocatedStatus.next();
+      assertEquals(0, locatedFileStatus.getLen());
+      BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
+      assertNotNull(blockLocations);
+      assertEquals(0, blockLocations.length);
+
+      count++;
+    }
+    assertEquals(1, count);
+
+    count = 0;
+    RemoteIterator<FileStatus> listStatus = fs.listStatusIterator(path);
+    while (listStatus.hasNext()) {
+      FileStatus fileStatus = listStatus.next();
+      assertEquals(0, fileStatus.getLen());
+      assertFalse(fileStatus instanceof LocatedFileStatus);
+      count++;
+    }
+    assertEquals(1, count);
+
+    FileStatus[] fileStatuses = fs.listStatus(path.getParent());
+    assertEquals(1, fileStatuses.length);
+    assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
   }
 }

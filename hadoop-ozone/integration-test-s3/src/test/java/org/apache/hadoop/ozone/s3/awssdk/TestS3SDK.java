@@ -15,27 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.ozone.s3.awssdk;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
-/**
- * Builder for ObjectEndpoint in tests.
- */
-public class ObjectEndpointBuilder extends
-    EndpointBuilder<ObjectEndpoint> {
-
-  public ObjectEndpointBuilder() {
-    super(ObjectEndpoint::new);
-  }
-
+class TestS3SDK extends OzoneS3SDKTests {
   @Override
-  public ObjectEndpoint build() {
-    ObjectEndpoint endpoint = super.build();
-    final OzoneConfiguration config = getConfig();
-    endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
-    endpoint.setHeaders(getHeaders());
-    endpoint.setContext(getContext());
-    return endpoint;
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = super.createOzoneConfig();
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    return conf;
   }
 }

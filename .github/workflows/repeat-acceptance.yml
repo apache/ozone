@@ -48,6 +48,7 @@ env:
   OZONE_TEST_SELECTOR: ${{ github.event.inputs.test-filter }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   JAVA_VERSION: 8
+  SPLITS: ${{ github.event.inputs.splits }}
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
 jobs:
   prepare-job:
@@ -67,7 +68,7 @@ jobs:
         name: Generate test matrix
         run: |
           splits=()
-          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+          for ((i = 1; i <= $SPLITS; i++)); do
               splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
