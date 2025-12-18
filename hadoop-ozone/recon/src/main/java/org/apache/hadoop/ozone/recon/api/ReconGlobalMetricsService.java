@@ -219,11 +219,32 @@ public class ReconGlobalMetricsService {
 
   public Map<String, Long> calculatePendingSizes() {
     Map<String, Long> result = new HashMap<>();
-    KeyInsightInfoResponse response = getPendingForDeletionDirInfo(-1, "");
-    Map<String, Long> pendingKeySize = getDeletedKeySummary();
-    result.put("pendingDirectorySize", response.getReplicatedDataSize());
-    result.put("pendingKeySize", pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L));
-    result.put("totalSize", result.get("pendingDirectorySize") + result.get("pendingKeySize"));
+    long pendingDirectorySize = -1L;
+    long pendingKeySizeValue = -1L;
+
+    //Getting pending deletion directory size
+    try {
+      KeyInsightInfoResponse response = getPendingForDeletionDirInfo(-1, "");
+      pendingDirectorySize = response.getReplicatedDataSize();
+    } catch (Exception ex) {
+      LOG.error("Error calculating pending directory size", ex);
+    }
+    result.put("pendingDirectorySize", pendingDirectorySize);
+
+    //Getting pending deletion key size
+    try {
+      Map<String, Long> pendingKeySizeMap = getDeletedKeySummary();
+      pendingKeySizeValue = pendingKeySizeMap.getOrDefault("totalReplicatedDataSize", 0L);
+    } catch (Exception ex) {
+      LOG.error("Error calculating pending key size", ex);
+    }
+    result.put("pendingKeySize", pendingKeySizeValue);
+
+    if (pendingDirectorySize < 0 || pendingKeySizeValue < 0) {
+      result.put("totalSize", -1L);
+    } else {
+      result.put("totalSize", pendingDirectorySize + pendingKeySizeValue);
+    }
     return result;
   }
 
