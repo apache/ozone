@@ -101,5 +101,8 @@ public class TestOzoneFsUtils {
 
     // Invalid paths - contains "//" in the middle
     assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a//b", true));
+
+    // Valid path ending with "/"
+    assertEquals("a/b/", OzoneFSUtils.isValidKeyPath("a/b/", true));
   }
 }

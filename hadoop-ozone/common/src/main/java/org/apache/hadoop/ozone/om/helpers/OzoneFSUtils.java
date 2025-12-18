@@ -129,8 +129,9 @@ public final class OzoneFSUtils {
 
       // The string may end with a /, but not have "//" in the middle.
       if (element.isEmpty() && i != components.length - 1) {
+        // Allow empty at start for absolute paths (e.g., "/a/b" → ["", "a", "b"])
+        // This is needed for isValidName but not for isValidKeyPath (which rejects leading slashes)
         if (allowLeadingSlash && i == 0) {
-          // Allow empty at start for absolute paths
           continue;
         }
         return false;
@@ -143,8 +144,8 @@ public final class OzoneFSUtils {
    * Whether the pathname is valid.  Currently prohibits relative paths,
    * names which contain a ":" or "//", or other non-canonical paths.
    */
-  public static boolean isValidName(String src) {
-    return validateKeyPathComponents(src, true);
+  public static boolean isValidName(String path) {
+    return validateKeyPathComponents(path, true);
   }
 
   /**
