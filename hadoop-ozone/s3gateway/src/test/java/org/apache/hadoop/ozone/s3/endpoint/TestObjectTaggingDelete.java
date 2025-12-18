@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -124,6 +125,7 @@ public class TestObjectTaggingDelete {
 
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
+    when(mockObjectStore.getClientProxy()).thenReturn(mock(ClientProtocol.class));
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()

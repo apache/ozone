@@ -78,6 +78,7 @@ public class TestS3GatewayMetrics {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    bucket.createKey("file1", 0).close();
 
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
@@ -132,8 +133,6 @@ public class TestS3GatewayMetrics {
   public void testGetBucketSuccess() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
-    clientStub = createClientWithKeys("file1");
-    bucketEndpoint.setClient(clientStub);
     bucketEndpoint.get(bucketName, null,
         null, null, 1000, null,
         null, "random", null,
@@ -635,13 +634,6 @@ public class TestS3GatewayMetrics {
     assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
     long curMetric = metrics.getDeleteObjectTaggingFailure();
     assertEquals(1L, curMetric - oriMetric);
-  }
-
-  private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    for (String key : keys) {
-      bucket.createKey(key, 0).close();
-    }
-    return clientStub;
   }
 
   private String initiateMultipartUpload(String bktName, String key)
