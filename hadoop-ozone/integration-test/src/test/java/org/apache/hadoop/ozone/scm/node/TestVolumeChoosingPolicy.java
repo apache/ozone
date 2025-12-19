@@ -262,7 +262,7 @@ public class TestVolumeChoosingPolicy {
     }
 
     // Initialize the volumeSet with the new volume map
-    volumeSet.setVolumeMap(newVolumeMap);
+    volumeSet.setVolumeMapForTesting(newVolumeMap);
     System.out.println("Created " +  NUM_VOLUMES + " volumes in " +
         (System.currentTimeMillis() - startTime) + " ms");
   }
