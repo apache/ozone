@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -109,8 +109,8 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
   }
 
   @Override
-  protected void displayResults(List<String> successNodes,
-      List<String> failedNodes) {
+  protected void displayResults(Set<String> successNodes,
+      Set<String> failedNodes) {
     // In JSON mode, results are already written, only show summary if needed
     if (getOptions().isJson()) {
       return;

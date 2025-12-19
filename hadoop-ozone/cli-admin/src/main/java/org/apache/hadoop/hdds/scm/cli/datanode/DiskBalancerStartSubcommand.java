@@ -18,10 +18,8 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -135,24 +133,20 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
   }
 
   @Override
-  protected void displayResults(List<String> successNodes,
-      List<String> failedNodes) {
+  protected void displayResults(Set<String> successNodes,
+      Set<String> failedNodes) {
     // In JSON mode, results are already written, only show summary if needed
     if (getOptions().isJson()) {
       return;
     }
 
-    // avoid showing duplicate nodes in output
-    List<String> uniqueSuccessNodes = new ArrayList<>(new LinkedHashSet<>(successNodes));
-    List<String> uniqueFailedNodes = new ArrayList<>(new LinkedHashSet<>(failedNodes));
-
     // Filter out skipped nodes from successNodes
-    List<String> actualSuccessNodes = new ArrayList<>(uniqueSuccessNodes);
+    Set<String> actualSuccessNodes = new LinkedHashSet<>(successNodes);
     actualSuccessNodes.removeAll(alreadyRunningNodes);
 
     // Check if all nodes are already running (batch mode only)
     boolean allNodesAlreadyRunning = isBatchMode() && actualSuccessNodes.isEmpty() 
-        && uniqueFailedNodes.isEmpty() && !alreadyRunningNodes.isEmpty();
+        && failedNodes.isEmpty() && !alreadyRunningNodes.isEmpty();
 
     if (allNodesAlreadyRunning) {
       System.out.println("DiskBalancer operation is already running on all IN_SERVICE and HEALTHY nodes.");
@@ -164,9 +158,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       }
 
       if (isBatchMode()) {
-        if (!uniqueFailedNodes.isEmpty()) {
+        if (!failedNodes.isEmpty()) {
           System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
-              String.join(", ", uniqueFailedNodes));
+              String.join(", ", failedNodes));
         }
         if (!actualSuccessNodes.isEmpty()) {
           System.out.println("Started DiskBalancer operation on all other IN_SERVICE and HEALTHY DNs.");
@@ -176,9 +170,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
           System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
               String.join(", ", actualSuccessNodes));
         }
-        if (!uniqueFailedNodes.isEmpty()) {
+        if (!failedNodes.isEmpty()) {
           System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
-              String.join(", ", uniqueFailedNodes));
+              String.join(", ", failedNodes));
         }
       }
     }

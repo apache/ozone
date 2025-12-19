@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -74,27 +76,29 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
+    // Deduplicate target datanodes by address
+    Set<String> uniqueTargetDatanodes = new LinkedHashSet<>(targetDatanodes);
+    targetDatanodes = new ArrayList<>(uniqueTargetDatanodes);
+
     // Track if we're using batch mode for display
     isBatchMode = options.isInServiceDatanodes();
 
     // Execute on all target datanodes and collect results
-    List<String> successNodes = new ArrayList<>();
-    List<String> failedNodes = new ArrayList<>();
-    List<Object> jsonResults = new ArrayList<>();
-    
+    Set<String> successNodes = new LinkedHashSet<>();
+    Set<String> failedNodes = new LinkedHashSet<>();
+    Map<String, Object> jsonResults = new LinkedHashMap<>();
+
     // Execute commands and collect results
     for (String dn : targetDatanodes) {
+      String hostname = DiskBalancerSubCommandUtil.getDatanodeHostname(dn);
+
       try {
         Object result = executeCommand(dn);
-        // Get hostname for display (fallback to original address if it fails)
-        String hostname = DiskBalancerSubCommandUtil.getDatanodeHostname(dn);
         successNodes.add(hostname);
         if (options.isJson()) {
-          jsonResults.add(result);
+          jsonResults.put(hostname, result);
         }
       } catch (Exception e) {
-        // Get hostname for error display (fallback to original address if it fails)
-        String hostname = DiskBalancerSubCommandUtil.getDatanodeHostname(dn);
         failedNodes.add(hostname);
         String errorMsg = e.getMessage();
         if (errorMsg != null && errorMsg.contains("\n")) {
@@ -104,20 +108,20 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
           errorMsg = e.getClass().getSimpleName();
         }
         if (options.isJson()) {
-          // Create error result object in JSON format
           Map<String, Object> errorResult = createErrorResult(hostname, errorMsg);
-          jsonResults.add(errorResult);
+          jsonResults.put(hostname, errorResult);
         } else {
           // Print error messages in non-JSON mode
           System.err.printf("Error on node [%s]: %s%n", hostname, errorMsg);
         }
       }
     }
-    
+
     // Output results
     if (options.isJson()) {
       if (!jsonResults.isEmpty()) {
-        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(jsonResults));
+        // Convert Map values to List for JSON serialization
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(new ArrayList<>(jsonResults.values())));
       }
     } else {
       displayResults(successNodes, failedNodes);
@@ -190,10 +194,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    * Display consolidated results after executing on all datanodes.
    * For JSON mode, this may be called for summary purposes only.
    * 
-   * @param successNodes list of nodes where command succeeded
-   * @param failedNodes list of nodes where command failed
+   * @param successNodes set of nodes where command succeeded
+   * @param failedNodes set of nodes where command failed
    */
-  protected abstract void displayResults(List<String> successNodes, List<String> failedNodes);
+  protected abstract void displayResults(Set<String> successNodes, Set<String> failedNodes);
 
   /**
    * Get the action name for this command (e.g., "start", "stop", "update", "status", "report").
