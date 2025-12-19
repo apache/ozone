@@ -136,6 +136,14 @@ public class TestDiskBalancerSubCommands {
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
+    // Mock getDatanodeHostname to extract hostname from address (e.g., "host-1:19864" -> "host-1")
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil.getDatanodeHostname(anyString()))
+        .thenAnswer(invocation -> {
+          String address = invocation.getArgument(0);
+          // Extract hostname from "hostname:port" or just return "hostname"
+          int colonIndex = address.indexOf(':');
+          return colonIndex > 0 ? address.substring(0, colonIndex) : address;
+        });
     
     return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
   }
@@ -151,10 +159,17 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
-    // Set up all required mocks
+    // Set up all required mocks first
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Now set up protocol mocks after static mocks are active
+      doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+      
+      // Mock getDiskBalancerInfo to return STOPPED status for all nodes
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"),
+              createStoppedStatusProto("host-2"),
+              createStoppedStatusProto("host-3"));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("--in-service-datanodes");
@@ -171,9 +186,12 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerWithConfiguration() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Set up protocol mocks after static mocks are active
+      doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("-t", "0.005", "-b", "100", "-p", "5", "-s", "false", "host-1");
@@ -188,9 +206,14 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerWithMultipleNodes() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Set up protocol mocks after static mocks are active
+      doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"),
+              createStoppedStatusProto("host-2"),
+              createStoppedStatusProto("host-3"));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("host-1", "host-2", "host-3");
@@ -205,12 +228,17 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerWithStdin() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
     String input = "host-1\nhost-2\nhost-3\n";
     System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Set up protocol mocks after static mocks are active
+      doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"),
+              createStoppedStatusProto("host-2"),
+              createStoppedStatusProto("host-3"));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("-");
@@ -225,9 +253,12 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerWithJson() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Set up protocol mocks after static mocks are active
+      doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("--json", "-t", "0.005", "-b", "100", "host-1");
@@ -246,10 +277,13 @@ public class TestDiskBalancerSubCommands {
   @Test
   public void testStartDiskBalancerFailure() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
-    doThrow(new IOException("Connection failed")).when(mockProtocol)
-        .startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
+      // Set up protocol mocks after static mocks are active
+      when(mockProtocol.getDiskBalancerInfo())
+          .thenReturn(createStoppedStatusProto("host-1"));
+      doThrow(new IOException("Connection failed")).when(mockProtocol)
+          .startDiskBalancer(any(DiskBalancerConfigurationProto.class));
 
       CommandLine c = new CommandLine(cmd);
       c.parseArgs("host-1");
@@ -623,6 +657,17 @@ public class TestDiskBalancerSubCommands {
       Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
+  }
+
+  /**
+   * Creates a STOPPED status proto for a given hostname.
+   * Used in start tests to ensure DiskBalancer is not already running.
+   * @param hostname the hostname
+   * @return DatanodeDiskBalancerInfoProto with STOPPED status
+   */
+  private DatanodeDiskBalancerInfoProto createStoppedStatusProto(String hostname) {
+    return createStatusProto(hostname, DiskBalancerRunningStatus.STOPPED, 
+        10.0, 20L, 5, 0L, 0L, 0L, 0L);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")

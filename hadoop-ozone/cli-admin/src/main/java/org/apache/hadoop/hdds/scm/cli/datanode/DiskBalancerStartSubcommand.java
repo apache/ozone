@@ -71,7 +71,8 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       DatanodeDiskBalancerInfoProto status = diskBalancerProxy.getDiskBalancerInfo();
       String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
       
-      if (status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING) {
+      if (status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING ||
+          status.getRunningStatus() == DiskBalancerRunningStatus.PAUSED) {
         // Track this node as already running
         alreadyRunningNodes.add(dnHostname);
         
@@ -163,7 +164,12 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
               String.join(", ", failedNodes));
         }
         if (!actualSuccessNodes.isEmpty()) {
-          System.out.println("Started DiskBalancer operation on all other IN_SERVICE and HEALTHY DNs.");
+          // If no nodes were skipped, use simpler message
+          if (alreadyRunningNodes.isEmpty()) {
+            System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
+          } else {
+            System.out.println("Started DiskBalancer operation on all other IN_SERVICE and HEALTHY DNs.");
+          }
         }
       } else {
         if (!actualSuccessNodes.isEmpty()) {

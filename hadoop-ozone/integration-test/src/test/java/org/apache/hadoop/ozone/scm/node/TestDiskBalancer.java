@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -90,6 +91,33 @@ public class TestDiskBalancer {
   public static void cleanup() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @AfterEach
+  public void stopDiskBalancer() throws IOException, InterruptedException, TimeoutException {
+    // Stop disk balancer on all DNs after each test to ensure clean state
+    NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
+    List<DatanodeDetails> allDatanodes = new ArrayList<>(nm.getAllNodes());
+    
+    for (DatanodeDetails dn : allDatanodes) {
+      try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
+        proxy.stopDiskBalancer();
+      } catch (IOException e) {
+        // Ignore errors when stopping - node might already be stopped
+      }
+    }
+
+    // Verify that all DNs have stopped DiskBalancerService
+    for (DatanodeDetails dn : allDatanodes) {
+      GenericTestUtils.waitFor(() -> {
+        try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
+          DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
+          return status.getRunningStatus() == DiskBalancerRunningStatus.STOPPED;
+        } catch (IOException e) {
+          return false;
+        }
+      }, 100, 5000); // Check every 100ms, timeout after 5s
     }
   }
 
