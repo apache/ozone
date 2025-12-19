@@ -226,6 +226,9 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("AllNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
+    assertGauge("NodesOutOfSpace", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalCapacity", 100L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalUsed", 10L,

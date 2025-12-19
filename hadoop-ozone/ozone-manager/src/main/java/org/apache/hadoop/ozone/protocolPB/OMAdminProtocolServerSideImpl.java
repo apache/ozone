@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -127,5 +129,23 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
 
     return CompactResponse.newBuilder()
         .setSuccess(true).build();
+  }
+
+  @Override
+  public TriggerSnapshotDefragResponse triggerSnapshotDefrag(
+      RpcController controller, TriggerSnapshotDefragRequest request)
+      throws ServiceException {
+    try {
+      boolean result = ozoneManager.triggerSnapshotDefrag(request.getNoWait());
+      return TriggerSnapshotDefragResponse.newBuilder()
+          .setSuccess(true)
+          .setResult(result)
+          .build();
+    } catch (Exception ex) {
+      return TriggerSnapshotDefragResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage())
+          .build();
+    }
   }
 }

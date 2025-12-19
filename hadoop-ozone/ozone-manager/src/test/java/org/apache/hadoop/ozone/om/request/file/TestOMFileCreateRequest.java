@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -24,6 +25,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -52,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -63,6 +66,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OMFileCreateRequest.
@@ -521,6 +525,40 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(true, true));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    // create file
+    String ozoneAll = "user:ozone:a";
+    List<OzoneAcl> aclList = new ArrayList<>();
+    aclList.add(OzoneAcl.parseAcl(ozoneAll));
+
+    // Recursive create file with acls inherited from bucket DEFAULT acls
+    OMRequest omRequest = createFileRequest(volumeName, bucketName,
+        keyName, HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, false, true, aclList);
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+    long id = modifiedOmRequest.getCreateFileRequest().getClientID();
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omFileCreateResponse.getOMResponse().getStatus());
+
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
+    if (ignoreClientACLs) {
+      assertFalse(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    } else {
+      assertTrue(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
+  }
+
+  @ParameterizedTest
   @CsvSource(value = {
       ".snapshot/keyName,Cannot create key under path reserved for snapshot: .snapshot/",
       ".snapshot/a/keyName,Cannot create key under path reserved for snapshot: .snapshot/",
@@ -617,11 +655,27 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       HddsProtos.ReplicationFactor replicationFactor,
       HddsProtos.ReplicationType replicationType, boolean overWrite,
       boolean recursive) {
+    return createFileRequest(volumeName, bucketName, keyName, replicationFactor,
+        replicationType, overWrite, recursive, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  @Nonnull
+  protected OMRequest createFileRequest(
+      String volumeName, String bucketName, String keyName,
+      HddsProtos.ReplicationFactor replicationFactor,
+      HddsProtos.ReplicationType replicationType, boolean overWrite,
+      boolean recursive, List<OzoneAcl> acls) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
             .setKeyName(keyName).setFactor(replicationFactor)
             .setType(replicationType).setDataSize(dataSize);
+    if (acls != null) {
+      for (OzoneAcl acl : acls) {
+        keyArgs.addAcls(OzoneAcl.toProtobuf(acl));
+      }
+    }
 
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
         .setKeyArgs(keyArgs)

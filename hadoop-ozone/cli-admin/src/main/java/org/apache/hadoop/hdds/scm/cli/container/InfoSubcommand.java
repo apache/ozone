@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -65,28 +65,21 @@ public class InfoSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    // validate all container IDs and fail fast
+    List<Long> containerIDs = containerList.getValidatedIDs();
+
     boolean first = true;
-    multiContainer = containerList.size() > 1;
+    multiContainer = containerIDs.size() > 1;
 
     printHeader();
-    // TODO HDDS-13592: Use ContainerIDParameters#getValidatedIDs to automatically handle type conversion and fail fast.
-    for (String id : containerList) {
-      printOutput(scmClient, id, first);
+    for (Long containerID : containerIDs) {
+      if (!first) {
+        printBreak();
+      }
+      printDetails(scmClient, containerID);
       first = false;
     }
     printFooter();
-  }
-
-  private void printOutput(ScmClient scmClient, String id, boolean first)
-      throws IOException {
-    long containerID;
-    try {
-      containerID = Long.parseLong(id);
-    } catch (NumberFormatException e) {
-      printError("Invalid container ID: " + id);
-      return;
-    }
-    printDetails(scmClient, containerID, first);
   }
 
   private void printHeader() {
@@ -113,12 +106,11 @@ public class InfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private void printDetails(ScmClient scmClient, long containerID,
-      boolean first) throws IOException {
+  private void printDetails(ScmClient scmClient, long containerID) throws IOException {
     final ContainerWithPipeline container;
     try {
       container = scmClient.getContainerWithPipeline(containerID);
-      Preconditions.checkNotNull(container, "Container cannot be null");
+      Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
       printError("Unable to retrieve the container details for " + containerID);
       return;
@@ -131,9 +123,6 @@ public class InfoSubcommand extends ScmSubcommand {
       printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
-    if (!first) {
-      printBreak();
-    }
     if (json) {
       if (!container.getPipeline().isEmpty()) {
         ContainerWithPipelineAndReplicas wrapper =

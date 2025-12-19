@@ -72,7 +72,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
-  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.001f;
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.02f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -130,7 +130,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   /**
    * Number of threads per volume that Datanode will use for chunk read.
    */
-  @Config(key = "read.chunk.threads.per.volume",
+  @Config(key = "hdds.datanode.read.chunk.threads.per.volume",
       type = ConfigType.INT,
       defaultValue = "10",
       tags = {DATANODE},
@@ -142,7 +142,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * The maximum number of threads used to delete containers on a datanode
    * simultaneously.
    */
-  @Config(key = "container.delete.threads.max",
+  @Config(key = "hdds.datanode.container.delete.threads.max",
       type = ConfigType.INT,
       defaultValue = "2",
       tags = {DATANODE},
@@ -154,7 +154,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * The maximum number of threads used to close containers on a datanode
    * simultaneously.
    */
-  @Config(key = "container.close.threads.max",
+  @Config(key = "hdds.datanode.container.close.threads.max",
       type = ConfigType.INT,
       defaultValue = "3",
       tags = {DATANODE},
@@ -169,7 +169,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * missed. With max threads 5, optimistically DN can handle 1500 individual
    * container delete tx in 60s with RocksDB cache miss.
    */
-  @Config(key = BLOCK_DELETE_THREAD_MAX,
+  @Config(key = "hdds.datanode.block.delete.threads.max",
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
@@ -183,7 +183,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * if the commands are pined up for more than 1 day, DN will start to discard
    * new comming commands.
    */
-  @Config(key = "block.delete.queue.limit",
+  @Config(key = "hdds.datanode.block.delete.queue.limit",
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
@@ -196,7 +196,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int blockDeleteQueueLimit = 5;
 
-  @Config(key = "block.delete.command.worker.interval",
+  @Config(key = "hdds.datanode.block.delete.command.worker.interval",
       type = ConfigType.TIME,
       defaultValue = "2s",
       tags = {DATANODE},
@@ -209,7 +209,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * The maximum number of commands in queued list.
    * if the commands limit crosses limit, then command will be ignored.
    */
-  @Config(key = "command.queue.limit",
+  @Config(key = "hdds.datanode.command.queue.limit",
       type = ConfigType.INT,
       defaultValue = "5000",
       tags = {DATANODE},
@@ -217,7 +217,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int cmdQueueLimit = 5000;
 
-  @Config(key = "block.deleting.service.interval",
+  @Config(key = "hdds.datanode.block.deleting.service.interval",
           defaultValue = "60s",
           type = ConfigType.TIME,
           tags = { ConfigTag.SCM, ConfigTag.DELETION },
@@ -230,7 +230,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
-  @Config(key = "recovering.container.scrubbing.service.interval",
+  @Config(key = "hdds.datanode.recovering.container.scrubbing.service.interval",
       defaultValue = "1m",
       type = ConfigType.TIME,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
@@ -249,7 +249,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * transaction won't be immediately discarded. Instead, it will be retried
    * after all the current delete block transactions have been processed.
    */
-  @Config(key = "block.delete.max.lock.wait.timeout",
+  @Config(key = "hdds.datanode.block.delete.max.lock.wait.timeout",
       defaultValue = "100ms",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DELETION},
@@ -257,7 +257,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
-  @Config(key = "block.deleting.limit.per.interval",
+  @Config(key = "hdds.datanode.block.deleting.limit.per.interval",
       defaultValue = "20000",
       reconfigurable = true,
       type = ConfigType.INT,
@@ -266,7 +266,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int blockLimitPerInterval = 20000;
 
-  @Config(key = "block.deleting.max.lock.holding.time",
+  @Config(key = "hdds.datanode.block.deleting.max.lock.holding.time",
       defaultValue = "1s",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DELETION },
@@ -294,7 +294,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
-      defaultValue = "0.001", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
+      defaultValue = "0.02", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
       description = "This determines the free space percent to be used for closing containers" +
@@ -305,7 +305,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 
-  @Config(key = "periodic.disk.check.interval.minutes",
+  @Config(key = "hdds.datanode.periodic.disk.check.interval.minutes",
       defaultValue = "60",
       type = ConfigType.LONG,
       tags = { DATANODE },
@@ -314,7 +314,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long periodicDiskCheckIntervalMinutes =
       PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 
-  @Config(key = "failed.data.volumes.tolerated",
+  @Config(key = "hdds.datanode.failed.data.volumes.tolerated",
       defaultValue = "-1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -325,7 +325,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int failedDataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
-  @Config(key = "failed.metadata.volumes.tolerated",
+  @Config(key = "hdds.datanode.failed.metadata.volumes.tolerated",
       defaultValue = "-1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -336,7 +336,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int failedMetadataVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
-  @Config(key = "failed.db.volumes.tolerated",
+  @Config(key = "hdds.datanode.failed.db.volumes.tolerated",
       defaultValue = "-1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -347,7 +347,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
-  @Config(key = "disk.check.io.test.count",
+  @Config(key = "hdds.datanode.disk.check.io.test.count",
       defaultValue = "3",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -360,7 +360,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
 
-  @Config(key = "disk.check.io.failures.tolerated",
+  @Config(key = "hdds.datanode.disk.check.io.failures.tolerated",
       defaultValue = "1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -371,7 +371,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private int volumeIOFailureTolerance =
       DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
 
-  @Config(key = "disk.check.io.file.size",
+  @Config(key = "hdds.datanode.disk.check.io.file.size",
       defaultValue = "100B",
       type = ConfigType.SIZE,
       tags = { DATANODE },
@@ -383,7 +383,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private int volumeHealthCheckFileSize =
       DISK_CHECK_FILE_SIZE_DEFAULT;
 
-  @Config(key = "disk.check.min.gap",
+  @Config(key = "hdds.datanode.disk.check.min.gap",
       defaultValue = "10m",
       type = ConfigType.TIME,
       tags = { DATANODE },
@@ -393,7 +393,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
 
-  @Config(key = "disk.check.timeout",
+  @Config(key = "hdds.datanode.disk.check.timeout",
       defaultValue = "10m",
       type = ConfigType.TIME,
       tags = { DATANODE },
@@ -404,7 +404,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
-  @Config(key = "chunk.data.validation.check",
+  @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
@@ -413,7 +413,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private boolean isChunkDataValidationCheck =
       CHUNK_DATA_VALIDATION_CHECK_DEFAULT;
 
-  @Config(key = "wait.on.all.followers",
+  @Config(key = "hdds.datanode.wait.on.all.followers",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
@@ -424,7 +424,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   private boolean waitOnAllFollowers = WAIT_ON_ALL_FOLLOWERS_DEFAULT;
 
-  @Config(key = "container.schema.v3.enabled",
+  @Config(key = "hdds.datanode.container.schema.v3.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
@@ -433,7 +433,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private boolean containerSchemaV3Enabled =
       CONTAINER_SCHEMA_V3_ENABLED_DEFAULT;
 
-  @Config(key = "container.schema.v3.key.separator",
+  @Config(key = "hdds.datanode.container.schema.v3.key.separator",
       defaultValue = "|",
       type = ConfigType.STRING,
       tags = { DATANODE },
@@ -441,7 +441,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private String containerSchemaV3KeySeparator = "|";
 
-  @Config(key = "rocksdb.log.level",
+  @Config(key = "hdds.datanode.rocksdb.log.level",
       defaultValue = "INFO",
       type = ConfigType.STRING,
       tags = { DATANODE },
@@ -449,7 +449,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private String rocksdbLogLevel = "INFO";
 
-  @Config(key = "rocksdb.log.max-file-size",
+  @Config(key = "hdds.datanode.rocksdb.log.max-file-size",
       defaultValue = "32MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
@@ -457,7 +457,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
-  @Config(key = "rocksdb.log.max-file-num",
+  @Config(key = "hdds.datanode.rocksdb.log.max-file-num",
       defaultValue = "64",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -468,7 +468,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   /**
    * Following RocksDB related configuration applies to Schema V3 only.
    */
-  @Config(key = "rocksdb.delete-obsolete-files-period",
+  @Config(key = "hdds.datanode.rocksdb.delete-obsolete-files-period",
       defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
       tags = { DATANODE },
@@ -477,7 +477,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long rocksdbDeleteObsoleteFilesPeriod =
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
 
-  @Config(key = "rocksdb.max-open-files",
+  @Config(key = "hdds.datanode.rocksdb.max-open-files",
       defaultValue = "1024",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -485,7 +485,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file",
+  @Config(key = "hdds.datanode.rocksdb.auto-compaction-small-sst-file",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
@@ -495,7 +495,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private boolean autoCompactionSmallSstFile = true;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file-size-threshold",
+  @Config(key = "hdds.datanode.rocksdb.auto-compaction-small-sst-file-size-threshold",
       defaultValue = "1MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
@@ -503,7 +503,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long autoCompactionSmallSstFileSize = 1024 * 1024;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file-num-threshold",
+  @Config(key = "hdds.datanode.rocksdb.auto-compaction-small-sst-file-num-threshold",
       defaultValue = "512",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -511,7 +511,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int autoCompactionSmallSstFileNum = 512;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file.interval.minutes",
+  @Config(key = "hdds.datanode.rocksdb.auto-compaction-small-sst-file.interval.minutes",
       defaultValue = "120",
       type = ConfigType.LONG,
       tags = { DATANODE },
@@ -520,7 +520,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long autoCompactionSmallSstFileIntervalMinutes =
       AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file.threads",
+  @Config(key = "hdds.datanode.rocksdb.auto-compaction-small-sst-file.threads",
       defaultValue = "1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -533,7 +533,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * Whether to check container directory or not to determine
    * container is empty.
    */
-  @Config(key = "check.empty.container.dir.on.delete",
+  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = { DATANODE },
@@ -546,7 +546,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * Whether to check container directory or not to determine
    * container is empty.
    */
-  @Config(key = "container.checksum.lock.stripes",
+  @Config(key = "hdds.datanode.container.checksum.lock.stripes",
       type = ConfigType.INT,
       defaultValue = "127",
       tags = { DATANODE },
@@ -557,7 +557,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
 
-  @Config(key = "container.client.cache.size",
+  @Config(key = "hdds.datanode.container.client.cache.size",
       type = ConfigType.INT,
       defaultValue = "100",
       tags = { DATANODE },
@@ -565,7 +565,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int containerClientCacheSize = CONTAINER_CLIENT_CACHE_SIZE_DEFAULT;
 
-  @Config(key = "container.client.cache.stale.threshold",
+  @Config(key = "hdds.datanode.container.client.cache.stale.threshold",
       type = ConfigType.INT,
       defaultValue = "10000",
       tags = { DATANODE },
@@ -575,7 +575,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private int containerClientCacheStaleThreshold =
       CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
 
-  @Config(key = "delete.container.timeout",
+  @Config(key = "hdds.datanode.delete.container.timeout",
       type = ConfigType.TIME,
       defaultValue = "60s",
       tags = { DATANODE },

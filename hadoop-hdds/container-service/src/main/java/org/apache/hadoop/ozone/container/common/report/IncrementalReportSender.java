@@ -23,7 +23,16 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
  * IncrementalReportSender is an interface to send ICRs.
  * @param <T>
  */
-@FunctionalInterface
 public interface IncrementalReportSender<T> {
+  /**
+   * Send ICR immediately (triggers heartbeat).
+   */
   void send(T t) throws StorageContainerException;
+  
+  /**
+   * Send deferred ICR to next scheduled heartbeat (no immediate trigger).
+   */
+  default void sendDeferred(T t) throws StorageContainerException {
+    send(t);
+  }
 }

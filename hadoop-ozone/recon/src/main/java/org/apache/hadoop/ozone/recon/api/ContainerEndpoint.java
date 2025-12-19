@@ -285,7 +285,7 @@ public class ContainerEndpoint {
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
             keyMetadata.setKey(omKeyInfo.getKeyName());
             keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
-                reconNamespaceSummaryManager, omMetadataManager));
+                reconNamespaceSummaryManager));
             keyMetadata.setCreationTime(
                 Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
             keyMetadata.setModificationTime(

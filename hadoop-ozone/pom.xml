@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
@@ -42,6 +42,7 @@
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
+    <module>multitenancy-ranger</module>
     <module>ozone-manager</module>
     <module>ozonefs</module>
     <module>ozonefs-common</module>
@@ -118,7 +119,6 @@
       <modules>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
-        <module>ozonefs-hadoop3-client</module>
         <module>ozonefs-shaded</module>
       </modules>
     </profile>

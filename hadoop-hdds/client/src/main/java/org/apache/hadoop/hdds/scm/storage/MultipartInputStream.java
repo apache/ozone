@@ -18,13 +18,16 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * A stream for accessing multipart streams.
@@ -36,6 +39,7 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
+  private final boolean isStreamBlockInputStream;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -58,11 +62,11 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   public MultipartInputStream(String keyName,
                               List<? extends PartInputStream> inputStreams) {
-
-    Preconditions.checkNotNull(inputStreams);
+    Objects.requireNonNull(inputStreams, "inputStreams == null");
 
     this.key = keyName;
-    this.partStreams = inputStreams;
+    this.partStreams = Collections.unmodifiableList(inputStreams);
+    this.isStreamBlockInputStream = !inputStreams.isEmpty() && inputStreams.get(0) instanceof StreamBlockInputStream;
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
@@ -70,6 +74,9 @@ public class MultipartInputStream extends ExtendedInputStream {
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
+      if (isStreamBlockInputStream) {
+        Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
+      }
       streamLength += partInputStream.getLength();
     }
     this.length = streamLength;
@@ -78,7 +85,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
-    Preconditions.checkArgument(strategy != null);
+    Objects.requireNonNull(strategy, "strategy == null");
     checkOpen();
 
     int totalReadLen = 0;
@@ -174,6 +181,28 @@ public class MultipartInputStream extends ExtendedInputStream {
     // 2. Seek the partStream to the adjusted position
     partStreams.get(partIndex).seek(pos - partOffsets[partIndex]);
     prevPartIndex = partIndex;
+  }
+
+  @Override
+  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
+    if (!isStreamBlockInputStream) {
+      return false;
+    }
+
+    final long oldPos = getPos();
+    seek(position);
+    try {
+      read(new ByteBufferReader(buffer) {
+        @Override
+        int readImpl(InputStream inputStream) throws IOException {
+          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
+              .readFully(getBuffer(), false);
+        }
+      });
+    } finally {
+      seek(oldPos);
+    }
+    return true;
   }
 
   public synchronized void initialize() throws IOException {

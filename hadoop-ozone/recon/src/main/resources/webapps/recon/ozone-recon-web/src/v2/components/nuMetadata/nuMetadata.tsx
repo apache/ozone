@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-import React, {useRef, useState} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import moment from 'moment';
-import axios, {AxiosError} from 'axios';
 import {Table} from 'antd';
 
-import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
-import {byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
+import {byteToSize, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
+import {useApiData, fetchData} from '@/v2/hooks/useAPIData.hook';
 
 import {Acl} from '@/v2/types/acl.types';
+import { QuotaAllowed, QuotaInNamespace, QuotaUsed } from '@/v2/constants/description.constants';
 
 
 // ------------- Types -------------- //
@@ -115,8 +115,9 @@ type MetadataProps = {
 };
 
 type MetadataState = {
-  key: string,
-  value: string | number | boolean | null
+  key: string | React.ReactNode,
+  value: string | number | boolean | null,
+  rowKey: string
 }[];
 
 
@@ -124,12 +125,31 @@ type MetadataState = {
 const NUMetadata: React.FC<MetadataProps> = ({
   path = '/'
 }) => {
-  const [loading, setLoading] = useState<boolean>(false);
   const [state, setState] = useState<MetadataState>([]);
-  const keyMetadataSummarySignal = useRef<AbortController>();
-  const cancelMetadataSignal = useRef<AbortController>();
+  const [isProcessingData, setIsProcessingData] = useState<boolean>(false);
+  const [pgNumber, setPgNumber] = useState<number>(1);
+  // Individual API calls that resolve together
+  const summaryAPI = useApiData<SummaryResponse>(
+    `/api/v1/namespace/summary?path=${path}`,
+    {} as SummaryResponse,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const quotaAPI = useApiData<any>(
+    `/api/v1/namespace/quota?path=${path}`,
+    {},
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const loading = summaryAPI.loading || quotaAPI.loading || isProcessingData;
 
-  const getObjectInfoMapping = React.useCallback((summaryResponse) => {
+  const getObjectInfoMapping = useCallback((summaryResponse) => {
     const data: MetadataState = [];
     /**
      * We are creating a specific set of keys under Object Info response
@@ -149,7 +169,8 @@ const NUMetadata: React.FC<MetadataProps> = ({
         keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
         data.push({
           key: keyName as string,
-          value: objectInfo[key as keyof ObjectInfo]
+          value: objectInfo[key as keyof ObjectInfo],
+          rowKey: keyName as string
         });
       }
     });
@@ -159,63 +180,72 @@ const NUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.sourceBucket !== undefined && objectInfo?.sourceBucket !== null) {
       data.push({
         key: 'Source Bucket',
-        value: objectInfo.sourceBucket
+        value: objectInfo.sourceBucket,
+        rowKey: 'Source Bucket'
       });
     }
 
     if(objectInfo?.sourceVolume !== undefined && objectInfo?.sourceVolume !== null) {
       data.push({
         key: 'Source Volume',
-        value: objectInfo.sourceVolume
+        value: objectInfo.sourceVolume,
+        rowKey: 'Source Volume'
       });
     }
 
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
       data.push({
         key: 'Creation Time',
-        value: moment(objectInfo.creationTime).format('ll LTS')
+        value: moment(objectInfo.creationTime).format('ll LTS'),
+        rowKey: 'Creation Time'
       });
     }
 
     if (objectInfo?.usedBytes !== undefined && objectInfo?.usedBytes !== -1 && objectInfo!.usedBytes !== null) {
       data.push({
         key: 'Used Bytes',
-        value: byteToSize(objectInfo.usedBytes, 3)
+        value: byteToSize(objectInfo.usedBytes, 3),
+        rowKey: 'Used Bytes'
       });
     }
 
     if (objectInfo?.dataSize !== undefined && objectInfo?.dataSize !== -1) {
       data.push({
         key: 'Data Size',
-        value: byteToSize(objectInfo.dataSize, 3)
+        value: byteToSize(objectInfo.dataSize, 3),
+        rowKey: 'Data Size'
       });
     }
 
     if (objectInfo?.modificationTime !== undefined && objectInfo?.modificationTime !== -1) {
       data.push({
         key: 'Modification Time',
-        value: moment(objectInfo.modificationTime).format('ll LTS')
+        value: moment(objectInfo.modificationTime).format('ll LTS'),
+        rowKey: 'Modification Time'
       });
     }
 
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
-        key: 'Quota In Namespace',
-        value: objectInfo.quotaInNamespace
+        key: QuotaInNamespace,
+        value: objectInfo.quotaInNamespace,
+        rowKey: 'Quota In Namespace'
       });
     }
 
     if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== undefined) {
       data.push({
         key: 'Replication Factor',
-        value: summaryResponse.objectInfo.replicationConfig.replicationFactor
+        value: summaryResponse.objectInfo.replicationConfig.replicationFactor,
+        rowKey: 'Replication Factor'
       });
     }
 
     if (summaryResponse.objectInfo?.replicationConfig?.replicationType !== undefined) {
       data.push({
         key: 'Replication Type',
-        value: summaryResponse.objectInfo.replicationConfig.replicationType
+        value: summaryResponse.objectInfo.replicationConfig.replicationType,
+        rowKey: 'Replication Type'
       });
     }
 
@@ -223,32 +253,23 @@ const NUMetadata: React.FC<MetadataProps> = ({
       && summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== -1) {
       data.push({
         key: 'Replication Required Nodes',
-        value: summaryResponse.objectInfo.replicationConfig.requiredNodes
+        value: summaryResponse.objectInfo.replicationConfig.requiredNodes,
+        rowKey: 'Replication Required Nodes'
       });
     }
 
     return data;
   }, [path]);
 
-  function loadData(path: string) {
-    const { requests, controller } = PromiseAllSettledGetHelper([
-      `/api/v1/namespace/summary?path=${path}`,
-      `/api/v1/namespace/quota?path=${path}`
-    ], cancelMetadataSignal.current);
-    cancelMetadataSignal.current = controller;
-
-    requests.then(axios.spread((
-      nsSummaryResponse: Awaited<Promise<any>>,
-      quotaApiResponse: Awaited<Promise<any>>,
-    ) => {
-      checkResponseError([nsSummaryResponse, quotaApiResponse]);
-      const summaryResponse: SummaryResponse = nsSummaryResponse.value?.data ?? {};
-      const quotaResponse = quotaApiResponse.value?.data ?? {};
+  // Process data when both APIs complete
+  const processMetadata = useCallback(async (summaryResponse: SummaryResponse, quotaResponse: any) => {
+    setIsProcessingData(true);
+    try {
       let data: MetadataState = [];
       let summaryResponsePresent = true;
       let quotaResponsePresent = true;
 
-      // Error checks
+      // Error checks for summary response
       if (summaryResponse.status === 'INITIALIZING') {
         summaryResponsePresent = false;
         showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
@@ -264,35 +285,37 @@ const NUMetadata: React.FC<MetadataProps> = ({
         // Summary Response data section
         data.push({
           key: 'Entity Type',
-          value: summaryResponse.type
+          value: summaryResponse.type,
+          rowKey: 'Entity Type'
         });
 
         // If the entity is a Key then fetch the Key metadata only
         if (summaryResponse.type === 'KEY') {
-          const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-            `/api/v1/namespace/usage?path=${path}&replica=true`,
-            keyMetadataSummarySignal.current
-          );
-          keyMetadataSummarySignal.current = metadataNewController;
-          metadataRequest.then(response => {
+          try {
+            const usageResponse: any = await fetchData(`/api/v1/namespace/usage?path=${path}&replica=true`);
             data.push(...[{
               key: 'File Size',
-              value: byteToSize(response.data.size, 3)
+              value: byteToSize(usageResponse.size, 3),
+              rowKey: 'File Size'
             }, {
               key: 'File Size With Replication',
-              value: byteToSize(response.data.sizeWithReplica, 3)
+              value: byteToSize(usageResponse.sizeWithReplica, 3),
+              rowKey: 'File Size With Replication'
             }, {
               key: 'Creation Time',
-              value: moment(summaryResponse.objectInfo.creationTime).format('ll LTS')
+              value: moment(summaryResponse.objectInfo.creationTime).format('ll LTS'),
+              rowKey: 'Creation Time'
             }, {
               key: 'Modification Time',
-              value: moment(summaryResponse.objectInfo.modificationTime).format('ll LTS')
-            }])
+              value: moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'),
+              rowKey: 'Modification Time'
+            }]);
             setState(data);
-          }).catch(error => {
-            showDataFetchError(error.toString());
-          });
-          return;
+            return;
+          } catch (error) {
+            showDataFetchError(error);
+            return;
+          }
         }
 
         data = removeDuplicatesAndMerge(data, getObjectInfoMapping(summaryResponse), 'key');
@@ -307,18 +330,20 @@ const NUMetadata: React.FC<MetadataProps> = ({
           numBucket: 'Buckets',
           numDir: 'Total Directories',
           numKey: 'Total Keys'
-        }
+        };
         Object.keys(countStats).forEach((key: string) => {
           if (countStats[key as keyof CountStats] !== undefined
             && countStats[key as keyof CountStats] !== -1) {
             data.push({
               key: keyToNameMap[key],
-              value: countStats[key as keyof CountStats]
+              value: countStats[key as keyof CountStats],
+              rowKey: keyToNameMap[key]
             });
           }
-        })
+        });
       }
 
+      // Error checks for quota response
       if (quotaResponse.state === 'INITIALIZING') {
         quotaResponsePresent = false;
         showDataFetchError(`The quota is currently initializing. Please wait a moment and try again later`);
@@ -333,42 +358,59 @@ const NUMetadata: React.FC<MetadataProps> = ({
         // In case the object's quota isn't set, we should not populate the values
         if (quotaResponse.allowed !== undefined && quotaResponse.allowed !== -1) {
           data.push({
-            key: 'Quota Allowed',
-            value: byteToSize(quotaResponse.allowed, 3)
+            key: QuotaAllowed,
+            value: byteToSize(quotaResponse.allowed, 3),
+            rowKey: 'Quota Allowed'
           });
         }
 
         if (quotaResponse.used !== undefined && quotaResponse.used !== -1) {
           data.push({
-            key: 'Quota Used',
-            value: byteToSize(quotaResponse.used, 3)
-          })
+            key: QuotaUsed,
+            value: byteToSize(quotaResponse.used, 3),
+            rowKey: 'Quota Used'
+          });
         }
       }
+      
       setState(data);
-    })).catch(error => {
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
+    } catch (error) {
+      showDataFetchError(error);
+    } finally {
+      setIsProcessingData(false);
+    }
+  }, [path, getObjectInfoMapping]);
 
-  React.useEffect(() => {
-    setLoading(true);
-    loadData(path);
-    setLoading(false);
-
-    return (() => {
-      cancelRequests([
-        cancelMetadataSignal.current!,
-      ]);
-    })
+  // Reset pagination when path changes
+  useEffect(() => {
+    setPgNumber(1);
   }, [path]);
+
+  // Coordinate API calls - process data when both calls complete
+  useEffect(() => {
+    if (!summaryAPI.loading && !quotaAPI.loading && 
+        summaryAPI.data && quotaAPI.data &&
+        summaryAPI.lastUpdated && quotaAPI.lastUpdated) {
+      processMetadata(summaryAPI.data, quotaAPI.data);
+    }
+  }, [summaryAPI.loading, quotaAPI.loading, summaryAPI.data, quotaAPI.data, 
+      summaryAPI.lastUpdated, quotaAPI.lastUpdated, processMetadata]);
+
+  const handleTableChange = (newPagination: any) => {
+    setPgNumber(newPagination.current);
+  };
 
   return (
     <Table
       size='small'
       loading={loading}
       dataSource={state}
+      rowKey='rowKey'
       bordered={true}
+      pagination={{
+        current: pgNumber
+      }}
+      onChange={handleTableChange}
       style={{
         flex: '0 1 45%',
         margin: '10px auto'

@@ -22,7 +22,6 @@ import React, {
   useState
 } from 'react';
 import moment from 'moment';
-import { AxiosError } from 'axios';
 import {
   Button,
   Modal
@@ -38,14 +37,9 @@ import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 import DatanodesTable, { COLUMNS } from '@/v2/components/tables/datanodesTable';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { showDataFetchError } from '@/utils/common';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import {
-  AxiosGetHelper,
-  AxiosPutHelper,
-  cancelRequests
-} from '@/utils/axiosRequestHelper';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import {
   Datanode,
   DatanodeDecomissionInfo,
@@ -55,7 +49,12 @@ import {
 } from '@/v2/types/datanode.types';
 
 import './datanodes.less'
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
+// Type for decommission API response
+type DecommissionAPIResponse = {
+  DatanodesDecommissionInfo: DatanodeDecomissionInfo[];
+};
 
 const defaultColumns = COLUMNS.map(column => ({
   label: (typeof column.title === 'string')
@@ -80,15 +79,46 @@ const COLUMN_UPDATE_DECOMMISSIONING = 'DECOMMISSIONING';
 
 const Datanodes: React.FC<{}> = () => {
 
-  const cancelSignal = useRef<AbortController>();
-  const cancelDecommissionSignal = useRef<AbortController>();
-
   const [state, setState] = useState<DatanodesState>({
     lastUpdated: 0,
     columnOptions: defaultColumns,
     dataSource: []
   });
-  const [loading, setLoading] = useState<boolean>(false);
+  
+  // API hooks for data fetching
+  const decommissionAPI = useApiData<DecommissionAPIResponse>(
+    '/api/v1/datanodes/decommission/info',
+    { DatanodesDecommissionInfo: [] },
+    { 
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const datanodesAPI = useApiData<DatanodesResponse>(
+    '/api/v1/datanodes',
+    { datanodes: [], totalCount: 0 },
+    { 
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const removeDatanodesAPI = useApiData<any>(
+    '/api/v1/datanodes/remove',
+    null,
+    { 
+      method: 'PUT',
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error),
+      onSuccess: () => {
+        loadData();
+        setSelectedRows([]);
+      }
+    }
+  );
+  
+  const loading = decommissionAPI.loading || datanodesAPI.loading || removeDatanodesAPI.loading;
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedRows, setSelectedRows] = useState<React.Key[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -101,62 +131,31 @@ const Datanodes: React.FC<{}> = () => {
     setSelectedColumns(selected as Option[]);
   }
 
-  async function loadDecommisionAPI() {
-    decommissionUuids = [];
-    const { request, controller } = await AxiosGetHelper(
-      '/api/v1/datanodes/decommission/info',
-      cancelDecommissionSignal.current
-    );
-    cancelDecommissionSignal.current = controller;
-    return request
-  };
-
-  async function loadDataNodeAPI() {
-    const { request, controller } = await AxiosGetHelper(
-      '/api/v1/datanodes',
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-    return request;
-  };
-
   async function removeDatanode(selectedRowKeys: string[]) {
-    setLoading(true);
-    const { request, controller } = await AxiosPutHelper(
-      '/api/v1/datanodes/remove',
-      selectedRowKeys,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-    request.then(() => {
-      loadData();
-    }).catch((error) => {
-      showDataFetchError(error.toString());
-    }).finally(() => {
-      setLoading(false);
-      setSelectedRows([]);
-    });
+    try {
+      await removeDatanodesAPI.execute(selectedRowKeys);
+    } catch (error) {
+      showDataFetchError(error);
+    }
   }
 
-  const loadData = async () => {
-    setLoading(true);
-    // Need to call decommission API on each interval to get updated status
-    // before datanode API call to compare UUID's
-    // update 'Operation State' column in table manually before rendering
-    try {
-      let decomissionResponse = await loadDecommisionAPI();
-      decommissionUuids = decomissionResponse.data?.DatanodesDecommissionInfo?.map(
-        (item: DatanodeDecomissionInfo) => item.datanodeDetails.uuid
-      );
-    } catch (error) {
-      decommissionUuids = [];
-      showDataFetchError((error as AxiosError).toString());
-    }
+  const loadData = () => {
+    // Trigger both API hooks to refetch data
+    decommissionAPI.refetch();
+    datanodesAPI.refetch();
+  };
 
-    try {
-      const datanodesAPIResponse = await loadDataNodeAPI();
-      const datanodesResponse: DatanodesResponse = datanodesAPIResponse.data;
-      const datanodes: DatanodeResponse[] = datanodesResponse.datanodes;
+  // Process data when both APIs have loaded
+  useEffect(() => {
+    if (!decommissionAPI.loading && !datanodesAPI.loading && 
+        decommissionAPI.data && datanodesAPI.data) {
+      
+      // Update decommission UUIDs
+      decommissionUuids = decommissionAPI.data?.DatanodesDecommissionInfo?.map(
+        (item: DatanodeDecomissionInfo) => item.datanodeDetails.uuid
+      ) || [];
+
+      const datanodes: DatanodeResponse[] = datanodesAPI.data.datanodes;
       const dataSource: Datanode[] = datanodes?.map(
         (datanode) => ({
           hostname: datanode.hostname,
@@ -181,30 +180,22 @@ const Datanodes: React.FC<{}> = () => {
           networkLocation: datanode.networkLocation
         })
       );
-      setLoading(false);
+
       setState({
         ...state,
         dataSource: dataSource,
         lastUpdated: Number(moment())
       });
-    } catch (error) {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString())
     }
-  }
+  }, [decommissionAPI.loading, datanodesAPI.loading, decommissionAPI.data, datanodesAPI.data]);
 
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
+  const autoReload = useAutoReload(loadData);
 
   useEffect(() => {
-    autoReloadHelper.startPolling();
-    loadData();
+    autoReload.startPolling();
 
     return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([
-        cancelSignal.current!,
-        cancelDecommissionSignal.current!
-      ]);
+      autoReload.stopPolling();
     });
   }, []);
 
@@ -231,7 +222,7 @@ const Datanodes: React.FC<{}> = () => {
         <AutoReloadPanel
           isLoading={loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
+          togglePolling={autoReload.handleAutoReloadToggle}
           onReload={loadData} />
       </div>
       <div className='data-container'>

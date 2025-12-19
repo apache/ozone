@@ -27,11 +27,13 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -56,6 +59,8 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -66,6 +71,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.event.Level;
 
 /**
  * Tests for Pipeline Closing.
@@ -79,11 +85,6 @@ public class TestPipelineClose {
   private ContainerManager containerManager;
   private PipelineManager pipelineManager;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -114,9 +115,6 @@ public class TestPipelineClose {
     // the other with an open container.
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {
@@ -254,6 +252,52 @@ public class TestPipelineClose {
 
     // match the pipeline id
     verifyCloseForPipeline(openPipeline, actionsFromDatanode);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
+    ContainerInfo allocateContainer = containerManager
+        .allocateContainer(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "newTestOwner");
+    ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(allocateContainer,
+        pipelineManager.getPipeline(allocateContainer.getPipelineID()));
+    
+    DatanodeStateMachine datanodeStateMachine = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
+    XceiverServerRatis xceiverRatis = (XceiverServerRatis) datanodeStateMachine.getContainer().getWriteChannel();
+
+    GenericTestUtils.setLogLevel(XceiverServerRatis.class, Level.DEBUG);
+    GenericTestUtils.LogCapturer xceiverLogCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
+
+    RaftGroupId groupId = RaftGroupId.valueOf(containerWithPipeline.getPipeline().getId().getId());
+    PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
+
+    ClosePipelineCommandHandler handler = datanodeStateMachine.getCommandDispatcher().getClosePipelineCommandHandler();
+     
+    Field pipelinesInProgressField = handler.getClass().getDeclaredField("pipelinesInProgress");
+    pipelinesInProgressField.setAccessible(true);
+    Set<UUID> pipelinesInProgress = (Set<UUID>) pipelinesInProgressField.get(handler);
+
+    try {
+      pipelinesInProgress.add(pipelineID.getId());
+
+      String detail = "test duplicate trigger ";
+      int numOfDuplicateTriggers = 10;
+      for (int i = 1; i <= numOfDuplicateTriggers; i++) {
+        xceiverRatis.triggerPipelineClose(groupId, detail + i, ClosePipelineInfo.Reason.PIPELINE_FAILED);
+      }
+
+      String xceiverLogs = xceiverLogCapturer.getOutput();
+      int skippedCount = StringUtils.countMatches(xceiverLogs.toLowerCase(), "skipped triggering pipeline close");
+      assertEquals(numOfDuplicateTriggers, skippedCount);
+    } finally {
+      pipelinesInProgress.remove(pipelineID.getId());
+      xceiverLogCapturer.stopCapturing();
+
+      pipelineManager.closePipeline(containerWithPipeline.getPipeline().getId());
+      pipelineManager.deletePipeline(containerWithPipeline.getPipeline().getId());
+    }
   }
 
   private boolean verifyCloseForPipeline(Pipeline pipeline,

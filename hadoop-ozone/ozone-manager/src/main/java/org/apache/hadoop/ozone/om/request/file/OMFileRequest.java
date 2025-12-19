@@ -463,12 +463,11 @@ public final class OMFileRequest {
    * @param omMetadataManager OM Metadata Manager
    * @param dbOpenFileName    open file name key
    * @param omFileInfo        key info
-   * @param fileName          file name
    * @param trxnLogIndex      transaction log index
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String fileName, String keyName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String keyName, long trxnLogIndex) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -478,8 +477,6 @@ public final class OMFileRequest {
       // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
       // (Full key path is required in commit key request)
       omFileInfo.setKeyName(keyName);
-      // fileName will contain only the leaf(file1) which is actual file name.
-      omFileInfo.setFileName(fileName);
       table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
     } else {
       table.addCacheEntry(dbOpenFileName, trxnLogIndex);
@@ -504,7 +501,6 @@ public final class OMFileRequest {
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
     omFileInfo.setKeyName(fileName);
-    omFileInfo.setFileName(fileName);
 
     BucketLayout bucketLayout =
         getBucketLayout(omMetadataManager, omFileInfo.getVolumeName(),
@@ -729,7 +725,6 @@ public final class OMFileRequest {
   }
 
   public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmKeyInfo omKeyInfo) {
-    omKeyInfo.setFileName(omKeyInfo.getKeyName());
     String fullKeyPath = OMFileRequest.getAbsolutePath(
         parentInfo.getKeyName(), omKeyInfo.getKeyName());
     omKeyInfo.setKeyName(fullKeyPath);
@@ -760,7 +755,6 @@ public final class OMFileRequest {
         .setModificationTime(dirInfo.getModificationTime())
         .setObjectID(dirInfo.getObjectID())
         .setUpdateID(dirInfo.getUpdateID())
-        .setFileName(dirInfo.getName())
         .setReplicationConfig(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
@@ -792,7 +786,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setParentObjectID(keyInfo.getParentObjectID())
         .setAcls(keyInfo.getAcls())
         .addAllMetadata(keyInfo.getMetadata())

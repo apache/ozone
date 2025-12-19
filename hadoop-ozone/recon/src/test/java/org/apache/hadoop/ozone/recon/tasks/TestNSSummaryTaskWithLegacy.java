@@ -185,6 +185,7 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
 
     @BeforeEach
     public void setUp() throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
       nSSummaryTaskWithLegacy.reprocessWithLegacy(getReconOMMetadataManager());
       nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch(), 0);
 
@@ -330,7 +331,7 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
     public void testProcessUpdateFileSize() throws IOException {
       // file 1 is gone, so bucket 1 is empty now
       assertNotNull(nsSummaryForBucket1);
-      assertEquals(6, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       // after put dir4, bucket1 now has two child dirs: dir1 and dir4

@@ -200,14 +200,14 @@ public class TestContainerReconciliationWithMockDatanodes {
 
   @ParameterizedTest
   @MethodSource("corruptionValues")
-  public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
+  public void testContainerReconciliation(int numBlocksToRemove, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
         checksumToString(healthyDataChecksum));
     // Introduce corruption in each container on different replicas.
     List<MockDatanode> dnsToCorrupt = datanodes.stream().limit(2).collect(Collectors.toList());
 
-    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, false);
-    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, true);
+    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, false);
+    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, true);
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     // Without reconciliation, checksums should be different because of the corruption.
@@ -686,7 +686,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * 2. Corrupt chunks at an offset.
      * If revers is true, the blocks and chunks are deleted in reverse order.
      */
-    public void introduceCorruption(long containerID, int numBlocksToDelete, int numChunksToCorrupt, boolean reverse)
+    public void introduceCorruption(long containerID, int numBlocksToRemove, int numChunksToCorrupt, boolean reverse)
         throws IOException {
       KeyValueContainer container = getContainer(containerID);
       KeyValueContainerData containerData = container.getContainerData();
@@ -695,7 +695,7 @@ public class TestContainerReconciliationWithMockDatanodes {
            BatchOperation batch = handle.getStore().getBatchHandler().initBatchOperation()) {
         List<BlockData> blockDataList = getSortedBlocks(container);
         int size = blockDataList.size();
-        for (int i = 0; i < numBlocksToDelete; i++) {
+        for (int i = 0; i < numBlocksToRemove; i++) {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
           File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
@@ -706,7 +706,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         handle.getStore().getBatchHandler().commitBatchOperation(batch);
         // Check that the correct number of blocks were deleted.
         blockDataList = getSortedBlocks(container);
-        assertEquals(numBlocksToDelete, size - blockDataList.size());
+        assertEquals(numBlocksToRemove, size - blockDataList.size());
       }
 
       // Corrupt chunks at an offset.

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -189,6 +190,8 @@ final class ObjectEndpointStreaming {
       }
       throw ex;
     }
-    return Response.ok().header(OzoneConsts.ETAG, eTag).build();
+    return Response.ok()
+        .header(OzoneConsts.ETAG, wrapInQuotes(eTag))
+        .build();
   }
 }

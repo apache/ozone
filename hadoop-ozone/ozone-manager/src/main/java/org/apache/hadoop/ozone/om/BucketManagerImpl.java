@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -71,8 +70,8 @@ public class BucketManagerImpl implements BucketManager {
   @Override
   public OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException {
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
+    Objects.requireNonNull(bucketName, "bucketName == null");
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -97,7 +96,7 @@ public class BucketManagerImpl implements BucketManager {
                                         int maxNumOfBuckets,
                                         boolean hasSnapshot)
       throws IOException {
-    Preconditions.checkNotNull(volumeName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
     return metadataManager.listBuckets(
         volumeName, startBucket, bucketPrefix, maxNumOfBuckets, hasSnapshot);
 

@@ -685,7 +685,7 @@ public class TestOzoneManagerSnapshotAcl {
         .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
     // Allow the snapshot to be written to disk
     String fileName =
-        getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
+        getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {

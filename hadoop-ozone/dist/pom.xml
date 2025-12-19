@@ -17,24 +17,28 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
-    <!-- suffix appended to Ozone version to get Docker image version -->
+    <!-- Hadoop Docker image for current version; multi-arch Hadoop 3.4.2-lean only available from ghcr.io currently -->
+    <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
+    <!-- suffix appended to Hadoop version to get Docker image version -->
+    <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
     <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
+    <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
     <downloadSources>true</downloadSources>
     <file.encoding>UTF-8</file.encoding>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <!-- rpm usage-->
-    <rpm.targetArch>noarch</rpm.targetArch>
+    <rpm.needArch>true</rpm.needArch>
   </properties>
 
   <dependencies>
@@ -101,6 +105,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-manager</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-multitenancy-ranger</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -262,11 +271,6 @@
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
-          <scope>runtime</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.ozone</groupId>
-          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
           <scope>runtime</scope>
         </dependency>
       </dependencies>
@@ -596,16 +600,17 @@
             <configuration>
               <name>ozone</name>
               <version>${project.version}</version>
-              <release>1</release>
+              <release>${rpm.release}%{?dist}</release>
               <license>Apache License, Version 2.0</license>
               <summary>Ozone RPM package</summary>
               <group>Applications/Engineering</group>
-              <targetArch>${rpm.targetArch}</targetArch>
               <targetOS>linux</targetOS>
+              <needarch>${rpm.needArch}</needarch>
               <postinstallScriptlet>
                 <scriptFile>${basedir}/src/main/package/rpm/postinstall.sh</scriptFile>
               </postinstallScriptlet>
               <requires>
+                <require>java-headless &gt;= 1:1.8.0</require>
                 <require>ncurses</require>
               </requires>
 

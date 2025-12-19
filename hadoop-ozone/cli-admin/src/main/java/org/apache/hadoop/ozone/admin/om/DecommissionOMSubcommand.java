@@ -42,7 +42,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "decommission",
-    customSynopsis = "ozone admin om decommission -id=<om-service-id> " +
+    customSynopsis = "ozone admin om decommission --service-id=<om-service-id> " +
         "-nodeid=<decommission-om-node-id> " +
         "-hostname=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
@@ -64,10 +64,8 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(names = {"-id", "--service-id"},
-      description = "OM Service ID",
-      required = true)
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(names = {"-nodeid", "--nodeid"},
       description = "NodeID of the OM to be decommissioned.",
@@ -106,7 +104,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
     // leader.
     try (OMAdminProtocolClientSideImpl omAdminProtocolClient =
              OMAdminProtocolClientSideImpl.createProxyForOMHA(ozoneConf, user,
-                 omServiceId)) {
+                 omServiceOption.getServiceID())) {
       OMNodeDetails decommNodeDetails = new OMNodeDetails.Builder()
           .setOMNodeId(decommNodeId)
           .setHostAddress(hostInetAddress.getHostAddress())
@@ -127,7 +125,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
    */
   private void verifyNodeIdAndHostAddress() throws IOException {
     String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-        omServiceId, decommNodeId);
+        omServiceOption.getServiceID(), decommNodeId);
     String rpcAddrStr = OmUtils.getOmRpcAddress(ozoneConf, rpcAddrKey);
     if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
       throw new IOException("There is no OM corresponding to " + decommNodeId
@@ -152,7 +150,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
    */
   private void verifyConfigUpdatedOnAllOMs() throws IOException {
     String decommNodesKey = ConfUtils.addKeySuffixes(
-        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceOption.getServiceID());
     Collection<String> decommNodes =
         OmUtils.getDecommissionedNodeIds(ozoneConf, decommNodesKey);
     if (!decommNodes.contains(decommNodeId)) {
@@ -165,7 +163,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
     // decommissioned node is either removed from ozone.om.nodes config or
     // added to ozone.om.decommissioned.nodes
     List<OMNodeDetails> activeOMNodeDetails = OmUtils.getAllOMHAAddresses(
-        ozoneConf, omServiceId, false);
+        ozoneConf, omServiceOption.getServiceID(), false);
     if (activeOMNodeDetails.isEmpty()) {
       throw new IOException("Cannot decommission OM " + decommNodeId + " as " +
           "it is the only node in the ring.");

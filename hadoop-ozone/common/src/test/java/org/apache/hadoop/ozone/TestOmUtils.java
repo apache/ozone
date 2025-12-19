@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
@@ -257,5 +258,72 @@ public class TestOmUtils {
     assertEquals(expected.size(), result.size());
     assertTrue(result.containsAll(expected));
   }
-}
 
+  @Test
+  void testGetOMEpoch() {
+    assertEquals(2, OmUtils.getOMEpoch());
+    assertEquals(OmUtils.EPOCH_WHEN_RATIS_ENABLED, OmUtils.getOMEpoch());
+  }
+
+  @Test
+  void testAddEpochToTxId() {
+    assertEquals(0L, OmUtils.addEpochToTxId(0, 0));
+    assertEquals(1L << 62, OmUtils.addEpochToTxId(1, 0));
+    assertEquals(2L << 62, OmUtils.addEpochToTxId(2, 0));
+    assertEquals(3L << 62, OmUtils.addEpochToTxId(3, 0));
+
+    long txId = 12345L;
+    long expected = (2L << 62) | (txId << 8);
+    assertEquals(expected, OmUtils.addEpochToTxId(2, txId));
+
+    long maxTxId = OmUtils.MAX_TRXN_ID;
+    long maxExpected = (2L << 62) | (maxTxId << 8);
+    assertEquals(maxExpected, OmUtils.addEpochToTxId(2, maxTxId));
+
+    // Verify bit structure
+    long result = OmUtils.addEpochToTxId(2, 0x123456789ABCDL);
+    assertEquals(2L, result >>> 62);
+    assertEquals(0x123456789ABCDL, (result & 0x3FFFFFFFFFFFFFFFL) >>> 8);
+  }
+
+  // Intentionally no tests for getTxIdFromObjectId(); this helper is not
+  // used in production paths and may be removed in the future.
+
+  @Test
+  void testGetObjectIdFromTxId() {
+    long txId = 12345L;
+    long epoch = 2L;
+    long expected = OmUtils.addEpochToTxId(epoch, txId);
+    assertEquals(expected, OmUtils.getObjectIdFromTxId(epoch, txId));
+
+    for (long e = 0; e <= 3; e++) {
+      long result = OmUtils.getObjectIdFromTxId(e, txId);
+      assertEquals(e, result >>> 62);
+      assertEquals(txId, (result & 0x3FFFFFFFFFFFFFFFL) >>> 8);
+    }
+
+    long maxTxId = OmUtils.MAX_TRXN_ID;
+    long maxResult = OmUtils.getObjectIdFromTxId(epoch, maxTxId);
+    assertEquals(epoch, maxResult >>> 62);
+    assertEquals(maxTxId, (maxResult & 0x3FFFFFFFFFFFFFFFL) >>> 8);
+  }
+
+  @Test
+  void testGetObjectIdFromTxIdValidation() {
+    long validTxId = OmUtils.MAX_TRXN_ID;
+    // Test valid case - should not throw exception
+    try {
+      OmUtils.getObjectIdFromTxId(2, validTxId);
+    } catch (Exception e) {
+      fail("Valid txId should not throw exception: " + e.getMessage());
+    }
+
+    long invalidTxId = (1L << 54) - 1;  // MAX_TRXN_ID + 1
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> OmUtils.getObjectIdFromTxId(2, invalidTxId));
+    assertTrue(exception.getMessage().contains("TransactionID exceeds max limit"));
+  }
+
+  // Consistency checks between epoch and txId are covered by
+  // testAddEpochToTxId() and testGetObjectIdFromTxId().
+}

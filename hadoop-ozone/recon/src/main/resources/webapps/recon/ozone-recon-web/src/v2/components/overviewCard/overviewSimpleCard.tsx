@@ -31,6 +31,7 @@ import {
   QuestionCircleOutlined
 } from '@ant-design/icons';
 import { numberWithCommas } from '@/utils/common';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 
 // ------------- Types -------------- //
@@ -40,11 +41,12 @@ type IconOptions = {
 
 type OverviewCardProps = {
   icon: string;
-  data: number | React.ReactElement;
+  data: number;
   title: string;
   hoverable?: boolean;
   loading?: boolean;
   linkToUrl?: string;
+  error?: string | null;
 }
 
 // ------------- Styles -------------- //
@@ -109,8 +111,13 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
   title = '',
   hoverable = false,
   loading = false,
-  linkToUrl = ''
+  linkToUrl = '',
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title={title} compact={true}/>
+  }
 
   const titleElement = (linkToUrl)
     ? (
@@ -122,7 +129,7 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
           View More
         </Link>
       </div>)
-    : title
+    : title;
 
   return (
     <Card
@@ -144,6 +151,6 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
       </Row>
     </Card>
   );
-}
+};
 
 export default OverviewSimpleCard;

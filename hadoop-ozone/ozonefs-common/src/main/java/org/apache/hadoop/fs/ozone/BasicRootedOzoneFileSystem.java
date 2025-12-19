@@ -37,8 +37,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -146,16 +145,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
-    isRatisStreamingEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
-    streamingAutoThreshold = (int) OzoneConfiguration.of(conf).getStorageSize(
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
-        StorageUnit.BYTES);
     setConf(conf);
-    Preconditions.checkNotNull(name.getScheme(),
-        "No scheme provided in %s", name);
+    Objects.requireNonNull(name.getScheme(),
+        () -> "No scheme provided in " + name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
         "Invalid scheme provided in %s", name);
 
@@ -208,6 +200,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IOException(msg, ue);
     }
     ozoneConfiguration = OzoneConfiguration.of(getConfSource());
+    isRatisStreamingEnabled = ozoneConfiguration.getBoolean(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
+    streamingAutoThreshold = (int) ozoneConfiguration.getStorageSize(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
+        StorageUnit.BYTES);
   }
 
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
@@ -246,8 +245,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     final String key = pathToKey(path);
     return TracingUtil.executeInNewSpan("ofs open",
         () -> {
-          Span span = GlobalTracer.get().activeSpan();
-          span.setTag("path", key);
+          Span span = TracingUtil.getActiveSpan();
+          span.setAttribute("path", key);
           return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
         });
   }
@@ -397,9 +396,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private boolean renameInSpan(Path src, Path dst) throws IOException {
-    Span span = GlobalTracer.get().activeSpan();
-    span.setTag("src", src.toString())
-        .setTag("dst", dst.toString());
+    Span span = TracingUtil.getActiveSpan();
+    span.setAttribute("src", src.toString())
+        .setAttribute("dst", dst.toString());
     incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     if (src.equals(dst)) {
@@ -1019,7 +1018,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path,
         ozoneConfiguration);
-    return this.makeQualified(ofsPath.getTrashRoot());
+    return this.makeQualified(ofsPath.getTrashRoot(getUsername()));
   }
 
   /**
@@ -1185,7 +1184,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
     return new OzoneFileStatusIterator<>(f,
-        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat : new LocatedFileStatus(stat, null),
+        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat :
+            new LocatedFileStatus(stat, stat.isFile() ? new BlockLocation[0] : null),
         false);
   }
 

@@ -19,13 +19,13 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -159,7 +159,7 @@ public final class SCMCertStore implements CertificateStore {
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count)
       throws IOException {
-    Preconditions.checkNotNull(startSerialID);
+    Objects.requireNonNull(startSerialID, "startSerialID == null");
 
     if (startSerialID.longValue() == 0) {
       startSerialID = null;

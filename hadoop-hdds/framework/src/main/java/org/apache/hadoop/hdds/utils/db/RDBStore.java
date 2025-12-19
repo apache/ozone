@@ -36,7 +36,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
@@ -74,19 +77,21 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final boolean readOnly;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   boolean readOnly,
-                  String dbJmxBeanName, boolean enableCompactionDag,
+                  String dbJmxBeanName,
+                  boolean enableCompactionDag, Function<Boolean, UncheckedAutoCloseable> differLockSupplier,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
                   boolean enableRocksDBMetrics)
       throws RocksDatabaseException {
-    Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
-    Preconditions.checkNotNull(families);
+    Objects.requireNonNull(dbFile, "DB file location cannot be null");
+    Objects.requireNonNull(families, "families == null");
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
     dbLocation = dbFile;
@@ -95,12 +100,14 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionDag) {
+        Objects.requireNonNull(differLockSupplier, "Differ Lock supplier cannot be null when " +
+            "compaction dag is enabled");
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR,
             DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
-            configuration);
+            configuration, differLockSupplier);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -108,6 +115,7 @@ public class RDBStore implements DBStore {
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
+      this.readOnly = readOnly;
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
@@ -147,7 +155,7 @@ public class RDBStore implements DBStore {
 
       if (enableCompactionDag) {
         ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
-        Preconditions.checkNotNull(ssInfoTableCF,
+        Objects.requireNonNull(ssInfoTableCF,
             "SnapshotInfoTable column family handle should not be null");
         // Set CF handle in differ to be used in DB listener
         rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
@@ -155,7 +163,7 @@ public class RDBStore implements DBStore {
         // Set CF handle in differ to be store compaction log entry.
         ColumnFamily compactionLogTableCF =
             db.getColumnFamily(COMPACTION_LOG_TABLE);
-        Preconditions.checkNotNull(compactionLogTableCF,
+        Objects.requireNonNull(compactionLogTableCF,
             "CompactionLogTable column family handle should not be null.");
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
             compactionLogTableCF.getHandle());
@@ -189,6 +197,7 @@ public class RDBStore implements DBStore {
     return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
   }
 
+  @Override
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
@@ -244,6 +253,16 @@ public class RDBStore implements DBStore {
     }
     if (statistics != null) {
       IOUtils.close(LOG, statistics);
+    }
+    if (!readOnly) {
+      try {
+        // Flush to ensure all data is persisted to disk before closing.
+        flushDB();
+        LOG.debug("Successfully flushed DB before close");
+      } catch (Exception e) {
+        LOG.warn("Failed to flush DB before close", e);
+        // Continue with close even if flush fails
+      }
     }
     IOUtils.close(LOG, db);
   }
@@ -330,6 +349,22 @@ public class RDBStore implements DBStore {
   @Override
   public Map<Integer, String> getTableNames() {
     return db.getColumnFamilyNames();
+  }
+
+  /**
+  /**
+   * Drops a table from the database by removing its associated column family.
+   * <p>
+   * <b>Warning:</b> This operation should be used with extreme caution. If the table needs to be used again,
+   * it is recommended to reinitialize the entire DB store, as the column family will be permanently
+   * removed from the database. This method is suitable for truncating a RocksDB column family in a single operation.
+   *
+   * @param tableName the name of the table to be dropped
+   * @throws RocksDatabaseException if an error occurs while attempting to drop the table
+   */
+  @Override
+  public void dropTable(String tableName) throws RocksDatabaseException {
+    db.dropColumnFamily(tableName);
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {

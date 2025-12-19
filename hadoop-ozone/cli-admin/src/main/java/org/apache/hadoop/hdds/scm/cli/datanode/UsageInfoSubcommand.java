@@ -97,7 +97,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         .collect(Collectors.toList());
 
     if (json) {
-      System.out.print(
+      System.out.println(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(usageList));
       return;
     }
@@ -147,9 +147,13 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     System.out.printf("%-24s: %s (%s) %n", "Remaining Allocatable",
         (info.getRemaining() - info.getCommitted()) + " B",
         StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
-    System.out.printf("%-24s: %s (%s) %n%n", "Free Space To Spare",
+    System.out.printf("%-24s: %s (%s) %n", "Free Space To Spare",
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
+    System.out.printf("%-13s: %s (%s) %n", "Reserved",
+        info.getReserved() + " B", 
+        StringUtils.byteDesc(info.getReserved()));
+    System.out.println();
   }
 
   /**
@@ -178,6 +182,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     private long freeSpaceToSpare = 0;
     private long containerCount = 0;
     private long pipelineCount = 0;
+    private long reserved = 0;
 
     DatanodeUsage(HddsProtos.DatanodeUsageInfoProto proto) {
       if (proto.hasNode()) {
@@ -203,6 +208,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       }
       if (proto.hasFreeSpaceToSpare()) {
         freeSpaceToSpare = proto.getFreeSpaceToSpare();
+      }
+      if (proto.hasReserved()) { 
+        reserved = proto.getReserved();
       }
     }
 
@@ -270,6 +278,10 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
     public long getPipelineCount() {
       return pipelineCount;
+    }
+
+    public long getReserved() { 
+      return reserved;
     }
   }
 

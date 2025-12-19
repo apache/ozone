@@ -361,13 +361,15 @@ public class SCMStateMachine extends BaseStateMachine {
       // 1. Refresh Safemode rules state.
       // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refresh();
-        scm.getDatanodeProtocolServer().start();
-
         refreshedAfterLeaderReady.set(true);
+        scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  public boolean isRefreshedAfterLeaderReady() {
+    return refreshedAfterLeaderReady.get();
   }
 
   @Override
@@ -399,7 +401,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    Preconditions.checkNotNull(installingDBCheckpoint);
+    requireNonNull(installingDBCheckpoint, "installingDBCheckpoint == null");
     DBCheckpoint checkpoint = installingDBCheckpoint;
     List<ManagedSecretKey> secretKeys = installingSecretKeys;
 

@@ -35,6 +35,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilter;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ public class ReconAuthFilter implements Filter {
       LoggerFactory.getLogger(ReconAuthFilter.class);
 
   private final OzoneConfiguration conf;
-  private AuthenticationFilter hadoopAuthFilter;
+  private ProxyUserAuthenticationFilter hadoopAuthFilter;
 
   @Inject
   ReconAuthFilter(OzoneConfiguration conf) {
@@ -59,7 +60,7 @@ public class ReconAuthFilter implements Filter {
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
-    hadoopAuthFilter = new AuthenticationFilter();
+    hadoopAuthFilter = new ProxyUserAuthenticationFilter();
 
     Map<String, String> parameters = getFilterConfigMap(conf,
         OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX);

@@ -40,14 +40,14 @@ class TestSendContainerOutputStream
   @Override
   protected OutputStream createSubject() {
     return new SendContainerOutputStream(getObserver(),
-        getContainerId(), getBufferSize(), NO_COMPRESSION);
+        getContainerId(), getBufferSize(), NO_COMPRESSION, null);
   }
 
   @ParameterizedTest
   @EnumSource
   void usesCompression(CopyContainerCompression compression) throws Exception {
     OutputStream subject = new SendContainerOutputStream(
-        getObserver(), getContainerId(), getBufferSize(), compression);
+        getObserver(), getContainerId(), getBufferSize(), compression, null);
 
     byte[] bytes = getRandomBytes(16);
     subject.write(bytes, 0, bytes.length);

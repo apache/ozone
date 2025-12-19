@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,20 +24,16 @@ import java.util.UUID;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
-import org.apache.hadoop.hdds.server.YamlUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ozone.compaction.log.SstFileInfo;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.rocksdb.LiveFileMetaData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
@@ -59,67 +50,14 @@ import org.yaml.snakeyaml.representer.Representer;
  * Checksum of the YAML fields are computed and stored in the YAML file transparently to callers.
  * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml
  */
-public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
-
-  private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
+public final class OmSnapshotLocalDataYaml {
 
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
   public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
   public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
+  public static final String YAML_FILE_EXTENSION = ".yaml";
 
-  /**
-   * Creates a new OmSnapshotLocalDataYaml with default values.
-   */
-  public OmSnapshotLocalDataYaml(List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
-    super(liveFileMetaDatas, previousSnapshotId);
-  }
-
-  /**
-   * Copy constructor to create a deep copy.
-   * @param source The source OmSnapshotLocalData to copy from
-   */
-  public OmSnapshotLocalDataYaml(OmSnapshotLocalData source) {
-    super(source);
-  }
-
-  /**
-   * Verifies the checksum of the snapshot data.
-   * @param snapshotData The snapshot data to verify
-   * @return true if the checksum is valid, false otherwise
-   * @throws IOException if there's an error computing the checksum
-   */
-  public static boolean verifyChecksum(OmSnapshotManager snapshotManager, OmSnapshotLocalData snapshotData)
-      throws IOException {
-    Preconditions.checkNotNull(snapshotData, "snapshotData cannot be null");
-
-    // Get the stored checksum
-    String storedChecksum = snapshotData.getChecksum();
-    if (storedChecksum == null) {
-      LOG.warn("No checksum found in snapshot data for verification");
-      return false;
-    }
-
-    // Create a copy of the snapshot data for computing checksum
-    OmSnapshotLocalDataYaml snapshotDataCopy = new OmSnapshotLocalDataYaml(snapshotData);
-
-    // Clear the existing checksum in the copy
-    snapshotDataCopy.setChecksum(null);
-
-    // Get the YAML representation
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
-      // Compute new checksum
-      snapshotDataCopy.computeAndSetChecksum(yaml.get());
-
-      // Compare the stored and computed checksums
-      String computedChecksum = snapshotDataCopy.getChecksum();
-      boolean isValid = storedChecksum.equals(computedChecksum);
-
-      if (!isValid) {
-        LOG.warn("Checksum verification failed for snapshot local data. " +
-            "Stored: {}, Computed: {}", storedChecksum, computedChecksum);
-      }
-      return isValid;
-    }
+  private OmSnapshotLocalDataYaml() {
   }
 
   /**
@@ -129,11 +67,13 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
 
     OmSnapshotLocalDataRepresenter(DumperOptions options) {
       super(options);
-      this.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
+      this.addClassTag(OmSnapshotLocalData.class, SNAPSHOT_YAML_TAG);
       this.addClassTag(VersionMeta.class, SNAPSHOT_VERSION_META_TAG);
       this.addClassTag(SstFileInfo.class, SST_FILE_INFO_TAG);
       representers.put(SstFileInfo.class, new RepresentSstFileInfo());
       representers.put(VersionMeta.class, new RepresentVersionMeta());
+      representers.put(TransactionInfo.class, data -> new ScalarNode(Tag.STR, data.toString(), null, null,
+          DumperOptions.ScalarStyle.PLAIN));
       representers.put(UUID.class, data ->
           new ScalarNode(Tag.STR, data.toString(), null, null, DumperOptions.ScalarStyle.PLAIN));
     }
@@ -190,7 +130,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
       this.yamlConstructors.put(SNAPSHOT_VERSION_META_TAG, new ConstructVersionMeta());
       this.yamlConstructors.put(SST_FILE_INFO_TAG, new ConstructSstFileInfo());
-      TypeDescription omDesc = new TypeDescription(OmSnapshotLocalDataYaml.class);
+      TypeDescription omDesc = new TypeDescription(OmSnapshotLocalData.class);
       omDesc.putMapPropertyType(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO, Integer.class, VersionMeta.class);
       this.addTypeDescription(omDesc);
       TypeDescription versionMetaDesc = new TypeDescription(VersionMeta.class);
@@ -227,8 +167,15 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
-        UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
-        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(Collections.emptyList(), prevSnapId);
+        final String snapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_SNAP_ID);
+        UUID snapId = UUID.fromString(snapIdStr);
+        final String prevSnapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID);
+        UUID prevSnapId = prevSnapIdStr != null ? UUID.fromString(prevSnapIdStr) : null;
+        final String purgeTxInfoStr = (String) nodes.get(OzoneConsts.OM_SLD_TXN_INFO);
+        final long dbTxnSeqNumber = ((Number)nodes.get(OzoneConsts.OM_SLD_DB_TXN_SEQ_NUMBER)).longValue();
+        TransactionInfo transactionInfo = purgeTxInfoStr != null ? TransactionInfo.valueOf(purgeTxInfoStr) : null;
+        OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(), prevSnapId,
+            transactionInfo, dbTxnSeqNumber);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
@@ -238,17 +185,17 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
 
         // Handle potential Integer/Long type mismatch from YAML parsing
-        Object lastCompactionTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L);
-        long lastCompactionTime;
-        if (lastCompactionTimeObj instanceof Number) {
-          lastCompactionTime = ((Number) lastCompactionTimeObj).longValue();
+        Object lastDefragTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME, -1L);
+        long lastDefragTime;
+        if (lastDefragTimeObj instanceof Number) {
+          lastDefragTime = ((Number) lastDefragTimeObj).longValue();
         } else {
-          throw new IllegalArgumentException("Invalid type for lastCompactionTime: " +
-              lastCompactionTimeObj.getClass().getName() + ". Expected Number type.");
+          throw new IllegalArgumentException("Invalid type for lastDefragTime: " +
+              lastDefragTimeObj.getClass().getName() + ". Expected Number type.");
         }
-        snapshotLocalData.setLastCompactionTime(lastCompactionTime);
+        snapshotLocalData.setLastDefragTime(lastDefragTime);
 
-        snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
+        snapshotLocalData.setNeedsDefrag((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_DEFRAG, false));
         Map<Integer, VersionMeta> versionMetaMap =
             (Map<Integer, VersionMeta>) nodes.get(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
         if (versionMetaMap != null) {
@@ -263,70 +210,6 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         return snapshotLocalData;
       }
     }
-  }
-
-  /**
-   * Returns the YAML representation of this object as a String
-   * (without triggering checksum computation or persistence).
-   * @return YAML string representation
-   */
-  public String getYaml(OmSnapshotManager snapshotManager) throws IOException {
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
-      return yaml.get().dump(this);
-    }
-  }
-
-  /**
-   * Computes checksum (stored in this object), and writes this object to a YAML file.
-   * @param yamlFile The file to write to
-   * @throws IOException If there's an error writing to the file
-   */
-  public void writeToYaml(OmSnapshotManager snapshotManager, File yamlFile) throws IOException {
-    // Create Yaml
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
-      // Compute Checksum and update SnapshotData
-      computeAndSetChecksum(yaml.get());
-      // Write the SnapshotData with checksum to Yaml file.
-      YamlUtils.dump(yaml.get(), this, yamlFile, LOG);
-    }
-  }
-
-  /**
-   * Creates a OmSnapshotLocalDataYaml instance from a YAML file.
-   * @param yamlFile The YAML file to read from
-   * @return A new OmSnapshotLocalDataYaml instance
-   * @throws IOException If there's an error reading the file
-   */
-  public static OmSnapshotLocalDataYaml getFromYamlFile(OmSnapshotManager snapshotManager, File yamlFile)
-      throws IOException {
-    Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
-    try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
-      return getFromYamlStream(snapshotManager, inputFileStream);
-    }
-  }
-
-  /**
-   * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
-   * @throws IOException
-   */
-  public static OmSnapshotLocalDataYaml getFromYamlStream(OmSnapshotManager snapshotManager,
-      InputStream input) throws IOException {
-    OmSnapshotLocalDataYaml dataYaml;
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
-      dataYaml = yaml.get().load(input);
-    } catch (YAMLException ex) {
-      // Unchecked exception. Convert to IOException
-      throw new IOException(ex);
-    }
-
-    if (dataYaml == null) {
-      // If Yaml#load returned null, then the file is empty. This is valid yaml
-      // but considered an error in this case since we have lost data about
-      // the snapshot.
-      throw new IOException("Failed to load snapshot file. File is empty.");
-    }
-
-    return dataYaml;
   }
 
   /**

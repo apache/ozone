@@ -190,7 +190,7 @@ public class TestContainerCommandReconciliation {
     }
 
     if (cluster != null) {
-      cluster.stop();
+      cluster.shutdown();
     }
   }
 
@@ -620,8 +620,7 @@ public class TestContainerCommandReconciliation {
           (KeyValueContainer) dn.getDatanodeStateMachine().getContainer().getController()
               .getContainer(containerID);
       if (keyValueContainer != null) {
-        keyValueHandler.getChecksumManager().writeContainerDataTree(
-            keyValueContainer.getContainerData(), tree);
+        keyValueHandler.getChecksumManager().updateTree(keyValueContainer.getContainerData(), tree);
       }
     }
   }

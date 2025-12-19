@@ -148,6 +148,21 @@ public class OMPerformanceMetrics {
   @Metric(about = "Latency of each iteration of OpenKeyCleanupService in ms")
   private MutableGaugeLong openKeyCleanupServiceLatencyMs;
 
+  @Metric(about = "ResolveBucketLink and ACL check latency for createKey in nanoseconds")
+  private MutableRate createKeyResolveBucketAndAclCheckLatencyNs;
+  
+  @Metric(about = "check quota for createKey in nanoseconds")
+  private MutableRate createKeyQuotaCheckLatencyNs;
+
+  @Metric(about = "Block allocation latency for createKey in nanoseconds")
+  private MutableRate createKeyAllocateBlockLatencyNs;
+
+  @Metric(about = "createKeyFailure latency in nanoseconds")
+  private MutableRate createKeyFailureLatencyNs;
+
+  @Metric(about = "creteKeySuccess latency in nanoseconds")
+  private MutableRate createKeySuccessLatencyNs;
+
   public static OMPerformanceMetrics register() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME,
@@ -290,6 +305,26 @@ public class OMPerformanceMetrics {
 
   public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
     return deleteKeyResolveBucketAndAclCheckLatencyNs;
+  }
+
+  public MutableRate getCreateKeyResolveBucketAndAclCheckLatencyNs() {
+    return createKeyResolveBucketAndAclCheckLatencyNs;
+  }
+
+  public void addCreateKeyQuotaCheckLatencyNs(long latencyInNs) {
+    createKeyQuotaCheckLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getCreateKeyAllocateBlockLatencyNs() {
+    return createKeyAllocateBlockLatencyNs;
+  }
+
+  public void addCreateKeyFailureLatencyNs(long latencyInNs) {
+    createKeyFailureLatencyNs.add(latencyInNs);
+  }
+
+  public void addCreateKeySuccessLatencyNs(long latencyInNs) {
+    createKeySuccessLatencyNs.add(latencyInNs);
   }
     
   public void addListKeysReadFromRocksDbLatencyNs(long latencyInNs) {

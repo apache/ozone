@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * SCM Node Metric that is used in the placement classes.
@@ -33,7 +33,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param stat - SCMNodeStat.
    */
   public SCMNodeMetric(SCMNodeStat stat) {
-    this.stat = stat;
+    this.stat = Objects.requireNonNull(stat, "stat == null");
   }
 
   /**
@@ -58,8 +58,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
-    Preconditions.checkNotNull(this.stat, "Argument cannot be null");
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "o == null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
@@ -89,7 +88,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isLess(SCMNodeStat o) {
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "Argument cannot be null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)

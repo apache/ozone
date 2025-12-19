@@ -42,14 +42,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
@@ -79,7 +78,9 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -169,28 +170,72 @@ public class TestContainerReader {
     KeyValueContainerData cData = keyValueContainer.getContainerData();
     try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
-      for (int i = 0; i < count; i++) {
-        Table<String, BlockData> blockDataTable =
-                metadataStore.getStore().getBlockDataTable();
+      if (metadataStore.getStore() instanceof DatanodeStoreSchemaThreeImpl) {
+        DatanodeStoreSchemaThreeImpl schemaThree = (DatanodeStoreSchemaThreeImpl) metadataStore.getStore();
+        Table<String, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaThree.getDeleteTransactionTable();
 
-        Long localID = blockNames.get(i);
-        String blk = cData.getBlockKey(localID);
-        BlockData blkInfo = blockDataTable.get(blk);
+        // Fix: Use the correct container prefix format for the delete transaction key
+        String containerPrefix = cData.containerPrefix();
+        long txId = System.currentTimeMillis();
+        String txKey = containerPrefix + txId; // This ensures the key matches the container prefix
 
-        blockDataTable.delete(blk);
-        blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txKey, deleteTx); // Use the properly formatted key
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaTwoImpl) {
+        DatanodeStoreSchemaTwoImpl schemaTwoStore = (DatanodeStoreSchemaTwoImpl) metadataStore.getStore();
+        Table<Long, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaTwoStore.getDeleteTransactionTable();
+
+        long txId = System.currentTimeMillis();
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txId, deleteTx);
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaOneImpl) {
+        // Schema 1: Move blocks to deleting prefix (this part looks correct)
+        Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          String blk = cData.getBlockKey(localID);
+          BlockData blkInfo = blockDataTable.get(blk);
+          blockDataTable.delete(blk);
+          blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        }
       }
 
       if (setMetaData) {
-        // Pending delete blocks are still counted towards the block count
-        // and bytes used metadata values, so those do not change.
-        Table<String, Long> metadataTable =
-                metadataStore.getStore().getMetadataTable();
-        metadataTable.put(cData.getPendingDeleteBlockCountKey(),
-            (long)count);
+        Table<String, Long> metadataTable = metadataStore.getStore().getMetadataTable();
+        metadataTable.put(cData.getPendingDeleteBlockCountKey(), (long)count);
+        // Also set the pending deletion size
+        long deletionSize = count * blockLen;
+        metadataTable.put(cData.getPendingDeleteBlockBytesKey(), deletionSize);
       }
-    }
 
+      metadataStore.getStore().flushDB();
+    }
   }
 
   private List<Long> addBlocks(KeyValueContainer keyValueContainer,
@@ -679,8 +724,6 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = keyValueHandler.getChecksumManager();
-    List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(containerData, deletedBlockIds);
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     long expectedDataChecksum = checksumManager.read(containerData).getContainerMerkleTree().getDataChecksum();
 
@@ -695,17 +738,7 @@ public class TestContainerReader {
     KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
     assertNotSame(containerData, loadedData);
     assertEquals(expectedDataChecksum, loadedData.getDataChecksum());
-    ContainerProtos.ContainerChecksumInfo loadedChecksumInfo =
-        ContainerChecksumTreeManager.readChecksumInfo(loadedData);
     verifyAllDataChecksumsMatch(loadedData, conf);
-
-    // Verify the deleted block IDs match what we set
-    List<Long> loadedDeletedBlockIds = loadedChecksumInfo.getDeletedBlocksList().stream()
-        .map(ContainerProtos.BlockMerkleTree::getBlockID)
-        .sorted()
-        .collect(Collectors.toList());
-    assertEquals(3, loadedChecksumInfo.getDeletedBlocksCount());
-    assertEquals(deletedBlockIds, loadedDeletedBlockIds);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -718,8 +751,7 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
-    ContainerProtos.ContainerChecksumInfo checksumInfo =
-        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long dataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
     // Verify no checksum in RocksDB initially

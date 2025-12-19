@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -278,7 +279,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       // find the next ancestor node
       String ancestorName = getNextLevelAncestorName(node);
       InnerNodeImpl childNode = (InnerNodeImpl)childrenMap.get(ancestorName);
-      Preconditions.checkNotNull(childNode, "InnerNode is deleted before leaf");
+      Objects.requireNonNull(childNode, "InnerNode is deleted before leaf");
       // remove node from the parent node
       childNode.remove(node);
       // if the parent node has no children, remove the parent node too

@@ -17,16 +17,17 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-csi</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone CSI service</name>
   <description>Apache Ozone CSI service</description>
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <maven.javadoc.skip>true</maven.javadoc.skip>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
   </properties>
@@ -39,7 +40,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>${grpc.protobuf-compile.version}</version>
+      <version>${protobuf.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -154,7 +155,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java-util</artifactId>
-      <version>${grpc.protobuf-compile.version}</version>
+      <version>${protobuf.version}</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -220,20 +221,9 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
-        <configuration>
-          <protocArtifact>com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}</protocArtifact>
-          <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-          <includes>
-            <include>csi.proto</include>
-          </includes>
-          <outputDirectory>target/generated-sources/java</outputDirectory>
-          <clearOutputDirectory>false</clearOutputDirectory>
-        </configuration>
         <executions>
           <execution>
-            <id>compile-protoc</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -243,6 +233,11 @@
             <configuration>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <includes>
+                <include>csi.proto</include>
+              </includes>
+              <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
         </executions>

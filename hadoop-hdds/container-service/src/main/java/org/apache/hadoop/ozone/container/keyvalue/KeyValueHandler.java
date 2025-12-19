@@ -46,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -55,12 +56,15 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.hdds.utils.IOUtils.roundUp;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.ratis.util.Preconditions.assertSame;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -82,6 +86,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
@@ -96,12 +101,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -117,10 +124,12 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -162,6 +171,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +182,7 @@ public class KeyValueHandler extends Handler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
+  private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
 
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -646,7 +657,7 @@ public class KeyValueHandler extends Handler {
 
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -709,7 +720,7 @@ public class KeyValueHandler extends Handler {
       checkContainerOpen(kvContainer);
       BlockID blockID = BlockID.getFromProtobuf(
           request.getFinalizeBlock().getBlockID());
-      Preconditions.checkNotNull(blockID);
+      Objects.requireNonNull(blockID, "blockID == null");
 
       LOG.info("Finalized Block request received {} ", blockID);
 
@@ -939,7 +950,7 @@ public class KeyValueHandler extends Handler {
           request.getReadChunk().getBlockID());
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
 
@@ -977,8 +988,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    Preconditions.checkNotNull(data, "Chunk data is null");
-
+    Objects.requireNonNull(data, "data == null");
     return getReadChunkResponse(request, data, byteBufferToByteString);
   }
 
@@ -1036,7 +1046,7 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo,  "chunkInfo == null");
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
@@ -1099,9 +1109,9 @@ public class KeyValueHandler extends Handler {
   public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
                                            ChunkBuffer data, KeyValueContainer kvContainer)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(chunkInfo);
-    Preconditions.checkNotNull(data);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(chunkInfo, "chunkInfo == null");
+    Objects.requireNonNull(data, "data == null");
     long writeChunkStartTime = Time.monotonicNowNanos();
     if (!checkContainerClose(kvContainer)) {
       throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
@@ -1130,8 +1140,8 @@ public class KeyValueHandler extends Handler {
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
                                          long blockCommitSequenceId, boolean overwriteBscId)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(blockData);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(blockData, "blockData == null");
     long startTime = Time.monotonicNowNanos();
 
     if (!checkContainerClose(kvContainer)) {
@@ -1175,11 +1185,11 @@ public class KeyValueHandler extends Handler {
 
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
 
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
@@ -1345,8 +1355,8 @@ public class KeyValueHandler extends Handler {
       final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
+    assertTrue(originalContainerData instanceof KeyValueContainerData,
+        () -> "Expected KeyValueContainerData but " + originalContainerData.getClass());
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         (KeyValueContainerData) originalContainerData);
@@ -1377,6 +1387,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerForClose(Container container)
       throws IOException {
     container.writeLock();
+    boolean stateChanged = false;
     try {
       ContainerProtos.ContainerDataProto.State state =
           container.getContainerState();
@@ -1388,12 +1399,17 @@ public class KeyValueHandler extends Handler {
           ContainerLogger.logRecovered(container.getContainerData());
         }
         container.markContainerForClose();
+        stateChanged = true;
       }
     } finally {
       container.writeUnlock();
     }
     ContainerLogger.logClosing(container.getContainerData());
-    sendICR(container);
+    if (stateChanged) {
+      sendICR(container);
+    } else {
+      sendDeferredICR(container);
+    }
   }
 
   @Override
@@ -1460,8 +1476,7 @@ public class KeyValueHandler extends Handler {
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
     boolean hadDataChecksum = !containerData.needsDataChecksum();
-    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
-        treeWriter);
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
@@ -1619,7 +1634,7 @@ public class KeyValueHandler extends Handler {
 
     // Obtain the original checksum info before reconciling with any peers.
     ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
-    if (!originalChecksumInfo.hasContainerMerkleTree()) {
+    if (!ContainerChecksumTreeManager.hasDataChecksum(originalChecksumInfo)) {
       // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
@@ -1635,6 +1650,7 @@ public class KeyValueHandler extends Handler {
         long numMissingBlocksRepaired = 0;
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
+        long numDivergedDeletedBlocksUpdated = 0;
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1651,8 +1667,9 @@ public class KeyValueHandler extends Handler {
           continue;
         }
 
-        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
-        // the next peer.
+        // This tree writer is initialized with our current persisted tree, then updated with the modifications done
+        // while reconciling with the peer. Once we finish reconciling with this peer, we will write the updated version
+        // back to the disk and pick it up as the starting point for reconciling with the next peer.
         ContainerMerkleTreeWriter updatedTreeWriter =
             new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
@@ -1712,6 +1729,12 @@ public class KeyValueHandler extends Handler {
           }
         }
 
+        // Merge block deletes from the peer that do not match our list of deleted blocks.
+        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDivergedDeletedBlocks()) {
+          updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
+          numDivergedDeletedBlocksUpdated++;
+        }
+
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
         ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
@@ -1722,7 +1745,10 @@ public class KeyValueHandler extends Handler {
         long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
         long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
         if (previousDataChecksum == latestDataChecksum) {
-          if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
+          if (numCorruptChunksRepaired != 0 ||
+              numMissingBlocksRepaired != 0 ||
+              numMissingChunksRepaired != 0 ||
+              numDivergedDeletedBlocksUpdated != 0) {
             // This condition should never happen.
             LOG.error("Checksum of container was not updated but blocks were repaired.");
           }
@@ -1733,11 +1759,13 @@ public class KeyValueHandler extends Handler {
                   ".\nMissing blocks repaired: {}/{}\n" +
                   "Missing chunks repaired: {}/{}\n" +
                   "Corrupt chunks repaired:  {}/{}\n" +
+                  "Diverged deleted blocks updated:  {}/{}\n" +
                   "Time taken: {} ms",
               containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
-              numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
-              numMissingChunksRepaired, diffReport.getMissingChunks().size(),
-              numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
+              numMissingBlocksRepaired, diffReport.getNumMissingBlocks(),
+              numMissingChunksRepaired, diffReport.getNumMissingChunks(),
+              numCorruptChunksRepaired, diffReport.getNumCorruptChunks(),
+              numDivergedDeletedBlocksUpdated, diffReport.getNumdivergedDeletedBlocks(),
               duration);
         }
 
@@ -2029,6 +2057,152 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public ContainerCommandResponseProto readBlock(
+      ContainerCommandRequestProto request, Container kvContainer,
+      RandomAccessFileChannel blockFile,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+
+    if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Only File Per Block is supported", IO_EXCEPTION), request);
+    }
+
+    ContainerCommandResponseProto responseProto = null;
+    if (!request.hasReadBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Block request. trace ID: {}", request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+    try {
+      readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+    } catch (StorageContainerException ex) {
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ioe) {
+      final StorageContainerException sce = new StorageContainerException(
+          "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
+      responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (Exception e) {
+      final StorageContainerException sce = new StorageContainerException(
+          "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
+      LOG.error("", sce);
+      responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    }
+    return responseProto;
+  }
+
+  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      throws IOException {
+    final ReadBlockRequestProto readBlock = request.getReadBlock();
+    int responseDataSize = readBlock.getResponseDataSize();
+    if (responseDataSize == 0) {
+      responseDataSize = 1 << 20;
+    }
+
+    final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    if (!blockFile.isOpen()) {
+      final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
+      blockFile.open(file);
+    }
+
+    // This is a new api the block should always be checked.
+    BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+    BlockUtils.verifyBCSId(kvContainer, blockID);
+
+    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+    final int bytesPerChunk = Math.toIntExact(chunkInfos.get(0).getLen());
+    final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
+    ChecksumData checksumData = null;
+    int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
+    if (checksumType == ContainerProtos.ChecksumType.NONE) {
+      checksumData = new ChecksumData(checksumType, 0);
+    } else {
+      bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
+    }
+    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+    // previous checksum boundary.
+    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
+    // it simplifies the code to always do this.
+    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    long adjustedOffset = readBlock.getOffset() - offsetAlignment;
+
+    final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
+    blockFile.position(adjustedOffset);
+    int totalDataLength = 0;
+    int numResponses = 0;
+    final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
+    final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
+    LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
+        adjustedOffset, requiredLength, blockData.getSize());
+    for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
+      shouldRead = blockFile.read(buffer);
+      buffer.flip();
+      final int readLength = buffer.remaining();
+      if (readLength == 0) {
+        assertTrue(!shouldRead);
+        break;
+      }
+      assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
+
+      if (checksumType != ContainerProtos.ChecksumType.NONE) {
+        final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
+            bytesPerChunk, bytesPerChecksum, chunkInfos);
+        LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
+            readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
+        checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
+        if (verifyChecksum) {
+          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
+        }
+      }
+      final ContainerCommandResponseProto response = getReadBlockResponse(
+          request, checksumData, buffer, adjustedOffset);
+      final int dataLength = response.getReadBlock().getData().size();
+      LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
+          numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
+      streamObserver.onNext(response);
+      buffer.clear();
+
+      adjustedOffset += readLength;
+      totalDataLength += dataLength;
+      numResponses++;
+    }
+  }
+
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
+      final List<ContainerProtos.ChunkInfo> chunks) {
+    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
+    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
+    final List<ByteString> checksums = new ArrayList<>(numChecksums);
+    for (int i = 0; i < numChecksums; i++) {
+      // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
+      // and its offset to pull out the correct checksum bytes for each read.
+      final int n = i * bytesPerChecksum;
+      final long offset = blockOffset + n;
+      final int c = Math.toIntExact(offset / bytesPerChunk);
+      final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
+      final int csi = chunkOffset / bytesPerChecksum;
+
+      assertTrue(c < chunks.size(),
+          () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
+      final ContainerProtos.ChunkInfo chunk = chunks.get(c);
+      if (c < chunks.size() - 1) {
+        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+      }
+      final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
+      assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
+      final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
+      assertTrue(csi < checksumsList.size(),
+          () -> "checksumIndex = " + csi + " >= checksumsList.size()" + checksumsList.size());
+      checksums.add(checksumsList.get(csi));
+    }
+    return checksums;
+  }
+
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
@@ -2066,7 +2240,7 @@ public class KeyValueHandler extends Handler {
       }
       if (nonZero) {
         LOG.error("blocks in rocksDB on container delete: {}",
-            stringBuilder.toString());
+            stringBuilder);
       }
     }
     return nonZero;
@@ -2076,7 +2250,7 @@ public class KeyValueHandler extends Handler {
     // List files left over
     File chunksPath = new
         File(container.getContainerData().getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
+    assertTrue(chunksPath.isDirectory(), () -> chunksPath + " is not a directory");
     boolean notEmpty = false;
     try (DirectoryStream<Path> dir
              = Files.newDirectoryStream(chunksPath.toPath())) {

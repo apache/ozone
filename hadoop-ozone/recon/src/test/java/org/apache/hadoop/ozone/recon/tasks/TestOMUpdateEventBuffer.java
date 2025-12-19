@@ -37,7 +37,7 @@ public class TestOMUpdateEventBuffer {
 
   @BeforeEach
   void setUp() {
-    eventBuffer = new OMUpdateEventBuffer(TEST_CAPACITY);
+    eventBuffer = new OMUpdateEventBuffer(TEST_CAPACITY, null);
   }
 
   @Test

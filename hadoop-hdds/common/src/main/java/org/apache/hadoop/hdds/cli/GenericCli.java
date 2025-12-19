@@ -110,6 +110,7 @@ public abstract class GenericCli implements GenericParentCommand {
     return config;
   }
 
+  @Override
   public UserGroupInformation getUser() throws IOException {
     if (user == null) {
       user = UserGroupInformation.getCurrentUser();

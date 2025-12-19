@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import io.opentracing.Scope;
-import io.opentracing.ScopeManager;
-import io.opentracing.Span;
-import io.opentracing.noop.NoopSpan;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.OutputStream;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -31,18 +26,18 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.ext.Provider;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.io.WrappedOutputStream;
 
 /**
- * Filter used to add jaeger tracing span.
+ * Filter used to add tracing span.
  */
 
 @Provider
 public class TracingFilter implements ContainerRequestFilter,
     ContainerResponseFilter {
 
-  public static final String TRACING_SCOPE = "TRACING_SCOPE";
-  public static final String TRACING_SPAN = "TRACING_SPAN";
+  public static final String TRACING_SPAN_CLOSABLE = "TRACING_SPAN_CLOSABLE";
 
   @Context
   private ResourceInfo resourceInfo;
@@ -51,51 +46,44 @@ public class TracingFilter implements ContainerRequestFilter,
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();
 
-    Span span = GlobalTracer.get().buildSpan(
-        resourceInfo.getResourceClass().getSimpleName() + "." +
-            resourceInfo.getResourceMethod().getName()).start();
-    Scope scope = GlobalTracer.get().activateSpan(span);
-    requestContext.setProperty(TRACING_SCOPE, scope);
-    requestContext.setProperty(TRACING_SPAN, span);
+    TracingUtil.TraceCloseable activatedSpan =
+        TracingUtil.createActivatedSpan(resourceInfo.getResourceClass().getSimpleName() + "." +
+            resourceInfo.getResourceMethod().getName());
+    requestContext.setProperty(TRACING_SPAN_CLOSABLE, activatedSpan);
   }
 
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    final Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
-    final Span span = (Span) requestContext.getProperty(TRACING_SPAN);
+    final TracingUtil.TraceCloseable spanClosable
+        = (TracingUtil.TraceCloseable) requestContext.getProperty(TRACING_SPAN_CLOSABLE);
     // HDDS-7064: Operation performed while writing StreamingOutput response
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
     OutputStream out = responseContext.getEntityStream();
-    if (out != null && !(span instanceof NoopSpan)) {
+    if (out != null) {
       responseContext.setEntityStream(new WrappedOutputStream(out) {
         @Override
         public void close() throws IOException {
           super.close();
-          finishAndClose(scope, span);
+          finishAndClose(spanClosable);
         }
       });
     } else {
-      finishAndClose(scope, span);
+      finishAndClose(spanClosable);
     }
   }
 
-  private static void finishAndClose(Scope scope, Span span) {
-    if (scope != null) {
-      scope.close();
-    }
-    if (span != null) {
-      span.finish();
+  private static void finishAndClose(TracingUtil.TraceCloseable spanClosable) {
+    try {
+      spanClosable.close();
+    } catch (Exception e) {
+      // Do nothing
     }
     finishAndCloseActiveSpan();
   }
 
   private static void finishAndCloseActiveSpan() {
-    ScopeManager scopeManager = GlobalTracer.get().scopeManager();
-    if (scopeManager != null && scopeManager.activeSpan() != null) {
-      scopeManager.activeSpan().finish();
-      scopeManager.activate(null);
-    }
+    TracingUtil.getActiveSpan().end();
   }
 }

@@ -68,7 +68,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -122,14 +121,13 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    * @throws Exception
    */
-  public static void addVolumeAndBucketToDB(String volumeName,
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
-
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+    return addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
         BucketLayout.DEFAULT);
   }
 
-  public static void addVolumeAndBucketToDB(String volumeName,
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager,
       BucketLayout bucketLayout) throws Exception {
 
@@ -137,11 +135,12 @@ public final class OMRequestTestUtils {
             omMetadataManager.getVolumeKey(volumeName))) {
       addVolumeToDB(volumeName, omMetadataManager);
     }
-
-    if (!omMetadataManager.getBucketTable().isExist(
-            omMetadataManager.getBucketKey(volumeName, bucketName))) {
-      addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo == null) {
+      return addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
+    return omBucketInfo;
   }
 
   public static void addVolumeAndBucketToDB(
@@ -591,7 +590,6 @@ public final class OMRequestTestUtils {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setReplicationConfig(replicationConfig)
         .setObjectID(0L)
         .setUpdateID(0L)
@@ -613,7 +611,7 @@ public final class OMRequestTestUtils {
   public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
       long objectID,
       long parentObjID) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -706,11 +704,10 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    * @throws Exception
    */
-  public static void addBucketToDB(String volumeName, String bucketName,
+  public static long addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
-
-    addBucketToDB(volumeName, bucketName, omMetadataManager,
-        BucketLayout.DEFAULT);
+    return addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT).getObjectID();
   }
 
   public static OmBucketInfo addBucketToDB(String volumeName,
@@ -719,6 +716,7 @@ public final class OMRequestTestUtils {
       throws Exception {
     return addBucketToDB(omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setObjectID(System.currentTimeMillis())
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
     );
@@ -1004,18 +1002,15 @@ public final class OMRequestTestUtils {
    * Deletes key from Key table and adds it to DeletedKeys table.
    * @return the deletedKey name
    */
-  public static String deleteKey(String ozoneKey,
-      OMMetadataManager omMetadataManager, long trxnLogIndex)
-      throws IOException {
+  public static String deleteKey(String ozoneKey, long bucketId, OMMetadataManager omMetadataManager,
+      long trxnLogIndex) throws IOException {
     // Retrieve the keyInfo
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
 
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-        omKeyInfo, trxnLogIndex);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId, omKeyInfo, trxnLogIndex);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 

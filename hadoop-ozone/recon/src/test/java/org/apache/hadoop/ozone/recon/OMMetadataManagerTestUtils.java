@@ -408,7 +408,7 @@ public final class OMMetadataManagerTestUtils {
     // Get the Ozone key for the first deleted key
     String omKey = omMetadataManager.getOzoneKey(volName,
         bucketName, keyNames.get(0));
-    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(infos);
+    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(infos, 1);
     // Put the deleted key information into the deleted table
     omMetadataManager.getDeletedTable().put(omKey, repeatedKeyInfo);
   }
@@ -445,7 +445,7 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
             bucketObjectId, parentObjectId, dirName);
     omMetadataManager.getDirectoryTable().put(omKey,
-            new OmDirectoryInfo.Builder()
+            OmDirectoryInfo.newBuilder()
                     .setName(dirName)
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)

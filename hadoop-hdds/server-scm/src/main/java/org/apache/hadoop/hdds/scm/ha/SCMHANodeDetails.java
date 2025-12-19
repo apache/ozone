@@ -44,7 +44,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -52,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -288,8 +288,8 @@ public class SCMHANodeDetails {
   public static SCMNodeDetails getHASCMNodeDetails(OzoneConfiguration conf,
       String localScmServiceId, String localScmNodeId,
       InetSocketAddress rpcAddress, int ratisPort, int grpcPort) {
-    Preconditions.checkNotNull(localScmServiceId);
-    Preconditions.checkNotNull(localScmNodeId);
+    Objects.requireNonNull(localScmServiceId, "localScmServiceId == null");
+    Objects.requireNonNull(localScmNodeId, "localScmNodeId == null");
 
     SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
     builder

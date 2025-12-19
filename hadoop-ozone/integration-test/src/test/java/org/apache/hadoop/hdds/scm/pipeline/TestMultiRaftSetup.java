@@ -67,9 +67,6 @@ public class  TestMultiRaftSetup {
     pipelineManager = scm.getPipelineManager();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();

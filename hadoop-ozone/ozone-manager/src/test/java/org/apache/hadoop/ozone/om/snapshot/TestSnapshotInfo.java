@@ -75,7 +75,6 @@ public class TestSnapshotInfo {
         .setPathPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath("test/path")
-        .setCheckpointDir("checkpoint.testdir")
         .build();
   }
 

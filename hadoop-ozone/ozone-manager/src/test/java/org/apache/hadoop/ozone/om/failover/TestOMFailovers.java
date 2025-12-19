@@ -74,7 +74,7 @@ public class TestOMFailovers {
     // Request should try all OMs one be one and fail when the last OM also
     // throws AccessControlException.
     assertThat(serviceException).hasCauseInstanceOf(AccessControlException.class)
-        .hasMessage("ServiceException of type class org.apache.hadoop.security.AccessControlException for om3");
+        .hasMessageStartingWith("ServiceException of type class org.apache.hadoop.security.AccessControlException");
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om1"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om2"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om3"));

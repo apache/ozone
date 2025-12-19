@@ -20,15 +20,15 @@ summary: Advanced tool to repair Ozone.
   limitations under the License.
 -->
 
-Ozone Repair (`ozone repair`) is an advanced tool to repair Ozone. The nodes being repaired must be stopped before the tool is run.
+Ozone Repair (`ozone repair`) is an advanced tool to repair Ozone. Check the `--help` output of the subcommand for the respective role status requirements.
 Note: All repair commands support a `--dry-run` option which allows a user to see what repair the command will be performing without actually making any changes to the cluster.
 Use the `--force` flag to override the running service check in false-positive cases.
 
 ```bash
 Usage: ozone repair [-hV] [--verbose] [-conf=<configurationPath>]
                     [-D=<String=String>]... [COMMAND]
-Advanced tool to repair Ozone. The nodes being repaired must be stopped before
-the tool is run.
+Advanced tool to repair Ozone. Check the --help output of the subcommand for
+the respective role status requirements.
       -conf=<configurationPath>
 
   -D, --set=<String=String>
@@ -50,18 +50,21 @@ Operational tool to repair datanode.
 ### upgrade-container-schema
 Upgrade all schema V2 containers to schema V3 for a datanode in offline mode.
 Optionally takes `--volume` option to specify which volume needs the upgrade.
+Datanode should be stopped before running this tool.
 
 ## ozone repair ldb
 Operational tool to repair ldb.
 
 ### compact
 Compact a column family in the DB to clean up tombstones while the service is offline.
+The corresponding OM, SCM or Datanode role should be stopped before running this tool.
 ```bash
 Usage: ozone repair ldb compact [-hV] [--dry-run] [--force] [--verbose]
                                 --cf=<columnFamilyName> --db=<dbPath>
 CLI to compact a column-family in the DB while the service is offline.
 Note: If om.db is compacted with this tool then it will negatively impact the
-Ozone Manager\'s efficient snapshot diff.
+Ozone Manager\'s efficient snapshot diff. The corresponding OM, SCM or Datanode
+role should be stopped for this tool.
       --cf, --column-family, --column_family=<columnFamilyName>
                       Column family name
       --db=<dbPath>   Database File Path
@@ -81,13 +84,13 @@ Operational tool to repair OM.
 ### fso-tree
 Identify and repair a disconnected FSO tree by marking unreferenced entries for deletion.
 Reports the reachable, unreachable (pending delete) and unreferenced (orphaned) directories and files.
-OM should be stopped while this tool is run.
+OM should be stopped before running this tool.
 ```bash
 Usage: ozone repair om fso-tree [-hV] [--dry-run] [--force] [--verbose]
                                 [-b=<bucketFilter>] --db=<omDBPath>
                                 [-v=<volumeFilter>]
 Identify and repair a disconnected FSO tree by marking unreferenced entries for
-deletion. OM should be stopped while this tool is run.
+deletion. OM should be stopped for this tool.
   -b, --bucket=<bucketFilter>
                         Filter by bucket name
       --db=<omDBPath>   Path to OM RocksDB
@@ -100,6 +103,7 @@ Subcommand for all snapshot related repairs.
 
 #### chain
 Update global and path previous snapshot for a snapshot in case snapshot chain is corrupted.
+OM should be stopped before running this tool.
 ```bash
 Usage: ozone repair om snapshot chain [-hV] [--dry-run] [--force] [--verbose]
                                       --db=<dbPath>
@@ -107,7 +111,7 @@ Usage: ozone repair om snapshot chain [-hV] [--dry-run] [--force] [--verbose]
                                       --pp=<pathPreviousSnapshotId> <value>
                                       <snapshotName>
 CLI to update global and path previous snapshot for a snapshot in case snapshot
-chain is corrupted.
+chain is corrupted. OM should be stopped for this tool.
       <value>          URI of the bucket (format: volume/bucket).
       <snapshotName>   Snapshot name to update
       --db=<dbPath>    Database File Path
@@ -119,12 +123,13 @@ chain is corrupted.
 
 ### update-transaction
 To avoid modifying Ratis logs and only update the latest applied transaction, use `update-transaction` command. 
-This updates the highest transaction index in the OM transaction info table.
+This updates the highest transaction index in the OM transaction info table. The OM role should be stopped before running this tool.
 ```bash
 Usage: ozone repair om update-transaction [-hV] [--dry-run] [--force]
        [--verbose] --db=<dbPath> --index=<highestTransactionIndex>
        --term=<highestTransactionTerm>
-CLI to update the highest index in transaction info table.
+CLI to update the highest index in transaction info table. The corresponding OM
+or SCM role should be stopped for this tool.
       --db=<dbPath>   Database File Path
       --index=<highestTransactionIndex>
                       Highest index to set. The input should be non-zero long
@@ -135,7 +140,7 @@ CLI to update the highest index in transaction info table.
 ```
 
 ### quota
-Operational tool to repair quota in OM DB.
+Operational tool to repair quota in OM DB. OM should be running for this tool.
 
 #### start
 To trigger quota repair use the `start` command.
@@ -177,12 +182,13 @@ CLI to get the status of last trigger quota repair if available.
 
 ### compact
 Compact a column family in the OM DB to clean up tombstones. The compaction happens asynchronously. Requires admin privileges.
+OM should be running for this tool.
 ```bash
 Usage: ozone repair om compact [-hV] [--dry-run] [--force] [--verbose]
                                --cf=<columnFamilyName> [--node-id=<nodeId>]
                                [--service-id=<omServiceId>]
 CLI to compact a column family in the om.db. The compaction happens
-asynchronously. Requires admin privileges.
+asynchronously. Requires admin privileges. OM should be running for this tool.
       --cf, --column-family, --column_family=<columnFamilyName>
                            Column family name
       --node-id=<nodeId>   NodeID of the OM for which db needs to be compacted.
@@ -194,6 +200,7 @@ asynchronously. Requires admin privileges.
 Omit a raft log in a ratis segment file by replacing the specified index with a dummy EchoOM command. 
 This is an offline tool meant to be used only when all 3 OMs crash on the same transaction. 
 If the issue is isolated to one OM, manually copy the DB from a healthy OM instead.
+OM should be stopped before running this tool.
 ```bash
 Usage: ozone repair om skip-ratis-transaction [-hV] [--dry-run] [--force]
        [--verbose] -b=<backupDir> --index=<index> (-s=<segmentFile> |
@@ -204,7 +211,8 @@ an offline command i.e., doesn\'t require OM to be running. The command should
 be run for the same transaction on all 3 OMs only when all the OMs are crashing
 while applying the same transaction. If only one OM is crashing and the other
 OMs have executed the log successfully, then the DB should be manually copied
-from one of the good OMs to the crashing OM instead.
+from one of the good OMs to the crashing OM instead. OM should be stopped for
+this tool.
   -b, --backup=<backupDir>   Directory to put the backup of the original
                                repaired segment file before the repair.
   -d, --ratis-log-dir=<logDir>
@@ -226,22 +234,24 @@ Operational tool to repair SCM.
 Subcommand for all certificate related repairs on SCM
 
 #### recover
-Recover Deleted SCM Certificate from RocksDB
+Recover Deleted SCM Certificate from RocksDB. SCM should be stopped before running this tool.
 ```bash
 Usage: ozone repair scm cert recover [-hV] [--dry-run] [--force] [--verbose]
                                      --db=<dbPath>
-Recover Deleted SCM Certificate from RocksDB
+Recover Deleted SCM Certificate from RocksDB. SCM should be stopped for this
+tool.
       --db=<dbPath>   SCM DB Path
 ```
 
 ### update-transaction
 To avoid modifying Ratis logs and only update the latest applied transaction, use `update-transaction` command.
-This updates the highest transaction index in the SCM transaction info table.
+This updates the highest transaction index in the SCM transaction info table. The SCM role should be stopped before running this tool.
 ```bash
 Usage: ozone repair scm update-transaction [-hV] [--dry-run] [--force]
        [--verbose] --db=<dbPath> --index=<highestTransactionIndex>
        --term=<highestTransactionTerm>
-CLI to update the highest index in transaction info table.
+CLI to update the highest index in transaction info table. The corresponding OM
+or SCM role should be stopped for this tool.
       --db=<dbPath>   Database File Path
       --index=<highestTransactionIndex>
                       Highest index to set. The input should be non-zero long

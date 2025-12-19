@@ -17,8 +17,9 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.ozone.om.helpers.OmKeyInfo.isKeyEmpty;
+
 import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -26,7 +27,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -58,7 +58,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       BatchOperation batchOperation,
       Table<String, ?> fromTable,
       String keyName,
-      OmKeyInfo omKeyInfo) throws IOException {
+      OmKeyInfo omKeyInfo,
+      long bucketId,
+      boolean isCommittedKey) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -75,8 +77,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID()
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
       );
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), keyName);
@@ -96,12 +99,15 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
    * @param omKeyInfo
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected void addDeletionToBatch(
       OMMetadataManager omMetadataManager,
       BatchOperation batchOperation,
       Table<String, ?> fromTable,
       String keyName, String deleteKeyName,
-      OmKeyInfo omKeyInfo) throws IOException {
+      OmKeyInfo omKeyInfo,
+      long bucketId,
+      boolean isCommittedKey) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -118,8 +124,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID()
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
       );
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, deleteKeyName, repeatedOmKeyInfo);
@@ -129,24 +136,4 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
   @Override
   public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
         BatchOperation batchOperation) throws IOException;
-
-  /**
-   * Check if the key is empty or not. Key will be empty if it does not have
-   * blocks.
-   *
-   * @param keyInfo
-   * @return if empty true, else false.
-   */
-  private boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
-    if (keyInfo == null) {
-      return true;
-    }
-    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
-            .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationListCount() != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
 }

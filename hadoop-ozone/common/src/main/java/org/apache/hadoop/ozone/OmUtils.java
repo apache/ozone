@@ -531,6 +531,7 @@ public final class OmUtils {
    * repeatedOmKeyInfo instance.
    * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
+   * @param bucketId bucket id
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
@@ -538,25 +539,27 @@ public final class OmUtils {
    *                     the same updateID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    */
-  public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
+  public static RepeatedOmKeyInfo prepareKeyForDelete(long bucketId, OmKeyInfo keyInfo,
       long trxnLogIndex) {
+    OmKeyInfo.Builder builder = keyInfo.toBuilder();
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
     if (Boolean.parseBoolean(
             keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
     ) {
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
-      keyInfo.clearFileEncryptionInfo();
+      builder.metadata().remove(OzoneConsts.GDPR_FLAG);
+      builder.metadata().remove(OzoneConsts.GDPR_ALGORITHM);
+      builder.metadata().remove(OzoneConsts.GDPR_SECRET);
+    
+      builder.setFileEncryptionInfo(null);
     }
 
     // Set the updateID
-    keyInfo.setUpdateID(trxnLogIndex);
+    builder.setUpdateID(trxnLogIndex);
 
     //The key doesn't exist in deletedTable, so create a new instance.
-    return new RepeatedOmKeyInfo(keyInfo);
+    return new RepeatedOmKeyInfo(builder.build(), bucketId);
   }
 
   /**
@@ -567,7 +570,7 @@ public final class OmUtils {
     try {
       HddsClientUtils.verifyResourceName(volumeName, "volume", isStrictS3);
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid volume name: " + volumeName,
+      throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
   }
@@ -580,7 +583,7 @@ public final class OmUtils {
     try {
       HddsClientUtils.verifyResourceName(bucketName, "bucket", isStrictS3);
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid bucket name: " + bucketName,
+      throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_BUCKET_NAME);
     }
   }

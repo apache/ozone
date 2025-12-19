@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -84,7 +84,6 @@ public class TestTriggerDBSyncEndpoint {
         Files.createDirectory(temporaryFolder.resolve("ReconDb"))
             .toFile().getAbsolutePath());
     configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
-    CommonUtils commonUtils = new CommonUtils();
     OzoneManagerProtocol ozoneManagerProtocol
         = mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocol.getDBUpdates(any(OzoneManagerProtocolProtos
@@ -117,7 +116,7 @@ public class TestTriggerDBSyncEndpoint {
         .thenReturn(httpURLConnectionMock);
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
+        ReconTestUtils.getReconNodeDetails());
 
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =

@@ -308,16 +308,13 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Validates balancer's state based on the specified expectedRunning.
+   * Validates balancer's eligibility based on SCM state.
    * Confirms SCM is leader-ready and out of safe mode.
    *
-   * @param expectedRunning true if ContainerBalancer is expected to be
-   *                        running, else false
    * @throws IllegalContainerBalancerStateException if SCM is not
-   * leader-ready, is in safe mode, or state does not match the specified
-   * expected state
+   * leader-ready or is in safe mode
    */
-  private void validateState(boolean expectedRunning)
+  private void validateEligibility()
       throws IllegalContainerBalancerStateException {
     if (!scmContext.isLeaderReady()) {
       LOG.warn("SCM is not leader ready");
@@ -328,6 +325,19 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn("SCM is in safe mode");
       throw new IllegalContainerBalancerStateException("SCM is in safe mode");
     }
+  }
+
+  /**
+   * Validates balancer's state based on the specified expectedRunning.
+   *
+   * @param expectedRunning true if ContainerBalancer is expected to be
+   *                        running, else false
+   * @throws IllegalContainerBalancerStateException if state does not
+   * match the specified expected state
+   */
+  private void validateState(boolean expectedRunning)
+      throws IllegalContainerBalancerStateException {
+    validateEligibility();
     if (!expectedRunning && !canBalancerStart()) {
       throw new IllegalContainerBalancerStateException(
           "Expect ContainerBalancer as not running state" +
@@ -387,18 +397,22 @@ public class ContainerBalancer extends StatefulService {
    */
   public void stopBalancer()
       throws IOException, IllegalContainerBalancerStateException {
-    Thread balancingThread;
+    Thread balancingThread = null;
     lock.lock();
     try {
-      validateState(true);
+      validateEligibility();
       saveConfiguration(config, false, 0);
-      LOG.info("Trying to stop ContainerBalancer service.");
-      task.stop();
-      balancingThread = currentBalancingThread;
+      if (isBalancerRunning()) {
+        LOG.info("Trying to stop ContainerBalancer service.");
+        task.stop();
+        balancingThread = currentBalancingThread;
+      }
     } finally {
       lock.unlock();
     }
-    blockTillTaskStop(balancingThread);
+    if (balancingThread != null) {
+      blockTillTaskStop(balancingThread);
+    }
   }
 
   public void saveConfiguration(ContainerBalancerConfiguration configuration,

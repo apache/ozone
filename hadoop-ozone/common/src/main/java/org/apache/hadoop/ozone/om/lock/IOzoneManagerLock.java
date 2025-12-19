@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Interface for OM Metadata locks.
@@ -71,6 +73,53 @@ public interface IOzoneManagerLock {
   void cleanup();
 
   OMLockMetrics getOMLockMetrics();
+
+  default UncheckedAutoCloseableSupplier<OMLockDetails> acquireResourceLock(Resource resource) {
+
+    OMLockDetails lockDetails = acquireResourceWriteLock(resource);
+    if (!lockDetails.isLockAcquired()) {
+      throw new RuntimeException("Failed to acquire lock for resource " + resource.getName());
+    }
+    AtomicBoolean closed = new AtomicBoolean(false);
+    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+      @Override
+      public void close() {
+        if (closed.compareAndSet(false, true)) {
+          releaseResourceWriteLock(resource);
+        }
+      }
+
+      @Override
+      public OMLockDetails get() {
+        return lockDetails;
+      }
+    };
+  }
+
+  default UncheckedAutoCloseableSupplier<OMLockDetails> acquireLock(Resource resource, String key, boolean isReadLock) {
+    OMLockDetails lockDetails = isReadLock ? acquireReadLock(resource, key) : acquireWriteLock(resource, key);
+    if (!lockDetails.isLockAcquired()) {
+      throw new RuntimeException("Failed to acquire lock for resource " + resource.getName() + " with key " + key);
+    }
+    AtomicBoolean closed = new AtomicBoolean(false);
+    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+      @Override
+      public void close() {
+        if (closed.compareAndSet(false, true)) {
+          if (isReadLock) {
+            releaseReadLock(resource, key);
+          } else {
+            releaseWriteLock(resource, key);
+          }
+        }
+      }
+
+      @Override
+      public OMLockDetails get() {
+        return lockDetails;
+      }
+    };
+  }
 
   /**
    * Defines a resource interface used to represent entities that can be

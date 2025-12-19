@@ -127,7 +127,8 @@ public class TestLdbRepair {
         "--db", dbPath.toString(),
         "--column-family", TEST_CF_NAME
     };
-    int exitCode = withTextFromSystemIn("y")
+    // Pass two "y" inputs - one for user confirmation and the other for warning to stop service
+    int exitCode = withTextFromSystemIn("y", "y")
         .execute(() -> cmd.execute(args));
     assertEquals(0, exitCode, "Compaction command should execute successfully");
     long sizeAfterCompaction = calculateSstFileSize(dbPath);
@@ -148,7 +149,7 @@ public class TestLdbRepair {
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath.toString());
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath.toString(), cfDescList, cfHandleList)) {
       List<LiveFileMetaData> liveFileMetaDataList = RdbUtil
-          .getLiveSSTFilesForCFs(db, Collections.singletonList(TEST_CF_NAME));
+          .getLiveSSTFilesForCFs(db, Collections.singleton(TEST_CF_NAME));
       for (LiveFileMetaData liveMetadata : liveFileMetaDataList) {
         assertEquals(0, liveMetadata.numDeletions(),
             "Tombstones found in file: " + liveMetadata.fileName());

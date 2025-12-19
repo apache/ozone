@@ -19,10 +19,14 @@ if [[ "${OZONE_SHELL_EXECNAME}" == ozone ]]; then
 fi
 
 _ozone_manager_hadoop_finalize() {
-  if [[ "${OZONE_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]] &&
-     [[ -n ${OZONE_MANAGER_CLASSPATH} ]];
-  then
-    echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
-    ozone_add_to_classpath_userpath "${OZONE_MANAGER_CLASSPATH}"
+  if [[ "${OZONE_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]]; then
+    if [[ -n ${OZONE_MANAGER_CLASSPATH} ]]; then
+      echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
+      ozone_add_to_classpath_userpath "${OZONE_MANAGER_CLASSPATH}"
+    fi
+
+    if [[ ! "$OZONE_CLASSPATH" =~ "ozone-multitenancy" ]]; then
+      ozone_add_classpath_from_file "${OZONE_HOME}/share/ozone/classpath/ozone-multitenancy-ranger.classpath"
+    fi
   fi
 }

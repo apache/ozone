@@ -93,7 +93,6 @@ public class TestSnapshotChain {
         .setPathPreviousSnapshotId(pathPrevID)
         .setGlobalPreviousSnapshotId(globalPrevID)
         .setSnapshotPath(String.join("/", "vol1", "bucket1"))
-        .setCheckpointDir("checkpoint.testdir")
         .build();
   }
 
