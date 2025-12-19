@@ -149,7 +149,8 @@ Each object represents the storage metrics for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "minimumFreeSpace": 1080992000
+      "minimumFreeSpace": 1080992000,
+      "reserved": 108110008
     },
     {
       "datanodeUuid": "d211a430-6363-4882-a4b5-5d3275652e5a",
@@ -158,7 +159,8 @@ Each object represents the storage metrics for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "minimumFreeSpace": 1080992000
+      "minimumFreeSpace": 1080992000,
+      "reserved": 108110008
     },
     {
       "datanodeUuid": "70fd6c8c-b3f3-43ad-83ac-4e0dc6e9d74d",
@@ -167,7 +169,8 @@ Each object represents the storage metrics for a single DataNode.
       "used": 5248118784,
       "remaining": 1000839806976,
       "committed": 0,
-      "minimumFreeSpace": 1080992000
+      "minimumFreeSpace": 1080992000,
+      "reserved": 108110008
     }
   ]
 }
