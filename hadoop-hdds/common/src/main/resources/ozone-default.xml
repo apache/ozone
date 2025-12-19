@@ -2060,8 +2060,8 @@
     <value>5m</value>
     <tag>OZONE, OM</tag>
     <description>Time interval used to update the space consumption stats of the
-      Ozone Manager snapshot directories. Background thread periodically saves these
-      stats. Unit could be defined with postfix (ns,ms,s,m,h,d)
+      Ozone Manager snapshot directories. Background thread periodically calculates
+      and updates these stats. Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>

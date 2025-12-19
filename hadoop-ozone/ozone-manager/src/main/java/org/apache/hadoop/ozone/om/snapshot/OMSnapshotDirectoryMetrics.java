@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Metrics for tracking db.snapshots directory space usage and SST file counts.
- * Provides both aggregate metrics and per-checkpoint-directory metrics.
+ * Provides aggregate metrics.
  * Metrics are updated asynchronously to avoid blocking operations.
  */
 @InterfaceAudience.Private
@@ -90,7 +90,7 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
 
   /**
    * @return if the update was successful.
-   * Updates all metrics synchronously - both aggregate and per-checkpoint-directory.
+   * Updates aggregate metrics synchronously.
    */
   @Override
   protected boolean updateMetrics() {
@@ -139,29 +139,34 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     int snapshotCount = 0;
     try (Stream<Path> checkpointDirs = Files.list(directory.toPath())) {
       for (Path checkpointDir : checkpointDirs.collect(Collectors.toList())) {
-        snapshotCount++;
-        try (Stream<Path> files = Files.list(checkpointDir)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (Files.isRegularFile(path)) {
-              try {
-                // Get inode number
-                Object fileKey = IOUtils.getINode(path);
-                if (fileKey == null) {
-                  // Fallback: use file path + size as unique identifier
-                  fileKey = path.toAbsolutePath() + ":" + Files.size(path);
-                }
-                // Only count this file if we haven't seen this inode before
-                if (visitedInodes.add(fileKey)) {
+        if (Files.isDirectory(checkpointDir)) {
+          snapshotCount++;
+          try (Stream<Path> files = Files.list(checkpointDir)) {
+            for (Path path : files.collect(Collectors.toList())) {
+              if (Files.isRegularFile(path)) {
+                try {
+                  // Get inode number
+                  Object fileKey = IOUtils.getINode(path);
+                  if (fileKey == null) {
+                    // Fallback: use file path + size as unique identifier
+                    fileKey = path.toAbsolutePath() + ":" + Files.size(path);
+                  }
+                  // Only count this file if we haven't seen this inode before
+                  if (visitedInodes.add(fileKey)) {
+                    if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
+                      sstFileCount++;
+                    }
+                    totalSize += Files.size(path);
+                  }
+                } catch (UnsupportedOperationException | IOException e) {
+                  // Fallback: if we can't get inode, just count the file size.
+                  LOG.warn("Could not get inode for {}, using file size directly: {}",
+                      path, e.getMessage());
+                  totalSize += Files.size(path);
                   if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
                     sstFileCount++;
                   }
-                  totalSize += Files.size(path);
                 }
-              } catch (UnsupportedOperationException | IOException e) {
-                // Fallback: if we can't get inode, just count the file size.
-                LOG.error("Could not get inode for {}, using file size directly: {}",
-                    path, e.getMessage());
-                totalSize += Files.size(path);
               }
             }
           }
