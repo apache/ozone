@@ -18,12 +18,17 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -56,29 +61,59 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       arity = "1")
   private Boolean stopAfterDiskEven;
 
+  // Track nodes that are already running for display purposes (using Set to avoid duplicates)
+  private final Set<String> alreadyRunningNodes = new LinkedHashSet<>();
+
   @Override
   protected Object executeCommand(String hostName) throws IOException {
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
+      // Check if DiskBalancer is already running before starting
+      DatanodeDiskBalancerInfoProto status = diskBalancerProxy.getDiskBalancerInfo();
+      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
+      
+      if (status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING) {
+        // Track this node as already running
+        alreadyRunningNodes.add(dnHostname);
+        
+        // Return a skipped result
+        return createJsonResult(dnHostname, "skipped",
+            "DiskBalancer operation is already running.");
+      }
+
+      // Not running, proceed with start
       DiskBalancerConfigurationProto config = buildConfigProto();
       diskBalancerProxy.startDiskBalancer(config);
 
-      // Get hostname for consistent JSON output
-      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
-
-      Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", dnHostname);
-      result.put("action", "start");
-      result.put("status", "success");
-      Map<String, Object> configMap = getConfigurationMap();
-      if (configMap != null && !configMap.isEmpty()) {
-        result.put("configuration", configMap);
-      }
-      return result;
+      // Return a success result
+      return createJsonResult(dnHostname, "success", null);
     } finally {
       diskBalancerProxy.close();
     }
+  }
+
+  /**
+   * Create a JSON result map for the start command.
+   * 
+   * @param hostname the datanode hostname
+   * @param status the status ("success" or "skipped")
+   * @param message optional message (for skipped status)
+   * @return result map
+   */
+  private Map<String, Object> createJsonResult(String hostname, String status, String message) {
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("datanode", hostname);
+    result.put("action", "start");
+    result.put("status", status);
+    if (message != null) {
+      result.put("message", message);
+    }
+    Map<String, Object> configMap = getConfigurationMap();
+    if (configMap != null && !configMap.isEmpty()) {
+      result.put("configuration", configMap);
+    }
+    return result;
   }
 
   private DiskBalancerConfigurationProto buildConfigProto() {
@@ -107,22 +142,44 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       return;
     }
 
-    if (isBatchMode()) {
-      if (!failedNodes.isEmpty()) {
-        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
-            String.join(", ", failedNodes));
-      } else {
-        System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
-      }
+    // avoid showing duplicate nodes in output
+    List<String> uniqueSuccessNodes = new ArrayList<>(new LinkedHashSet<>(successNodes));
+    List<String> uniqueFailedNodes = new ArrayList<>(new LinkedHashSet<>(failedNodes));
+
+    // Filter out skipped nodes from successNodes
+    List<String> actualSuccessNodes = new ArrayList<>(uniqueSuccessNodes);
+    actualSuccessNodes.removeAll(alreadyRunningNodes);
+
+    // Check if all nodes are already running (batch mode only)
+    boolean allNodesAlreadyRunning = isBatchMode() && actualSuccessNodes.isEmpty() 
+        && uniqueFailedNodes.isEmpty() && !alreadyRunningNodes.isEmpty();
+
+    if (allNodesAlreadyRunning) {
+      System.out.println("DiskBalancer operation is already running on all IN_SERVICE and HEALTHY nodes.");
     } else {
-      // Detailed message for specific nodes
-      if (!successNodes.isEmpty()) {
-        System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", successNodes));
+      // Display warning for nodes that are already running (if not all)
+      if (!alreadyRunningNodes.isEmpty()) {
+        System.out.printf("DiskBalancer operation is already running on : [%s]%n",
+            String.join(", ", alreadyRunningNodes));
       }
-      if (!failedNodes.isEmpty()) {
-        System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", failedNodes));
+
+      if (isBatchMode()) {
+        if (!uniqueFailedNodes.isEmpty()) {
+          System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
+              String.join(", ", uniqueFailedNodes));
+        }
+        if (!actualSuccessNodes.isEmpty()) {
+          System.out.println("Started DiskBalancer operation on all other IN_SERVICE and HEALTHY DNs.");
+        }
+      } else {
+        if (!actualSuccessNodes.isEmpty()) {
+          System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
+              String.join(", ", actualSuccessNodes));
+        }
+        if (!uniqueFailedNodes.isEmpty()) {
+          System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
+              String.join(", ", uniqueFailedNodes));
+        }
       }
     }
   }
