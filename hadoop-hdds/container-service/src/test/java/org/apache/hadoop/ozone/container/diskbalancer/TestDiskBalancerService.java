@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -324,5 +325,40 @@ public class TestDiskBalancerService {
   private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
     String schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  public static Stream<Arguments> thresholdValidationTestCases() {
+    return Stream.of(
+        // Invalid values that should throw IllegalArgumentException
+        Arguments.arguments(0.0, true, null),
+        Arguments.arguments(100.0, true, null),
+        Arguments.arguments(-1.0, true, null),
+        Arguments.arguments(-0.001, true, null),
+        Arguments.arguments(100.001, true, null),
+        // Valid boundary values that should be accepted
+        Arguments.arguments(0.001, false, 0.001),
+        Arguments.arguments(99.999, false, 99.999),
+        // Valid middle values that should be accepted
+        Arguments.arguments(50.5, false, 50.5),
+        Arguments.arguments(99.0, false, 99.0)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("thresholdValidationTestCases")
+  public void testDiskBalancerConfigurationThresholdValidation(double threshold,
+      boolean shouldThrowException, Double expectedThreshold) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+
+    if (shouldThrowException) {
+      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+          () -> config.setThreshold(threshold));
+      assertEquals("Threshold must be a percentage(double) in the range 0 to 100 both exclusive.",
+          exception.getMessage());
+    } else {
+      // Valid threshold should be accepted
+      config.setThreshold(threshold);
+      assertEquals(expectedThreshold, config.getThreshold(), 0.0001);
+    }
   }
 }
