@@ -238,4 +238,17 @@ public class RequestContext {
   public String getSessionPolicy() {
     return sessionPolicy;
   }
+
+  public Builder toBuilder() {
+    return newBuilder()
+        .setHost(host)
+        .setIp(ip)
+        .setClientUgi(clientUgi)
+        .setServiceId(serviceId)
+        .setAclType(aclType)
+        .setAclRights(aclRights)
+        .setOwnerName(ownerName)
+        .setRecursiveAccessCheck(recursiveAccessCheck)
+        .setSessionPolicy(sessionPolicy);
+  }
 }

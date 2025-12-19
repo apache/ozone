@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -589,8 +590,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public boolean checkAcls(OzoneObj obj, RequestContext context,
       boolean throwIfPermissionDenied) throws OMException {
 
+    final RequestContext normalizedRequestContext = maybeAttachSessionPolicyFromThreadLocal(context);
+
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
-        () -> accessAuthorizer.checkAccess(obj, context))) {
+        () -> accessAuthorizer.checkAccess(obj, normalizedRequestContext))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -599,11 +602,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getShortUserName(), context.getAclRights(),
+            normalizedRequestContext.getClientUgi().getShortUserName(),
+            normalizedRequestContext.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
-            "User " + context.getClientUgi().getShortUserName() +
-            " doesn't have " + context.getAclRights() +
+            "User " + normalizedRequestContext.getClientUgi().getShortUserName() +
+            " doesn't have " + normalizedRequestContext.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
       }
@@ -611,6 +615,24 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     } else {
       return true;
     }
+  }
+
+  /**
+   * Attaches session policy to RequestContext if an STSTokenIdentifier is found in the Ozone Manager thread local
+   * (meaning this is an STS request), and the STSTokenIdentifier has a session policy.  Otherwise, returns the
+   * RequestContext as it was before.
+   * @param context the original RequestContext
+   * @return RequestContext as before or with sessionPolicy embedded
+   */
+  private RequestContext maybeAttachSessionPolicyFromThreadLocal(RequestContext context) {
+    final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+    if (stsTokenIdentifier == null) {
+      return context;
+    }
+
+    return context.toBuilder()
+        .setSessionPolicy(stsTokenIdentifier.getSessionPolicy())
+        .build();
   }
 
   static String getClientAddress() {
