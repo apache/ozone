@@ -66,7 +66,6 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
@@ -164,8 +163,6 @@ public class DiskBalancerService extends BackgroundService {
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
-
-    constructTmpDir();
   }
 
   /**
@@ -177,13 +174,53 @@ public class DiskBalancerService extends BackgroundService {
     applyDiskBalancerInfo(diskBalancerInfo);
   }
 
+  /**
+   * Checks if the tmp directory exists for the given volume.
+   * Creates it if it doesn't exist yet and properly initializes the volume's tmpDir field.
+   *
+   * @param volume the HddsVolume to ensure tmp directory for
+   * @return the tmp directory File
+   * @throws IOException if tmp directory cannot be created
+   */
+  private File checkTmpDirExists(HddsVolume volume) throws IOException {
+    File tmpDir = volume.getTmpDir();
+    if (tmpDir == null) {
+      // If tmpDir is not yet initialized, create it using createTmpDirs()
+      // This properly initializes the volume's tmpDir field
+      String clusterId = volume.getClusterID();
+      if (clusterId == null) {
+        throw new IOException("ClusterID is not set for volume " +
+            volume.getStorageDir());
+      }
+      // Use workingDirName if available, otherwise use clusterId
+      String workDirName = volume.getWorkingDirName();
+      if (workDirName == null) {
+        File clusterIdDir = new File(volume.getStorageDir(), clusterId);
+        if (!clusterIdDir.exists()) {
+          Files.createDirectories(clusterIdDir.toPath());
+        }
+        workDirName = clusterId;
+      }
+      // This will create tmpDir and set it on the volume object
+      // createTmpDirs() uses Files.createDirectories() which creates parent dirs if needed
+      volume.createTmpDirs(workDirName);
+      tmpDir = volume.getTmpDir();
+    }
+    return tmpDir;
+  }
+
   private void constructTmpDir() throws IOException {
     for (HddsVolume volume:
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-      Path tmpDir = getDiskBalancerTmpDir(volume);
+      // check if tmp directory exists if not, initialize it
+      checkTmpDirExists(volume);
+      Path diskBalancerTmpDir = getDiskBalancerTmpDir(volume);
       try {
-        FileUtils.deleteDirectory(tmpDir.toFile());
-        FileUtils.forceMkdir(tmpDir.toFile());
+        // Clean up any existing diskBalancer directory and recreate it
+        if (diskBalancerTmpDir.toFile().exists()) {
+          FileUtils.deleteDirectory(diskBalancerTmpDir.toFile());
+        }
+        FileUtils.forceMkdir(diskBalancerTmpDir.toFile());
       } catch (IOException ex) {
         LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
             ex);
@@ -341,6 +378,18 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   @Override
+  public synchronized void start() {
+    // Ensure tmp directories are properly constructed before starting the service
+    try {
+      constructTmpDir();
+    } catch (IOException e) {
+      LOG.error("Failed to construct diskBalancer tmp directories before starting service", e);
+      throw new RuntimeException("Failed to initialize diskBalancer tmp directories", e);
+    }
+    super.start();
+  }
+
+  @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
@@ -462,8 +511,8 @@ public class DiskBalancerService extends BackgroundService {
       container.readLock();
       try {
         // Step 1: Copy container to new Volume's tmp Dir
-        diskBalancerTmpDir = destVolume.getTmpDir().toPath()
-            .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
+        diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
+            .resolve(String.valueOf(containerId));
         ozoneContainer.getController().copyContainer(containerData, diskBalancerTmpDir);
 
         // Step 2: verify checksum and Transition Temp container to Temp C1-RECOVERING
@@ -682,9 +731,8 @@ public class DiskBalancerService extends BackgroundService {
     return totalBytesToMove;
   }
 
-  private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    return Paths.get(hddsVolume.getVolumeRootDir())
-        .resolve(StorageVolume.TMP_DIR_NAME).resolve(DISK_BALANCER_DIR);
+  private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) throws IOException {
+    return hddsVolume.getTmpDir().toPath().resolve(DISK_BALANCER_DIR);
   }
 
   public DiskBalancerServiceMetrics getMetrics() {
