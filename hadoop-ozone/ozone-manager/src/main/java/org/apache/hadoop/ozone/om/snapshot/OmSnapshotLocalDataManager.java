@@ -789,11 +789,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     /**
-     * Returns the last defrag time, in epoch milliseconds.
-     * @return Timestamp of the last defrag
+     * Returns the version of the snapshot local data.
+     * @return Version of the snapshot local data
      */
-    public long getLastDefragTime() {
-      return snapshotLocalData.getLastDefragTime();
+    public long getVersion() {
+      return snapshotLocalData.getVersion();
     }
 
     @Override

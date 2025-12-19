@@ -150,8 +150,8 @@ public class SstFilteringService extends BackgroundService
         }
         try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
                  localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
-          // If last defrag time is not 0, it means the snapshot has been defragged
-          return provider.getLastDefragTime() != 0;
+          // If snapshot local data version is not 0, it means the snapshot has been defragged
+          return provider.getVersion() > 0;
         }
       } catch (IOException e) {
         LOG.debug("Error checking if snapshot {} is defragged", snapshotInfo.getSnapshotId(), e);
