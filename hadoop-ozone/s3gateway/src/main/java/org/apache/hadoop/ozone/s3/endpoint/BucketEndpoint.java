@@ -114,25 +114,22 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @GET
-  @SuppressWarnings({"parameternumber", "methodlength"})
+  @SuppressWarnings("methodlength")
   public Response get(
       @PathParam(BUCKET) String bucketName,
-      @QueryParam(QueryParams.DELIMITER) String delimiter,
-      @QueryParam(QueryParams.ENCODING_TYPE) String encodingType,
-      @QueryParam(QueryParams.MARKER) String marker,
       @DefaultValue("1000") @QueryParam(QueryParams.MAX_KEYS) int maxKeys,
-      @QueryParam(QueryParams.PREFIX) String prefix,
-      @QueryParam(QueryParams.CONTINUATION_TOKEN) String continueToken,
-      @QueryParam(QueryParams.START_AFTER) String startAfter,
-      @QueryParam(QueryParams.UPLOADS) String uploads,
-      @QueryParam(QueryParams.ACL) String aclMarker,
-      @QueryParam(QueryParams.KEY_MARKER) String keyMarker,
-      @QueryParam(QueryParams.UPLOAD_ID_MARKER) String uploadIdMarker,
       @DefaultValue("1000") @QueryParam(QueryParams.MAX_UPLOADS) int maxUploads
   ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
+
+    final String continueToken = getQueryParam(QueryParams.CONTINUATION_TOKEN);
+    final String delimiter = getQueryParam(QueryParams.DELIMITER);
+    final String encodingType = getQueryParam(QueryParams.ENCODING_TYPE);
+    final String marker = getQueryParam(QueryParams.MARKER);
+    String prefix = getQueryParam(QueryParams.PREFIX);
+    String startAfter = getQueryParam(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     ContinueToken decodedToken =
@@ -140,6 +137,7 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
+      final String aclMarker = getQueryParam(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
@@ -148,8 +146,11 @@ public class BucketEndpoint extends EndpointBase {
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
+      final String uploads = getQueryParam(QueryParams.UPLOADS);
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
+        final String uploadIdMarker = getQueryParam(QueryParams.UPLOAD_ID_MARKER);
+        final String keyMarker = getQueryParam(QueryParams.KEY_MARKER);
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
@@ -317,13 +318,13 @@ public class BucketEndpoint extends EndpointBase {
   @PUT
   public Response put(
       @PathParam(BUCKET) String bucketName,
-      @QueryParam(QueryParams.ACL) String aclMarker,
       InputStream body
   ) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
+      final String aclMarker = getQueryParam(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
         Response response =  putAcl(bucketName, body);
