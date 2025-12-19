@@ -788,6 +788,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return false;
     }
 
+    /**
+     * Returns the version of the snapshot local data.
+     * @return Version of the snapshot local data
+     */
+    public long getVersion() {
+      return snapshotLocalData.getVersion();
+    }
+
     @Override
     public void close() throws IOException {
       if (previousLock != null) {
