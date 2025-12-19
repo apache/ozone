@@ -139,11 +139,11 @@ public class ReconControllerModule extends AbstractModule {
     protected void configure() {
       Multibinder<ReconOmTask> taskBinder =
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
-//      taskBinder.addBinding().to(ContainerKeyMapperTaskFSO.class);
-//      taskBinder.addBinding().to(ContainerKeyMapperTaskOBS.class);
-//      taskBinder.addBinding().to(FileSizeCountTaskFSO.class);
-//      taskBinder.addBinding().to(FileSizeCountTaskOBS.class);
-//      taskBinder.addBinding().to(OmTableInsightTask.class);
+      taskBinder.addBinding().to(ContainerKeyMapperTaskFSO.class);
+      taskBinder.addBinding().to(ContainerKeyMapperTaskOBS.class);
+      taskBinder.addBinding().to(FileSizeCountTaskFSO.class);
+      taskBinder.addBinding().to(FileSizeCountTaskOBS.class);
+      taskBinder.addBinding().to(OmTableInsightTask.class);
       taskBinder.addBinding().to(NSSummaryTask.class);
     }
   }

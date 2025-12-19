@@ -80,7 +80,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
   private void flushLoop() {
     while (state.get() == FlushState.RUNNING || !flushQueue.isEmpty()) {
       try {
-        // Attempt to retrieve one batch from the queue, If queue empty → waits 100ms, then returns null
+        // Attempt to retrieve one batch from the queue
         Map<Long, NSSummary> workerMap = flushQueue.poll(100, TimeUnit.MILLISECONDS);
         
         if (workerMap == null) {
@@ -122,7 +122,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
 
     // For each object in worker map (could be either a directory or bucket)
     for (Map.Entry<Long, NSSummary> entry : workerMap.entrySet()) {
-      long currentObjectId = entry.getKey();  // ← RENAMED from immediateParentId
+      long currentObjectId = entry.getKey();
       NSSummary delta = entry.getValue();
 
       // Get actual UpToDate nssummary (check merged map first, then DB)
@@ -141,7 +141,6 @@ public class NSSummaryAsyncFlusher implements Closeable {
         existingNSSummary.setReplicatedSizeOfFiles(existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
 
         // Merge file size buckets
-        // Question - Should we remove this? discuss with sumit
         int[] actualBucket = existingNSSummary.getFileSizeBucket();
         int[] deltaBucket = delta.getFileSizeBucket();
         for (int i = 0; i < actualBucket.length; i++) {
@@ -166,7 +165,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
 
       if (delta.getSizeOfFiles() > 0 || delta.getNumOfFiles() > 0) {
         // Propagate delta to ancestors (parent, grandparent, etc.)
-        propagateDeltaToAncestors(existingNSSummary.getParentId(), delta, mergedMap);  // ← RENAMED
+        propagateDeltaToAncestors(existingNSSummary.getParentId(), delta, mergedMap);
       }
     }
 
