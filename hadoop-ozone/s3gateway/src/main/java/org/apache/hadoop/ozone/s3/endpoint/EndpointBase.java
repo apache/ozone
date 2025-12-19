@@ -114,6 +114,14 @@ public abstract class EndpointBase {
   protected static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
+  protected String getQueryParam(String key) {
+    return getQueryParameters().getFirst(key);
+  }
+
+  public MultivaluedMap<String, String> getQueryParameters() {
+    return context.getUriInfo().getQueryParameters();
+  }
+
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
     OzoneBucket bucket;
