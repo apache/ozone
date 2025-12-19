@@ -99,8 +99,8 @@ public class SCMNodeStat implements NodeStat {
   }
 
   /**
-   * Get the reserved spade on the node.
-   * @return the reserved spade on the node
+   * Get the reserved space on the node.
+   * @return the reserved space on the node
    */
   @Override
   public LongMetric getReserved() {
