@@ -121,6 +121,7 @@ Each object represents the storage metrics for a single DataNode.
 | remaining        | Long   | Remaining free space on the DataNode in bytes. |
 | committed        | Long   | Bytes committed to keys on this DataNode.      |
 | minimumFreeSpace | Long   | Configured minimum free space in bytes.        |
+| reserved         | Long   | Configured reserved space in bytes.            | 
 
 **Example Response:**
 
@@ -189,12 +190,20 @@ Each object represents the storage metrics for a single DataNode.
 
 ##### a) Ozone Manager (OM) - `GET /pendingDeletion?component=om`
 
-| Field               | Type | Description                          |
-|---------------------|------|--------------------------------------|
-| totalSize           | Long | Total pending bytes across all items |
+| Field                | Type | Description                          |
+|----------------------|------|--------------------------------------|
+| totalSize            | Long | Total pending bytes across all items |
 | pendingDirectorySize | Long | Total pending bytes for directories  |
-| pendingKeySize      | Long | Total pending bytes for keys         |
+| pendingKeySize       | Long | Total pending bytes for keys         |
 
+Example:-
+```json
+{
+  "totalSize": 0,
+  "pendingDirectorySize": 0,
+  "pendingKeySize": 0
+}
+```
 ##### b) Storage Container Manager (SCM) - `GET /pendingDeletion?component=scm`
 
 | Field                    | Type | Description                                    |
@@ -203,13 +212,24 @@ Each object represents the storage metrics for a single DataNode.
 | totalReplicatedBlockSize | Long | Total pending bytes for replicated blocks      |
 | totalBlocksCount         | Long | Total number of pending blocks                 |
 
+Example:-
+```json
+{
+  "totalBlocksize": 0,
+  "totalReplicatedBlockSize": 0,
+  "totalBlocksCount": 0
+}
+```
+
 ##### c) DataNodes (DN) - `GET /pendingDeletion?component=dn`
 
-| Field                      | Type             | Description                                         |
-|----------------------------|------------------|-----------------------------------------------------|
+| Field                      | Type             | Description                                        |
+|----------------------------|------------------|----------------------------------------------------|
 | status                     | String           | Status of the background metrics collection task   |
 | totalPendingDeletion       | Long             | Sum of pending deletion bytes across all DataNodes |
 | pendingDeletionPerDataNode | Array of Objects | Per-DataNode pending deletion metrics              |
+| totalNodesQueried          | Long             | Total number of JMx Queries                        |
+| totalNodeQueriesFailed     | Long             | Number of Jmx queries failed                       |
 
 **pendingDeletionPerDataNode Array (Per-DataNode Metrics):**
 Each object contains pending deletion information for a single DataNode.
@@ -219,6 +239,33 @@ Each object contains pending deletion information for a single DataNode.
 | hostName         | String | Hostname of the DataNode                 |
 | datanodeUuid     | String | Unique identifier for the DataNode       |
 | pendingBlockSize | Long   | Total pending bytes on this DataNode     |
+
+Example:-
+```json
+{
+  "status": "FINISHED",
+  "totalPendingDeletionSize": 0,
+  "pendingDeletionPerDataNode": [
+    {
+      "hostName": "ozone-datanode-2.ozone_default",
+      "datanodeUuid": "002d69fa-ce3e-4d66-bd23-ac235f599fc6",
+      "pendingBlockSize": 0
+    },
+    {
+      "hostName": "ozone-datanode-3.ozone_default",
+      "datanodeUuid": "d5946743-3496-4f6d-834f-374cebae2159",
+      "pendingBlockSize": 0
+    },
+    {
+      "hostName": "ozone-datanode-1.ozone_default",
+      "datanodeUuid": "35e850c7-9824-4098-8818-7e95f4ccce0e",
+      "pendingBlockSize": 0
+    }
+  ],
+  "totalNodesQueried": 3,
+  "totalNodeQueriesFailed": 0
+}
+```
 
 ### Backend Implementation
 
