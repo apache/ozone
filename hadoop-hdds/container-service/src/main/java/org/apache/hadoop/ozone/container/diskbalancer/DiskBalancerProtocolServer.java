@@ -91,6 +91,15 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
     adminChecker.check("startDiskBalancer");
     final DiskBalancerInfo info = getDiskBalancerInfoImpl();
 
+    // Check if DiskBalancer is already running or paused
+    DiskBalancerRunningStatus currentStatus = info.getOperationalState();
+    if (currentStatus == DiskBalancerRunningStatus.RUNNING 
+        || currentStatus == DiskBalancerRunningStatus.PAUSED) {
+      // If already running/paused and no configuration change requested, log warning and return early
+      LOG.warn("DiskBalancer is already in {} state.", currentStatus);
+      return;
+    }
+
     // Check node operational state before starting DiskBalancer
     // Only IN_SERVICE nodes should actively balance disks
     NodeOperationalState nodeState = 
