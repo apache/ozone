@@ -163,7 +163,6 @@ public class TestStreamRead {
         // get the client ready by writing a dummy key
         createKey(testBucket.delegate(), DUMMY_KEY, SizeInBytes.ONE_KB, SizeInBytes.ONE_KB);
 
-
         for (SizeInBytes bufferSize : bufferSizes) {
           // create key
           System.out.println("---------------------------------------------------------");
@@ -264,12 +263,6 @@ public class TestStreamRead {
       }
     }
     final long elapsedNanos = System.nanoTime() - startTime;
-
-    for (long pos = 0; pos < keySizeByte;) {
-      final int writeSize = Math.toIntExact(Math.min(buffer.length, keySizeByte - pos));
-      pos += writeSize;
-    }
-
     if (!keyName.startsWith(DUMMY_KEY)) {
       print("createStreamKey", keySizeByte, elapsedNanos, bufferSize, null);
     }
