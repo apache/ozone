@@ -1111,9 +1111,11 @@ public abstract class TestOmSnapshot {
     bucket.createDirectory(dir2);
     createSnapshot(testVolumeName, testBucketName, snap1);
     bucket.deleteDirectory(dir1, true);
+    // assert that dir2 exists
+    assertTrue(dirExists("dir2"));
     GenericTestUtils.waitFor(() -> {
       try {
-        return getNumDirsInDeletedTable() == 0;
+        return !dirExists("dir2");
       } catch (RocksDatabaseException | CodecException e) {
         fail("Exception occurred while waiting for deletion" + e.getMessage());
         return false;
@@ -1131,15 +1133,19 @@ public abstract class TestOmSnapshot {
     stopKeyManager();
   }
 
-  private int getNumDirsInDeletedTable() throws RocksDatabaseException, CodecException {
-    int numDirs = 0;
-    Table<String, OmDirectoryInfo> directoryTable = ozoneManager.getMetadataManager().getDirectoryTable();
-    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = directoryTable.iterator()) {
+  private boolean dirExists(String dirName) throws RocksDatabaseException,
+      CodecException {
+    Table<String, OmDirectoryInfo> directoryTable = ozoneManager
+        .getMetadataManager().getDirectoryTable();
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = directoryTable
+        .iterator()) {
       while (it.hasNext()) {
-        numDirs++;
-        it.next();
+        String name = it.next().getValue().getName();
+        if (name.equals(dirName)) {
+          return true;
+        }
       }
-      return numDirs;
+      return false;
     }
   }
 
