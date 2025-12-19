@@ -356,17 +356,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   @Override
   public OmBucketInfo copyObject() {
-    Builder builder = toBuilder();
-
-    if (bekInfo != null) {
-      builder.setBucketEncryptionKey(bekInfo.copy());
-    }
-
-    if (defaultReplicationConfig != null) {
-      builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
-    }
-
-    return builder.build();
+    return toBuilder().build();
   }
 
   public Builder toBuilder() {
