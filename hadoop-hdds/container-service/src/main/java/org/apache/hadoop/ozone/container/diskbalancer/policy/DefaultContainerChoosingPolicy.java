@@ -78,8 +78,8 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     final long dstCommittedBytes = dst.getCommittedBytes();
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
-      if (!inProgressContainerIDs.contains(
-          ContainerID.valueOf(containerData.getContainerID())) &&
+      if (containerData.getBytesUsed() > 0 &&
+          !inProgressContainerIDs.contains(ContainerID.valueOf(containerData.getContainerID())) &&
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
         // Check if dst can accept the candidate container.
