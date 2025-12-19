@@ -114,7 +114,7 @@ Each object represents the storage metrics for a single DataNode.
 
 | Field            | Type   | Description                                    |
 |------------------|--------|------------------------------------------------|
-| dataNodeUuId     | String | Unique identifier for the DataNode             |
+| datanodeUuid     | String | Unique identifier for the DataNode             |
 | hostName         | String | Hostname of the DataNode                       |
 | capacity         | Long   | Total capacity of the DataNode in bytes.       |
 | used             | Long   | Used space on the DataNode in bytes.           |
@@ -138,7 +138,7 @@ Each object represents the storage metrics for a single DataNode.
   },
   "usedSpaceBreakdown": {
     "openKeysBytes": 0,
-    "committedBytes": 5242880000,
+    "committedKeyBytes": 5242880000,
     "preAllocatedContainerBytes": 0
   },
   "dataNodeUsage": [
@@ -231,8 +231,8 @@ Example:-
 | status                     | String           | Status of the background metrics collection task   |
 | totalPendingDeletion       | Long             | Sum of pending deletion bytes across all DataNodes |
 | pendingDeletionPerDataNode | Array of Objects | Per-DataNode pending deletion metrics              |
-| totalNodesQueried          | Long             | Total number of JMx Queries                        |
-| totalNodeQueriesFailed     | Long             | Number of Jmx queries failed                       |
+| totalNodesQueried          | Int              | Total number of JMx Queries                        |
+| totalNodeQueriesFailed     | Int              | Number of Jmx queries failed                       |
 
 **pendingDeletionPerDataNode Array (Per-DataNode Metrics):**
 Each object contains pending deletion information for a single DataNode.
