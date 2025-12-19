@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
-import static javax.ws.rs.core.HttpHeaders.ETAG;
-import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
@@ -94,6 +91,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
@@ -135,6 +133,7 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -148,6 +147,9 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/{bucket}/{path:.+}")
 public class ObjectEndpoint extends EndpointBase {
+
+  private static final String BUCKET = "bucket";
+  private static final String PATH = "path";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpoint.class);
@@ -174,12 +176,12 @@ public class ObjectEndpoint extends EndpointBase {
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
-        .put("Content-Type", "response-content-type")
-        .put("Content-Language", "response-content-language")
-        .put("Expires", "response-expires")
-        .put("Cache-Control", "response-cache-control")
-        .put("Content-Disposition", "response-content-disposition")
-        .put("Content-Encoding", "response-content-encoding")
+        .put(HttpHeaders.CONTENT_TYPE, "response-content-type")
+        .put(HttpHeaders.CONTENT_LANGUAGE, "response-content-language")
+        .put(HttpHeaders.EXPIRES, "response-expires")
+        .put(HttpHeaders.CACHE_CONTROL, "response-cache-control")
+        .put(HttpHeaders.CONTENT_DISPOSITION, "response-content-disposition")
+        .put(HttpHeaders.CONTENT_ENCODING, "response-content-encoding")
         .build();
   }
 
@@ -210,13 +212,13 @@ public class ObjectEndpoint extends EndpointBase {
   @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @PUT
   public Response put(
-      @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath,
-      @HeaderParam("Content-Length") long length,
-      @QueryParam("partNumber")  int partNumber,
-      @QueryParam("uploadId") @DefaultValue("") String uploadID,
-      @QueryParam("tagging") String taggingMarker,
-      @QueryParam("acl") String aclMarker,
+      @PathParam(BUCKET) String bucketName,
+      @PathParam(PATH) String keyPath,
+      @HeaderParam(HttpHeaders.CONTENT_LENGTH) long length,
+      @QueryParam(QueryParams.PART_NUMBER)  int partNumber,
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker,
+      @QueryParam(QueryParams.ACL) String aclMarker,
       final InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
@@ -328,13 +330,13 @@ public class ObjectEndpoint extends EndpointBase {
           eTag = DatatypeConverter.printHexBinary(
                   digestInputStream.getMessageDigest().digest())
               .toLowerCase();
-          output.getMetadata().put(ETAG, eTag);
+          output.getMetadata().put(OzoneConsts.ETAG, eTag);
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
-          .header(ETAG, wrapInQuotes(eTag))
+          .header(HttpHeaders.ETAG, wrapInQuotes(eTag))
           .status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
@@ -404,13 +406,13 @@ public class ObjectEndpoint extends EndpointBase {
   @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @GET
   public Response get(
-      @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath,
-      @QueryParam("partNumber") int partNumber,
-      @QueryParam("uploadId") String uploadId,
-      @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
-      @QueryParam("part-number-marker") String partNumberMarker,
-      @QueryParam("tagging") String taggingMarker)
+      @PathParam(BUCKET) String bucketName,
+      @PathParam(PATH) String keyPath,
+      @QueryParam(QueryParams.PART_NUMBER) int partNumber,
+      @QueryParam(QueryParams.UPLOAD_ID) String uploadId,
+      @QueryParam(QueryParams.MAX_PARTS) @DefaultValue("1000") int maxParts,
+      @QueryParam(QueryParams.PART_NUMBER_MARKER) String partNumberMarker,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
@@ -471,7 +473,7 @@ public class ObjectEndpoint extends EndpointBase {
         };
         responseBuilder = Response
             .ok(output)
-            .header(CONTENT_LENGTH, keyDetails.getDataSize());
+            .header(HttpHeaders.CONTENT_LENGTH, keyDetails.getDataSize());
 
       } else {
 
@@ -495,7 +497,7 @@ public class ObjectEndpoint extends EndpointBase {
         responseBuilder = Response
             .status(Status.PARTIAL_CONTENT)
             .entity(output)
-            .header(CONTENT_LENGTH, copyLength);
+            .header(HttpHeaders.CONTENT_LENGTH, copyLength);
 
         String contentRangeVal = RANGE_HEADER_SUPPORTED_UNIT + " " +
             rangeHeader.getStartOffset() + "-" + rangeHeader.getEndOffset() +
@@ -506,9 +508,9 @@ public class ObjectEndpoint extends EndpointBase {
       responseBuilder
           .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
-      String eTag = keyDetails.getMetadata().get(ETAG);
+      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
       if (eTag != null) {
-        responseBuilder.header(ETAG, wrapInQuotes(eTag));
+        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
         String partsCount = extractPartsCount(eTag);
         if (partsCount != null) {
           responseBuilder.header(MP_PARTS_COUNT, partsCount);
@@ -575,7 +577,7 @@ public class ObjectEndpoint extends EndpointBase {
         .atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
 
     responseBuilder
-        .header(LAST_MODIFIED,
+        .header(HttpHeaders.LAST_MODIFIED,
             RFC1123Util.FORMAT.format(lastModificationTime));
   }
 
@@ -598,8 +600,8 @@ public class ObjectEndpoint extends EndpointBase {
    */
   @HEAD
   public Response head(
-      @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath) throws IOException, OS3Exception {
+      @PathParam(BUCKET) String bucketName,
+      @PathParam(PATH) String keyPath) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_KEY;
 
@@ -636,16 +638,16 @@ public class ObjectEndpoint extends EndpointBase {
         S3StorageType.fromReplicationConfig(key.getReplicationConfig());
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header("Content-Length", key.getDataSize())
-        .header("Content-Type", "binary/octet-stream")
+        .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
+        .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
 
-    String eTag = key.getMetadata().get(ETAG);
+    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
     if (eTag != null) {
       // Should not return ETag header if the ETag is not set
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
-      response.header(ETAG, wrapInQuotes(eTag));
+      response.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
       String partsCount = extractPartsCount(eTag);
       if (partsCount != null) {
         response.header(MP_PARTS_COUNT, partsCount);
@@ -717,10 +719,10 @@ public class ObjectEndpoint extends EndpointBase {
   @DELETE
   @SuppressWarnings("emptyblock")
   public Response delete(
-      @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath,
-      @QueryParam("uploadId") @DefaultValue("") String uploadId,
-      @QueryParam("tagging") String taggingMarker) throws
+      @PathParam(BUCKET) String bucketName,
+      @PathParam(PATH) String keyPath,
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadId,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker) throws
       IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_KEY;
@@ -794,8 +796,8 @@ public class ObjectEndpoint extends EndpointBase {
   @Produces(MediaType.APPLICATION_XML)
   @Consumes(HeaderPreprocessor.MULTIPART_UPLOAD_MARKER)
   public Response initializeMultipartUpload(
-      @PathParam("bucket") String bucket,
-      @PathParam("path") String key
+      @PathParam(BUCKET) String bucket,
+      @PathParam(PATH) String key
   )
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
@@ -858,9 +860,10 @@ public class ObjectEndpoint extends EndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
-  public Response completeMultipartUpload(@PathParam("bucket") String bucket,
-      @PathParam("path") String key,
-      @QueryParam("uploadId") @DefaultValue("") String uploadID,
+  public Response completeMultipartUpload(
+      @PathParam(BUCKET) String bucket,
+      @PathParam(PATH) String key,
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
       CompleteMultipartUploadRequest multipartUploadRequest)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
@@ -1025,9 +1028,9 @@ public class ObjectEndpoint extends EndpointBase {
                 new byte[getIOBufferSize(length)]);
             ozoneOutputStream.getMetadata()
                 .putAll(sourceKeyDetails.getMetadata());
-            String raw = ozoneOutputStream.getMetadata().get(ETAG);
+            String raw = ozoneOutputStream.getMetadata().get(OzoneConsts.ETAG);
             if (raw != null) {
-              ozoneOutputStream.getMetadata().put(ETAG, stripQuotes(raw));
+              ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, stripQuotes(raw));
             }
             outputStream = ozoneOutputStream;
           }
@@ -1045,7 +1048,7 @@ public class ObjectEndpoint extends EndpointBase {
               new byte[getIOBufferSize(length)]);
           byte[] digest = digestInputStream.getMessageDigest().digest();
           ozoneOutputStream.getMetadata()
-              .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+              .put(OzoneConsts.ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
@@ -1069,7 +1072,7 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
         getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
-        return Response.ok().header(ETAG, eTag).build();
+        return Response.ok().header(HttpHeaders.ETAG, eTag).build();
       }
 
     } catch (OMException ex) {
@@ -1189,7 +1192,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
         String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
-        dest.getMetadata().put(ETAG, eTag);
+        dest.getMetadata().put(OzoneConsts.ETAG, eTag);
       }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -1236,7 +1239,7 @@ public class ObjectEndpoint extends EndpointBase {
           // still does not support this just returning dummy response
           // for now
           CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-          copyObjectResponse.setETag(wrapInQuotes(sourceKeyDetails.getMetadata().get(ETAG)));
+          copyObjectResponse.setETag(wrapInQuotes(sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG)));
           copyObjectResponse.setLastModified(Instant.ofEpochMilli(
               Time.now()));
           return copyObjectResponse;
@@ -1291,7 +1294,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       getMetrics().updateCopyObjectSuccessStats(startNanos);
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-      copyObjectResponse.setETag(wrapInQuotes(destKeyDetails.getMetadata().get(ETAG)));
+      copyObjectResponse.setETag(wrapInQuotes(destKeyDetails.getMetadata().get(OzoneConsts.ETAG)));
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
       return copyObjectResponse;
     } catch (OMException ex) {

@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
@@ -82,6 +83,8 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/{bucket}")
 public class BucketEndpoint extends EndpointBase {
+
+  private static final String BUCKET = "bucket";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketEndpoint.class);
@@ -113,19 +116,20 @@ public class BucketEndpoint extends EndpointBase {
   @GET
   @SuppressWarnings({"parameternumber", "methodlength"})
   public Response get(
-      @PathParam("bucket") String bucketName,
-      @QueryParam("delimiter") String delimiter,
-      @QueryParam("encoding-type") String encodingType,
-      @QueryParam("marker") String marker,
-      @DefaultValue("1000") @QueryParam("max-keys") int maxKeys,
-      @QueryParam("prefix") String prefix,
-      @QueryParam("continuation-token") String continueToken,
-      @QueryParam("start-after") String startAfter,
-      @QueryParam("uploads") String uploads,
-      @QueryParam("acl") String aclMarker,
-      @QueryParam("key-marker") String keyMarker,
-      @QueryParam("upload-id-marker") String uploadIdMarker,
-      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads) throws OS3Exception, IOException {
+      @PathParam(BUCKET) String bucketName,
+      @QueryParam(QueryParams.DELIMITER) String delimiter,
+      @QueryParam(QueryParams.ENCODING_TYPE) String encodingType,
+      @QueryParam(QueryParams.MARKER) String marker,
+      @DefaultValue("1000") @QueryParam(QueryParams.MAX_KEYS) int maxKeys,
+      @QueryParam(QueryParams.PREFIX) String prefix,
+      @QueryParam(QueryParams.CONTINUATION_TOKEN) String continueToken,
+      @QueryParam(QueryParams.START_AFTER) String startAfter,
+      @QueryParam(QueryParams.UPLOADS) String uploads,
+      @QueryParam(QueryParams.ACL) String aclMarker,
+      @QueryParam(QueryParams.KEY_MARKER) String keyMarker,
+      @QueryParam(QueryParams.UPLOAD_ID_MARKER) String uploadIdMarker,
+      @DefaultValue("1000") @QueryParam(QueryParams.MAX_UPLOADS) int maxUploads
+  ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -311,9 +315,11 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   @PUT
-  public Response put(@PathParam("bucket") String bucketName,
-                      @QueryParam("acl") String aclMarker,
-                      InputStream body) throws IOException, OS3Exception {
+  public Response put(
+      @PathParam(BUCKET) String bucketName,
+      @QueryParam(QueryParams.ACL) String aclMarker,
+      InputStream body
+  ) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
@@ -420,7 +426,7 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @HEAD
-  public Response head(@PathParam("bucket") String bucketName)
+  public Response head(@PathParam(BUCKET) String bucketName)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
@@ -443,7 +449,7 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @DELETE
-  public Response delete(@PathParam("bucket") String bucketName)
+  public Response delete(@PathParam(BUCKET) String bucketName)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
@@ -487,10 +493,11 @@ public class BucketEndpoint extends EndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
-  public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
-                                         @QueryParam("delete") String delete,
-                                         MultiDeleteRequest request)
-      throws OS3Exception, IOException {
+  public MultiDeleteResponse multiDelete(
+      @PathParam(BUCKET) String bucketName,
+      @QueryParam(QueryParams.DELETE) String delete,
+      MultiDeleteRequest request
+  ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
     OzoneBucket bucket = getBucket(bucketName);
