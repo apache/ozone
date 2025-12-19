@@ -1721,19 +1721,14 @@ public class KeyManagerImpl implements KeyManager {
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyInfo.getVolumeName())
-        .setBucketName(keyInfo.getBucketName())
+    return keyInfo.toBuilder()
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(keyInfo.getAcls())
-        .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
 
