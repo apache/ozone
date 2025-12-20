@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.awssdk.v2;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
@@ -47,6 +49,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -512,19 +515,19 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     return Stream.of(
         Arguments.of(
             Arrays.asList(Tag.builder().key(repeatChar('a', 129)).value("value").build()),
-            400
+            HTTP_BAD_REQUEST
         ),
         Arguments.of(
             Arrays.asList(Tag.builder().key("valid-key").value(repeatChar('b', 257)).build()),
-            400
+            HTTP_BAD_REQUEST
         ),
         Arguments.of(
             Arrays.asList(Tag.builder().key("t$ag@#invalid").value("value").build()),
-            400
+            HTTP_BAD_REQUEST
         ),
         Arguments.of(
             Arrays.asList(Tag.builder().key("aws:test").value("value").build()),
-            400
+            HTTP_BAD_REQUEST
         )
     );
   }
@@ -1471,7 +1474,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .expectedBucketOwner(WRONG_OWNER)
             .build();
         S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.headBucket(wrongRequest));
-        assertEquals(403, exception.statusCode());
+        assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       }
 
       @Test
@@ -1744,7 +1747,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .expectedBucketOwner(WRONG_OWNER)
             .build();
         S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.headObject(wrongRequest));
-        assertEquals(403, exception.statusCode());
+        assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       }
 
       @Test
@@ -1963,7 +1966,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     private void verifyBucketOwnershipVerificationAccessDenied(Executable function) {
       S3Exception exception = assertThrows(S3Exception.class, function);
-      assertEquals(403, exception.statusCode());
+      assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
     }
   }

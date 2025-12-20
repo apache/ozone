@@ -96,6 +96,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -107,8 +108,6 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -125,7 +124,6 @@ import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
@@ -1049,7 +1047,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
             RandomStringUtils.secure().nextAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(403, ase.getStatusCode());
+    assertEquals(HttpURLConnection.HTTP_FORBIDDEN, ase.getStatusCode());
     assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
@@ -1367,7 +1365,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-  static class BucketOwnershipLinkBucketTests {
+  class LinkBucketTests {
     private String nonS3VolumeName;
     private String linkBucketName;
     private String sourceBucketName;
@@ -1405,7 +1403,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
           .withExpectedBucketOwner("wrong-owner");
       AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
           () -> s3Client.getBucketAcl(wrongRequest));
-      assertEquals(403, wrongOwner.getStatusCode());
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
       assertEquals("AccessDenied", wrongOwner.getErrorCode());
 
       Owner owner = s3Client.getBucketAcl(linkBucketName).getOwner();
@@ -1430,7 +1428,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
           .withExpectedBucketOwner("wrong-owner");
       AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
           () -> s3Client.getBucketAcl(wrongRequest));
-      assertEquals(403, wrongOwner.getStatusCode());
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
       assertEquals("AccessDenied", wrongOwner.getErrorCode());
 
       Owner owner = s3Client.getBucketAcl(danglingLinkBucketName).getOwner();
@@ -1520,10 +1518,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
   private String getKeyName(String ignored) {
     return uniqueObjectName();
-  }
-
-  private String getTestName() {
-    return RandomStringUtils.secure().nextAlphanumeric(8).toLowerCase(Locale.ROOT);
   }
 
   private String multipartUpload(String bucketName, String key, File file, long partSize, String contentType,
