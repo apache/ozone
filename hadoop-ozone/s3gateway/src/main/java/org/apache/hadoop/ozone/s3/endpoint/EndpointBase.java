@@ -52,6 +52,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -69,6 +71,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
+import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -106,6 +109,9 @@ public abstract class EndpointBase {
   @Context
   private HttpHeaders headers;
 
+  // initialized in @PostConstruct
+  private MutableConfigurationSource queryParams;
+
   private final Set<String> excludeMetadataFields =
       new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
   private static final Logger LOG =
@@ -114,12 +120,14 @@ public abstract class EndpointBase {
   protected static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
-  protected String getQueryParam(String key) {
-    return getQueryParameters().getFirst(key);
+  /** Read-only access to query parameters. */
+  protected ConfigurationSource queryParams() {
+    return queryParams;
   }
 
-  public MultivaluedMap<String, String> getQueryParameters() {
-    return context.getUriInfo().getQueryParameters();
+  /** For setting multiple values use {@link #getContext()}. */
+  public MutableConfigurationSource queryParamsForTest() {
+    return queryParams;
   }
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
@@ -149,6 +157,7 @@ public abstract class EndpointBase {
    */
   @PostConstruct
   public void initialization() {
+    queryParams = RequestParameters.of(context.getUriInfo().getQueryParameters());
     // Note: userPrincipal is initialized to be the same value as accessId,
     //  could be updated later in RpcClient#getS3Volume
     s3Auth = new S3Auth(signatureInfo.getStringToSign(),

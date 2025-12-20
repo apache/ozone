@@ -63,4 +63,8 @@ public interface ConfigurationTarget {
     ConfigurationReflectionUtil.updateConfiguration(this, object);
   }
 
+  default void unset(String key) {
+    set(key, null);
+  }
+
 }

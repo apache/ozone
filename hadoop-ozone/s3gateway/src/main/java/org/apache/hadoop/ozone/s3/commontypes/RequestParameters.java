@@ -15,49 +15,47 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.conf;
+package org.apache.hadoop.ozone.s3.commontypes;
 
-import java.io.IOException;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import javax.ws.rs.core.MultivaluedMap;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
-/**
- * In memory, mutable configuration source for testing.
- */
-public class InMemoryConfiguration implements MutableConfigurationSource {
+/** Allow looking up query parameters as primitive types. */
+public final class RequestParameters implements MutableConfigurationSource {
 
-  private Map<String, String> configs = new HashMap<>();
+  private final MultivaluedMap<String, String> params;
 
-  public InMemoryConfiguration() {
+  public static RequestParameters of(MultivaluedMap<String, String> params) {
+    return new RequestParameters(params);
   }
 
-  public InMemoryConfiguration(String key, String value) {
-    set(key, value);
+  private RequestParameters(MultivaluedMap<String, String> params) {
+    this.params = params;
   }
 
   @Override
   public String get(String key) {
-    return configs.get(key);
+    return params.getFirst(key);
   }
 
   @Override
   public Collection<String> getConfigKeys() {
-    return configs.keySet();
+    return params.keySet();
   }
 
   @Override
-  public char[] getPassword(String key) throws IOException {
-    return configs.get(key).toCharArray();
+  public char[] getPassword(String key) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public void set(String key, String value) {
-    configs.put(key, value);
+    params.putSingle(key, value);
   }
 
   @Override
   public void unset(String key) {
-    configs.remove(key);
+    params.remove(key);
   }
 }
