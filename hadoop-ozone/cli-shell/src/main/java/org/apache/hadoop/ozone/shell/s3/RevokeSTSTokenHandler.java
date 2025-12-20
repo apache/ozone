@@ -43,11 +43,6 @@ public class RevokeSTSTokenHandler extends S3Handler {
       description = "STS temporary access key id (for example, ASIA...)")
   private String accessKeyId;
 
-  @Option(names = "-t",
-      required = true,
-      description = "STS session token")
-  private String sessionToken;
-
   @Option(names = "-y",
       description = "Continue without interactive user confirmation")
   private boolean yes;
@@ -73,7 +68,7 @@ public class RevokeSTSTokenHandler extends S3Handler {
       }
     }
 
-    client.getObjectStore().revokeSTSToken(accessKeyId, sessionToken);
+    client.getObjectStore().revokeSTSToken(accessKeyId);
     out().println("STS token revoked for accessKeyId '" + accessKeyId + "'.");
   }
 }

@@ -152,7 +152,7 @@ public final class S3SecurityUtil {
         throw new OMException(msg, INTERNAL_ERROR);
       }
 
-      final Table<String, String> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
+      final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
       if (revokedStsTokenTable == null) {
         final String msg = "Could not determine STS revocation: revokedStsTokenTable is null";
         LOG.warn(msg);
