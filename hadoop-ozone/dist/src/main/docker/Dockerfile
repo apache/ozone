@@ -16,7 +16,14 @@
 
 FROM apache/ozone-runner:@docker.ozone-runner.version@
 
-
 ADD --chown=hadoop . /opt/hadoop
 
 WORKDIR /opt/hadoop
+
+RUN rm -rf docs tests smoketest compose kubernetes share/ozone/byteman && \
+    rm -f share/ozone/lib/ozone-filesystem-hadoop2*.jar \
+        share/ozone/lib/ozone-filesystem-hadoop3*.jar \
+        share/ozone/lib/ozone-filesystem-hadoop3-client*.jar \
+        share/ozone/lib/hdds-docs*.jar \
+        bom.json bom.xml \
+        README.md HISTORY.md SECURITY.md CONTRIBUTING.md
