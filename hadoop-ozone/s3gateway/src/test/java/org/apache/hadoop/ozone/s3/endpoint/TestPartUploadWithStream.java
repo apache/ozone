@@ -72,8 +72,6 @@ public class TestPartUploadWithStream {
         .setClient(client)
         .setConfig(conf)
         .build();
-
-    rest.init();
   }
 
   @Test

@@ -101,6 +101,10 @@ public final class AuditMessage implements Message {
       return this;
     }
 
+    public Map<String, String> getParams() {
+      return params;
+    }
+
     public Builder withResult(AuditEventStatus result) {
       this.ret = result.getStatus();
       return this;

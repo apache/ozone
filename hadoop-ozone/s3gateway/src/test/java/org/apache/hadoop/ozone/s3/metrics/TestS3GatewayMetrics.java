@@ -36,12 +36,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -81,9 +78,17 @@ public class TestS3GatewayMetrics {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    bucket.createKey("file1", 0).close();
+
+    headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+        "STANDARD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
 
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
 
     rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
@@ -92,22 +97,10 @@ public class TestS3GatewayMetrics {
 
     keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
 
-    headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
-    bucketEndpoint.setHeaders(headers);
-    keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
-
-    ContainerRequestContext context = mock(ContainerRequestContext.class);
-    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-    keyEndpoint.setContext(context);
   }
 
   /**
@@ -140,8 +133,6 @@ public class TestS3GatewayMetrics {
   public void testGetBucketSuccess() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
-    clientStub = createClientWithKeys("file1");
-    bucketEndpoint.setClient(clientStub);
     bucketEndpoint.get(bucketName, null,
         null, null, 1000, null,
         null, "random", null,
@@ -643,13 +634,6 @@ public class TestS3GatewayMetrics {
     assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
     long curMetric = metrics.getDeleteObjectTaggingFailure();
     assertEquals(1L, curMetric - oriMetric);
-  }
-
-  private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    for (String key : keys) {
-      bucket.createKey(key, 0).close();
-    }
-    return clientStub;
   }
 
   private String initiateMultipartUpload(String bktName, String key)

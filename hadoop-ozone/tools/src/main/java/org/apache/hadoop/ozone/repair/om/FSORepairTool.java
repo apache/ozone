@@ -30,7 +30,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -86,7 +87,6 @@ public class FSORepairTool extends RepairTool {
   private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
   private static final String PENDING_TO_DELETE_TABLE = "pendingToDelete";
-  private static final byte[] EMPTY_BYTE_ARRAY = {};
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -133,8 +133,8 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
     private DBStore tempDB;
-    private Table<String, byte[]> reachableTable;
-    private Table<String, byte[]> pendingToDeleteTable;
+    private Table<String, CodecBuffer> reachableTable;
+    private Table<String, CodecBuffer> pendingToDeleteTable;
     private final ReportStatistics reachableStats;
     private final ReportStatistics pendingToDeleteStats;
     private final ReportStatistics orphanedStats;
@@ -553,7 +553,7 @@ public class FSORepairTool extends RepairTool {
     private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
       String reachableKey = buildReachableKey(volume, bucket, object);
       // No value is needed for this table.
-      reachableTable.put(reachableKey, EMPTY_BYTE_ARRAY);
+      reachableTable.put(reachableKey, CodecBuffer.getEmptyBuffer());
     }
 
     /**
@@ -562,7 +562,7 @@ public class FSORepairTool extends RepairTool {
      */
     private void addPendingToDeleteEntry(String originalKey) throws IOException {
       // No value is needed for this table.
-      pendingToDeleteTable.put(originalKey, EMPTY_BYTE_ARRAY);
+      pendingToDeleteTable.put(originalKey, CodecBuffer.getEmptyBuffer());
     }
 
     /**
@@ -598,8 +598,8 @@ public class FSORepairTool extends RepairTool {
           .addTable(REACHABLE_TABLE)
           .addTable(PENDING_TO_DELETE_TABLE)
           .build();
-      reachableTable = tempDB.getTable(REACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
-      pendingToDeleteTable = tempDB.getTable(PENDING_TO_DELETE_TABLE, StringCodec.get(), ByteArrayCodec.get());
+      reachableTable = tempDB.getTable(REACHABLE_TABLE, StringCodec.get(), CodecBufferCodec.get(true));
+      pendingToDeleteTable = tempDB.getTable(PENDING_TO_DELETE_TABLE, StringCodec.get(), CodecBufferCodec.get(true));
     }
 
     private void closeTempDB() throws IOException {

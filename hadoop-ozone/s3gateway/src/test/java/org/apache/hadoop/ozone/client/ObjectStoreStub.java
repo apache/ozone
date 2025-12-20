@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -44,7 +45,7 @@ public class ObjectStoreStub extends ObjectStore {
   private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
 
   public ObjectStoreStub() {
-    super();
+    super(conf, mock(ClientProtocol.class));
   }
 
   public ObjectStoreStub(ConfigurationSource conf, ClientProtocol proxy) {
