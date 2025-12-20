@@ -180,43 +180,59 @@ public final class ContainerUtils {
       LOG.warn("Failed to read Datanode ID file as YAML. Reason: {}. " +
           "Attempting recovery.", e.getMessage());
       try {
-        LOG.info("Attempting to recover Datanode ID from VERSION file.");
-        String dnUuid = null;
-        Collection<String> dataNodeDirs = HddsServerUtil.getDatanodeStorageDirs(conf);
-        if (dataNodeDirs.isEmpty()) {
-          throw new IOException("hdds.datanode.dir is not configured.");
-        }
-        for (String dataNodeDir : dataNodeDirs) {
-          File versionFile = new File(dataNodeDir, "hdds/VERSION");
-          if (versionFile.exists()) {
-            Properties props = DatanodeVersionFile.readFrom(versionFile);
-            dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
-            if (dnUuid != null && !dnUuid.isEmpty()) {
-              break;
-            }
-          }
-        }
-        if (dnUuid == null) {
-          throw new IOException("Could not find a valid datanode UUID from " +
-              "any VERSION file in " + dataNodeDirs);
-        }
-        DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-        builder.setUuid(UUID.fromString(dnUuid));
-        DatanodeDetails datanodeDetails = builder.build();
-        DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
-        LOG.info("Successfully recovered and rewrote datanode ID file.");
-        return datanodeDetails;
+        return recoverDatanodeDetailsFromVersionFile(path, conf);
       } catch (IOException recoveryEx) {
         LOG.warn("Datanode ID recovery from VERSION file failed. Reason: {}. " +
             "Falling back to reading as Protobuf.", recoveryEx.getMessage());
-        try (InputStream in = Files.newInputStream(path.toPath())) {
-          return DatanodeDetails.getFromProtoBuf(
-              HddsProtos.DatanodeDetailsProto.parseFrom(in));
+        try {
+          return readDatanodeDetailsFromProto(path);
         } catch (IOException io) {
           throw new IOException("Failed to parse DatanodeDetails from "
               + path.getAbsolutePath(), io);
         }
       }
+    }
+  }
+
+  /**
+   * Recover DatanodeDetails from VERSION file.
+   */
+  private static DatanodeDetails recoverDatanodeDetailsFromVersionFile(
+      File path, ConfigurationSource conf) throws IOException {
+    LOG.info("Attempting to recover Datanode ID from VERSION file.");
+    String dnUuid = null;
+    Collection<String> dataNodeDirs =
+        HddsServerUtil.getDatanodeStorageDirs(conf);
+    if (dataNodeDirs.isEmpty()) {
+      throw new IOException("hdds.datanode.dir is not configured.");
+    }
+    for (String dataNodeDir : dataNodeDirs) {
+      File versionFile = new File(dataNodeDir, "hdds/VERSION");
+      if (versionFile.exists()) {
+        Properties props = DatanodeVersionFile.readFrom(versionFile);
+        dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
+        if (dnUuid != null && !dnUuid.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (dnUuid == null) {
+      throw new IOException("Could not find a valid datanode UUID from " +
+          "any VERSION file in " + dataNodeDirs);
+    }
+    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
+    builder.setUuid(UUID.fromString(dnUuid));
+    DatanodeDetails datanodeDetails = builder.build();
+    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
+    LOG.info("Successfully recovered and rewrote datanode ID file.");
+    return datanodeDetails;
+  }
+
+  private static DatanodeDetails readDatanodeDetailsFromProto(File path)
+      throws IOException {
+    try (InputStream in = Files.newInputStream(path.toPath())) {
+      return DatanodeDetails.getFromProtoBuf(
+          HddsProtos.DatanodeDetailsProto.parseFrom(in));
     }
   }
 
