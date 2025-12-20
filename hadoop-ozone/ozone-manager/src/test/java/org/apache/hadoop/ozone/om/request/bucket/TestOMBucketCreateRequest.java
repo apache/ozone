@@ -322,7 +322,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         {"bucket_underscore", "_bucket___multi_underscore_", "bucket_"};
     when(ozoneManager.isStrictS3()).thenReturn(false);
     for (String bucketName : nonS3CompliantBucketName) {
-      acceptBucketCreationHelper(volumeName, bucketName);
+      acceptFSOBucketCreationHelper(volumeName, bucketName);
     }
   }
 
@@ -477,5 +477,29 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
     OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+  }
+
+  protected OMBucketCreateRequest doPreExecute(String volumeName,
+                                               String bucketName,
+                                               OzoneManagerProtocolProtos.BucketLayoutProto layout) throws Exception {
+
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(layout);
+
+    if (layout == OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED) {
+      bucketInfo.addMetadata(OMRequestTestUtils.fsoMetadata());
+    }
+
+    return doPreExecute(bucketInfo);
+  }
+
+  private void acceptFSOBucketCreationHelper(String volumeName, String bucketName)
+      throws Exception {
+    OMBucketCreateRequest omBucketCreateRequest =
+        doPreExecute(volumeName, bucketName,
+            OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED);
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
   }
 }
