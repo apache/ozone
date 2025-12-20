@@ -108,7 +108,7 @@ public class VolumeUsage {
   }
 
   SpaceUsageSource.Fixed realUsage() {
-    return source.snapshot();
+    return (SpaceUsageSource.Fixed) source.snapshot();
   }
 
   /**
