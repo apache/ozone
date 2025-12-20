@@ -1131,6 +1131,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-client</artifactId>
+        <version>${ozone.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-common</artifactId>
         <version>${ozone.version}</version>
       </dependency>
