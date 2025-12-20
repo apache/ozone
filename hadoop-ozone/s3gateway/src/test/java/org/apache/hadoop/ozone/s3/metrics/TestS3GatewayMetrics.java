@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -133,10 +134,7 @@ public class TestS3GatewayMetrics {
   public void testGetBucketSuccess() throws Exception {
     long oriMetric = metrics.getGetBucketSuccess();
 
-    bucketEndpoint.get(bucketName, null,
-        null, null, 1000, null,
-        null, "random", null,
-        null, null, null, 0).getEntity();
+    bucketEndpoint.get(bucketName, 1000, 0).getEntity();
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -148,8 +146,7 @@ public class TestS3GatewayMetrics {
 
     // Searching for a bucket that does not exist
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "newBucket", null, null, null, 1000, null, null, "random", null,
-        null, null, null, 0));
+        "newBucket", 1000, 0));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -161,7 +158,7 @@ public class TestS3GatewayMetrics {
   public void testCreateBucketSuccess() throws Exception {
 
     long oriMetric = metrics.getCreateBucketSuccess();
-    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null, null));
+    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null));
     long curMetric = metrics.getCreateBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -172,7 +169,7 @@ public class TestS3GatewayMetrics {
 
     // Creating an error by trying to create a bucket that already exists
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null));
+        bucketName, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
     assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
 
@@ -210,10 +207,9 @@ public class TestS3GatewayMetrics {
   public void testGetAclSuccess() throws Exception {
     long oriMetric = metrics.getGetAclSuccess();
 
+    bucketEndpoint.getQueryParameters().add(QueryParams.ACL, ACL_MARKER);
     Response response =
-        bucketEndpoint.get(bucketName, null, null,
-            null, 0, null, null,
-            null, null, "acl", null, null, 0);
+        bucketEndpoint.get(bucketName, 0, 0);
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
@@ -223,10 +219,9 @@ public class TestS3GatewayMetrics {
   public void testGetAclFailure() throws Exception {
     long oriMetric = metrics.getGetAclFailure();
 
+    bucketEndpoint.getQueryParameters().add(QueryParams.ACL, ACL_MARKER);
     // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "random_bucket", null, null, null, 0, null,
-        null, null, null, "acl", null, null, 0));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("random_bucket", 0, 0));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -242,7 +237,8 @@ public class TestS3GatewayMetrics {
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
 
-    bucketEndpoint.put("b1", ACL_MARKER, inputBody);
+    bucketEndpoint.getQueryParameters().add(QueryParams.ACL, ACL_MARKER);
+    bucketEndpoint.put("b1", inputBody);
     inputBody.close();
     long curMetric = metrics.getPutAclSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -255,9 +251,9 @@ public class TestS3GatewayMetrics {
 
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
+    bucketEndpoint.getQueryParameters().add(QueryParams.ACL, ACL_MARKER);
     try {
-      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", ACL_MARKER,
-          inputBody));
+      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", inputBody));
     } finally {
       inputBody.close();
     }
