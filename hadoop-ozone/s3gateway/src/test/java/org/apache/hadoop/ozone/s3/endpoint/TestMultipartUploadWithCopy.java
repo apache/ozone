@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -330,8 +331,9 @@ public class TestMultipartUploadWithCopy {
     setHeaders();
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
+    endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = endpoint.put(OzoneConsts.S3_BUCKET, key, content.length(),
-        partNumber, uploadID, null, null, body);
+        partNumber, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
@@ -375,8 +377,9 @@ public class TestMultipartUploadWithCopy {
     setHeaders(additionalHeaders);
 
     ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
+    endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = endpoint.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
-        uploadID, null, null, body);
+        body);
     assertEquals(200, response.getStatus());
 
     CopyPartResult result = (CopyPartResult) response.getEntity();
@@ -403,7 +406,8 @@ public class TestMultipartUploadWithCopy {
         OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
     additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, "bytes=0-3");
     setHeaders(additionalHeaders);
-    endpoint.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, null, null, body);
+    endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    endpoint.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, body);
     OzoneMultipartUploadPartListParts parts =
         client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
         .listParts(KEY, uploadID, 0, 100);
@@ -415,8 +419,9 @@ public class TestMultipartUploadWithCopy {
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
       String uploadID) throws IOException, OS3Exception {
     setHeaders();
+    endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = endpoint.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
-        uploadID, completeMultipartUploadRequest);
+        completeMultipartUploadRequest);
 
     assertEquals(200, response.getStatus());
 

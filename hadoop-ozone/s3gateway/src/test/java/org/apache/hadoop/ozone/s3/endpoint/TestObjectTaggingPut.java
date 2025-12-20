@@ -90,13 +90,14 @@ public class TestObjectTaggingPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, null, body);
+    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, body);
   }
 
   @Test
   public void testPutObjectTaggingWithEmptyBody() throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
+      objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1,
           null);
       fail();
     } catch (OS3Exception ex) {
@@ -107,8 +108,8 @@ public class TestObjectTaggingPut {
 
   @Test
   public void testPutValidObjectTagging() throws Exception {
-    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null,
-         "", null, twoTags()).getStatus());
+    objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
+    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, twoTags()).getStatus());
     OzoneKeyDetails keyDetails =
         clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
     assertEquals(2, keyDetails.getTags().size());
@@ -129,7 +130,8 @@ public class TestObjectTaggingPut {
   private void testInvalidObjectTagging(Supplier<InputStream> inputStream,
                                         int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
+      objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1,
           inputStream.get());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
@@ -141,8 +143,9 @@ public class TestObjectTaggingPut {
   @Test
   public void testPutObjectTaggingNoKeyFound() throws Exception {
     try {
+      objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
       objectEndpoint.put(BUCKET_NAME, "nonexistent", 0, 1,
-          null, "", null, twoTags());
+          twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -153,8 +156,9 @@ public class TestObjectTaggingPut {
   @Test
   public void testPutObjectTaggingNoBucketFound() throws Exception {
     try {
+      objectEndpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
       objectEndpoint.put("nonexistent", "nonexistent", 0, 1,
-          null, "", null, twoTags());
+          twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -185,9 +189,9 @@ public class TestObjectTaggingPut {
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);
 
+    endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
     try {
-      endpoint.put("fsoBucket", "dir/", 0, 1, null, "",
-          null, twoTags());
+      endpoint.put("fsoBucket", "dir/", 0, 1, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());

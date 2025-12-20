@@ -90,17 +90,17 @@ public class TestObjectGet {
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     rest.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        1, null, null, null, body);
+        1, body);
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
+        1, body);
   }
 
   @Test
   public void get() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
 
     //THEN
     OzoneInputStream ozoneInputStream =
@@ -122,7 +122,7 @@ public class TestObjectGet {
   @Test
   public void getKeyWithTag() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get(BUCKET_NAME, KEY_WITH_TAG, 0, null, 0, null, null);
+    Response response = rest.get(BUCKET_NAME, KEY_WITH_TAG, 0, 0);
 
     //THEN
     OzoneInputStream ozoneInputStream =
@@ -144,7 +144,7 @@ public class TestObjectGet {
   public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
 
     assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
@@ -174,7 +174,7 @@ public class TestObjectGet {
         CONTENT_DISPOSITION2);
     queryParameter.putSingle("response-content-encoding", CONTENT_ENCODING2);
 
-    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
 
     assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));
@@ -195,13 +195,13 @@ public class TestObjectGet {
     Response response;
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
 
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
     assertEquals("1", response.getHeaderString("Content-Length"));
     assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
     assertEquals(
@@ -214,7 +214,7 @@ public class TestObjectGet {
   @Test
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
     assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
@@ -222,7 +222,7 @@ public class TestObjectGet {
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
-    response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
+    response = rest.get(BUCKET_NAME, KEY_NAME, 0, 0);
     assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
@@ -256,7 +256,7 @@ public class TestObjectGet {
 
     // WHEN
     final OS3Exception ex = assertThrows(OS3Exception.class,
-            () -> rest.get(BUCKET_NAME, keyPath, 0, null, 0, null, null));
+            () -> rest.get(BUCKET_NAME, keyPath, 0, 0));
 
     // THEN
     assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());

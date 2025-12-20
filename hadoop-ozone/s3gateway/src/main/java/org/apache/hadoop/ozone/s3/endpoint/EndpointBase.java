@@ -118,6 +118,11 @@ public abstract class EndpointBase {
     return getQueryParameters().getFirst(key);
   }
 
+  protected String getQueryParam(String key, String defaultValue) {
+    final String value = getQueryParam(key);
+    return value != null ? value : defaultValue;
+  }
+
   public MultivaluedMap<String, String> getQueryParameters() {
     return context.getUriInfo().getQueryParameters();
   }
