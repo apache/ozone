@@ -2092,7 +2092,13 @@ public class KeyValueHandler extends Handler {
     }
     try {
       readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
-      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+      final ReadBlockRequestProto readBlock = request.getReadBlock();
+      final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+      final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+      final long bytesRead = readBlock.hasLength() && readBlock.getLength() > 0
+          ? readBlock.getLength()
+          : blockData.getSize();
+      metrics.incContainerBytesStats(Type.ReadBlock, bytesRead);
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
