@@ -16,6 +16,6 @@
  */
 
 /**
- * This package contains utility classes related to Managed SST dump tool.
+ * Native rocksdb utilities.
  */
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils.db;
