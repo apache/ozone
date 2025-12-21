@@ -254,7 +254,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   @Override
-  public Map<String, String> getTags() {
+  public ImmutableMap<String, String> getTags() {
     return tags;
   }
 
@@ -928,6 +928,10 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Builder toBuilder() {
     return new Builder(this);
+  }
+
+  public OmDirectoryInfo.Builder toDirectoryInfoBuilder() {
+    return OmDirectoryInfo.builderFromOmKeyInfo(this);
   }
 
   /**
