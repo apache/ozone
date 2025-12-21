@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Queue;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -46,7 +44,7 @@ public class TestRDBSstFileWriter {
 
   @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
   @Test
-  public void testSstFileTombstoneCreationWithCodecBufferReuse() throws IOException, RocksDBException {
+  public void testSstFileTombstoneCreationWithCodecBufferReuse() throws IOException {
     ManagedRawSSTFileReader.tryLoadLibrary();
     Path sstPath = path.resolve("test.sst").toAbsolutePath();
     try (CodecBuffer codecBuffer = CodecBuffer.allocateDirect(1024);
@@ -78,8 +76,7 @@ public class TestRDBSstFileWriter {
     }
     Assertions.assertTrue(sstPath.toFile().exists());
     try (ManagedOptions options = new ManagedOptions();
-         ManagedRawSSTFileReader<ManagedRawSSTFileIterator.KeyValue> reader = new ManagedRawSSTFileReader<>(options,
-             sstPath.toString(), 1024);
+         ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(options, sstPath.toString(), 1024);
          ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> itr =
              reader.newIterator(kv -> kv, null, null, IteratorType.KEY_AND_VALUE)) {
 
@@ -89,7 +86,7 @@ public class TestRDBSstFileWriter {
         ManagedRawSSTFileIterator.KeyValue kv = itr.next();
         assertEquals(idx, kv.getType());
         assertEquals(keys.get(idx), keys.get(idx++));
-        assertEquals(0, kv.getValue().length);
+        assertEquals(0, kv.getValue().readableBytes());
       }
       assertEquals(2, idx);
     }
