@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -94,12 +94,12 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
 
   /**
    * Used for S3 tags.
    */
-  private Map<String, String> tags;
+  private final ImmutableMap<String, String> tags;
 
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
@@ -120,12 +120,12 @@ public final class OmKeyInfo extends WithParentObjectId
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.encInfo = b.encInfo;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
-    this.tags = b.tags;
+    this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
@@ -256,11 +256,6 @@ public final class OmKeyInfo extends WithParentObjectId
   @Override
   public Map<String, String> getTags() {
     return tags;
-  }
-
-  @Override
-  public void setTags(Map<String, String> tags) {
-    this.tags = tags;
   }
 
   /**
@@ -442,19 +437,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
-  }
-
-  public boolean addAcl(OzoneAcl acl) {
-    return OzoneAclUtil.addAcl(acls, acl);
-  }
-
-  public boolean removeAcl(OzoneAcl acl) {
-    return OzoneAclUtil.removeAcl(acls, acl);
-  }
-
-  public boolean setAcls(List<OzoneAcl> newAcls) {
-    return OzoneAclUtil.setAcl(acls, newAcls);
+    return acls;
   }
 
   public void setReplicationConfig(ReplicationConfig repConfig) {
@@ -499,20 +482,23 @@ public final class OmKeyInfo extends WithParentObjectId
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private FileEncryptionInfo encInfo;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private final AclListBuilder acls;
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private FileChecksum fileChecksum;
 
     private boolean isFile;
-    private final Map<String, String> tags = new HashMap<>();
+    private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
 
     public Builder() {
+      this.acls = AclListBuilder.empty();
+      this.tags = MapBuilder.empty();
     }
 
     public Builder(OmKeyInfo obj) {
       super(obj);
+      this.acls = AclListBuilder.of(obj.acls);
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -526,10 +512,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      if (obj.getTags() != null) {
-        this.tags.putAll(obj.getTags());
-      }
-      this.acls.addAll(obj.getAcls());
+      this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
@@ -563,6 +546,7 @@ public final class OmKeyInfo extends WithParentObjectId
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
       if (omKeyLocationInfoList != null) {
+        this.omKeyLocationInfoGroups.clear();
         this.omKeyLocationInfoGroups.addAll(omKeyLocationInfoList);
       }
       return this;
@@ -621,9 +605,13 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls.set(listOfAcls);
       }
       return this;
+    }
+
+    public AclListBuilder acls() {
+      return acls;
     }
 
     public Builder addAcl(OzoneAcl ozoneAcl) {
@@ -662,18 +650,17 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder setTags(Map<String, String> tags) {
-      this.tags.clear();
-      addAllTags(tags);
+      this.tags.set(tags);
       return this;
     }
 
     public Builder addTag(String key, String value) {
-      tags.put(key, value);
+      this.tags.put(key, value);
       return this;
     }
 
     public Builder addAllTags(Map<String, String> keyTags) {
-      tags.putAll(keyTags);
+      this.tags.putAll(keyTags);
       return this;
     }
 

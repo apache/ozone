@@ -124,13 +124,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
-  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
-                                     OmKeyInfo.Builder builder) {
-    // updates parentID
-    builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
-  }
-
-  @Override
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName)throws IOException {
 
