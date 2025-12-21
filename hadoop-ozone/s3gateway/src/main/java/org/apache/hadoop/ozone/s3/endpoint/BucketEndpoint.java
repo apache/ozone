@@ -40,7 +40,6 @@ import java.util.Objects;
 import java.util.Set;
 import javax.annotation.PostConstruct;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.POST;
@@ -116,20 +115,20 @@ public class BucketEndpoint extends EndpointBase {
   @GET
   @SuppressWarnings("methodlength")
   public Response get(
-      @PathParam(BUCKET) String bucketName,
-      @DefaultValue("1000") @QueryParam(QueryParams.MAX_KEYS) int maxKeys,
-      @DefaultValue("1000") @QueryParam(QueryParams.MAX_UPLOADS) int maxUploads
+      @PathParam(BUCKET) String bucketName
   ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
-    final String continueToken = getQueryParam(QueryParams.CONTINUATION_TOKEN);
-    final String delimiter = getQueryParam(QueryParams.DELIMITER);
-    final String encodingType = getQueryParam(QueryParams.ENCODING_TYPE);
-    final String marker = getQueryParam(QueryParams.MARKER);
-    String prefix = getQueryParam(QueryParams.PREFIX);
-    String startAfter = getQueryParam(QueryParams.START_AFTER);
+    final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+    final String delimiter = queryParams().get(QueryParams.DELIMITER);
+    final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
+    final String marker = queryParams().get(QueryParams.MARKER);
+    int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
+    final int maxUploads = queryParams().getInt(QueryParams.MAX_UPLOADS, 1000);
+    String prefix = queryParams().get(QueryParams.PREFIX);
+    String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     ContinueToken decodedToken =
@@ -137,7 +136,7 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
-      final String aclMarker = getQueryParam(QueryParams.ACL);
+      final String aclMarker = queryParams().get(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
@@ -146,11 +145,11 @@ public class BucketEndpoint extends EndpointBase {
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
-      final String uploads = getQueryParam(QueryParams.UPLOADS);
+      final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        final String uploadIdMarker = getQueryParam(QueryParams.UPLOAD_ID_MARKER);
-        final String keyMarker = getQueryParam(QueryParams.KEY_MARKER);
+        final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
+        final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
@@ -324,7 +323,7 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
-      final String aclMarker = getQueryParam(QueryParams.ACL);
+      final String aclMarker = queryParams().get(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
         Response response =  putAcl(bucketName, body);
