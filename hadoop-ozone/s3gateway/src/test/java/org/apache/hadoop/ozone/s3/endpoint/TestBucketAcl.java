@@ -69,7 +69,7 @@ public class TestBucketAcl {
         .setClient(client)
         .setHeaders(headers)
         .build();
-    bucketEndpoint.getQueryParameters().add(QueryParams.ACL, ACL_MARKER);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
   }
 
   @AfterEach
@@ -82,8 +82,7 @@ public class TestBucketAcl {
   @Test
   public void testGetAcl() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    Response response =
-        bucketEndpoint.get(BUCKET_NAME, 0, 0);
+    Response response = bucketEndpoint.get(BUCKET_NAME);
     assertEquals(HTTP_OK, response.getStatus());
     System.out.println(response.getEntity());
   }
