@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -89,7 +90,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   };
 
   @Override
-  public void setPreCommit(Runnable preCommit) {
+  public void setPreCommit(@Nonnull Runnable preCommit) {
     this.preCommit = preCommit;
   }
 

@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -84,7 +85,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
   private Runnable preCommit = () -> {
   };
 
-  public void setPreCommit(Runnable preCommit) {
+  public void setPreCommit(@Nonnull Runnable preCommit) {
     this.preCommit = preCommit;
   }
 

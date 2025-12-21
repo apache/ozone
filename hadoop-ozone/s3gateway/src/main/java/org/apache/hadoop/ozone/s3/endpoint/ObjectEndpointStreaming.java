@@ -111,6 +111,7 @@ final class ObjectEndpointStreaming {
       PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
     long writeLen;
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
@@ -122,7 +123,6 @@ final class ObjectEndpointStreaming {
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
 
-      final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
       // If sha256Digest exists, this request must validate x-amz-content-sha256
       MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
       if (sha256Digest != null) {

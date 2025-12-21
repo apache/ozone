@@ -33,6 +33,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -112,7 +113,7 @@ public class KeyOutputStream extends OutputStream
   private Runnable preCommit = () -> {
   };
 
-  public void setPreCommit(Runnable preCommit) {
+  public void setPreCommit(@Nonnull Runnable preCommit) {
     this.preCommit = preCommit;
   }
 

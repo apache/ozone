@@ -343,6 +343,8 @@ public class ObjectEndpoint extends EndpointBase {
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
+        final String amzContentSha256Header =
+            validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = getClientProtocol().createKey(
             volume.getName(), bucketName, keyPath, length, replicationConfig,
             customMetadata, tags)) {
@@ -356,8 +358,6 @@ public class ObjectEndpoint extends EndpointBase {
               .toLowerCase();
           output.getMetadata().put(ETAG, eTag);
 
-          final String amzContentSha256Header =
-              validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
           // If sha256Digest exists, this request must validate x-amz-content-sha256
           MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
           if (sha256Digest != null) {
