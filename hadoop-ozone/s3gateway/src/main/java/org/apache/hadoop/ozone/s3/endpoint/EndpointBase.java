@@ -52,8 +52,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -110,7 +108,7 @@ public abstract class EndpointBase {
   private HttpHeaders headers;
 
   // initialized in @PostConstruct
-  private MutableConfigurationSource queryParams;
+  private RequestParameters.MultivaluedMapImpl queryParams;
 
   private final Set<String> excludeMetadataFields =
       new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
@@ -121,12 +119,12 @@ public abstract class EndpointBase {
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
   /** Read-only access to query parameters. */
-  protected ConfigurationSource queryParams() {
+  protected RequestParameters queryParams() {
     return queryParams;
   }
 
   /** For setting multiple values use {@link #getContext()}. */
-  public MutableConfigurationSource queryParamsForTest() {
+  public RequestParameters.Mutable queryParamsForTest() {
     return queryParams;
   }
 

@@ -108,11 +108,6 @@ public class LegacyHadoopConfigurationSource
     configuration.set(key, value);
   }
 
-  @Override
-  public void unset(String key) {
-    configuration.unset(key);
-  }
-
   /**
    * Helper method to get original Hadoop configuration for legacy Hadoop
    * libraries.

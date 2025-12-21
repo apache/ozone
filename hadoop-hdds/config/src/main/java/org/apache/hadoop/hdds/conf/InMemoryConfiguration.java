@@ -55,9 +55,4 @@ public class InMemoryConfiguration implements MutableConfigurationSource {
   public void set(String key, String value) {
     configs.put(key, value);
   }
-
-  @Override
-  public void unset(String key) {
-    configs.remove(key);
-  }
 }

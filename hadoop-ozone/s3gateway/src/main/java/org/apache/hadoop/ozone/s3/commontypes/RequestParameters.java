@@ -17,45 +17,71 @@
 
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import java.util.Collection;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MultivaluedMap;
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 /** Allow looking up query parameters as primitive types. */
-public final class RequestParameters implements MutableConfigurationSource {
+public interface RequestParameters {
 
-  private final MultivaluedMap<String, String> params;
+  String get(String key);
 
-  public static RequestParameters of(MultivaluedMap<String, String> params) {
-    return new RequestParameters(params);
+  static MultivaluedMapImpl of(MultivaluedMap<String, String> params) {
+    return new MultivaluedMapImpl(params);
   }
 
-  private RequestParameters(MultivaluedMap<String, String> params) {
-    this.params = params;
+  default String get(String key, String defaultValue) {
+    final String value = get(key);
+    return value != null ? value : defaultValue;
   }
 
-  @Override
-  public String get(String key) {
-    return params.getFirst(key);
+  default int getInt(String key, int defaultValue) {
+    final String value = get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw translateException(e);
+    }
   }
 
-  @Override
-  public Collection<String> getConfigKeys() {
-    return params.keySet();
+  default WebApplicationException translateException(RuntimeException e) {
+    return new WebApplicationException(e.getMessage(), S3ErrorTable.INVALID_ARGUMENT.getHttpCode());
   }
 
-  @Override
-  public char[] getPassword(String key) {
-    throw new UnsupportedOperationException();
+  /** Additional methods for tests. */
+  interface Mutable extends RequestParameters {
+
+    void set(String key, String value);
+
+    void unset(String key);
+
+    default void setInt(String key, int value) {
+      set(key, String.valueOf(value));
+    }
   }
 
-  @Override
-  public void set(String key, String value) {
-    params.putSingle(key, value);
-  }
+  /** Mutable implementation based on {@link MultivaluedMap}. */
+  final class MultivaluedMapImpl implements Mutable {
+    private final MultivaluedMap<String, String> params;
 
-  @Override
-  public void unset(String key) {
-    params.remove(key);
+    private MultivaluedMapImpl(MultivaluedMap<String, String> params) {
+      this.params = params;
+    }
+
+    public String get(String key) {
+      return params.getFirst(key);
+    }
+
+    public void set(String key, String value) {
+      params.putSingle(key, value);
+    }
+
+    public void unset(String key) {
+      params.remove(key);
+    }
   }
 }
