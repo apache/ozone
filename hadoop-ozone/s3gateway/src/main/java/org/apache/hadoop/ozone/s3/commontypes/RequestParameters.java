@@ -72,14 +72,17 @@ public interface RequestParameters {
       this.params = params;
     }
 
+    @Override
     public String get(String key) {
       return params.getFirst(key);
     }
 
+    @Override
     public void set(String key, String value) {
       params.putSingle(key, value);
     }
 
+    @Override
     public void unset(String key) {
       params.remove(key);
     }
