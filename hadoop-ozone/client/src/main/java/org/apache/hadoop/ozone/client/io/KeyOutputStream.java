@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
@@ -34,7 +35,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
