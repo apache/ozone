@@ -109,4 +109,30 @@ public final class S3Consts {
     REPLACE
   }
 
+  /** Constants for query parameters. */
+  public static final class QueryParams {
+    public static final String ACL = "acl";
+    public static final String CONTINUATION_TOKEN = "continuation-token";
+    public static final String DELETE = "delete";
+    public static final String DELIMITER = "delimiter";
+    public static final String ENCODING_TYPE = "encoding-type";
+    public static final String KEY_MARKER = "key-marker";
+    public static final String MARKER = "marker";
+    public static final String MAX_KEYS = "max-keys";
+    public static final String MAX_PARTS = "max-parts";
+    public static final String MAX_UPLOADS = "max-uploads";
+    public static final String PART_NUMBER = "partNumber";
+    public static final String PART_NUMBER_MARKER = "part-number-marker";
+    public static final String PREFIX = "prefix";
+    public static final String START_AFTER = "start-after";
+    public static final String TAGGING = "tagging";
+    public static final String UPLOAD_ID = "uploadId";
+    public static final String UPLOAD_ID_MARKER = "upload-id-marker";
+    public static final String UPLOADS = "uploads";
+
+    private QueryParams() {
+      // no instances
+    }
+  }
+
 }

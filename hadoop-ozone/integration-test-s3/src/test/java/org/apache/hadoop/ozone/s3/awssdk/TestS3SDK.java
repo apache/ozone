@@ -15,24 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.ozone.s3.awssdk;
 
-/**
- * Builder for BucketEndpoint in tests.
- */
-public class BucketEndpointBuilder extends
-    EndpointBuilder<BucketEndpoint> {
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
-  public BucketEndpointBuilder() {
-    super(BucketEndpoint::new);
-  }
-
+class TestS3SDK extends OzoneS3SDKTests {
   @Override
-  public BucketEndpoint build() {
-    BucketEndpoint endpoint = super.build();
-    endpoint.setOzoneConfiguration(getConfig());
-    endpoint.setHeaders(getHeaders());
-
-    return endpoint;
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = super.createOzoneConfig();
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    return conf;
   }
 }

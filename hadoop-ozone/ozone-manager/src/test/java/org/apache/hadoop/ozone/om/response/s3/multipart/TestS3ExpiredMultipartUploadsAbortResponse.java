@@ -277,12 +277,16 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
           bucket, omMetadataManager, getBucketLayout());
 
       ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ONE);
-      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
-              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
-          .build();
+      OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
+              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true));
 
       if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        omKeyInfo.setParentObjectID(omBucketInfo.getObjectID());
+        keyInfoBuilder.setParentObjectID(omBucketInfo.getObjectID());
+      }
+
+      final OmKeyInfo omKeyInfo = keyInfoBuilder.build();
+
+      if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             omKeyInfo.getFileName(), omKeyInfo, uploadId, 0L,
             omMetadataManager);

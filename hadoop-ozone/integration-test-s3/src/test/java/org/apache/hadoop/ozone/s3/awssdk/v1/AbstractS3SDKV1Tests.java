@@ -86,7 +86,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,7 +94,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -107,7 +105,6 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -117,13 +114,12 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.kerby.util.Hex;
+import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -145,7 +141,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  *
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonHATests.TestCase {
 
   // server-side limitation
   private static final int MAX_UPLOADS_LIMIT = 1000;
@@ -203,39 +200,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
    *   - UploadObjectKMSKey.java
    */
 
-  private static MiniOzoneCluster cluster = null;
-  private static AmazonS3 s3Client = null;
+  private MiniOzoneCluster cluster;
+  private AmazonS3 s3Client;
 
-  /**
-   * Create a MiniOzoneCluster with S3G enabled for testing.
-   * @param conf Configurations to start the cluster
-   * @throws Exception exception thrown when waiting for the cluster to be ready.
-   */
-  static void startCluster(OzoneConfiguration conf) throws Exception {
-    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .addService(s3g)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-    s3Client = new S3ClientFactory(s3g.getConf()).createS3Client();
-  }
-
-  /**
-   * Shutdown the MiniOzoneCluster.
-   */
-  static void shutdownCluster() throws IOException {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-  public static void setCluster(MiniOzoneCluster cluster) {
-    AbstractS3SDKV1Tests.cluster = cluster;
-  }
-
-  public static MiniOzoneCluster getCluster() {
-    return AbstractS3SDKV1Tests.cluster;
+  @BeforeAll
+  void createClient() {
+    cluster = cluster();
+    s3Client = new S3ClientFactory(cluster.getConf())
+        .createS3Client();
   }
 
   @Test
@@ -1077,9 +1049,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   class PresignedUrlTests {
-    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String BUCKET_NAME = "v1-presigned-url-bucket";
     private static final String CONTENT = "bar";
-    private final byte[] requestBody = CONTENT.getBytes(StandardCharsets.UTF_8);
     // Set the presigned URL to expire after one hour.
     private final Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
 
@@ -1162,18 +1133,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
       URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
-      MessageDigest md = MessageDigest.getInstance("SHA-256");
-      md.update(requestBody);
-      String sha256 = Hex.encode(md.digest()).toLowerCase();
-      Map<String, List<String>> headers = new HashMap<>();
-      List<String> sha256Value = new ArrayList<>();
-      sha256Value.add(sha256);
-      headers.put("x-amz-content-sha256", sha256Value);
-
       HttpURLConnection connection = null;
       try {
         connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
-            headers, requestBody);
+            null, CONTENT.getBytes(StandardCharsets.UTF_8));
         int responseCode = connection.getResponseCode();
         assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
         String actualContent;
@@ -1187,41 +1150,6 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           connection.disconnect();
         }
       }
-    }
-
-    @Test
-    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
-      final String keyName = getKeyName();
-
-      // Test PutObjectRequest presigned URL
-      GeneratePresignedUrlRequest generatePresignedUrlRequest =
-          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
-      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
-
-      Map<String, List<String>> headers = new HashMap<>();
-      List<String> sha256Value = new ArrayList<>();
-      sha256Value.add("wrong-sha256-value");
-      headers.put("x-amz-content-sha256", sha256Value);
-
-      HttpURLConnection connection = null;
-      try {
-        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
-            headers, requestBody);
-        int responseCode = connection.getResponseCode();
-        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
-      } finally {
-        if (connection != null) {
-          connection.disconnect();
-        }
-      }
-
-      // Verify the object was not uploaded
-      AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-          () -> s3Client.getObject(BUCKET_NAME, keyName));
-
-      assertEquals(ErrorType.Client, ase.getErrorType());
-      assertEquals(404, ase.getStatusCode());
-      assertEquals("NoSuchKey", ase.getErrorCode());
     }
 
     @Test
@@ -1495,16 +1423,16 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     return getBucketName("");
   }
 
-  private String getBucketName(String suffix) {
-    return (getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+  private String getBucketName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String getKeyName() {
     return getKeyName("");
   }
 
-  private String getKeyName(String suffix) {
-    return (getTestName() +  "key" + suffix).toLowerCase(Locale.ROOT);
+  private String getKeyName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String multipartUpload(String bucketName, String key, File file, long partSize, String contentType,

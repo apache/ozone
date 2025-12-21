@@ -35,17 +35,15 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -85,13 +83,6 @@ public class TestObjectTaggingDelete {
         .thenReturn("UNSIGNED-PAYLOAD");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
         1, null, null, null, body);
-
-
-    ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
-    Mockito.when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-    rest.setContext(context);
   }
 
   @Test
@@ -134,6 +125,7 @@ public class TestObjectTaggingDelete {
 
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
+    when(mockObjectStore.getClientProxy()).thenReturn(mock(ClientProtocol.class));
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()

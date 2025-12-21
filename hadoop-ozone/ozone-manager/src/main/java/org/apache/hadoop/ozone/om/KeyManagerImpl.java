@@ -376,6 +376,15 @@ public class KeyManagerImpl implements KeyManager {
    */
   public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
     if (isSstFilteringSvcEnabled()) {
+      if (isDefragSvcEnabled()) {
+        LOG.info("SstFilteringService is disabled (despite configuration intending to enable it) " +
+            "because SnapshotDefragService is enabled. Defrag effectively performs filtering already.");
+        return;
+      }
+
+      LOG.info("SstFilteringService is enabled. Note SstFilteringService is " +
+          "deprecated in favor of SnapshotDefragService and may be removed in a future release.");
+
       long serviceInterval = conf.getTimeDuration(
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
@@ -542,8 +551,7 @@ public class KeyManagerImpl implements KeyManager {
         });
     long generateEDEKTime = monotonicNow() - generateEDEKStartTime;
     LOG.debug("generateEDEK takes {} ms", generateEDEKTime);
-    Objects.requireNonNull(edek, "edek == null");
-    return edek;
+    return Objects.requireNonNull(edek, "edek == null");
   }
 
   @Override
@@ -674,7 +682,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
-    Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
+    Objects.requireNonNull(value, "OMKeyInfo cannot be null");
     if (grpcBlockTokenEnabled) {
       String remoteUser = getRemoteUser().getShortUserName();
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
@@ -1188,7 +1196,7 @@ public class KeyManagerImpl implements KeyManager {
 
           replicationConfig = omKeyInfo.getReplicationConfig();
         }
-        Preconditions.checkNotNull(replicationConfig,
+        Objects.requireNonNull(replicationConfig,
             "ReplicationConfig can't be identified");
 
         if (partKeyInfoMapIterator.hasNext()) {
@@ -1470,7 +1478,7 @@ public class KeyManagerImpl implements KeyManager {
    */
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     return getFileStatus(args, null);
   }
 
@@ -1489,7 +1497,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
           throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
 
@@ -1502,7 +1510,7 @@ public class KeyManagerImpl implements KeyManager {
   private OzoneFileStatus getOzoneFileStatus(OmKeyArgs args,
       String clientAddress) throws IOException {
 
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     final String keyName = args.getKeyName();
@@ -1722,19 +1730,14 @@ public class KeyManagerImpl implements KeyManager {
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyInfo.getVolumeName())
-        .setBucketName(keyInfo.getBucketName())
+    return keyInfo.toBuilder()
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(keyInfo.getAcls())
-        .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
 
@@ -1750,7 +1753,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args, String clientAddress)
       throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -1778,7 +1781,7 @@ public class KeyManagerImpl implements KeyManager {
    */
   @Override
   public void refresh(OmKeyInfo key) throws IOException {
-    Preconditions.checkNotNull(key, "Key info can not be null");
+    Objects.requireNonNull(key, "Key info can not be null");
     refreshPipeline(Collections.singletonList(key));
   }
 
@@ -1899,7 +1902,7 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();

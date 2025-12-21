@@ -786,7 +786,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setParentObjectID(keyInfo.getParentObjectID())
         .setAcls(keyInfo.getAcls())
         .addAllMetadata(keyInfo.getMetadata())

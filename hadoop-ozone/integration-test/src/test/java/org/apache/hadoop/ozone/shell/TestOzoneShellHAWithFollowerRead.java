@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
@@ -64,8 +67,33 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     super.testListAllKeysInternal("skipvol2");
 
     long curMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
-    Assertions.assertEquals(lastMetrics, curMetrics);
+    assertEquals(lastMetrics, curMetrics);
 
     getCluster().getOMLeader().setConfiguration(oldConf);
+  }
+
+  @Test
+  public void testAllowFollowerReadLocalLease() throws Exception {
+    OzoneConfiguration oldConf = getCluster().getConf();
+    OzoneConfiguration newConf1 = new OzoneConfiguration(oldConf);
+    newConf1.setBoolean("ozone.om.follower.read.local.lease.enabled", true);
+    OzoneConfiguration newConf2 = new OzoneConfiguration(newConf1);
+    newConf2.setLong("ozone.om.follower.read.local.lease.time.ms", -1000);
+
+    try {
+      getCluster().getOzoneManager(1).setConfiguration(newConf1);
+      getCluster().getOzoneManager(2).setConfiguration(newConf2);
+
+      String[] args = new String[]{"volume", "list"};
+      for (int i = 0; i < 100; i++) {
+        execute(getOzoneShell(), args);
+      }
+      assertThat(getCluster().getOzoneManager(1).getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
+      assertEquals(0, getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseSuccess());
+      assertThat(getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0).isTrue();
+    } finally {
+      getCluster().getOzoneManager(1).setConfiguration(oldConf);
+      getCluster().getOzoneManager(2).setConfiguration(oldConf);
+    }
   }
 }

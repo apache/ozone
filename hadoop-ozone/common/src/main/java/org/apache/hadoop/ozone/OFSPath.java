@@ -25,13 +25,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 import java.util.StringTokenizer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
@@ -185,7 +185,7 @@ public class OFSPath {
     if (isEmpty()) {
       return "";
     }
-    Preconditions.checkNotNull(authority);
+    Objects.requireNonNull(authority, "authority == null");
     StringBuilder sb = new StringBuilder();
     if (!isMount()) {
       sb.append(volumeName);
@@ -343,7 +343,7 @@ public class OFSPath {
    */
   @VisibleForTesting
   static String getTempMountBucketName(String username) {
-    Preconditions.checkNotNull(username);
+    Objects.requireNonNull(username, "username == null");
     // TODO: Improve this to "slugify(username)-md5(username)" for better
     //  readability?
     return md5Hex(username);
@@ -365,13 +365,25 @@ public class OFSPath {
    * @return trash root for the given path.
    */
   public Path getTrashRoot() {
+    return getTrashRoot(null);
+  }
+
+  /**
+   * Return trash root for the given path and username.
+   * The username can be specified to use the proxy user instead of {@link UserGroupInformation#getCurrentUser()}.
+   * @param username the username used to get the trash root path. If it is not specified,
+   *                 will fall back to {@link UserGroupInformation#getCurrentUser()}.
+   * @return trash root for the given path and username.
+   */
+  public Path getTrashRoot(String username) {
     if (!this.isKey()) {
       throw new RuntimeException("Recursive rm of volume or bucket with trash" +
           " enabled is not permitted. Consider using the -skipTrash option.");
     }
     try {
-      final String username =
-              UserGroupInformation.getCurrentUser().getShortUserName();
+      if (StringUtils.isEmpty(username)) {
+        username = UserGroupInformation.getCurrentUser().getShortUserName();
+      }
       final Path pathRoot = new Path(
           OZONE_OFS_URI_SCHEME, authority, OZONE_URI_DELIMITER);
       final Path pathToVolume = new Path(pathRoot, volumeName);

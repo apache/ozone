@@ -189,9 +189,11 @@ public class TestOmKeyInfo {
       }
     }
 
-    key.setAcls(Arrays.asList(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE)));
+    key = key.toBuilder()
+        .setAcls(Arrays.asList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, "user1",
+            ACCESS, IAccessAuthorizer.ACLType.WRITE)))
+        .build();
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);
@@ -204,7 +206,9 @@ public class TestOmKeyInfo {
     assertEquals(key.getAcls(), cloneKey.getAcls());
 
     // Change object tags and check
-    key.setTags(Collections.singletonMap("tagKey3", "tagValue3"));
+    key = key.toBuilder()
+        .setTags(Collections.singletonMap("tagKey3", "tagValue3"))
+        .build();
 
     assertNotEquals(key, cloneKey);
   }

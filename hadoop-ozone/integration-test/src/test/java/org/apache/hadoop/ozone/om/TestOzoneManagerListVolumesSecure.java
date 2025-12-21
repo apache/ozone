@@ -220,8 +220,8 @@ public class TestOzoneManagerListVolumesSecure {
     String aclUser1All = "user:user1:a";
     String aclUser2All = "user:user2:a";
     String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(omClient, "volume1", USER_1, aclUser1All);
-    createVolumeWithOwnerAndAcl(omClient, "volume2", USER_2, aclUser2All);
+    createVolumeWithOwnerAndAcl(omClient, "volume1", USER_1, null);
+    createVolumeWithOwnerAndAcl(omClient, "volume2", USER_2, null);
     createVolumeWithOwnerAndAcl(omClient, "volume3", USER_1, aclUser2All);
     createVolumeWithOwnerAndAcl(omClient, "volume4", USER_2, aclUser1All);
     createVolumeWithOwnerAndAcl(omClient, "volume5", USER_1, aclWorldAll);

@@ -15,28 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.awssdk.v2;
-
-import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-
 /**
- * Tests the AWS S3 SDK V2 basic operations with OM Ratis enabled.
+ * This package contains classes for managing snapshot diff db.
  */
-public class TestS3SDKV2 extends AbstractS3SDKV2Tests {
-
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    startCluster(conf);
-  }
-
-  @AfterAll
-  public static void shutdown() throws IOException {
-    shutdownCluster();
-  }
-}
+package org.apache.hadoop.ozone.om.snapshot.db;

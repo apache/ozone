@@ -19,12 +19,9 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
-import org.apache.ozone.test.tag.Unhealthy;
-
 /**
  * Test OmSnapshot for Legacy bucket type.
  */
-@Unhealthy("HDDS-13466")
 public class TestOmSnapshotWithoutBucketLinkingLegacy extends TestOmSnapshot {
 
   public TestOmSnapshotWithoutBucketLinkingLegacy() throws Exception {

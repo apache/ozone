@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Function.identity;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -53,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -218,13 +220,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                           String activeDBLocationName,
                           ConfigurationSource configuration,
                           Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
-    Preconditions.checkNotNull(metadataDirName);
-    Preconditions.checkNotNull(sstBackupDirName);
-    Preconditions.checkNotNull(compactionLogDirName);
-    Preconditions.checkNotNull(activeDBLocationName);
-    Preconditions.checkNotNull(lockSupplier);
+    this.metadataDir = Objects.requireNonNull(metadataDirName, "metadataDirName == null");
+    Objects.requireNonNull(sstBackupDirName, "sstBackupDirName == null");
+    Objects.requireNonNull(compactionLogDirName, "compactionLogDirName == null");
+    Objects.requireNonNull(activeDBLocationName, "activeDBLocationName == null");
+    Objects.requireNonNull(lockSupplier, "lockSupplier == null");
     this.lock = new BootstrapStateHandler.Lock(lockSupplier);
-    this.metadataDir = metadataDirName;
     this.compactionLogDir =
         createCompactionLogDir(metadataDirName, compactionLogDirName);
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
@@ -362,24 +363,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   /**
    * Set SnapshotInfoTable DB column family handle to be used in DB listener.
-   * @param snapshotInfoTableCFHandle ColumnFamilyHandle
+   * @param handle ColumnFamilyHandle
    */
   public void setSnapshotInfoTableCFHandle(
-      ColumnFamilyHandle snapshotInfoTableCFHandle) {
-    Preconditions.checkNotNull(snapshotInfoTableCFHandle,
-        "Column family handle should not be null");
-    this.snapshotInfoTableCFHandle = snapshotInfoTableCFHandle;
+      ColumnFamilyHandle handle) {
+    this.snapshotInfoTableCFHandle = Objects.requireNonNull(handle, "handle == null");
   }
 
   /**
    * Set CompactionLogTable DB column family handle to access the table.
-   * @param compactionLogTableCFHandle ColumnFamilyHandle
+   * @param handle ColumnFamilyHandle
    */
   public synchronized void setCompactionLogTableCFHandle(
-      ColumnFamilyHandle compactionLogTableCFHandle) {
-    Preconditions.checkNotNull(compactionLogTableCFHandle,
-        "Column family handle should not be null");
-    this.compactionLogTableCFHandle = compactionLogTableCFHandle;
+      ColumnFamilyHandle handle) {
+    this.compactionLogTableCFHandle = Objects.requireNonNull(handle, "handle == null");
   }
 
   /**
@@ -387,7 +384,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param activeRocksDB RocksDB
    */
   public synchronized void setActiveRocksDB(ManagedRocksDB activeRocksDB) {
-    Preconditions.checkNotNull(activeRocksDB, "RocksDB should not be null.");
+    Objects.requireNonNull(activeRocksDB, "RocksDB should not be null.");
     this.activeRocksDB = activeRocksDB;
   }
 
@@ -728,12 +725,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   private void preconditionChecksForLoadAllCompactionLogs() {
-    Preconditions.checkNotNull(compactionLogDir,
+    Objects.requireNonNull(compactionLogDir,
         "Compaction log directory must be set.");
-    Preconditions.checkNotNull(compactionLogTableCFHandle,
+    Objects.requireNonNull(compactionLogTableCFHandle,
         "compactionLogTableCFHandle must be set before calling " +
             "loadAllCompactionLogs.");
-    Preconditions.checkNotNull(activeRocksDB,
+    Objects.requireNonNull(activeRocksDB,
         "activeRocksDB must be set before calling loadAllCompactionLogs.");
   }
 
@@ -1372,7 +1369,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
              options, sstFilePath, SST_READ_AHEAD_SIZE);
          ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null);
+             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
       sstFileWriter.open(prunedFilePath);
       while (itr.hasNext()) {

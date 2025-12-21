@@ -322,7 +322,7 @@ public class GrpcOmTransport implements OmTransport {
    */
   @ConfigGroup(prefix = "ozone.om.grpc")
   public static final class GrpcOmTransportConfig {
-    @Config(key = "port", defaultValue = "8981",
+    @Config(key = "ozone.om.grpc.port", defaultValue = "8981",
         description = "Port used for"
             + " the GrpcOmTransport OzoneManagerServiceGrpc server",
         tags = {ConfigTag.MANAGEMENT})

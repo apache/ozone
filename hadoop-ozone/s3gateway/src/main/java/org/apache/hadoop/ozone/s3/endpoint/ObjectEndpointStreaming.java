@@ -213,7 +213,7 @@ final class ObjectEndpointStreaming {
       throw ex;
     }
     return Response.ok()
-        .header(OzoneConsts.ETAG, wrapInQuotes(eTag))
+        .header(HttpHeaders.ETAG, wrapInQuotes(eTag))
         .build();
   }
 }

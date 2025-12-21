@@ -94,6 +94,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -749,6 +750,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-14101")
   void testContainerStateMachineSingleFailureRetry()
       throws Exception {
     try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -784,6 +786,7 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
+  @Flaky("HDDS-14101")
   void testContainerStateMachineDualFailureRetry()
       throws Exception {
     OzoneOutputStream key =
@@ -818,14 +821,16 @@ public class TestContainerStateMachineFailures {
   void testContainerStateMachineAllNodeFailure()
       throws Exception {
     // mark all dn volume as full to induce failure
-    List<Pair<StorageVolume, Long>> increasedVolumeSpace = new ArrayList<>();
+    List<Pair<VolumeUsage, Long>> increasedVolumeSpace = new ArrayList<>();
     cluster.getHddsDatanodes().forEach(
         dn -> {
           List<StorageVolume> volumesList = dn.getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList();
           volumesList.forEach(sv -> {
-            if (sv.getVolumeUsage().isPresent()) {
-              increasedVolumeSpace.add(Pair.of(sv, sv.getCurrentUsage().getAvailable()));
-              sv.getVolumeUsage().get().incrementUsedSpace(sv.getCurrentUsage().getAvailable());
+            final VolumeUsage volumeUsage = sv.getVolumeUsage();
+            if (volumeUsage != null) {
+              final long available = sv.getCurrentUsage().getAvailable();
+              increasedVolumeSpace.add(Pair.of(volumeUsage, available));
+              volumeUsage.incrementUsedSpace(available);
             }
           });
         }
@@ -841,14 +846,14 @@ public class TestContainerStateMachineFailures {
       key.flush();
       fail();
     } catch (IOException ex) {
-      assertTrue(ex.getMessage().contains("Retry request failed. retries get failed due to exceeded" +
-          " maximum allowed retries number: 5"), ex.getMessage());
+      assertThat(ex.getMessage()).contains("Retry request failed. retries get failed due to exceeded" +
+          " maximum allowed retries number: 5");
     } finally {
-      increasedVolumeSpace.forEach(e -> e.getLeft().getVolumeUsage().ifPresent(
-          p -> p.decrementUsedSpace(e.getRight())));
+      increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       // test execution is less than 2 sec but to be safe putting 30 sec as without fix, taking more than 60 sec
-      assertTrue(Time.monotonicNow() - startTime < 30000, "Operation took longer than expected: "
-          + (Time.monotonicNow() - startTime));
+      assertThat(Time.monotonicNow() - startTime)
+          .describedAs("Operation took longer than expected")
+          .isLessThan(30000);
     }
 
     // previous pipeline gets closed due to disk full failure, so created a new pipeline and write should succeed,

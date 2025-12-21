@@ -15,27 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.ozone.om.request.util;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.util.List;
+import java.util.function.BiPredicate;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 
 /**
- * Builder for ObjectEndpoint in tests.
+ * ACL operation.
  */
-public class ObjectEndpointBuilder extends
-    EndpointBuilder<ObjectEndpoint> {
-
-  public ObjectEndpointBuilder() {
-    super(ObjectEndpoint::new);
-  }
-
-  @Override
-  public ObjectEndpoint build() {
-    ObjectEndpoint endpoint = super.build();
-    final OzoneConfiguration config = getConfig();
-    endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
-    endpoint.setHeaders(getHeaders());
-    endpoint.setContext(getContext());
-    return endpoint;
-  }
+public interface AclOp extends BiPredicate<List<OzoneAcl>, AclListBuilder> {
+  // just a shortcut to avoid having to repeat long list of generic parameters
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.Closeable;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDirectSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
@@ -60,6 +61,17 @@ public class RDBSstFileWriter implements Closeable {
     }
   }
 
+  public void put(CodecBuffer key, CodecBuffer value) throws RocksDatabaseException {
+    try {
+      sstFileWriter.put(key.asReadOnlyByteBuffer(), value.asReadOnlyByteBuffer());
+      keyCounter.incrementAndGet();
+    } catch (RocksDBException e) {
+      closeOnFailure();
+      throw new RocksDatabaseException("Failed to put key (length=" + key.readableBytes()
+          + ") and value (length=" + value.readableBytes() + "), sstFile=" + sstFile.getAbsolutePath(), e);
+    }
+  }
+
   public void delete(byte[] key) throws RocksDatabaseException {
     try {
       sstFileWriter.delete(key);
@@ -67,6 +79,19 @@ public class RDBSstFileWriter implements Closeable {
     } catch (RocksDBException e) {
       closeOnFailure();
       throw new RocksDatabaseException("Failed to delete key (length=" + key.length
+          + "), sstFile=" + sstFile.getAbsolutePath(), e);
+    }
+  }
+
+  public void delete(CodecBuffer key) throws RocksDatabaseException {
+    try (ManagedDirectSlice slice = new ManagedDirectSlice(key.asReadOnlyByteBuffer())) {
+      slice.putFromBuffer(directSlice -> {
+        sstFileWriter.delete(directSlice);
+        keyCounter.incrementAndGet();
+      });
+    } catch (RocksDatabaseException e) {
+      closeOnFailure();
+      throw new RocksDatabaseException("Failed to delete key (length=" + key.readableBytes()
           + "), sstFile=" + sstFile.getAbsolutePath(), e);
     }
   }
