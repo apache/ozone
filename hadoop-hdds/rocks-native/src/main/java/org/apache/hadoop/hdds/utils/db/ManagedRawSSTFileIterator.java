@@ -85,8 +85,8 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
 
   @Override
   public synchronized void close() {
-    this.closeInternal(this.nativeHandle);
     if (!closed) {
+      this.closeInternal(this.nativeHandle);
       keyBuffer.release();
       valueBuffer.release();
     }
