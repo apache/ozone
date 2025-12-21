@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -96,14 +95,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
 
     BucketLayout bucketLayout = BucketLayout.fromProto(bucketInfo.getBucketLayout());
-    OmConfig omConfig = ozoneManager.getConfig();
-    boolean fsPathEnabled = false;
-    if (omConfig != null) {
-      fsPathEnabled = omConfig.isFileSystemPathEnabled();
-    }
-
     boolean strict = ozoneManager.isStrictS3()
-        || bucketLayout.isObjectStore(fsPathEnabled);
+        || bucketLayout.isObjectStore(ozoneManager.getConfig().isFileSystemPathEnabled());
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
     // ACL check during preExecute

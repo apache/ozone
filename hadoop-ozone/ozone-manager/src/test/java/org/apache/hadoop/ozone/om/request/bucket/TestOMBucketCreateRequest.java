@@ -326,6 +326,34 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     }
   }
 
+  @Test
+  public void testNonS3BucketNameRejectedForObjectStoreWhenStrictDisabled()
+      throws Exception {
+
+    // strict mode disabled
+    ozoneManager.getConfiguration().setBoolean(
+        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false);
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket_with_underscore"; // non-S3-compliant
+    addCreateVolumeToTable(volumeName, omMetadataManager);
+
+    // Explicitly set bucket layout to OBJECT_STORE so the test doesn't depend on
+    // defaults or mocked OM behavior.
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.OBJECT_STORE);
+
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
+    OMBucketCreateRequest req = new OMBucketCreateRequest(originalRequest);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+
+    assertEquals(OMException.ResultCodes.INVALID_BUCKET_NAME, ex.getResult());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
@@ -480,17 +508,14 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   }
 
   protected OMBucketCreateRequest doPreExecute(String volumeName,
-                                               String bucketName,
-                                               OzoneManagerProtocolProtos.BucketLayoutProto layout) throws Exception {
-
+      String bucketName,
+      OzoneManagerProtocolProtos.BucketLayoutProto layout) throws Exception {
     OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
         newBucketInfoBuilder(bucketName, volumeName)
             .setBucketLayout(layout);
-
     if (layout == OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED) {
       bucketInfo.addMetadata(OMRequestTestUtils.fsoMetadata());
     }
-
     return doPreExecute(bucketInfo);
   }
 
