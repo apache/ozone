@@ -70,9 +70,9 @@ class RDBTable implements Table<byte[], byte[]> {
     db.put(family, key, value);
   }
 
-  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).put(family, key, value);
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) throws RocksDatabaseException {
+    if (batch instanceof AbstractRDBBatchOperation) {
+      ((AbstractRDBBatchOperation) batch).put(family, key, value);
     } else {
       throw new IllegalArgumentException("Unexpected batch class: "
           + batch.getClass().getSimpleName());
@@ -80,9 +80,9 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).put(family, key, value);
+  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) throws RocksDatabaseException {
+    if (batch instanceof AbstractRDBBatchOperation) {
+      ((AbstractRDBBatchOperation) batch).put(family, key, value);
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
@@ -194,9 +194,9 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, byte[] key) {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).delete(family, key);
+  public void deleteWithBatch(BatchOperation batch, byte[] key) throws RocksDatabaseException {
+    if (batch instanceof AbstractRDBBatchOperation) {
+      ((AbstractRDBBatchOperation) batch).delete(family, key);
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
@@ -204,9 +204,9 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void deleteRangeWithBatch(BatchOperation batch, byte[] beginKey, byte[] endKey) {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).deleteRange(family, beginKey, endKey);
+  public void deleteRangeWithBatch(BatchOperation batch, byte[] beginKey, byte[] endKey) throws RocksDatabaseException {
+    if (batch instanceof AbstractRDBBatchOperation) {
+      ((AbstractRDBBatchOperation) batch).deleteRange(family, beginKey, endKey);
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }

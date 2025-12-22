@@ -78,7 +78,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws CodecException {
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
+      throws CodecException, RocksDatabaseException {
     rwLock.readLock().lock();
     try {
       txFlushPending.getAndIncrement();
@@ -190,7 +191,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public void close() {
+  public void close() throws RocksDatabaseException {
     if (currentBatchOperation != null) {
       currentBatchOperation.close();
     }

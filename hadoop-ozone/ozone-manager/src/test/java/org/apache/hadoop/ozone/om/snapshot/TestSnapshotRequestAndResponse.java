@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -191,7 +192,7 @@ public class TestSnapshotRequestAndResponse {
   }
 
   @AfterEach
-  public void stop() {
+  public void stop() throws RocksDatabaseException {
     omMetrics.unRegister();
     omSnapshotIntMetrics.unregister();
     framework().clearInlineMocks();

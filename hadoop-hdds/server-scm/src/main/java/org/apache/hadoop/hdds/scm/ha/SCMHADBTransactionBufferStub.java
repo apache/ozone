@@ -67,7 +67,8 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key) throws CodecException {
+  public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
+      throws CodecException, RocksDatabaseException {
     rwLock.readLock().lock();
     try {
       table.deleteWithBatch(getCurrentBatchOperation(), key);

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -124,7 +125,7 @@ public class TestOMKeyResponse {
   }
 
   @AfterEach
-  public void stop() {
+  public void stop() throws RocksDatabaseException {
     framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();

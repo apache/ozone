@@ -132,7 +132,7 @@ public interface Table<KEY, VALUE> {
    * @param batch the batch operation
    * @param key metadata key
    */
-  void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException;
+  void deleteWithBatch(BatchOperation batch, KEY key) throws RocksDatabaseException, CodecException;
 
   /**
    * Deletes a range of keys from the metadata store as part of a batch operation.
@@ -140,7 +140,8 @@ public interface Table<KEY, VALUE> {
    * @param beginKey start metadata key, inclusive.
    * @param endKey end metadata key, exclusive.
    */
-  void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException;
+  void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws RocksDatabaseException,
+      CodecException;
 
   /**
    * Deletes a range of keys from the metadata store.
