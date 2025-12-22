@@ -193,7 +193,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // to ensure uniqueness of objectIDs.
   private final long omEpoch;
 
-  private Map<String, Table> tableMap = new HashMap<>();
+  private final Map<String, Table> tableMap = new HashMap<>();
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
@@ -675,7 +675,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
-            fileName, uploadId);
+        fileName, uploadId);
   }
 
   /**
@@ -718,10 +718,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return false;
     }
 
-    if (isKeyPresentInTable(volumePrefix, bucketTable)) {
-      return false; // we found at least one key with this vol/
-    }
-    return true;
+    return !isKeyPresentInTable(volumePrefix, bucketTable); // we found at least one key with this vol/
   }
 
   /**
@@ -1103,7 +1100,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = getKeyTable(getBucketLayout()).iterator()) {
+             keyIter = getKeyTable(getBucketLayout()).iterator(null, seekKey)) {
       readFromRDbStartNs = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
@@ -1875,11 +1872,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     // Check in table
-    if (isKeyPresentInTable(keyPrefix, multipartInfoTable)) {
-      return true;
-    }
-
-    return false;
+    return isKeyPresentInTable(keyPrefix, multipartInfoTable);
   }
 
   // NOTE: Update both getTableBucketPrefix(volume, bucket) & getTableBucketPrefix(tableName, volume, bucket)

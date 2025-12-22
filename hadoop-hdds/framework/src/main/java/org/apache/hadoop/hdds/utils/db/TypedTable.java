@@ -402,6 +402,20 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KEY seek)
+      throws RocksDatabaseException, CodecException {
+    if (supportCodecBuffer) {
+      KeyValueIterator<KEY, VALUE> iterator = iterator(prefix, IteratorType.KEY_AND_VALUE);
+      iterator.seek(seek);
+      return iterator;
+    } else {
+      final byte[] prefixBytes = encodeKey(prefix);
+      final byte[] seekBytes = encodeKey(seek);
+      return new TypedTableIterator(rawTable.iterator(prefixBytes, seekBytes));
+    }
+  }
+
+  @Override
   public String getName() {
     return rawTable.getName();
   }
@@ -573,7 +587,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       this.rawIterator = rawIterator;
     }
 
-    /** Covert the given key to the {@link RAW} type. */
+    /**
+     * Covert the given key to the {@link RAW} type.
+     */
     abstract AutoCloseSupplier<RAW> convert(KEY key) throws CodecException;
 
     /**
