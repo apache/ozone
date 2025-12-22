@@ -272,7 +272,8 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
         && Objects.equals(name, omDirInfo.name)
         && Objects.equals(owner, omDirInfo.owner)
         && Objects.equals(getMetadata(), omDirInfo.getMetadata())
-        && Objects.equals(acls, omDirInfo.acls);
+        && Objects.equals(acls, omDirInfo.acls)
+        && Objects.equals(tags, omDirInfo.tags);
   }
 
   @Override
