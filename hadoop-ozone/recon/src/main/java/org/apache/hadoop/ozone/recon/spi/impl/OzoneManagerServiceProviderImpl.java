@@ -74,7 +74,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -633,7 +632,6 @@ public class OzoneManagerServiceProviderImpl
 
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      final RocksDatabase rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
