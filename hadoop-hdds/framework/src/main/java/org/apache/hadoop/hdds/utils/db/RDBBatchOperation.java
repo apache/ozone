@@ -51,12 +51,11 @@ public abstract class RDBBatchOperation implements BatchOperation {
 
   // TODO: Remove this once recon components code implements BatchOperationHandler and make use of mocked batch
   //  operation.
-  @VisibleForTesting
   public static RDBBatchOperation newAtomicOperation() {
     return new AtomicRDBBatchOperation();
   }
 
-  static RDBBatchOperation newAtomicOperation(ManagedWriteBatch writeBatch) {
+  public static RDBBatchOperation newAtomicOperation(ManagedWriteBatch writeBatch) {
     return new AtomicRDBBatchOperation(writeBatch);
   }
 }
