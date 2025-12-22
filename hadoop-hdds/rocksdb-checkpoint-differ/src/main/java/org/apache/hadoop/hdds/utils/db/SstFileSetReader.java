@@ -27,14 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTypeUtil;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.rocksdb.RocksDBException;
 
@@ -133,64 +133,40 @@ public class SstFileSetReader {
     final MultipleSstFileIterator<String> itr = new MultipleSstFileIterator<String>(sstFiles) {
       //TODO: [SNAPSHOT] Check if default Options is enough.
       private ManagedOptions options;
-      private ManagedSlice lowerBoundSlice;
-      private ManagedSlice upperBoundSlice;
+      private Optional<ManagedSlice> lowerBoundSlice;
+      private Optional<ManagedSlice> upperBoundSlice;
 
       @Override
       protected void init() throws CodecException {
         this.options = new ManagedOptions();
         if (Objects.nonNull(lowerBound)) {
-          this.lowerBoundSlice = new ManagedSlice(
-              StringCodec.get().toPersistedFormat(lowerBound));
+          this.lowerBoundSlice = Optional.of(new ManagedSlice(
+              ManagedTypeUtil.getInternalKey(StringCodec.get().toPersistedFormat(lowerBound), options)));
+        } else {
+          this.lowerBoundSlice = Optional.empty();
         }
         if (Objects.nonNull(upperBound)) {
-          this.upperBoundSlice = new ManagedSlice(
-              StringCodec.get().toPersistedFormat(upperBound));
+          this.upperBoundSlice = Optional.of(new ManagedSlice(
+              ManagedTypeUtil.getInternalKey(StringCodec.get().toPersistedFormat(upperBound), options)));
+        } else {
+          this.upperBoundSlice = Optional.empty();
         }
       }
 
       @Override
-      protected ClosableIterator<String> getKeyIteratorForFile(String file) {
-        return new ManagedRawSstFileIterator(file, options, lowerBoundSlice, upperBoundSlice,
-            keyValue -> StringCodec.get().fromCodecBuffer(keyValue.getKey()), KEY_ONLY);
+      protected ClosableIterator<String> getKeyIteratorForFile(String file) throws RocksDatabaseException {
+        return new ManagedRawSstFileIterator<>(file, options, lowerBoundSlice, upperBoundSlice, KEY_ONLY,
+            keyValue -> StringCodec.get().fromCodecBuffer(keyValue.getKey()));
       }
 
       @Override
       public void close() throws UncheckedIOException {
         super.close();
         options.close();
-        IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice);
+        IOUtils.closeQuietly(lowerBoundSlice.orElse(null), upperBoundSlice.orElse(null));
       }
     };
     return itr;
-  }
-
-  private static class ManagedRawSstFileIterator implements ClosableIterator<String> {
-    private final ManagedRawSSTFileReader fileReader;
-    private final ManagedRawSSTFileIterator<String> fileReaderIterator;
-    private static final int READ_AHEAD_SIZE = 2 * 1024 * 1024;
-
-    ManagedRawSstFileIterator(String path, ManagedOptions options, ManagedSlice lowerBound, ManagedSlice upperBound,
-                              Function<KeyValue, String> keyValueFunction, IteratorType type) {
-      this.fileReader = new ManagedRawSSTFileReader(options, path, READ_AHEAD_SIZE);
-      this.fileReaderIterator = fileReader.newIterator(keyValueFunction, lowerBound, upperBound, type);
-    }
-
-    @Override
-    public void close() {
-      this.fileReaderIterator.close();
-      this.fileReader.close();
-    }
-
-    @Override
-    public boolean hasNext() {
-      return fileReaderIterator.hasNext();
-    }
-
-    @Override
-    public String next() {
-      return fileReaderIterator.next();
-    }
   }
 
   /**

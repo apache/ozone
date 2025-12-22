@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
@@ -40,7 +38,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -93,8 +90,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSstFileIterator;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
@@ -125,10 +121,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.EntryType;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -354,28 +350,21 @@ public class TestRocksDBCheckpointDiffer {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT)).thenReturn(2000);
 
-    when(config.getBoolean(
-        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
-        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)).thenReturn(true);
-
-    try (MockedStatic<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
-      mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary).thenReturn(true);
-      ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-      Function<Boolean, UncheckedAutoCloseable> lockFunction = (readLock) -> {
-        if (readLock) {
-          readWriteLock.readLock().lock();
-          return () -> readWriteLock.readLock().unlock();
-        } else {
-          readWriteLock.writeLock().lock();
-          return () -> readWriteLock.writeLock().unlock();
-        }
-      };
-      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
-          SST_BACK_UP_DIR_NAME,
-          COMPACTION_LOG_DIR_NAME,
-          ACTIVE_DB_DIR_NAME,
-          config, lockFunction);
-    }
+    ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    Function<Boolean, UncheckedAutoCloseable> lockFunction = (readLock) -> {
+      if (readLock) {
+        readWriteLock.readLock().lock();
+        return () -> readWriteLock.readLock().unlock();
+      } else {
+        readWriteLock.writeLock().lock();
+        return () -> readWriteLock.writeLock().unlock();
+      }
+    };
+    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
+        SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME,
+        ACTIVE_DB_DIR_NAME,
+        config, lockFunction);
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();
@@ -1644,17 +1633,15 @@ public class TestRocksDBCheckpointDiffer {
     // Run the SST file pruner.
 
     try (CodecBuffer keyCodecBuffer = CodecBuffer.allocateDirect(1024);
-        MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
-            ManagedRawSSTFileReader.class, (mock, context) -> {
-              ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+        MockedConstruction<ManagedRawSstFileIterator> mockedRawSSTReader = Mockito.mockConstruction(
+            ManagedRawSstFileIterator.class, (mock, context) -> {
+              Iterator<Pair<CodecBuffer, EntryType>> keyItr = keys.stream().map(i -> {
                 keyCodecBuffer.clear();
                 keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
-                return Pair.of(keyCodecBuffer, i.getValue());
+                return Pair.of(keyCodecBuffer, i.getValue() == 0 ? EntryType.kEntryDelete : EntryType.kEntryPut);
               }).iterator();
-              doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
-              doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
-              when(mock.newIterator(any(), any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+              doAnswer(i -> keyItr.hasNext()).when(mock).hasNext();
+              doAnswer(i -> keyItr.next()).when(mock).next();
               doNothing().when(mock).close();
             })) {
       rocksDBCheckpointDiffer.pruneSstFileValues();

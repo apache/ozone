@@ -27,7 +27,7 @@ on:
         default: ''
         required: false
 env:
-  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true"
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
@@ -290,7 +290,7 @@ jobs:
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
-      script-args: -Ptest-${{ matrix.profile }} -Drocks_tools_native
+      script-args: -Ptest-${{ matrix.profile }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.profile }}
       timeout-minutes: 90

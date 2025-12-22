@@ -23,8 +23,6 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
@@ -95,9 +93,7 @@ import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -183,9 +179,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean snapshotForceFullDiff;
 
-  private final boolean diffDisableNativeLibs;
-
-  private final boolean isNativeLibsLoaded;
+  private final boolean diffDisableEfficientDiff;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
@@ -215,7 +209,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
 
-    this.diffDisableNativeLibs = ozoneManager.getConfiguration().getBoolean(
+    this.diffDisableEfficientDiff = ozoneManager.getConfiguration().getBoolean(
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT);
 
@@ -259,8 +253,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     createEmptySnapDiffDir(path);
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
-    this.isNativeLibsLoaded = initNativeLibraryForEfficientDiff(ozoneManager.getConfiguration());
-
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
     // inefficient. Especially, when OM node restarts and loses its leadership.
@@ -280,19 +272,6 @@ public class SnapshotDiffManager implements AutoCloseable {
   @VisibleForTesting
   public PersistentMap<String, SnapshotDiffJob> getSnapDiffJobTable() {
     return snapDiffJobTable;
-  }
-
-  private boolean initNativeLibraryForEfficientDiff(final OzoneConfiguration conf) {
-    if (conf.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
-      try {
-        return ManagedRawSSTFileReader.loadLibrary();
-      } catch (NativeLibraryNotLoadedException e) {
-        LOG.warn("Native Library for raw sst file reading loading failed." +
-            " Fallback to performing a full diff instead. {}", e.getMessage());
-        return false;
-      }
-    }
-    return false;
   }
 
   /**
@@ -788,7 +767,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot = null;
 
     boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
-    boolean performNonNativeDiff = diffDisableNativeLibs || disableNativeDiff || !isNativeLibsLoaded;
+    boolean performNonNativeDiff = diffDisableEfficientDiff || disableNativeDiff;
 
     Consumer<SubStatus> activityReporter = (jobStatus) -> recordActivity(jobKey, jobStatus);
     try (DeltaFileComputer deltaFileComputer = new CompositeDeltaDiffComputer(ozoneManager.getOmSnapshotManager(),

@@ -73,7 +73,7 @@ jobs:
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist -Drocks_tools_native clean verify
+        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist clean verify
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
