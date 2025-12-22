@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,11 +35,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -90,7 +94,13 @@ class TestManagedRawSSTFileIterator {
             Named.of("Value starting & ending with a number & containing null character & new line character",
                 "%1$dvalue\n\0%1$d")),
         Arguments.of(Named.of("Key ending with a number & containing a null character", "key\0%1$d"),
-            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")))
+            Named.of("Value starting & ending with a number & elosed within quotes", "%1$dvalue\r%1$d")),
+        Arguments.of(Named.of("Key with prefix length 5k of random alphaNumeric string",
+                new StringBuilder(RandomStringUtils.secure().nextAlphanumeric(5 << 10))
+                    .append("key%1$d").toString()),
+            Named.of("Value with prefix length 5k of random alphaNumeric string",
+                new StringBuilder(RandomStringUtils.secure().nextAlphanumeric(5 << 10))
+                    .append("%1$dvalue%1$d").toString())))
         .flatMap(i -> Arrays.stream(IteratorType.values()).map(type -> Arguments.of(i.get()[0], i.get()[1], type)));
   }
 
@@ -109,7 +119,7 @@ class TestManagedRawSSTFileIterator {
         (v1, v2) -> v2, TreeMap::new));
     File file = createSSTFileWithKeys(keys);
     try (ManagedOptions options = new ManagedOptions();
-         ManagedRawSSTFileReader<ManagedRawSSTFileIterator.KeyValue> reader = new ManagedRawSSTFileReader<>(
+         ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(
              options, file.getAbsolutePath(), 2 * 1024 * 1024)) {
       List<Optional<String>> testBounds = TestUtils.getTestingBounds(keys.keySet().stream()
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
@@ -129,10 +139,10 @@ class TestManagedRawSSTFileIterator {
               ManagedRawSSTFileIterator.KeyValue r = iterator.next();
               assertTrue(expectedKeyItr.hasNext());
               Map.Entry<Pair<String, Integer>, String> expectedKey = expectedKeyItr.next();
-              String key = r.getKey() == null ? null : StringUtils.bytes2String(r.getKey());
+              String key = r.getKey() == null ? null : StringCodec.get().fromCodecBuffer(r.getKey());
               assertEquals(type.readKey() ? expectedKey.getKey().getKey() : null, key);
               assertEquals(type.readValue() ? expectedKey.getValue() : null,
-                  type.readValue() ? StringUtils.bytes2String(r.getValue()) : r.getValue());
+                  type.readValue() ? StringCodec.get().fromCodecBuffer(r.getValue()) : r.getValue());
               expectedKeyItr.remove();
             }
             assertEquals(0, expectedKeys.size());
