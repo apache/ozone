@@ -155,7 +155,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
       PersistedUserVolumeInfo volumeList = null;
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
-        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+        LOG.debug("volume:{} already exists", volume);
         throw new OMException("Volume already exists",
             OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
       } else {

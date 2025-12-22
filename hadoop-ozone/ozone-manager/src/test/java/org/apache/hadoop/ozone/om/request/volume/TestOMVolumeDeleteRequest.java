@@ -17,18 +17,21 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,6 +50,34 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     OMRequest modifiedRequest = omVolumeDeleteRequest.preExecute(ozoneManager);
     assertNotEquals(originalRequest, modifiedRequest);
   }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabledForDeleteVolume()
+      throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = createDeleteVolumeRequest(volumeName);
+
+    OMVolumeDeleteRequest req = new OMVolumeDeleteRequest(originalRequest) {
+      @Override
+      public void checkAcls(OzoneManager ozoneManager,
+                            OzoneObj.ResourceType resType,
+                            OzoneObj.StoreType storeType,
+                            IAccessAuthorizer.ACLType aclType,
+                            String vol, String bucket, String key) throws IOException {
+
+
+        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
+  }
+
 
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {

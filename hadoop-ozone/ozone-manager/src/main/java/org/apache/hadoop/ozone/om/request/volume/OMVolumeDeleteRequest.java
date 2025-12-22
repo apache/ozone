@@ -25,6 +25,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -59,15 +60,41 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    final OMRequest omRequest = super.preExecute(ozoneManager);
-    final String volume = omRequest.getDeleteVolumeRequest().getVolumeName();
+
+    super.preExecute(ozoneManager);
+
+    final String volumeName =
+        getOmRequest().getDeleteVolumeRequest().getVolumeName();
+
+    // Verify resource name
+    OmUtils.validateVolumeName(volumeName, ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
-          null, null);
+      try {
+        checkAcls(ozoneManager,
+            OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE,
+            IAccessAuthorizer.ACLType.DELETE,
+            volumeName, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(
+            ozoneManager.getAuditLogger(),
+            buildAuditMessage(
+                OMAction.DELETE_VOLUME,
+                buildVolumeAuditMap(volumeName),
+                ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
     }
-    return omRequest;
+
+    return getOmRequest().toBuilder()
+        .setUserInfo(getUserInfo())
+        .build();
   }
+
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
