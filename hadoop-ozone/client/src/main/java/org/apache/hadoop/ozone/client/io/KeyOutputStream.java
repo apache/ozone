@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,11 +112,10 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
-  private Runnable preCommit = () -> {
-  };
+  private List<Runnable> preCommits = Collections.emptyList();
 
-  public void setPreCommit(@Nonnull Runnable preCommit) {
-    this.preCommit = preCommit;
+  public void setPreCommits(@Nonnull List<Runnable> preCommits) {
+    this.preCommits = preCommits;
   }
 
   @VisibleForTesting
@@ -662,7 +662,7 @@ public class KeyOutputStream extends OutputStream
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
-      preCommit.run();
+      preCommits.forEach(Runnable::run);
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();

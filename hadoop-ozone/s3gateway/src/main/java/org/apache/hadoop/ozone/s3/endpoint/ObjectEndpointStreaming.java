@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
+import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -128,11 +129,11 @@ final class ObjectEndpointStreaming {
       if (sha256Digest != null) {
         final String actualSha256 = DatatypeConverter.printHexBinary(
             sha256Digest.digest()).toLowerCase();
-        streamOutput.getKeyDataStreamOutput().setPreCommit(() -> {
+        Runnable preCommit = () -> {
           Preconditions.checkArgument(amzContentSha256Header.equals(actualSha256),
               S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getErrorMessage());
-            }
-        );
+        };
+        streamOutput.getKeyDataStreamOutput().setPreCommits(Collections.singletonList(preCommit));
       }
     }
     return Pair.of(eTag, writeLen);
