@@ -18,17 +18,19 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newDeleteBucketRequest;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -38,6 +40,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +61,32 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
     // As user info gets added.
     assertNotEquals(omRequest, omBucketDeleteRequest.preExecute(ozoneManager));
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = newDeleteBucketRequest(volumeName, bucketName);
+
+    OMBucketDeleteRequest req = new OMBucketDeleteRequest(originalRequest) {
+      @Override
+      public void checkAcls(OzoneManager ozoneManager,
+                            OzoneObj.ResourceType resType,
+                            OzoneObj.StoreType storeType,
+                            IAccessAuthorizer.ACLType aclType,
+                            String vol, String bucket, String key) throws IOException {
+        throw new OMException("denied",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test

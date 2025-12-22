@@ -75,19 +75,31 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
+    super.preExecute(ozoneManager);
 
-    final DeleteBucketRequest deleteBucketRequest =
-        omRequest.getDeleteBucketRequest();
-    final String volumeName = deleteBucketRequest.getVolumeName();
-    final String bucketName = deleteBucketRequest.getBucketName();
-    // check Acl
+    DeleteBucketRequest deleteReq = getOmRequest().getDeleteBucketRequest();
+    String volume = deleteReq.getVolumeName();
+    String bucket = deleteReq.getBucketName();
+    // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
-          volumeName, bucketName, null);
+      try {
+        checkAcls(ozoneManager,
+            OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE,
+            IAccessAuthorizer.ACLType.DELETE,
+            volume, bucket, null);
+      } catch (IOException ex) {
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.DELETE_BUCKET,
+                buildVolumeAuditMap(volume), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
     }
-    return getOmRequest();
+
+    return getOmRequest().toBuilder()
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
