@@ -1169,7 +1169,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       HttpURLConnection connection = null;
       try {
         connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
-            headers, requestBody);
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
         int responseCode = connection.getResponseCode();
         assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
       } finally {
