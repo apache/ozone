@@ -665,18 +665,22 @@ public class AtomicRDBBatchOperation extends RDBBatchOperation {
     opCache.clear();
   }
 
+  @Override
   void delete(ColumnFamily family, byte[] key) {
     opCache.delete(family, key);
   }
 
+  @Override
   void put(ColumnFamily family, CodecBuffer key, CodecBuffer value) {
     opCache.put(family, key, value);
   }
 
+  @Override
   void put(ColumnFamily family, byte[] key, byte[] value) {
     opCache.put(family, key, value);
   }
 
+  @Override
   void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
     opCache.deleteRange(family, startKey, endKey);
   }
