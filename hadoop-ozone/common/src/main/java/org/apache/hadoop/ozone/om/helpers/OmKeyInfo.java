@@ -930,6 +930,10 @@ public final class OmKeyInfo extends WithParentObjectId
     return new Builder(this);
   }
 
+  public OmDirectoryInfo.Builder toDirectoryInfoBuilder() {
+    return OmDirectoryInfo.builderFromOmKeyInfo(this);
+  }
+
   /**
    * Return a new copy of the object.
    */
