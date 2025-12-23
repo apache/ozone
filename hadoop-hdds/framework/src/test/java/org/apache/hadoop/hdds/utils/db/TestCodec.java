@@ -34,7 +34,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.ByteArray;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.CodecBufferBytes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
@@ -294,15 +295,15 @@ public final class TestCodec {
 
   static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
     final byte[] array = codec.toPersistedFormat(object);
-    final Bytes fromArray = new Bytes(array);
+    final ByteArray fromArray = new ByteArray(array);
 
     try (CodecBuffer buffer = codec.toCodecBuffer(object,
         CodecBuffer.Allocator.HEAP)) {
-      final Bytes fromBuffer = new Bytes(buffer);
+      final CodecBufferBytes fromBuffer = new CodecBufferBytes(buffer);
 
       assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
-      assertEquals(fromArray, fromBuffer);
-      assertEquals(fromBuffer, fromArray);
+      assertEquals(fromArray.asReadOnlyByteBuffer(), fromBuffer.asReadOnlyByteBuffer());
+      assertEquals(fromBuffer.asReadOnlyByteBuffer(), fromArray.asReadOnlyByteBuffer());
     }
   }
 }

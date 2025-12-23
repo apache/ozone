@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
+import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.UnsignedBytes;
@@ -34,7 +35,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -60,8 +60,6 @@ public final class RDBBatchOperation implements BatchOperation {
 
   private final OpCache opCache = new OpCache();
 
-  private enum Op { DELETE, PUT, DELETE_RANGE }
-
   public static RDBBatchOperation newAtomicOperation() {
     return newAtomicOperation(new ManagedWriteBatch());
   }
@@ -84,32 +82,60 @@ public final class RDBBatchOperation implements BatchOperation {
     return count + " (" + byteSize2String(size) + ")";
   }
 
+  static final class ByteArray extends Bytes<byte[]> {
+    ByteArray(byte[] array) {
+      super(array);
+    }
+
+    @Override
+    int length() {
+      return getBytes().length;
+    }
+
+    @Override
+    ByteBuffer asReadOnlyByteBuffer() {
+      return ByteBuffer.wrap(getBytes());
+    }
+  }
+
+  static final class CodecBufferBytes extends Bytes<CodecBuffer> {
+    CodecBufferBytes(CodecBuffer buffer) {
+      super(buffer);
+    }
+
+    @Override
+    int length() {
+      return getBytes().readableBytes();
+    }
+
+    @Override
+    ByteBuffer asReadOnlyByteBuffer() {
+      return getBytes().asReadOnlyByteBuffer();
+    }
+  }
+
   /**
    * The key type of {@link RDBBatchOperation.OpCache.FamilyCache#opsKeys}.
    * To implement {@link #equals(Object)} and {@link #hashCode()}
    * based on the contents of the bytes.
    */
-  static final class Bytes implements Comparable<Bytes> {
-    private final byte[] array;
-    private final CodecBuffer buffer;
+  abstract static class Bytes<T> {
+    private final T byteObject;
     /** Cache the hash value. */
     private final int hash;
 
-    Bytes(CodecBuffer buffer) {
-      this.array = null;
-      this.buffer = Objects.requireNonNull(buffer, "buffer == null");
-      this.hash = buffer.asReadOnlyByteBuffer().hashCode();
+    Bytes(T byteObject) {
+      this.byteObject = Objects.requireNonNull(byteObject, "byteObject == null");
+      this.hash = asReadOnlyByteBuffer().hashCode();
     }
 
-    Bytes(byte[] array) {
-      this.array = array;
-      this.buffer = null;
-      this.hash = ByteBuffer.wrap(array).hashCode();
+    T getBytes() {
+      return byteObject;
     }
 
-    ByteBuffer asReadOnlyByteBuffer() {
-      return buffer.asReadOnlyByteBuffer();
-    }
+    abstract int length();
+
+    abstract ByteBuffer asReadOnlyByteBuffer();
 
     @Override
     public boolean equals(Object obj) {
@@ -118,15 +144,11 @@ public final class RDBBatchOperation implements BatchOperation {
       } else if (!(obj instanceof Bytes)) {
         return false;
       }
-      final Bytes that = (Bytes) obj;
+      final Bytes<?> that = (Bytes<?>) obj;
       if (this.hash != that.hash) {
         return false;
       }
-      final ByteBuffer thisBuf = this.array != null ?
-          ByteBuffer.wrap(this.array) : this.asReadOnlyByteBuffer();
-      final ByteBuffer thatBuf = that.array != null ?
-          ByteBuffer.wrap(that.array) : that.asReadOnlyByteBuffer();
-      return thisBuf.equals(thatBuf);
+      return this.asReadOnlyByteBuffer().equals(that.asReadOnlyByteBuffer());
     }
 
     @Override
@@ -136,17 +158,13 @@ public final class RDBBatchOperation implements BatchOperation {
 
     @Override
     public String toString() {
-      return array != null ? bytes2String(array)
-          : bytes2String(asReadOnlyByteBuffer());
+      return bytes2String(asReadOnlyByteBuffer());
     }
 
+    // TODO: use ByteWiseComparator directly and do not reimplement it.
     // This method mimics the ByteWiseComparator in RocksDB.
-    @Override
-    public int compareTo(RDBBatchOperation.Bytes that) {
-      final ByteBuffer thisBuf = this.array != null ?
-          ByteBuffer.wrap(this.array) : this.asReadOnlyByteBuffer();
-      final ByteBuffer thatBuf = that.array != null ?
-          ByteBuffer.wrap(that.array) : that.asReadOnlyByteBuffer();
+    int compareTo(ByteBuffer thatBuf) {
+      final ByteBuffer thisBuf = asReadOnlyByteBuffer();
 
       for (int i = 0; i < Math.min(thisBuf.remaining(), thatBuf.remaining()); i++) {
         int cmp = UnsignedBytes.compare(thisBuf.get(i), thatBuf.get(i));
@@ -158,28 +176,30 @@ public final class RDBBatchOperation implements BatchOperation {
     }
   }
 
-  private abstract class Operation implements Closeable {
-    private Bytes keyBytes;
+  abstract static class Op<T extends Bytes<?>> implements Closeable {
+    private final T keyBytes;
 
-    private Operation(Bytes keyBytes) {
-      this.keyBytes = keyBytes;
+    private Op(T keyBytes) {
+      this.keyBytes = Objects.requireNonNull(keyBytes, "keyBytes == null");
     }
 
     abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
 
-    abstract int keyLen();
+    int keyLen() {
+      return getKey().length();
+    }
 
-    abstract int valLen();
+    int valLen() {
+      return 0;
+    }
 
-    Bytes getKey() {
+    T getKey() {
       return keyBytes;
     }
 
     int totalLength() {
       return keyLen() + valLen();
     }
-
-    abstract Op getOpType();
 
     @Override
     public void close() {
@@ -189,144 +209,116 @@ public final class RDBBatchOperation implements BatchOperation {
   /**
    * Delete operation to be applied to a {@link ColumnFamily} batch.
    */
-  private final class DeleteOperation extends Operation {
-    private final byte[] key;
-
-    private DeleteOperation(byte[] key, Bytes keyBytes) {
-      super(Objects.requireNonNull(keyBytes, "keyBytes == null"));
-      this.key = Objects.requireNonNull(key, "key == null");
+  static final class DeleteOp extends Op<ByteArray> {
+    private DeleteOp(ByteArray key) {
+      super(key);
     }
 
     @Override
     public void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException {
-      family.batchDelete(batch, this.key);
-    }
-
-    @Override
-    public int keyLen() {
-      return key.length;
-    }
-
-    @Override
-    public int valLen() {
-      return 0;
-    }
-
-    @Override
-    public Op getOpType() {
-      return Op.DELETE;
+      family.batchDelete(batch, getKey().getBytes());
     }
   }
 
   /**
    * Put operation to be applied to a {@link ColumnFamily} batch using the CodecBuffer api.
    */
-  private final class CodecBufferPutOperation extends Operation {
-    private final CodecBuffer key;
-    private final CodecBuffer value;
+  static final class CodecBufferPutOp extends Op<CodecBufferBytes> {
+    private final CodecBufferBytes value;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private CodecBufferPutOperation(CodecBuffer key, CodecBuffer value, Bytes keyBytes) {
-      super(keyBytes);
-      this.key = key;
+    private CodecBufferPutOp(CodecBufferBytes key, CodecBufferBytes value) {
+      super(key);
       this.value = value;
     }
 
     @Override
     public void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException {
-      family.batchPut(batch, key.asReadOnlyByteBuffer(), value.asReadOnlyByteBuffer());
-    }
-
-    @Override
-    public int keyLen() {
-      return key.readableBytes();
+      family.batchPut(batch, getKey().asReadOnlyByteBuffer(), value.asReadOnlyByteBuffer());
     }
 
     @Override
     public int valLen() {
-      return value.readableBytes();
-    }
-
-    @Override
-    public Op getOpType() {
-      return Op.PUT;
+      return value.length();
     }
 
     @Override
     public void close() {
       if (closed.compareAndSet(false, true)) {
-        key.release();
-        value.release();
+        getKey().getBytes().release();
+        value.getBytes().release();
       }
-      super.close();
     }
   }
 
   /**
    * Put operation to be applied to a {@link ColumnFamily} batch using the byte array api.
    */
-  private final class ByteArrayPutOperation extends Operation {
-    private final byte[] key;
+  static final class ByteArrayPutOp extends Op<ByteArray> {
     private final byte[] value;
 
-    private ByteArrayPutOperation(byte[] key, byte[] value, Bytes keyBytes) {
-      super(Objects.requireNonNull(keyBytes));
-      this.key = Objects.requireNonNull(key, "key == null");
+    private ByteArrayPutOp(ByteArray key, byte[] value) {
+      super(key);
       this.value = Objects.requireNonNull(value, "value == null");
     }
 
     @Override
     public void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException {
-      family.batchPut(batch, key, value);
-    }
-
-    @Override
-    public int keyLen() {
-      return key.length;
+      family.batchPut(batch, getKey().getBytes(), value);
     }
 
     @Override
     public int valLen() {
       return value.length;
     }
+  }
 
-    @Override
-    public Op getOpType() {
-      return Op.PUT;
+  static DeleteRangeOp findContainingRange(Bytes<?> key, Iterable<DeleteRangeOp> deleteRanges) {
+    for (DeleteRangeOp op: deleteRanges) {
+      if (op.containKey(key)) {
+        return op;
+      }
     }
+    return null;
   }
 
   /**
    * Delete range operation to be applied to a {@link ColumnFamily} batch.
    */
-  private final class DeleteRangeOperation extends Operation {
-    private final byte[] startKey;
-    private final byte[] endKey;
+  static final class DeleteRangeOp extends Op<ByteArray> {
+    private final ByteArray endKey;
 
-    private DeleteRangeOperation(byte[] startKey, byte[] endKey) {
-      super(null);
-      this.startKey = Objects.requireNonNull(startKey, "startKey == null");
+    private DeleteRangeOp(ByteArray startKey, ByteArray endKey) {
+      super(startKey);
       this.endKey = Objects.requireNonNull(endKey, "endKey == null");
+    }
+
+    boolean containKey(Bytes<?> key) {
+      final ByteBuffer keyBuf = ByteBuffer.wrap(assertInstanceOf(key.getBytes(), byte[].class));
+      return getKey().compareTo(keyBuf) <= 0 && endKey.compareTo(keyBuf) > 0;
+    }
+
+    ByteBuffer getStartKey() {
+      return getKey().asReadOnlyByteBuffer();
+    }
+
+    ByteBuffer getEndKey() {
+      return endKey.asReadOnlyByteBuffer();
     }
 
     @Override
     public void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException {
-      family.batchDeleteRange(batch, startKey, endKey);
+      family.batchDeleteRange(batch, getKey().getBytes(), endKey.getBytes());
     }
 
     @Override
     public int keyLen() {
-      return startKey.length + endKey.length;
+      return getKey().length() + endKey.length();
     }
 
     @Override
-    public int valLen() {
-      return 0;
-    }
-
-    @Override
-    public Op getOpType() {
-      return Op.DELETE_RANGE;
+    public String toString() {
+      return String.format("deleteRange[%s, %s)", bytes2String(getStartKey()), bytes2String(getEndKey()));
     }
   }
 
@@ -353,7 +345,7 @@ public final class RDBBatchOperation implements BatchOperation {
        * This field plays a critical role in managing the logical consistency and proper execution
        * order of operations stored in the batch when interacting with a RocksDB-backed system.
        */
-      private final Map<Bytes, Integer> opsKeys = new HashMap<>();
+      private final Map<Bytes<?>, Integer> opsKeys = new HashMap<>();
       /**
        * Maintains a mapping of unique operation indices to their corresponding {@code Operation} instances.
        *
@@ -372,7 +364,7 @@ public final class RDBBatchOperation implements BatchOperation {
        * - Operations stored in this map are expected to define specific actions (e.g., put, delete,
        *   delete range) and their associated data (e.g., keys, values).
        */
-      private final Map<Integer, Operation> batchOps = new HashMap<>();
+      private final Map<Integer, Op<?>> batchOps = new HashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -417,13 +409,15 @@ public final class RDBBatchOperation implements BatchOperation {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
         // Sort Entries based on opIndex and flush the operation to the batch in the same order.
-        List<Operation> ops = batchOps.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getKey))
+        // TODO: use sorted map
+        final List<Op<?>> ops = batchOps.entrySet().stream()
+            .sorted(Comparator.comparingInt(Map.Entry::getKey))
             .map(Map.Entry::getValue).collect(Collectors.toList());
         List<List<Integer>> deleteRangeIndices = new ArrayList<>();
         int index = 0;
         int prevIndex = -2;
-        for (Operation op : ops) {
-          if (Op.DELETE_RANGE == op.getOpType()) {
+        for (Op<?> op : ops) {
+          if (op instanceof DeleteRangeOp) {
             if (index - prevIndex > 1) {
               deleteRangeIndices.add(new ArrayList<>());
             }
@@ -437,42 +431,26 @@ public final class RDBBatchOperation implements BatchOperation {
         deleteRangeIndices.add(Collections.emptyList());
         int startIndex = 0;
         for (List<Integer> continuousDeleteRangeIndices : deleteRangeIndices) {
-          List<DeleteRangeOperation> deleteRangeOps = continuousDeleteRangeIndices.stream()
-              .map(i -> (DeleteRangeOperation)ops.get(i))
-              .collect(Collectors.toList());
-          List<Pair<Bytes, Bytes>> deleteRangeOpsRanges = continuousDeleteRangeIndices.stream()
-              .map(i -> (DeleteRangeOperation)ops.get(i))
-              .map(i -> Pair.of(new Bytes(i.startKey), new Bytes(i.endKey)))
+          final List<DeleteRangeOp> deleteRangeOps = continuousDeleteRangeIndices.stream()
+              .map(i -> (DeleteRangeOp)ops.get(i))
               .collect(Collectors.toList());
           int firstOpIndex = continuousDeleteRangeIndices.isEmpty() ? ops.size() : continuousDeleteRangeIndices.get(0);
 
           for (int i = startIndex; i < firstOpIndex; i++) {
-            Operation op = ops.get(i);
-            Bytes key = op.getKey();
-            // Compare the key with the startKey and endKey of the delete range operation. Add to Batch if key
-            // doesn't fall [startKey, endKey) range.
-            boolean keyInRange = false;
-            Pair<Bytes, Bytes> deleteRange = null;
-            for (Pair<Bytes, Bytes> deleteRangeOp : deleteRangeOpsRanges) {
-              if (key.compareTo(deleteRangeOp.getLeft()) >= 0 && key.compareTo(deleteRangeOp.getRight()) < 0) {
-                keyInRange = true;
-                deleteRange = deleteRangeOp;
-                break;
-              }
-            }
-            if (!keyInRange) {
+            final Op<?> op = ops.get(i);
+            final Bytes<?> key = op.getKey();
+            // Add to Batch if the key is not contained in a deleteRange.
+            final DeleteRangeOp containingRange = findContainingRange(key, deleteRangeOps);
+            if (containingRange == null) {
               op.apply(family, writeBatch);
             } else {
-              Pair<Bytes, Bytes> finalDeleteRange = deleteRange;
-              debug(() -> String.format("Discarding Operation with Key: %s as it falls within the range of [%s, %s)",
-                  bytes2String(key.asReadOnlyByteBuffer()),
-                  bytes2String(finalDeleteRange.getKey().asReadOnlyByteBuffer()),
-                  bytes2String(finalDeleteRange.getRight().asReadOnlyByteBuffer())));
+              debug(() -> String.format("Discarding Operation with Key: %s as it falls within %s",
+                  bytes2String(key.asReadOnlyByteBuffer()), containingRange));
               discardedCount++;
               discardedSize += op.totalLength();
             }
           }
-          for (DeleteRangeOperation deleteRangeOp : deleteRangeOps) {
+          for (DeleteRangeOp deleteRangeOp : deleteRangeOps) {
             // Apply the delete range operation to the batch.
             deleteRangeOp.apply(family, writeBatch);
           }
@@ -499,30 +477,29 @@ public final class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      private void deleteIfExist(Bytes key, boolean removeFromIndexMap) {
+      private void deleteIfExist(Bytes<?> key) {
         // remove previous first in order to call release()
-        if (opsKeys.containsKey(key)) {
-          int previousIndex = removeFromIndexMap ? opsKeys.remove(key) : opsKeys.get(key);
-          final Operation previous = batchOps.remove(previousIndex);
+        final Integer previousIndex = opsKeys.remove(key);
+        if (previousIndex != null) {
+          final Op<?> previous = batchOps.remove(previousIndex);
           previous.close();
           discardedSize += previous.totalLength();
           discardedCount++;
-          debug(() -> String.format("%s overwriting a previous %s[valLen => %s]", this, previous.getOpType(),
-              previous.valLen()));
+          debug(() -> String.format("%s overwriting a previous %s[valLen=%s]",
+              this, previous.getClass().getSimpleName(), previous.valLen()));
         }
       }
 
-      void overWriteOpIfExist(Bytes key, Operation operation) {
+      void overwriteIfExist(Bytes<?> key, Op<?> op) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
-        deleteIfExist(key, true);
-        batchSize += operation.totalLength();
+        deleteIfExist(key);
+        batchSize += op.totalLength();
         int newIndex = opIndex.getAndIncrement();
         final Integer overwritten = opsKeys.put(key, newIndex);
-        batchOps.put(newIndex, operation);
+        batchOps.put(newIndex, op);
         Preconditions.checkState(overwritten == null || !batchOps.containsKey(overwritten));
         debug(() -> String.format("%s %s, %s; key=%s", this,
-            Op.DELETE == operation.getOpType() ? delString(operation.totalLength()) : putString(operation.keyLen(),
-                operation.valLen()),
+            op instanceof DeleteOp ? delString(op.totalLength()) : putString(op.keyLen(), op.valLen()),
             batchSizeDiscardedString(), key));
       }
 
@@ -530,25 +507,25 @@ public final class RDBBatchOperation implements BatchOperation {
         putCount++;
 
         // always release the key with the value
-        Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new CodecBufferPutOperation(key, value, keyBytes));
+        final CodecBufferBytes keyBytes = new CodecBufferBytes(key);
+        overwriteIfExist(keyBytes, new CodecBufferPutOp(keyBytes, new CodecBufferBytes(value)));
       }
 
       void put(byte[] key, byte[] value) {
         putCount++;
-        Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new ByteArrayPutOperation(key, value, keyBytes));
+        final ByteArray keyBytes = new ByteArray(key);
+        overwriteIfExist(keyBytes, new ByteArrayPutOp(keyBytes, value));
       }
 
       void delete(byte[] key) {
         delCount++;
-        Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new DeleteOperation(key, keyBytes));
+        final ByteArray keyBytes = new ByteArray(key);
+        overwriteIfExist(keyBytes, new DeleteOp(keyBytes));
       }
 
       void deleteRange(byte[] startKey, byte[] endKey) {
         delRangeCount++;
-        batchOps.put(opIndex.getAndIncrement(), new DeleteRangeOperation(startKey, endKey));
+        batchOps.put(opIndex.getAndIncrement(), new DeleteRangeOp(new ByteArray(startKey), new ByteArray(endKey)));
       }
 
       String putString(int keySize, int valueSize) {
