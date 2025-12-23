@@ -54,11 +54,9 @@ public class TestBucketList {
         .setClient(client)
         .build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0)
-            .getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/",
@@ -74,10 +72,9 @@ public class TestBucketList {
     OzoneClient client = createClientWithKeys("dir1/file2", "dir1/dir2/file2");
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir1");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir1");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/",
@@ -94,11 +91,9 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir1/");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0)
-            .getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir1/");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/dir2/",
@@ -127,10 +122,9 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "key");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "key");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(2, getBucketResponse.getContents().size());
     assertEquals(user1.getShortUserName(),
@@ -147,10 +141,9 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir1");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir1");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(3, getBucketResponse.getCommonPrefixes().size());
   }
@@ -163,10 +156,9 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(3, getBucketResponse.getCommonPrefixes().size());
     assertEquals("file2", getBucketResponse.getContents().get(0)
@@ -181,11 +173,10 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir1bh");
-    endpoint.getQueryParameters().putSingle(QueryParams.START_AFTER, "dir1/dir2/file2");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir1bh");
+    endpoint.queryParamsForTest().set(QueryParams.START_AFTER, "dir1/dir2/file2");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
   }
@@ -200,10 +191,9 @@ public class TestBucketList {
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
     // Should behave the same if delimiter is null
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir1/");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 100, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir1/");
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(0, getBucketResponse.getCommonPrefixes().size());
     assertEquals(4, getBucketResponse.getContents().size());
@@ -229,24 +219,24 @@ public class TestBucketList {
     // As we have 5 keys, with max keys 2 we should call list 3 times.
 
     // First time
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, maxKeys);
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getContents().size());
 
     // 2nd time
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, getBucketResponse.getNextToken());
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    String value1 = getBucketResponse.getNextToken();
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, value1);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getContents().size());
 
     //3rd time
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, getBucketResponse.getNextToken());
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    String value = getBucketResponse.getNextToken();
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, value);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(1, getBucketResponse.getContents().size());
@@ -272,10 +262,10 @@ public class TestBucketList {
 
     ListObjectResponse getBucketResponse;
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "test/");
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "test/");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, maxKeys);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertEquals(0, getBucketResponse.getContents().size());
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
@@ -284,9 +274,9 @@ public class TestBucketList {
     assertEquals("test/dir2/",
         getBucketResponse.getCommonPrefixes().get(1).getPrefix().getName());
 
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, getBucketResponse.getNextToken());
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    String value = getBucketResponse.getNextToken();
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, value);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
     assertEquals(1, getBucketResponse.getContents().size());
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("test/dir3/",
@@ -311,25 +301,25 @@ public class TestBucketList {
     // As we have 5 keys, with max keys 2 we should call list 3 times.
 
     // First time
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir");
-    ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, maxKeys);
+    ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
     // 2nd time
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, getBucketResponse.getNextToken());
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    String value1 = getBucketResponse.getNextToken();
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, value1);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
     assertTrue(getBucketResponse.isTruncated());
     assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
     //3rd time
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, getBucketResponse.getNextToken());
-    getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", maxKeys, 0).getEntity();
+    String value = getBucketResponse.getNextToken();
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, value);
+    getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
@@ -343,10 +333,11 @@ public class TestBucketList {
 
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, "/");
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, "dir");
-    endpoint.getQueryParameters().putSingle(QueryParams.CONTINUATION_TOKEN, "random");
-    OS3Exception e = assertThrows(OS3Exception.class, () -> endpoint.get("b1", 2, 1000).getEntity());
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir");
+    endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, "random");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 2);
+    OS3Exception e = assertThrows(OS3Exception.class, () -> endpoint.get("b1").getEntity());
     assertEquals("random", e.getResource());
     assertEquals("Invalid Argument", e.getErrorMessage());
   }
@@ -360,7 +351,7 @@ public class TestBucketList {
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
 
     ListObjectResponse getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 1000, 0).getEntity();
+        (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(5, getBucketResponse.getContents().size());
@@ -369,16 +360,16 @@ public class TestBucketList {
     // have 4 keys.
     String startAfter = "dir0/file1";
 
-    endpoint.getQueryParameters().putSingle(QueryParams.START_AFTER, startAfter);
+    endpoint.queryParamsForTest().set(QueryParams.START_AFTER, startAfter);
     getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 1000, 0).getEntity();
+        (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(4, getBucketResponse.getContents().size());
 
-    endpoint.getQueryParameters().putSingle(QueryParams.START_AFTER, "random");
+    endpoint.queryParamsForTest().set(QueryParams.START_AFTER, "random");
     getBucketResponse =
-        (ListObjectResponse) endpoint.get("b1", 1000, 0).getEntity();
+        (ListObjectResponse) endpoint.get("b1").getEntity();
 
     assertFalse(getBucketResponse.isTruncated());
     assertEquals(0, getBucketResponse.getContents().size());
@@ -419,11 +410,11 @@ public class TestBucketList {
     String startAfter = "data=";
     String encodingType = ENCODING_TYPE;
 
-    endpoint.getQueryParameters().putSingle(QueryParams.DELIMITER, delimiter);
-    endpoint.getQueryParameters().putSingle(QueryParams.PREFIX, prefix);
-    endpoint.getQueryParameters().putSingle(QueryParams.ENCODING_TYPE, encodingType);
-    endpoint.getQueryParameters().putSingle(QueryParams.START_AFTER, startAfter);
-    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1", 1000, 0).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, delimiter);
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, prefix);
+    endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, encodingType);
+    endpoint.queryParamsForTest().set(QueryParams.START_AFTER, startAfter);
+    ListObjectResponse response = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     // Assert encodingType == url.
     // The Object name will be encoded by ObjectKeyNameAdapter
@@ -439,8 +430,8 @@ public class TestBucketList {
     assertEquals(encodingType,
         response.getContents().get(0).getKey().getEncodingType());
 
-    endpoint.getQueryParameters().remove(QueryParams.ENCODING_TYPE);
-    response = (ListObjectResponse) endpoint.get("b1", 1000, 0).getEntity();
+    endpoint.queryParamsForTest().unset(QueryParams.ENCODING_TYPE);
+    response = (ListObjectResponse) endpoint.get("b1").getEntity();
 
     // Assert encodingType == null.
     // The Object name will not be encoded by ObjectKeyNameAdapter
@@ -461,9 +452,8 @@ public class TestBucketList {
     client.getObjectStore().createS3Bucket("b1");
     BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(client).build();
 
-    endpoint.getQueryParameters().putSingle(QueryParams.ENCODING_TYPE, "unSupportType");
-    OS3Exception e = assertThrows(OS3Exception.class, () -> endpoint.get(
-        "b1", 1000, 0).getEntity());
+    endpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, "unSupportType");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> endpoint.get("b1").getEntity());
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
   }
 
@@ -476,9 +466,8 @@ public class TestBucketList {
         .build();
 
     // maxKeys < 0 should throw InvalidArgument
-    OS3Exception e1 = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.get("bucket", -1, 1000)
-    );
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, -1);
+    OS3Exception e1 = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucket"));
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
   }
 
@@ -491,8 +480,8 @@ public class TestBucketList {
         .build();
 
     // maxKeys = 0, should return empty list and not throw.
-    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
-        "bucket", 0, 1000).getEntity();
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 0);
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get("bucket").getEntity();
 
     assertEquals(0, response.getContents().size());
     assertFalse(response.isTruncated());
@@ -505,15 +494,15 @@ public class TestBucketList {
         .setClient(client)
         .build();
 
-    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
-        "b1", 0, 1000).getEntity();
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 0);
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get("b1").getEntity();
 
     // Should return empty list and not throw.
     assertEquals(0, response.getContents().size());
     assertFalse(response.isTruncated());
 
-    ListObjectResponse fullResponse = (ListObjectResponse) bucketEndpoint.get(
-        "b1", 1000, 1000).getEntity();
+    bucketEndpoint.queryParamsForTest().unset(QueryParams.MAX_KEYS);
+    ListObjectResponse fullResponse = (ListObjectResponse) bucketEndpoint.get("b1").getEntity();
     assertEquals(5, fullResponse.getContents().size());
   }
 
@@ -540,9 +529,8 @@ public class TestBucketList {
 
     // Act: Request more keys than the configured max-keys limit
     final int requestedMaxKeys = Integer.parseInt(configuredMaxKeysLimit) + 1;
-    ListObjectResponse response = (ListObjectResponse)
-        bucketEndpoint.get("b1", requestedMaxKeys,
-            1000).getEntity();
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, requestedMaxKeys);
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get("b1").getEntity();
 
     // Assert: The number of returned keys should be capped at the configured limit
     assertEquals(Integer.parseInt(configuredMaxKeysLimit), response.getContents().size());

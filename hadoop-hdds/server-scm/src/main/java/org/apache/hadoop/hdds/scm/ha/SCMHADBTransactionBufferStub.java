@@ -49,7 +49,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initBatchOperation();
       } else {
-        currentBatchOperation = new RDBBatchOperation();
+        currentBatchOperation = RDBBatchOperation.newAtomicOperation();
       }
     }
     return currentBatchOperation;
