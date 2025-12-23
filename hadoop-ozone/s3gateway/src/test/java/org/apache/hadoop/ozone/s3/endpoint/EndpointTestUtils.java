@@ -31,6 +31,15 @@ import org.apache.ratis.util.function.CheckedSupplier;
 /** Utilities for unit-testing S3 endpoints. */
 public final class EndpointTestUtils {
 
+  /** Get key tags. */
+  public static Response getTagging(
+      ObjectEndpoint subject,
+      String bucket,
+      String key
+  ) throws IOException, OS3Exception {
+    return subject.get(bucket, key, 0, null, 0, null, "");
+  }
+
   /** Put without content. */
   public static Response putDir(
       ObjectEndpoint subject,
@@ -50,6 +59,23 @@ public final class EndpointTestUtils {
     return put(subject, bucket, key, 0, null, content);
   }
 
+  /** Add tagging on key. */
+  public static Response putTagging(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String content
+  ) throws IOException, OS3Exception {
+    if (content == null) {
+      return subject.put(bucket, key, 0, 0, null, "", null, null);
+    } else {
+      final long length = content.length();
+      try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
+        return subject.put(bucket, key, length, 0, null, "", null, body);
+      }
+    }
+  }
+
   /** Put with content, part number, upload ID. */
   public static Response put(
       ObjectEndpoint subject,
@@ -67,6 +93,15 @@ public final class EndpointTestUtils {
         return subject.put(bucket, key, length, partNumber, uploadID, null, null, body);
       }
     }
+  }
+
+  /** Delete key tags. */
+  public static Response deleteTagging(
+      ObjectEndpoint subject,
+      String bucket,
+      String key
+  ) throws IOException, OS3Exception {
+    return subject.delete(bucket, key, null, "");
   }
 
   /** Verify response is success for {@code request}. */
