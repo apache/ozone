@@ -158,7 +158,7 @@ class TestObjectPut {
     bucket.setReplicationConfig(replication);
 
     //WHEN
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, length, 1, body);
+    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, length, 1, null, null, null, body);
 
     //THEN
     assertEquals(200, response.getStatus());
@@ -185,7 +185,7 @@ class TestObjectPut {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     long dataSize = CONTENT.length();
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 0, body);
+    objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 0, null, null, null, body);
     assertEquals(dataSize, getKeyDataSize());
   }
 
@@ -202,8 +202,8 @@ class TestObjectPut {
 
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn("15");
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, chunkedContent.length(), 0,
-        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
+    objectEndpoint.put(BUCKET_NAME, KEY_NAME, chunkedContent.length(), 0, null, null,
+        null, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertEquals(15, getKeyDataSize());
   }
 
@@ -218,7 +218,7 @@ class TestObjectPut {
     objectEndpoint.setHeaders(headersWithTags);
 
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        1, body);
+        1, null, null, null, body);
 
     assertEquals(200, response.getStatus());
 
@@ -242,7 +242,7 @@ class TestObjectPut {
 
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, body);
+          1, null, null, null, body);
       fail("request with invalid query param should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
@@ -261,7 +261,7 @@ class TestObjectPut {
     objectEndpoint.setHeaders(headersWithDuplicateTagKey);
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, body);
+          1, null, null, null, body);
       fail("request with duplicate tag key should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
@@ -281,7 +281,7 @@ class TestObjectPut {
     objectEndpoint.setHeaders(headersWithLongTagKey);
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, body);
+          1, null, null, null, body);
       fail("request with tag key exceeding the length limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
@@ -301,7 +301,7 @@ class TestObjectPut {
     when(headersWithLongTagValue.getHeaderString(TAG_HEADER)).thenReturn("tag1=" + longTagValue);
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, body);
+          1, null, null, null, body);
       fail("request with tag value exceeding the length limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
@@ -327,7 +327,7 @@ class TestObjectPut {
     objectEndpoint.setHeaders(headersWithTooManyTags);
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, body);
+          1, null, null, null, body);
       fail("request with number of tags exceeding limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
@@ -356,7 +356,7 @@ class TestObjectPut {
 
     //WHEN
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        chunkedContent.length(), 1,
+        chunkedContent.length(), 1, null, null, null,
         new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
 
     //THEN
@@ -386,7 +386,7 @@ class TestObjectPut {
           new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
       try {
         objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT
-            .length(), 1, body);
+            .length(), 1, null, null, null, body);
         fail("Should throw IOException");
       } catch (IOException ignored) {
         // Verify that the message digest is reset so that the instance can be reused for the
@@ -411,7 +411,7 @@ class TestObjectPut {
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
 
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        CONTENT.length(), 1, body);
+        CONTENT.length(), 1, null, null, null, body);
 
     OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
         .getS3Bucket(BUCKET_NAME)
@@ -437,7 +437,7 @@ class TestObjectPut {
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
 
     response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-        body);
+        null, null, null, body);
 
     // Check destination key and response
     ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
@@ -467,7 +467,7 @@ class TestObjectPut {
     metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2");
 
     response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-        body);
+        null, null, null, body);
 
     ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
         .readKey(DEST_KEY);
@@ -494,7 +494,7 @@ class TestObjectPut {
     // wrong copy metadata directive
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("INVALID");
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-            DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1, body),
+            DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1, null, null, null, body),
         "test copy object failed");
     assertThat(e.getHttpCode()).isEqualTo(400);
     assertThat(e.getCode()).isEqualTo("InvalidArgument");
@@ -504,7 +504,7 @@ class TestObjectPut {
 
     // source and dest same
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-            BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, body),
+            BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, null, null, body),
         "test copy object failed");
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
 
@@ -512,28 +512,28 @@ class TestObjectPut {
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         NO_SUCH_BUCKET + "/"  + urlEncode(KEY_NAME));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(DEST_BUCKET_NAME,
-        DEST_KEY, CONTENT.length(), 1, body), "test copy object failed");
+        DEST_KEY, CONTENT.length(), 1, null, null, null, body), "test copy object failed");
     assertThat(e.getCode()).contains("NoSuchBucket");
 
     // dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(NO_SUCH_BUCKET,
-        DEST_KEY, CONTENT.length(), 1, body), "test copy object failed");
+        DEST_KEY, CONTENT.length(), 1, null, null, null, body), "test copy object failed");
     assertThat(e.getCode()).contains("NoSuchBucket");
 
     //Both source and dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         NO_SUCH_BUCKET + "/" + urlEncode(KEY_NAME));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(NO_SUCH_BUCKET,
-        DEST_KEY, CONTENT.length(), 1, body), "test copy object failed");
+        DEST_KEY, CONTENT.length(), 1, null, null, null, body), "test copy object failed");
     assertThat(e.getCode()).contains("NoSuchBucket");
 
     // source key not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(NO_SUCH_BUCKET));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "nonexistent", KEY_NAME, CONTENT.length(), 1, body),
+        "nonexistent", KEY_NAME, CONTENT.length(), 1, null, null, null, body),
         "test copy object failed");
     assertThat(e.getCode()).contains("NoSuchBucket");
   }
@@ -545,7 +545,7 @@ class TestObjectPut {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        CONTENT.length(), 1, body);
+        CONTENT.length(), 1, null, null, null, body);
 
     OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
         .getS3Bucket(BUCKET_NAME)
@@ -573,7 +573,7 @@ class TestObjectPut {
 
       try {
         objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-            body);
+            null, null, null, body);
         fail("Should throw IOException");
       } catch (IOException ignored) {
         // Verify that the message digest is reset so that the instance can be reused for the
@@ -596,7 +596,7 @@ class TestObjectPut {
     String sourceKeyName = "sourceKey";
 
     Response putResponse = objectEndpoint.put(BUCKET_NAME, sourceKeyName,
-        CONTENT.length(), 1, body);
+        CONTENT.length(), 1, null, null, null, body);
     OzoneKeyDetails keyDetails =
         clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(sourceKeyName);
 
@@ -614,7 +614,7 @@ class TestObjectPut {
         BUCKET_NAME  + "/" + urlEncode(sourceKeyName));
 
     objectEndpoint.setHeaders(headersForCopy);
-    Response copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, body);
+    Response copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, null, null, body);
 
     OzoneKeyDetails destKeyDetails = clientStub.getObjectStore()
         .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
@@ -633,7 +633,7 @@ class TestObjectPut {
 
     // With x-amz-tagging-directive = COPY with a different x-amz-tagging
     when(headersForCopy.getHeaderString(TAG_HEADER)).thenReturn("tag3=value3");
-    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, body);
+    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, null, null, body);
     assertEquals(200, copyResponse.getStatus());
 
     destKeyDetails = clientStub.getObjectStore()
@@ -648,7 +648,7 @@ class TestObjectPut {
 
     // Copy object with x-amz-tagging-directive = REPLACE
     when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("REPLACE");
-    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, body);
+    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, null, null, body);
     assertEquals(200, copyResponse.getStatus());
 
     destKeyDetails = clientStub.getObjectStore()
@@ -670,7 +670,7 @@ class TestObjectPut {
     HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
     when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("INVALID");
     try {
-      objectEndpoint.put(DEST_BUCKET_NAME, "somekey", CONTENT.length(), 1, body);
+      objectEndpoint.put(DEST_BUCKET_NAME, "somekey", CONTENT.length(), 1, null, null, null, body);
     } catch (OS3Exception ex) {
       assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
       assertThat(ex.getErrorMessage()).contains("The tagging copy directive specified is invalid");
@@ -685,7 +685,7 @@ class TestObjectPut {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("random");
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, body));
+        BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, null, null, body));
     assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getErrorMessage(),
         e.getErrorMessage());
     assertEquals("random", e.getResource());
@@ -698,7 +698,7 @@ class TestObjectPut {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("");
 
     objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT
-            .length(), 1, body);
+            .length(), 1, null, null, null, body);
     OzoneKeyDetails key =
         clientStub.getObjectStore().getS3Bucket(BUCKET_NAME)
             .getKey(KEY_NAME);
@@ -717,7 +717,7 @@ class TestObjectPut {
 
     // WHEN
     try (Response response = objectEndpoint.put(fsoBucket.getName(), path,
-        0L, 0, null)) {
+        0L, 0, "", null,  null, null)) {
       assertEquals(HttpStatus.SC_OK, response.getStatus());
     }
 
@@ -732,12 +732,12 @@ class TestObjectPut {
     final String path = "key";
     final ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    objectEndpoint.put(FSO_BUCKET_NAME, path, CONTENT.length(), 0, body);
+    objectEndpoint.put(FSO_BUCKET_NAME, path, CONTENT.length(), 0, "", null, null, body);
 
     // WHEN
     final OS3Exception exception = assertThrows(OS3Exception.class,
         () -> objectEndpoint
-            .put(FSO_BUCKET_NAME, path + "/", 0, 0, null)
+            .put(FSO_BUCKET_NAME, path + "/", 0, 0, "", null, null, null)
             .close());
 
     // THEN
@@ -753,7 +753,7 @@ class TestObjectPut {
     ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
     objectEndpoint.setHeaders(headersWithTags);
 
-    Response putResponse = objectEndpoint.put(BUCKET_NAME, KEY_NAME, emptyString.length(), 1, body);
+    Response putResponse = objectEndpoint.put(BUCKET_NAME, KEY_NAME, emptyString.length(), 1, null, null, null, body);
     assertEquals(200, putResponse.getStatus());
     OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
     assertEquals(0, keyDetails.getDataSize());

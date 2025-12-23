@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -94,9 +93,8 @@ public class TestPartUploadWithStream {
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -116,9 +114,8 @@ public class TestPartUploadWithStream {
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -126,9 +123,8 @@ public class TestPartUploadWithStream {
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
-    rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     response = rest.put(S3BUCKET, S3KEY,
-        content.length(), 1, body);
+        content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -140,9 +136,8 @@ public class TestPartUploadWithStream {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
-      rest.getQueryParameters().putSingle(S3Consts.QueryParams.UPLOAD_ID, "random");
       rest.put(S3BUCKET, S3KEY, content.length(), 1,
-          body);
+          "random", null, null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
     assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());

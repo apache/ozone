@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -83,13 +82,12 @@ public class TestObjectTaggingDelete {
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, body);
-    rest.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
+        1, null, null, null, body);
   }
 
   @Test
   public void testDeleteTagging() throws IOException, OS3Exception {
-    Response response = rest.delete(BUCKET_NAME, KEY_WITH_TAG);
+    Response response = rest.delete(BUCKET_NAME, KEY_WITH_TAG, null,  "");
     assertEquals(HTTP_NO_CONTENT, response.getStatus());
 
     assertTrue(client.getObjectStore().getS3Bucket(BUCKET_NAME)
@@ -99,7 +97,7 @@ public class TestObjectTaggingDelete {
   @Test
   public void testDeleteTaggingNoKeyFound() throws Exception {
     try {
-      rest.delete(BUCKET_NAME, "nonexistent");
+      rest.delete(BUCKET_NAME, "nonexistent", null,  "");
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -110,7 +108,7 @@ public class TestObjectTaggingDelete {
   @Test
   public void testDeleteTaggingNoBucketFound() throws Exception {
     try {
-      rest.delete("nonexistent", "nonexistent");
+      rest.delete("nonexistent", "nonexistent", null,  "");
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -137,8 +135,7 @@ public class TestObjectTaggingDelete {
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).deleteObjectTagging("dir/");
 
     try {
-      endpoint.getQueryParameters().putSingle(S3Consts.QueryParams.TAGGING, "");
-      endpoint.delete("fsoBucket", "dir/");
+      endpoint.delete("fsoBucket", "dir/", null, "");
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());

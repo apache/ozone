@@ -168,7 +168,7 @@ public class ObjectEndpoint extends EndpointBase {
 
   /*FOR the feature Overriding Response Header
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
-  private final Map<String, String> overrideQueryParameter;
+  private Map<String, String> overrideQueryParameter;
   private int bufferSize;
   private int chunkSize;
   private boolean datastreamEnabled;
@@ -209,18 +209,17 @@ public class ObjectEndpoint extends EndpointBase {
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html for
    * more details.
    */
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @PUT
   public Response put(
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath,
       @HeaderParam(HttpHeaders.CONTENT_LENGTH) long length,
-      @QueryParam(QueryParams.PART_NUMBER) int partNumber,
-      final InputStream body
-  ) throws IOException, OS3Exception {
-    final String aclMarker = getQueryParam(QueryParams.ACL);
-    final String taggingMarker = getQueryParam(QueryParams.TAGGING);
-    final String uploadID = getQueryParam(QueryParams.UPLOAD_ID);
+      @QueryParam(QueryParams.PART_NUMBER)  int partNumber,
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker,
+      @QueryParam(QueryParams.ACL) String aclMarker,
+      final InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
@@ -404,17 +403,17 @@ public class ObjectEndpoint extends EndpointBase {
    * https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
    * for more details.
    */
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   @GET
   public Response get(
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath,
       @QueryParam(QueryParams.PART_NUMBER) int partNumber,
-      @QueryParam(QueryParams.MAX_PARTS) @DefaultValue("1000") int maxParts
-  ) throws IOException, OS3Exception {
-    final String uploadId = getQueryParam(QueryParams.UPLOAD_ID);
-    final String partNumberMarker = getQueryParam(QueryParams.PART_NUMBER_MARKER);
-    final String taggingMarker = getQueryParam(QueryParams.TAGGING);
+      @QueryParam(QueryParams.UPLOAD_ID) String uploadId,
+      @QueryParam(QueryParams.MAX_PARTS) @DefaultValue("1000") int maxParts,
+      @QueryParam(QueryParams.PART_NUMBER_MARKER) String partNumberMarker,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker)
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -721,11 +720,10 @@ public class ObjectEndpoint extends EndpointBase {
   @SuppressWarnings("emptyblock")
   public Response delete(
       @PathParam(BUCKET) String bucketName,
-      @PathParam(PATH) String keyPath
-  ) throws IOException, OS3Exception {
-    final String taggingMarker = getQueryParam(QueryParams.TAGGING);
-    final String uploadId = getQueryParam(QueryParams.UPLOAD_ID);
-
+      @PathParam(PATH) String keyPath,
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadId,
+      @QueryParam(QueryParams.TAGGING) String taggingMarker) throws
+      IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_KEY;
 
@@ -800,7 +798,8 @@ public class ObjectEndpoint extends EndpointBase {
   public Response initializeMultipartUpload(
       @PathParam(BUCKET) String bucket,
       @PathParam(PATH) String key
-  ) throws IOException, OS3Exception {
+  )
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
 
@@ -864,9 +863,9 @@ public class ObjectEndpoint extends EndpointBase {
   public Response completeMultipartUpload(
       @PathParam(BUCKET) String bucket,
       @PathParam(PATH) String key,
-      CompleteMultipartUploadRequest multipartUploadRequest
-  ) throws IOException, OS3Exception {
-    final String uploadID = getQueryParam(QueryParams.UPLOAD_ID);
+      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
+      CompleteMultipartUploadRequest multipartUploadRequest)
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
     OzoneVolume volume = getVolume();

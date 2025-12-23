@@ -47,7 +47,7 @@ public class TestObjectDelete {
         .build();
 
     //WHEN
-    rest.delete("b1", "key1");
+    rest.delete("b1", "key1", null, null);
 
     //THEN
     assertFalse(bucket.listKeys("").hasNext(),
