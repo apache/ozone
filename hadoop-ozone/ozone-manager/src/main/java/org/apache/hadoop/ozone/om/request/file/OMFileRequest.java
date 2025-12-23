@@ -786,16 +786,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return OmDirectoryInfo.newBuilder()
-        .setParentObjectID(keyInfo.getParentObjectID())
-        .setAcls(keyInfo.getAcls())
-        .addAllMetadata(keyInfo.getMetadata())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
-        .setObjectID(keyInfo.getObjectID())
-        .setUpdateID(keyInfo.getUpdateID())
-        .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()))
-        .build();
+    return keyInfo.toDirectoryInfoBuilder().build();
   }
 
   /**

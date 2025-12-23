@@ -169,8 +169,7 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "bucketName", 1000, 0));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -214,9 +213,8 @@ public class TestPermissionCheck {
         .setClient(client)
         .setHeaders(headers)
         .build();
-    bucketEndpoint.getQueryParameters().putSingle(QueryParams.ACL, "acl");
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "bucketName", 1000, 0));
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -237,7 +235,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .setHeaders(headers)
         .build();
-    bucketEndpoint.getQueryParameters().putSingle(QueryParams.ACL, "acl");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
     try {
       bucketEndpoint.put("bucketName", null);
     } catch (Exception e) {
