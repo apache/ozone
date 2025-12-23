@@ -194,6 +194,7 @@ public class TestOzoneShellHA {
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
     ozoneConfiguration = conf;
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -1832,6 +1833,81 @@ public class TestOzoneShellHA {
         newEncKey};
     execute(ozoneShell, args);
     assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
+  }
+
+  @Test
+  public void testLifecycleStatus() throws UnsupportedEncodingException {
+    String[] args = new String[] {"om", "lifecycle", "status", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    String output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("IsEnabled:");
+  }
+
+  @Test
+  public void testLifecycleSuspendAndResume() throws Exception {
+    List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
+    for (OzoneManager om : ozoneManagers) {
+      assertNotNull(om.getKeyManager().getKeyLifecycleService());
+      assertTrue(om.getLifecycleServiceStatus().getIsEnabled());
+      assertFalse(om.getLifecycleServiceStatus().getIsSuspended());
+    }
+
+    // Execute suspend command
+    String[] args = new String[] {"om", "lifecycle", "suspend", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    String output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("Lifecycle Service has been suspended");
+    out.reset();
+
+    // Wait for the suspend command to propagate through Ratis to all OMs
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : ozoneManagers) {
+        assertNotNull(om.getKeyManager().getKeyLifecycleService());
+        if (!om.getLifecycleServiceStatus().getIsSuspended()) {
+          return false;
+        }
+      }
+      return true;
+    }, 100, 10000);
+
+    // Verify lifecycle service is suspended on all OMs
+    for (OzoneManager om : ozoneManagers) {
+      if (om.getKeyManager().getKeyLifecycleService() != null) {
+        assertTrue(om.getLifecycleServiceStatus().getIsSuspended(),
+            "Lifecycle service should be suspended on OM: " + om.getOMNodeId());
+        // isEnabled should still be true (based on configuration)
+        assertTrue(om.getLifecycleServiceStatus().getIsEnabled(),
+            "Lifecycle service isEnabled should still be true on OM: " + om.getOMNodeId());
+      }
+    }
+
+    // Execute resume command
+    args = new String[] {"om", "lifecycle", "resume", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    output = out.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("Lifecycle Service has been resumed");
+    out.reset();
+
+    // Wait for the resume command to propagate through Ratis to all OMs
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : ozoneManagers) {
+        assertNotNull(om.getKeyManager().getKeyLifecycleService());
+        if (om.getLifecycleServiceStatus().getIsSuspended()) {
+          return false;
+        }
+      }
+      return true;
+    }, 100, 10000);
+
+    // Verify lifecycle service is resumed on all OMs
+    for (OzoneManager om : ozoneManagers) {
+      if (om.getKeyManager().getKeyLifecycleService() != null) {
+        assertFalse(om.getLifecycleServiceStatus().getIsSuspended(),
+            "Lifecycle service should be resumed on OM: " + om.getOMNodeId());
+        assertTrue(om.getLifecycleServiceStatus().getIsEnabled(),
+            "Lifecycle service isEnabled should be true on OM: " + om.getOMNodeId());
+      }
+    }
   }
 
   @Test
