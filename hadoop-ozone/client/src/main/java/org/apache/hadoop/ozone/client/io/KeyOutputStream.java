@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -110,6 +112,11 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
+  private List<Runnable> preCommits = Collections.emptyList();
+
+  public void setPreCommits(@Nonnull List<Runnable> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
@@ -655,6 +662,7 @@ public class KeyOutputStream extends OutputStream
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
+      preCommits.forEach(Runnable::run);
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();

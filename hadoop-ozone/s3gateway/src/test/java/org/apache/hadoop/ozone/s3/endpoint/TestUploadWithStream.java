@@ -66,7 +66,7 @@ public class TestUploadWithStream {
     client.getObjectStore().createS3Bucket(S3BUCKET);
 
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     OzoneConfiguration conf = new OzoneConfiguration();

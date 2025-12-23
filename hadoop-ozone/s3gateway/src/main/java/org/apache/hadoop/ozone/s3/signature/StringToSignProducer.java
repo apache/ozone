@@ -337,7 +337,7 @@ public final class StringToSignProducer {
       }
       break;
     case X_AMZ_CONTENT_SHA256:
-      // TODO: Construct request payload and match HEX(SHA256(requestPayload))
+      // Validate x-amz-content-sha256 after data is uploaded to the DN in ObjectEndpoint
       break;
     default:
       break;

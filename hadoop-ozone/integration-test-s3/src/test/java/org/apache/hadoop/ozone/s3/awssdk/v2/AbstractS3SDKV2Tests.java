@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
@@ -643,6 +644,41 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       ResponseInputStream<GetObjectResponse> object = s3Client.getObject(b -> b.bucket(BUCKET_NAME).key(keyName));
       actualContent = IoUtils.toUtf8String(object);
       assertEquals(CONTENT, actualContent);
+    }
+
+    @Test
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      PutObjectRequest objectRequest = PutObjectRequest.builder().bucket(BUCKET_NAME).key(keyName).build();
+
+      PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+          .signatureDuration(duration)
+          .putObjectRequest(objectRequest)
+          .build();
+
+      PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
+
+      Map<String, List<String>> headers = presignedRequest.signedHeaders();
+      List<String> sha256 = new ArrayList<>();
+      sha256.add("wrong-sha256-value");
+      headers.put(S3Consts.X_AMZ_CONTENT_SHA256, sha256);
+
+      // use http url connection
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedRequest.url(), "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Verify the object was not uploaded
+      assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
     }
 
     @Test

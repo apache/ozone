@@ -233,9 +233,13 @@ public class TestPartUpload {
     assertEquals(200, response.getStatus());
 
     MessageDigest messageDigest = mock(MessageDigest.class);
+    when(messageDigest.getAlgorithm()).thenReturn("MD5");
+    MessageDigest sha256Digest = mock(MessageDigest.class);
+    when(sha256Digest.getAlgorithm()).thenReturn("SHA-256");
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getSha256DigestInstance()).thenReturn(sha256Digest);
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
@@ -251,6 +255,7 @@ public class TestPartUpload {
         // Verify that the message digest is reset so that the instance can be reused for the
         // next request in the same thread
         verify(messageDigest, times(1)).reset();
+        verify(sha256Digest, times(1)).reset();
       }
     }
   }
