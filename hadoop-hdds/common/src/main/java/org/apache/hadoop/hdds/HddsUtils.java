@@ -31,6 +31,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
@@ -57,10 +58,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -329,6 +332,38 @@ public final class HddsUtils {
       }
       return addresses;
     }
+  }
+
+  /**
+   * Returns the SCM address for datanodes based on the service ID and the SCM addresses.
+   * @param conf Configuration
+   * @param scmServiceId SCM service ID
+   * @param scmNodeIds Requested SCM node IDs
+   * @return A collection with addresses of the request SCM node IDs.
+   * Null if there is any wrongly configured SCM address. Note that the returned collection
+   * might not be ordered the same way as the requested SCM node IDs
+   */
+  public static Collection<Pair<String, InetSocketAddress>> getSCMAddressForDatanodes(
+      ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
+    Collection<Pair<String, InetSocketAddress>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
+    for (String scmNodeId : scmNodeIds) {
+      String addressKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
+      String scmAddress = conf.get(addressKey);
+      if (scmAddress == null) {
+        LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
+        return null;
+      }
+
+      int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
+          OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
+          OZONE_SCM_DATANODE_PORT_DEFAULT);
+
+      String scmDatanodeAddressStr = SCMNodeInfo.buildAddress(scmAddress, scmDatanodePort);
+      InetSocketAddress scmDatanodeAddress = NetUtils.createSocketAddr(scmDatanodeAddressStr);
+      scmNodeAddress.add(Pair.of(scmNodeId, scmDatanodeAddress));
+    }
+    return scmNodeAddress;
   }
 
   /**
@@ -635,10 +670,8 @@ public final class HddsUtils {
    *     ancestor of {@code path}
    */
   public static void validatePath(Path path, Path ancestor) {
-    Preconditions.checkNotNull(path,
-        "Path should not be null");
-    Preconditions.checkNotNull(ancestor,
-        "Ancestor should not be null");
+    Objects.requireNonNull(path, "Path should not be null");
+    Objects.requireNonNull(ancestor, "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path %s should be a descendant of %s", path, ancestor);
@@ -852,8 +885,7 @@ public final class HddsUtils {
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "HddsProtos.UUID can't be null to transform to java UUID.");
+    Objects.requireNonNull(uuid, "HddsProtos.UUID can't be null to transform to java UUID.");
     return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
   }
 
@@ -861,8 +893,7 @@ public final class HddsUtils {
    * Transform a Java UUID to protobuf UUID.
    */
   public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "UUID can't be null to transform to protobuf UUID.");
+    Objects.requireNonNull(uuid, "UUID can't be null to transform to protobuf UUID.");
     return HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())

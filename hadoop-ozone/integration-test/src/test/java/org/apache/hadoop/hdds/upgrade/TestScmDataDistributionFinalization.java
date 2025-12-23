@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -180,6 +181,7 @@ public class TestScmDataDistributionFinalization {
    * Test for an empty cluster.
    */
   @Test
+  @Flaky("HDDS-14050")
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
     init(new OzoneConfiguration(), null, true);
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());

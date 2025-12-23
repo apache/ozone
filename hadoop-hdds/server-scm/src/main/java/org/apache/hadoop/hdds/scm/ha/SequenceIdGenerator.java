@@ -28,6 +28,7 @@ import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -93,13 +94,13 @@ public class SequenceIdGenerator {
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
-    Preconditions.checkNotNull(scmhaManager);
+    Objects.requireNonNull(scmhaManager, "scmhaManager == null");
     this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
   }
 
   public StateManager createStateManager(SCMHAManager scmhaManager,
       Table<String, Long> sequenceIdTable) {
-    Preconditions.checkNotNull(scmhaManager);
+    Objects.requireNonNull(scmhaManager, "scmhaManager == null");
     return new StateManagerImpl.Builder()
         .setRatisServer(scmhaManager.getRatisServer())
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
@@ -281,9 +282,9 @@ public class SequenceIdGenerator {
           Table.KeyValue<String, Long> kv = iterator.next();
           final String sequenceIdName = kv.getKey();
           final Long lastId = kv.getValue();
-          Preconditions.checkNotNull(sequenceIdName,
+          Objects.requireNonNull(sequenceIdName,
               "sequenceIdName should not be null");
-          Preconditions.checkNotNull(lastId,
+          Objects.requireNonNull(lastId,
               "lastId should not be null");
           sequenceIdToLastIdMap.put(sequenceIdName, lastId);
         }
@@ -315,8 +316,8 @@ public class SequenceIdGenerator {
       }
 
       public StateManager build() {
-        Preconditions.checkNotNull(table);
-        Preconditions.checkNotNull(buffer);
+        Objects.requireNonNull(table, "table == null");
+        Objects.requireNonNull(buffer, "buffer == null");
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 

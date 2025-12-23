@@ -82,12 +82,12 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     String toKeyParentName = UUID.randomUUID().toString();
     fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fromKeyParentName, replicationConfig)
         .setObjectID(bucketId + 100L)
+        .setParentObjectID(bucketId)
         .build();
     toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, toKeyParentName, replicationConfig)
         .setObjectID(bucketId + 101L)
+        .setParentObjectID(bucketId)
         .build();
-    fromKeyParent.setParentObjectID(bucketId);
-    toKeyParent.setParentObjectID(bucketId);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     bucketInfo = TestOMResponseUtils.createBucket(volumeName, bucketName);

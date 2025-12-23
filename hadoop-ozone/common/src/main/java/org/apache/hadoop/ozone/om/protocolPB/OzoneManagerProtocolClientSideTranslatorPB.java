@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -833,7 +834,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
-    Preconditions.checkNotNull(locationInfoList);
+    Objects.requireNonNull(locationInfoList, "locationInfoList == null");
     KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -1663,7 +1664,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       OmKeyArgs omKeyArgs, long clientId) throws IOException {
 
     List<OmKeyLocationInfo> locationInfoList = omKeyArgs.getLocationInfoList();
-    Preconditions.checkNotNull(locationInfoList);
+    Objects.requireNonNull(locationInfoList, "locationInfoList == null");
 
 
     MultipartCommitUploadPartRequest.Builder multipartCommitUploadPartRequest

@@ -18,16 +18,17 @@
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.util.AclOp;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
@@ -47,8 +48,8 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMVolumeSetAclRequest.class);
 
-  private static final VolumeAclOp VOLUME_SET_ACL_OP =
-      (acls, volArgs) -> volArgs.setAcls(acls);
+  private static final AclOp VOLUME_SET_ACL_OP =
+      (acls, builder) -> builder.set(acls);
 
   private final List<OzoneAcl> ozoneAcls;
   private final String volumeName;
@@ -72,9 +73,9 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
     Objects.requireNonNull(setAclRequest, "setAclRequest == null");
-    ozoneAcls = new ArrayList<>();
-    setAclRequest.getAclList().forEach(oai ->
-        ozoneAcls.add(OzoneAcl.fromProtobuf(oai)));
+    ozoneAcls = setAclRequest.getAclList().stream()
+        .map(OzoneAcl::fromProtobuf)
+        .collect(Collectors.toList());
     obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
     volumeName = obj.getPath().substring(1);
   }

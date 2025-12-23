@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
-import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -34,8 +34,8 @@ public final class ReportResult<T> {
       Set<T> missingEntries,
       Set<T> newEntries) {
     this.status = status;
-    Preconditions.checkNotNull(missingEntries);
-    Preconditions.checkNotNull(newEntries);
+    Objects.requireNonNull(missingEntries, "missingEntries == null");
+    Objects.requireNonNull(newEntries, "newEntries == null");
     this.missingEntries = missingEntries;
     this.newEntries = newEntries;
   }

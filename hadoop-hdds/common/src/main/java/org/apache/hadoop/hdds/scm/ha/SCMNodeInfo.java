@@ -181,12 +181,11 @@ public class SCMNodeInfo {
 
   }
 
-  private static String buildAddress(String address, int port) {
-    return new StringBuilder().append(address).append(':')
-        .append(port).toString();
+  public static String buildAddress(String address, int port) {
+    return address + ':' + port;
   }
 
-  private static int getPort(ConfigurationSource conf,
+  public static int getPort(ConfigurationSource conf,
       String scmServiceId, String scmNodeId, String configKey,
       String portKey, int defaultPort) {
     String suffixKey = ConfUtils.addKeySuffixes(configKey, scmServiceId,

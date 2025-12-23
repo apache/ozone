@@ -23,6 +23,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
@@ -99,7 +100,7 @@ public class TestBucketPut {
 
     InputStream body = new ByteArrayInputStream(VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
 
-    Response resp = bucketEndpoint.put(bucketName, OzoneConsts.ACL, body);
+    Response resp = bucketEndpoint.put(bucketName, body);
     assertEquals(HTTP_OK, resp.getStatus());
   }
 
@@ -108,7 +109,7 @@ public class TestBucketPut {
     bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
 
     WebApplicationException wae = assertThrows(WebApplicationException.class,
-        () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
+        () -> bucketEndpoint.put(bucketName, null));
 
     Throwable cause = wae.getCause();
     assertNotNull(cause);
@@ -121,14 +122,24 @@ public class TestBucketPut {
   }
 
   @Test
+  public void testBucketFailWithAuthHeaderMissing() throws Exception {
+    try {
+      bucketEndpoint.put(bucketName, null);
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+    }
+  }
+
+  @Test
   public void testBucketPut() throws Exception {
-    Response response = bucketEndpoint.put(bucketName, null, null);
+    Response response = bucketEndpoint.put(bucketName, null);
     assertEquals(HTTP_OK, response.getStatus());
     assertNotNull(response.getLocation());
 
     // Create-bucket on an existing bucket fails
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null));
+        bucketName, null));
     assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
   }
@@ -136,7 +147,7 @@ public class TestBucketPut {
   @Test
   public void testPutAclOnNonExistingBucket() throws Exception {
     OS3Exception e = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
+        () -> bucketEndpoint.put(bucketName, null));
     assertEquals(NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
   }
@@ -148,7 +159,7 @@ public class TestBucketPut {
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn("id=\"owner-id\"");
 
-    Response resp = bucketEndpoint.put(bucketName, OzoneConsts.ACL, null);
+    Response resp = bucketEndpoint.put(bucketName, null);
 
     assertEquals(HTTP_OK, resp.getStatus());
   }
@@ -161,7 +172,7 @@ public class TestBucketPut {
         "not-xml".getBytes(StandardCharsets.UTF_8));
 
     WebApplicationException wae = assertThrows(WebApplicationException.class,
-        () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, body));
+        () -> bucketEndpoint.put(bucketName, body));
 
     Throwable cause = wae.getCause();
     assertNotNull(cause);
@@ -180,7 +191,7 @@ public class TestBucketPut {
         .thenReturn("id\"owner-id\"");
 
     OS3Exception os3 = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
+        () -> bucketEndpoint.put(bucketName, null));
 
     assertEquals(INVALID_ARGUMENT.getCode(), os3.getCode());
     assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
@@ -198,7 +209,7 @@ public class TestBucketPut {
     InputStream body = new ByteArrayInputStream(
         VALID_ACL_XML.getBytes(StandardCharsets.UTF_8));
 
-    Response resp = bucketEndpoint.put(bucketName, OzoneConsts.ACL, body);
+    Response resp = bucketEndpoint.put(bucketName, body);
     assertEquals(HTTP_OK, resp.getStatus());
 
     OzoneBucket bucket = bucketEndpoint.getClient()
@@ -226,13 +237,23 @@ public class TestBucketPut {
   }
 
   @Test
+  public void testBucketFailWithInvalidHeader() throws Exception {
+    try {
+      bucketEndpoint.put(bucketName, null);
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+    }
+  }
+
+  @Test
   public void testPutAclWithEmptyGrantHeaderValue() throws Exception {
     bucketEndpoint.getClient().getObjectStore().createS3Bucket(bucketName);
 
     when(mockHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(""); // empty
 
-    Response resp = bucketEndpoint.put(bucketName, OzoneConsts.ACL, null);
+    Response resp = bucketEndpoint.put(bucketName, null);
 
     assertEquals(HTTP_OK, resp.getStatus());
   }
@@ -245,7 +266,7 @@ public class TestBucketPut {
         .thenReturn(WHITESPACE_ONLY); // whitespace only
 
     OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> bucketEndpoint.put(bucketName, OzoneConsts.ACL, null));
+        () -> bucketEndpoint.put(bucketName, null));
 
     assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
     assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());

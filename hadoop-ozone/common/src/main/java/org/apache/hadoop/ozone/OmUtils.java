@@ -548,10 +548,9 @@ public final class OmUtils {
     if (Boolean.parseBoolean(
             keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
     ) {
-      Map<String, String> metadata = builder.getMetadata();
-      metadata.remove(OzoneConsts.GDPR_FLAG);
-      metadata.remove(OzoneConsts.GDPR_ALGORITHM);
-      metadata.remove(OzoneConsts.GDPR_SECRET);
+      builder.metadata().remove(OzoneConsts.GDPR_FLAG);
+      builder.metadata().remove(OzoneConsts.GDPR_ALGORITHM);
+      builder.metadata().remove(OzoneConsts.GDPR_SECRET);
     
       builder.setFileEncryptionInfo(null);
     }

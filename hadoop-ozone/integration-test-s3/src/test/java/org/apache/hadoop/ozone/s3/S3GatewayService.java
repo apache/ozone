@@ -61,6 +61,8 @@ public class S3GatewayService implements MiniOzoneCluster.Service {
 
     conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY,  localhostWithFreePort());
     conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY, localhostWithFreePort());
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY,  localhostWithFreePort());
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY, localhostWithFreePort());
 
     OzoneConfigurationHolder.setConfiguration(conf);
   }

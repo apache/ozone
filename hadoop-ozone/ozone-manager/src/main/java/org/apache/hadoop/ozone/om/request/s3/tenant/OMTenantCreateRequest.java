@@ -219,7 +219,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    OmVolumeArgs omVolumeArgs = null;
+    OmVolumeArgs omVolumeArgs;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     final String owner = getOmRequest().getUserInfo().getUserName();
@@ -273,16 +273,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           USER_LOCK, owner));
       acquiredUserLock = getOmLockDetails().isLockAcquired();
 
+      OmVolumeArgs.Builder volumeBuilder;
       PersistedUserVolumeInfo volumeList = null;
       if (!skipVolumeCreation) {
         // Create volume. TODO: dedup OMVolumeCreateRequest
-        omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+        volumeBuilder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
             .setQuotaInBytes(OzoneConsts.QUOTA_RESET)
             .setQuotaInNamespace(OzoneConsts.QUOTA_RESET)
             .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
             .setUpdateID(transactionLogIndex)
-            .incRefCount()
-            .build();
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
@@ -298,10 +299,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       } else {
         LOG.info("Skipped volume '{}' creation. "
             + "Will only increment volume refCount", volumeName);
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+        volumeBuilder = getVolumeInfo(omMetadataManager, volumeName)
             .toBuilder()
-            .incRefCount()
-            .build();
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
@@ -313,7 +314,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       }
 
       // Audit
-      auditMap = omVolumeArgs.toAuditMap();
+      auditMap = volumeBuilder.toAuditMap();
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {

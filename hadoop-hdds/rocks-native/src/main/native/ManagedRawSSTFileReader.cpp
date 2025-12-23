@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#include "org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader.h"
+#include "org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileReader.h"
 #include "rocksdb/options.h"
 #include "rocksdb/raw_sst_file_reader.h"
 #include "rocksdb/raw_iterator.h"
@@ -24,7 +24,7 @@
 #include "cplusplus_to_java_convert.h"
 #include <iostream>
 
-jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newRawSSTFileReader(JNIEnv *env, jobject obj,
+jlong Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileReader_newRawSSTFileReader(JNIEnv *env, jobject obj,
                                                                                                jlong options_handle,
                                                                                                jstring jfilename,
                                                                                                jint readahead_size) {
@@ -37,7 +37,7 @@ jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newRa
     return GET_CPLUSPLUS_POINTER(raw_sst_file_reader);
 }
 
-jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newIterator(JNIEnv *env, jobject obj,
+jlong Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileReader_newIterator(JNIEnv *env, jobject obj,
                                                                                        jlong native_handle,
                                                                                        jboolean jhas_from,
                                                                                        jlong from_slice_handle,
@@ -59,7 +59,7 @@ jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newIt
     return GET_CPLUSPLUS_POINTER(iterator);
 }
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_disposeInternal(JNIEnv *env, jobject obj,
+void Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileReader_disposeInternal(JNIEnv *env, jobject obj,
                                                                                           jlong native_handle) {
     delete reinterpret_cast<ROCKSDB_NAMESPACE::RawSstFileReader*>(native_handle);
 }

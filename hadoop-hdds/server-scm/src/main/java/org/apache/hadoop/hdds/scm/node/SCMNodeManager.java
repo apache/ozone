@@ -48,9 +48,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -537,7 +539,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
                                            CommandQueueReportProto queueReport) {
-    Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
+    Objects.requireNonNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
@@ -938,6 +940,7 @@ public class SCMNodeManager implements NodeManager {
     long remaining = 0L;
     long committed = 0L;
     long freeSpaceToSpare = 0L;
+    long reserved = 0L;
 
     for (SCMNodeStat stat : getNodeStats().values()) {
       capacity += stat.getCapacity().get();
@@ -945,9 +948,10 @@ public class SCMNodeManager implements NodeManager {
       remaining += stat.getRemaining().get();
       committed += stat.getCommitted().get();
       freeSpaceToSpare += stat.getFreeSpaceToSpare().get();
+      reserved += stat.getReserved().get();
     }
     return new SCMNodeStat(capacity, used, remaining, committed,
-        freeSpaceToSpare);
+        freeSpaceToSpare, reserved);
   }
 
   /**
@@ -1055,6 +1059,7 @@ public class SCMNodeManager implements NodeManager {
       long remaining = 0L;
       long committed = 0L;
       long freeSpaceToSpare = 0L;
+      long reserved = 0L;
 
       final DatanodeInfo datanodeInfo = nodeStateManager
           .getNode(datanodeDetails);
@@ -1066,9 +1071,10 @@ public class SCMNodeManager implements NodeManager {
         remaining += reportProto.getRemaining();
         committed += reportProto.getCommitted();
         freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
+        reserved += reportProto.getReserved();
       }
       return new SCMNodeStat(capacity, used, remaining, committed,
-          freeSpaceToSpare);
+          freeSpaceToSpare, reserved);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.", datanodeDetails);
       return null;
@@ -1279,8 +1285,8 @@ public class SCMNodeManager implements NodeManager {
     nodeStateStatistics(nodeStatistics);
     // Statistics node space
     nodeSpaceStatistics(nodeStatistics);
-    // Statistics node readOnly
-    nodeOutOfSpaceStatistics(nodeStatistics);
+    // Statistics node non-writable
+    nodeNonWritableStatistics(nodeStatistics);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
@@ -1368,43 +1374,59 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
-  private void nodeOutOfSpaceStatistics(Map<String, String> nodeStatics) {
-    List<DatanodeInfo> allNodes = getAllNodes();
-    long blockSize = (long) conf.getStorageSize(
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-    long minRatisVolumeSizeBytes = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
-        ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
-        StorageUnit.BYTES);
-    long containerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-
-    int nodeOutOfSpaceCount = (int) allNodes.parallelStream()
-        .filter(dn -> !hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
-            && !hasEnoughCommittedVolumeSpace(dn, blockSize))
+  private void nodeNonWritableStatistics(Map<String, String> nodeStatics) {
+    int nonWritableNodesCount = (int) getAllNodes().parallelStream()
+        .filter(new NonWritableNodeFilter(conf))
         .count();
 
-    nodeStatics.put("NodesOutOfSpace", String.valueOf(nodeOutOfSpaceCount));
+    nodeStatics.put("NonWritableNodes", String.valueOf(nonWritableNodesCount));
   }
-  
-  /**
-   * Check if any volume in the datanode has committed space >= blockSize.
-   *
-   * @return true if any volume has committed space >= blockSize, false otherwise
-   */
-  private boolean hasEnoughCommittedVolumeSpace(DatanodeInfo dnInfo, long blockSize) {
-    for (StorageReportProto reportProto : dnInfo.getStorageReports()) {
-      if (reportProto.getCommitted() >= blockSize) {
-        return true;
-      }
+
+  static class NonWritableNodeFilter implements Predicate<DatanodeInfo> {
+
+    private final long blockSize;
+    private final long minRatisVolumeSizeBytes;
+    private final long containerSize;
+    private final ConfigurationSource conf;
+
+    NonWritableNodeFilter(ConfigurationSource conf) {
+      blockSize = (long) conf.getStorageSize(
+          OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+          OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+          StorageUnit.BYTES);
+      minRatisVolumeSizeBytes = (long) conf.getStorageSize(
+          ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+          ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
+          StorageUnit.BYTES);
+      containerSize = (long) conf.getStorageSize(
+          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+          StorageUnit.BYTES);
+      this.conf = conf;
     }
-    LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
-        dnInfo.getID(), blockSize);
-    return false;
+
+    @Override
+    public boolean test(DatanodeInfo dn) {
+      return !dn.getNodeStatus().isNodeWritable()
+          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
+          && !hasEnoughCommittedVolumeSpace(dn));
+    }
+
+    /**
+     * Check if any volume in the datanode has committed space >= blockSize.
+     *
+     * @return true if any volume has committed space >= blockSize, false otherwise
+     */
+    private boolean hasEnoughCommittedVolumeSpace(DatanodeInfo dnInfo) {
+      for (StorageReportProto reportProto : dnInfo.getStorageReports()) {
+        if (reportProto.getCommitted() >= blockSize) {
+          return true;
+        }
+      }
+      LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
+          dnInfo.getID(), blockSize);
+      return false;
+    }
   }
 
   /**
@@ -1592,7 +1614,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
     HashSet<DatanodeDetails> dns = new HashSet<>();
-    Preconditions.checkNotNull(dn);
+    Objects.requireNonNull(dn, "dn == null");
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getID());
     PipelineManager pipelineManager = scmContext.getScm().getPipelineManager();

@@ -39,7 +39,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.39.5</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.40.13</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.83</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -108,7 +108,6 @@
     <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
-    <jakarta.validation.version>2.0.2</jakarta.validation.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
@@ -606,11 +605,6 @@
         <groupId>jakarta.annotation</groupId>
         <artifactId>jakarta.annotation-api</artifactId>
         <version>${jakarta.annotation.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>jakarta.validation</groupId>
-        <artifactId>jakarta.validation-api</artifactId>
-        <version>${jakarta.validation.version}</version>
       </dependency>
       <dependency>
         <groupId>jakarta.ws.rs</groupId>
@@ -1134,6 +1128,12 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-client</artifactId>
         <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-client</artifactId>
+        <version>${ozone.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -2079,6 +2079,7 @@
                     <bannedImports>
                       <bannedImport>javax.annotation.Nonnull</bannedImport>
                       <bannedImport>javax.annotation.Nullable</bannedImport>
+                      <bannedImport>javax.validation.constraints.NotNull</bannedImport>
                       <bannedImport>org.checkerframework.checker.nullness.qual.NonNull</bannedImport>
                       <bannedImport>org.checkerframework.checker.nullness.qual.Nullable</bannedImport>
                       <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
@@ -2145,8 +2146,10 @@
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
                       <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
-                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                       <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator</bannedImport>
+                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator</bannedImport>
+                      <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                       <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
@@ -2389,8 +2392,6 @@
           <suppressionsLocation>hadoop-hdds/dev-support/checkstyle/suppressions.xml</suppressionsLocation>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <failOnViolation>false</failOnViolation>
-          <format>xml</format>
-          <format>html</format>
           <outputFile>${project.build.directory}/test/checkstyle-errors.xml</outputFile>
         </configuration>
         <dependencies>

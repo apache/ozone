@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -89,7 +90,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized void process(PipelineReportFromDatanode report) {
-    Preconditions.checkNotNull(report);
+    Objects.requireNonNull(report, "report == null");
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
       try {
