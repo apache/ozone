@@ -866,7 +866,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam(PATH) String key,
       CompleteMultipartUploadRequest multipartUploadRequest
   ) throws IOException, OS3Exception {
-    final String uploadID = getQueryParam(QueryParams.UPLOAD_ID, "");
+    final String uploadID = getQueryParam(QueryParams.UPLOAD_ID);
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
     OzoneVolume volume = getVolume();
