@@ -1246,4 +1246,13 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
+
+  /**
+   * Resumes the lifecycle service.
+   * @throws IOException
+   */
+  default void resumeLifecycleService() throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
 }

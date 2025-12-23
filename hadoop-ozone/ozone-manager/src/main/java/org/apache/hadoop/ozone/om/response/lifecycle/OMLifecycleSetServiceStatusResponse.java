@@ -25,13 +25,13 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for SuspendLifecycleService request.
+ * Response for SetLifecycleServiceStatus request.
  * This response does not modify any database tables.
  */
 @CleanupTableInfo
-public class OMLifecycleServiceSuspendResponse extends OMClientResponse {
+public class OMLifecycleSetServiceStatusResponse extends OMClientResponse {
 
-  public OMLifecycleServiceSuspendResponse(OMResponse omResponse) {
+  public OMLifecycleSetServiceStatusResponse(OMResponse omResponse) {
     super(omResponse);
   }
 
@@ -39,7 +39,7 @@ public class OMLifecycleServiceSuspendResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
                               BatchOperation batchOperation)
       throws IOException {
-    // No database update required for suspending the lifecycle service.
+    // No database update required for setting the lifecycle service state.
     // The service state is maintained in memory only.
   }
 }

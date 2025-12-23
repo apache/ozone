@@ -32,6 +32,7 @@ import picocli.CommandLine;
     subcommands = {
         LifecycleStatusSubCommand.class,
         LifecycleSuspendSubCommand.class,
+        LifecycleResumeSubCommand.class,
     })
 public class LifecycleSubCommand implements AdminSubcommand {
 

@@ -26,7 +26,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Handler of ozone admin status command.
+ * Handler of ozone admin om lifecycle status command.
  */
 @Command(
     name = "status",
@@ -67,6 +67,9 @@ public class LifecycleStatusSubCommand implements Callable<Void> {
     out.println("          Lifecycle Service Status");
     out.println("========================================");
     out.printf("IsEnabled: %s%n", status.getIsEnabled());
+    if (status.getIsEnabled() && status.hasIsSuspended()) {
+      out.printf("IsSuspended: %s%n", status.getIsSuspended());
+    }
 
     if (status.getRunningBucketsCount() > 0) {
       out.println("Running Buckets:");

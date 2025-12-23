@@ -25,15 +25,14 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Handler of ozone admin om lifecycle suspend command.
+ * Handler of ozone admin om lifecycle resume command.
  */
 @Command(
-    name = "suspend",
-    description = "Suspend Lifecycle Service. Use 'resume' command to resume it, " +
-        "or it will be re-enabled after OM restarts based on the configuration",
+    name = "resume",
+    description = "Resume Lifecycle Service that was previously suspended",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class LifecycleSuspendSubCommand implements Callable<Void> {
+public class LifecycleResumeSubCommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private LifecycleSubCommand parent;
@@ -54,7 +53,7 @@ public class LifecycleSuspendSubCommand implements Callable<Void> {
   public Void call() throws Exception {
     try (OzoneManagerProtocol ozoneManagerClient =
              parent.getParent().createOmClient(omServiceId, omHost, false)) {
-      ozoneManagerClient.suspendLifecycleService();
+      ozoneManagerClient.resumeLifecycleService();
       output();
     }
     return null;
@@ -63,9 +62,7 @@ public class LifecycleSuspendSubCommand implements Callable<Void> {
   protected void output() {
     PrintStream out = out();
     out.println("========================================");
-    out.println("Lifecycle Service has been suspended.");
-    out.println("Use 'ozone admin om lifecycle resume' to resume it,");
-    out.println("or it will be re-enabled after OM restarts based on the configuration.");
+    out.println("Lifecycle Service has been resumed.");
     out.println("========================================");
   }
 

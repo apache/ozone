@@ -208,7 +208,6 @@ public class KeyLifecycleService extends BackgroundService {
   /**
    * Suspend the service.
    */
-  @VisibleForTesting
   public void suspend() {
     suspended.set(true);
   }
@@ -216,18 +215,12 @@ public class KeyLifecycleService extends BackgroundService {
   /**
    * Resume the service if suspended.
    */
-  @VisibleForTesting
   public void resume() {
     suspended.set(false);
   }
 
-  /**
-   * Set isServiceEnabled.
-   * @param enabled whether enable the lifecycle Service
-   */
-  public void setServiceEnabled(boolean enabled) {
-    this.isServiceEnabled.set(enabled);
-    LOG.info("KeyLifecycleService is {}", enabled ? "enabled" : "disabled");
+  public boolean isSuspended() {
+    return suspended.get();
   }
 
   @Override
@@ -244,6 +237,7 @@ public class KeyLifecycleService extends BackgroundService {
     Set<String> runningBuckets = new HashSet<>(inFlight.keySet());
     return GetLifecycleServiceStatusResponse.newBuilder()
         .setIsEnabled(isServiceEnabled.get())
+        .setIsSuspended(suspended.get())
         .addAllRunningBuckets(runningBuckets)
         .build();
   }
@@ -494,8 +488,10 @@ public class KeyLifecycleService extends BackgroundService {
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
-          LOG.info("KeyLifecycleService is suspended or disabled. " +
-              "Stopping LifecycleActionTask for bucket {}.", bucketName);
+          LOG.info("LifecycleActionTask for bucket {} stopping. " +
+              "Service enabled: {}, suspended: {}, leader ready: {}",
+              bucketName, isServiceEnabled.get(), suspended.get(), 
+              getOzoneManager() != null ? getOzoneManager().isLeaderReady() : "N/A");
           return;
         }
         PendingEvaluateDirectory item = stack.pop();

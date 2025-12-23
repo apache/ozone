@@ -60,7 +60,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
-import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleServiceSuspendResponse;
+import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleSetServiceStatusResponse;
 import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
@@ -136,7 +136,7 @@ public class TestCleanupTableInfo {
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
     subTypes.remove(DummyOMClientResponse.class);
-    subTypes.remove(OMLifecycleServiceSuspendResponse.class);
+    subTypes.remove(OMLifecycleSetServiceStatusResponse.class);
     subTypes.forEach(aClass -> {
       assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
           aClass + " does not have annotation of" +

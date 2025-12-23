@@ -342,7 +342,7 @@ public final class OmUtils {
     case DeleteObjectTagging:
     case SetLifecycleConfiguration:
     case DeleteLifecycleConfiguration:
-    case SuspendLifecycleService:
+    case SetLifecycleServiceStatus:
     case UnknownCommand:
       return false;
     case EchoRPC:

@@ -2742,13 +2742,27 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void suspendLifecycleService() throws IOException {
-    OzoneManagerProtocolProtos.SuspendLifecycleServiceRequest
-        suspendLifecycleServiceRequest =
-        OzoneManagerProtocolProtos.SuspendLifecycleServiceRequest
-            .newBuilder().build();
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(true).build();
 
-    OMRequest omRequest = createOMRequest(Type.SuspendLifecycleService)
-        .setSuspendLifecycleServiceRequest(suspendLifecycleServiceRequest)
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void resumeLifecycleService() throws IOException {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+        setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest
+            .newBuilder().setSuspend(false).build();
+
+    OMRequest omRequest = createOMRequest(Type.SetLifecycleServiceStatus)
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
         .build();
 
     handleError(submitRequest(omRequest));

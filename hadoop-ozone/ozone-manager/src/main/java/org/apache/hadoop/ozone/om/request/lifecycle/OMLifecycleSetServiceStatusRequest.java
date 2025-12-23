@@ -27,27 +27,25 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleServiceSuspendResponse;
+import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleSetServiceStatusResponse;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SuspendLifecycleServiceResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleServiceStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles SuspendLifecycleService Request.
- * This request suspends the KeyLifecycleService by setting isServiceEnabled to false.
- * The service will remain suspended until OM restarts, at which point it will
- * be re-enabled based on the configuration.
+ * Handles SetLifecycleServiceStatus Request.
+ * This request suspends or resumes the KeyLifecycleService.
  */
-public class OMLifecycleServiceSuspendRequest extends OMClientRequest {
+public class OMLifecycleSetServiceStatusRequest extends OMClientRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMLifecycleServiceSuspendRequest.class);
+      LoggerFactory.getLogger(OMLifecycleSetServiceStatusRequest.class);
 
-  public OMLifecycleServiceSuspendRequest(OMRequest omRequest) {
+  public OMLifecycleSetServiceStatusRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -56,40 +54,49 @@ public class OMLifecycleServiceSuspendRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     UserInfo userInfo = getOmRequest().getUserInfo();
+    HashMap<String, String> auditMap = new HashMap<>();
     IOException exception = null;
     OMClientResponse omClientResponse;
+    boolean suspend = getOmRequest().getSetLifecycleServiceStatusRequest().getSuspend();
+    auditMap.put("suspend", String.valueOf(suspend));
 
     try {
       if (ozoneManager.getAclsEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
-              + "Superuser privilege is required to suspend Lifecycle Service.",
+              + "Superuser privilege is required to " + (suspend ? "suspend" : "resume") + " Lifecycle Service.",
               OMException.ResultCodes.ACCESS_DENIED);
         }
       }
 
       KeyLifecycleService keyLifecycleService = ozoneManager.getKeyManager().getKeyLifecycleService();
       if (keyLifecycleService != null) {
-        keyLifecycleService.setServiceEnabled(false);
-        LOG.info("KeyLifecycleService has been suspended by user: {}",
-            userInfo != null ? userInfo.getUserName() : "unknown");
+        if (suspend) {
+          keyLifecycleService.suspend();
+          LOG.info("KeyLifecycleService has been suspended by user: {}",
+              userInfo != null ? userInfo.getUserName() : "unknown");
+        } else {
+          keyLifecycleService.resume();
+          LOG.info("KeyLifecycleService resume called by user: {}",
+              userInfo != null ? userInfo.getUserName() : "unknown");
+        }
       } else {
         LOG.warn("KeyLifecycleService is not available");
       }
 
-      omResponse.setSuspendLifecycleServiceResponse(
-          SuspendLifecycleServiceResponse.newBuilder().build());
-      omClientResponse = new OMLifecycleServiceSuspendResponse(omResponse.build());
+      omResponse.setSetLifecycleServiceStatusResponse(
+          SetLifecycleServiceStatusResponse.newBuilder().build());
+      omClientResponse = new OMLifecycleSetServiceStatusResponse(omResponse.build());
     } catch (IOException ex) {
       exception = ex;
-      LOG.error("Failed to suspend KeyLifecycleService", ex);
-      omClientResponse = new OMLifecycleServiceSuspendResponse(
+      LOG.error("Failed to " + (suspend ? "suspend" : "resume") + " KeyLifecycleService", ex);
+      omClientResponse = new OMLifecycleSetServiceStatusResponse(
           createErrorOMResponse(omResponse, ex));
     }
 
-    markForAudit(auditLogger, buildAuditMessage(
-        OMAction.SUSPEND_LIFECYCLE_SERVICE, new HashMap<>(), exception, userInfo));
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_LIFECYCLE_SERVICE_STATUS,
+        auditMap, exception, userInfo));
     return omClientResponse;
   }
 }
