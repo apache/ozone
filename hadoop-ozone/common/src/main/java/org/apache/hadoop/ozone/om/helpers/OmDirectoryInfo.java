@@ -79,6 +79,10 @@ public final class OmDirectoryInfo extends WithParentObjectId {
     return new Builder(keyInfo);
   }
 
+  public OmKeyInfo.Builder toKeyInfoBuilder() {
+    return OmKeyInfo.builderFromOmDirectoryInfo(this);
+  }
+
   /**
    * Builder for Directory Info.
    */
