@@ -254,7 +254,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   @Override
-  public ImmutableMap<String, String> getTags() {
+  public Map<String, String> getTags() {
     return tags;
   }
 

@@ -53,7 +53,7 @@ public final class AclListBuilder {
     if (list instanceof ImmutableList) {
       return new AclListBuilder((ImmutableList<OzoneAcl>) list);
     }
-    return new AclListBuilder(list == null ? ImmutableList.of() : ImmutableList.copyOf(list));
+    return copyOf(list);
   }
 
   public static AclListBuilder copyOf(List<OzoneAcl> list) {

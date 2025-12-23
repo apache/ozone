@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,7 +35,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Directo
  * path. Also, it stores directory node related metadata details.
  */
 @Immutable
-public final class OmDirectoryInfo extends WithParentObjectId implements WithTags {
+public final class OmDirectoryInfo extends WithParentObjectId {
 
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
@@ -52,14 +51,12 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
   private final long modificationTime;
 
   private final ImmutableList<OzoneAcl> acls;
-  private final ImmutableMap<String, String> tags;
 
   private OmDirectoryInfo(Builder builder) {
     super(builder);
     this.name = builder.name;
     this.owner = builder.owner;
     this.acls = builder.acls.build();
-    this.tags = builder.tags.build();
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
   }
@@ -93,11 +90,9 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
     private long modificationTime;
 
     private final AclListBuilder acls;
-    private final MapBuilder<String, String> tags;
 
     private Builder() {
       this.acls = AclListBuilder.empty();
-      this.tags = MapBuilder.empty();
     }
 
     private Builder(OmDirectoryInfo obj) {
@@ -107,7 +102,6 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
       this.creationTime = obj.creationTime;
       this.modificationTime = obj.modificationTime;
       this.acls = AclListBuilder.of(obj.acls);
-      this.tags = MapBuilder.of(obj.tags);
     }
 
     private Builder(OmKeyInfo keyInfo) {
@@ -116,7 +110,6 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
       this.creationTime = keyInfo.getCreationTime();
       this.modificationTime = keyInfo.getModificationTime();
       this.acls = AclListBuilder.of(keyInfo.getAcls());
-      this.tags = MapBuilder.of(keyInfo.getTags());
     }
 
     @Override
@@ -203,11 +196,6 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
     return acls;
   }
 
-  @Override
-  public ImmutableMap<String, String> getTags() {
-    return tags;
-  }
-
   /**
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.
    */
@@ -272,8 +260,7 @@ public final class OmDirectoryInfo extends WithParentObjectId implements WithTag
         && Objects.equals(name, omDirInfo.name)
         && Objects.equals(owner, omDirInfo.owner)
         && Objects.equals(getMetadata(), omDirInfo.getMetadata())
-        && Objects.equals(acls, omDirInfo.acls)
-        && Objects.equals(tags, omDirInfo.tags);
+        && Objects.equals(acls, omDirInfo.acls);
   }
 
   @Override
