@@ -782,4 +782,53 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getPreCheckComplete());
     assertFalse(scmSafeModeManager.getInSafeMode());
   }
+
+  /**
+   * Test that each safemode rule's getStatusText is being logged periodically
+   * while SCM is in safe mode.
+   */
+  @Test
+  public void testSafeModePeriodicLogging() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "500ms");
+    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 3);
+
+    containers = new ArrayList<>(HddsTestUtils.getContainerInfo(50));
+    for (ContainerInfo container : containers) {
+      container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
+    }
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 5);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(SCMSafeModeManager.getLogger());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager, pipelineManager,
+        containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+    assertTrue(scmSafeModeManager.getInSafeMode());
+
+    try {
+      Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+
+      for (int i = 0; i < 3; i++) {
+        logCapturer.clearOutput();
+        // Wait for configured interval (500ms + small buffer) for next log message.
+        Thread.sleep(600);
+        String logOutput = logCapturer.getOutput();
+
+        assertThat(logOutput).contains("SCM SafeMode Status | state=");
+
+        for (String ruleName : ruleStatuses.keySet()) {
+          assertThat(logOutput).contains("SCM SafeMode Status | " + ruleName);
+        }
+      }
+    } finally {
+      logCapturer.stopCapturing();
+    }
+  }
 }
