@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -38,47 +37,59 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
+import javax.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Handler for bucket ACL operations (?acl query parameter).
  * Implements PUT operations for bucket Access Control Lists.
+ *
+ * This handler extends EndpointBase to inherit all required functionality
+ * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public class AclHandler implements BucketOperationHandler {
-  
+public class AclHandler extends EndpointBase implements BucketOperationHandler {
+
   private static final Logger LOG = LoggerFactory.getLogger(AclHandler.class);
-  
-  @Override
-  public String getQueryParamName() {
-    return "acl";
+
+  /**
+   * Determine if this handler should handle the current request.
+   * @return true if the request has the "acl" query parameter
+   */
+  private boolean shouldHandle() {
+    return queryParams().get(QueryParams.ACL) != null;
   }
-  
+
   /**
    * Implement acl put.
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   @Override
-  public Response handlePutRequest(
-      String bucketName,
-      InputStream body,
-      HttpHeaders headers,
-      BucketEndpointContext context,
-      long startNanos) throws IOException, OS3Exception {
+  public Response handlePutRequest(String bucketName, InputStream body)
+      throws IOException, OS3Exception {
 
-    String grantReads = headers.getHeaderString(S3Acl.GRANT_READ);
-    String grantWrites = headers.getHeaderString(S3Acl.GRANT_WRITE);
-    String grantReadACP = headers.getHeaderString(S3Acl.GRANT_READ_ACP);
-    String grantWriteACP = headers.getHeaderString(S3Acl.GRANT_WRITE_ACP);
-    String grantFull = headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL);
+    if (!shouldHandle()) {
+      return null;  // Not responsible for this request
+    }
+
+    long startNanos = Time.monotonicNowNanos();
+    S3GAction s3GAction = S3GAction.PUT_ACL;
+
+    String grantReads = getHeaders().getHeaderString(S3Acl.GRANT_READ);
+    String grantWrites = getHeaders().getHeaderString(S3Acl.GRANT_WRITE);
+    String grantReadACP = getHeaders().getHeaderString(S3Acl.GRANT_READ_ACP);
+    String grantWriteACP = getHeaders().getHeaderString(S3Acl.GRANT_WRITE_ACP);
+    String grantFull = getHeaders().getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
-      OzoneBucket bucket = context.getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
-      OzoneVolume volume = context.getVolume();
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
       List<OzoneAcl> ozoneAclListOnVolume = new ArrayList<>();
@@ -152,25 +163,26 @@ public class AclHandler implements BucketOperationHandler {
         volume.addAcl(acl);
       }
 
-      context.getEndpoint().getMetrics().updatePutAclSuccessStats(startNanos);
+      getMetrics().updatePutAclSuccessStats(startNanos);
+      auditWriteSuccess(s3GAction);
       return Response.status(HttpStatus.SC_OK).build();
 
     } catch (OMException exception) {
-      context.getEndpoint().getMetrics().updatePutAclFailureStats(startNanos);
-      context.auditWriteFailure(S3GAction.PUT_ACL, exception);
+      getMetrics().updatePutAclFailureStats(startNanos);
+      auditWriteFailure(s3GAction, exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
-      } else if (context.isAccessDenied(exception)) {
+      } else if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
       }
       throw exception;
     } catch (OS3Exception ex) {
-      context.getEndpoint().getMetrics().updatePutAclFailureStats(startNanos);
-      context.auditWriteFailure(S3GAction.PUT_ACL, ex);
+      getMetrics().updatePutAclFailureStats(startNanos);
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
   }
-  
+
   /**
    * Convert ACL string to Ozone ACL on bucket.
    *
@@ -257,5 +269,11 @@ public class AclHandler implements BucketOperationHandler {
     }
 
     return ozoneAclList;
+  }
+
+  @Override
+  @PostConstruct
+  public void init() {
+    // No initialization needed for AclHandler
   }
 }

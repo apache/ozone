@@ -31,8 +31,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -95,23 +95,11 @@ public class BucketEndpoint extends EndpointBase {
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
-  private static final BucketOperationHandlerFactory HANDLER_FACTORY =
-      new BucketOperationHandlerFactory();
+  private static final List<BucketOperationHandler> PUT_HANDLERS =
+      Collections.unmodifiableList(Arrays.asList(
+          new AclHandler()
+      ));
 
-  @Context
-  private HttpHeaders headers;
-
-  private BucketEndpointContext context;
-
-  public BucketEndpoint() {
-    super();
-    this.context = new BucketEndpointContext(this);
-  }
-
-  private BucketEndpointContext getContext() {
-    return context;
-  }
-  
   /**
    * Rest endpoint to list objects in a specific bucket.
    * <p>
@@ -325,18 +313,28 @@ public class BucketEndpoint extends EndpointBase {
       @PathParam(BUCKET) String bucketName,
       InputStream body
   ) throws IOException, OS3Exception {
+
+    // Chain of responsibility: let each handler try to handle the request
+    for (BucketOperationHandler handler : PUT_HANDLERS) {
+      Response response = handler.handlePutRequest(bucketName, body);
+      if (response != null) {
+        return response;  // Handler handled the request
+      }
+    }
+
+    // No handler handled the request, execute default operation: create bucket
+    return handleCreateBucket(bucketName);
+  }
+
+  /**
+   * Default PUT bucket operation (create bucket).
+   */
+  private Response handleCreateBucket(String bucketName)
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
-      final String aclMarker = queryParams().get(QueryParams.ACL);
-      if (aclMarker != null) {
-        s3GAction = S3GAction.PUT_ACL;
-        Response response =  putAcl(bucketName, body);
-        auditWriteSuccess(s3GAction);
-        return response;
-      }
-
       String location = createS3Bucket(bucketName);
       auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
@@ -352,18 +350,6 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       throw ex;
-    }
-  }
-
-  /**
-   * Map query parameter to corresponding S3GAction for audit logging.
-   */
-  private S3GAction getActionForQueryParam(String queryParam) {
-    switch (queryParam) {
-    case "acl":
-      return S3GAction.PUT_ACL;
-    default:
-      return S3GAction.GET_BUCKET;
     }
   }
 
@@ -601,8 +587,6 @@ public class BucketEndpoint extends EndpointBase {
     }
   }
 
-<<<<<<< HEAD
-=======
   /**
    * Implement acl put.
    * <p>
@@ -770,7 +754,6 @@ public class BucketEndpoint extends EndpointBase {
     }
     return ozoneAclList;
   }
->>>>>>> 210aa3e9a3 (HDDS-14123. Refactor BucketEndpoint#Put method)
 
   private void addKey(ListObjectResponse response, OzoneKey next) {
     KeyMetadata keyMetadata = new KeyMetadata();
