@@ -87,12 +87,6 @@ public class BucketEndpoint extends EndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketEndpoint.class);
 
-  private static final BucketOperationHandlerFactory HANDLER_FACTORY =
-      new BucketOperationHandlerFactory();
-
-  @Context
-  private HttpHeaders headers;
-
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
@@ -348,18 +342,6 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       throw ex;
-    }
-  }
-
-  /**
-   * Map query parameter to corresponding S3GAction for audit logging.
-   */
-  private S3GAction getActionForQueryParam(String queryParam) {
-    switch (queryParam) {
-    case "acl":
-      return S3GAction.PUT_ACL;
-    default:
-      return S3GAction.GET_BUCKET;
     }
   }
 
