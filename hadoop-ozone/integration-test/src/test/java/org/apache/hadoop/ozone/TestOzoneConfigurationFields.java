@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
+import org.apache.hadoop.ozone.s3sts.S3STSConfigKeys;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
@@ -45,6 +46,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             S3SecretConfigKeys.class,
+            S3STSConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
