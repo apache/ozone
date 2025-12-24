@@ -77,7 +77,7 @@ public class TestS3MultipartResponse {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (batchOperation != null) {
       batchOperation.close();
     }

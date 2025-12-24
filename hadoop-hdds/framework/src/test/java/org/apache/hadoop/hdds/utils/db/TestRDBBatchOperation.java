@@ -26,6 +26,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -54,7 +55,7 @@ import org.rocksdb.ColumnFamilyHandle;
  * 2. Mocking of methods to track operations performed on*/
 public class TestRDBBatchOperation {
   @Test
-  public void testBatchOperationWithDeleteRange() throws RocksDatabaseException {
+  public void testBatchOperationWithDeleteRange() throws IOException {
     final List<Pair<Pair<String, String>, Integer>> deleteKeyRangePairs = new ArrayList<>();
     final List<Pair<Pair<String, String>, Integer>> putKeys = new ArrayList<>();
     final List<Pair<String, Integer>> deleteKeys = new ArrayList<>();

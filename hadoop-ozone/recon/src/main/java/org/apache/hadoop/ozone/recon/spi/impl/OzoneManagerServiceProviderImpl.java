@@ -74,7 +74,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -633,7 +632,6 @@ public class OzoneManagerServiceProviderImpl
 
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
-      final RocksDatabase rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
@@ -655,10 +653,9 @@ public class OzoneManagerServiceProviderImpl
             // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
             writeBatch.iterate(omdbUpdatesHandler);
             // Commit the OM DB transactions in recon rocks DB and sync here.
-            try (RDBBatchOperation rdbBatchOperation =
-                     RDBBatchOperation.newAtomicOperation(writeBatch)) {
+            try (RDBBatchOperation rdbBatchOperation = rocksDBStore.initBatchOperation(writeBatch)) {
               try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
-                rdbBatchOperation.commit(rocksDB, wOpts);
+                rocksDBStore.commitBatchOperation(rdbBatchOperation, wOpts);
               }
             }
           }

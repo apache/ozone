@@ -260,7 +260,7 @@ public class TestRDBTableStore {
   @Test
   public void batchPut() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       byte[] key =
           RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
@@ -280,7 +280,7 @@ public class TestRDBTableStore {
   @Test
   public void batchDelete() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
 
       //given
       byte[] key =
@@ -780,7 +780,7 @@ public class TestRDBTableStore {
   @Test
   public void batchDeleteWithRange() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
 
       //given
       String keyStr = RandomStringUtils.secure().next(10);
@@ -814,7 +814,7 @@ public class TestRDBTableStore {
   @Test
   public void orderOfBatchOperations() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+    try (RDBBatchOperation batch = rdbStore.initBatchOperation()) {
 
       //given
       String keyStr = RandomStringUtils.secure().next(10);
