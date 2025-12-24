@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
 import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSCMAddressForDatanodes;
 
 import com.google.common.base.Strings;
 import java.io.File;

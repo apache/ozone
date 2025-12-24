@@ -25,9 +25,15 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
@@ -40,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -58,6 +65,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -69,6 +78,7 @@ import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -85,6 +95,7 @@ import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
@@ -104,6 +115,7 @@ import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.ratis.util.Preconditions;
@@ -755,6 +767,92 @@ public final class HddsServerUtil {
     if (logger != null) {
       logger.info("pool size {} from {} to {}", change, currentCorePoolSize, size);
     }
+  }
+
+  /**
+   * Retrieve the socket addresses of all storage container managers.
+   *
+   * @return A collection of SCM addresses
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
+      ConfigurationSource conf) {
+
+    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
+
+    if (getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
+      }
+      return scmAddressList;
+    } else {
+      // fall back to OZONE_SCM_NAMES.
+      Collection<String> names =
+          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
+      if (names.isEmpty()) {
+        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
+            + " need to be a set of valid DNS names or IP addresses."
+            + " Empty address list found.");
+      }
+
+      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
+      for (String address : names) {
+        Optional<String> hostname = getHostName(address);
+        if (!hostname.isPresent()) {
+          throw new IllegalArgumentException("Invalid hostname for SCM: "
+              + address);
+        }
+        int port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                OZONE_SCM_DATANODE_PORT_DEFAULT));
+        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
+            port);
+        addresses.add(addr);
+      }
+
+      if (addresses.size() > 1) {
+        LOG.warn("When SCM HA is configured, configure {} appended with " +
+                "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
+            OZONE_SCM_NAMES);
+      }
+      return addresses;
+    }
+  }
+
+  /**
+   * Returns the SCM address for datanodes based on the service ID and the SCM addresses.
+   * @param conf Configuration
+   * @param scmServiceId SCM service ID
+   * @param scmNodeIds Requested SCM node IDs
+   * @return A collection with addresses of the request SCM node IDs.
+   * Null if there is any wrongly configured SCM address. Note that the returned collection
+   * might not be ordered the same way as the requested SCM node IDs
+   */
+  public static Collection<Pair<String, InetSocketAddress>> getSCMAddressForDatanodes(
+      ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
+    Collection<Pair<String, InetSocketAddress>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
+    for (String scmNodeId : scmNodeIds) {
+      String addressKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
+      String scmAddress = conf.get(addressKey);
+      if (scmAddress == null) {
+        LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
+        return null;
+      }
+
+      int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
+          OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
+          OZONE_SCM_DATANODE_PORT_DEFAULT);
+
+      String scmDatanodeAddressStr = SCMNodeInfo.buildAddress(scmAddress, scmDatanodePort);
+      InetSocketAddress scmDatanodeAddress = NetUtils.createSocketAddr(scmDatanodeAddressStr);
+      scmNodeAddress.add(Pair.of(scmNodeId, scmDatanodeAddress));
+    }
+    return scmNodeAddress;
   }
 
 }
