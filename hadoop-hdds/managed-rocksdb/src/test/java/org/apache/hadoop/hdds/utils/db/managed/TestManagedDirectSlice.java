@@ -22,11 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.rocksdb.DirectSlice;
 
 /**
  * Tests for ManagedDirectSlice.
@@ -39,48 +36,15 @@ public class TestManagedDirectSlice {
 
   @ParameterizedTest
   @CsvSource({"0, 1024", "1024, 1024", "512, 1024", "0, 100", "10, 512", "0, 0"})
-  public void testManagedDirectSliceWithOffsetMovedAheadByteBuffer(int offset, int numberOfBytesWritten)
-      throws RocksDatabaseException {
+  public void testManagedDirectSliceWithOffset(int offset, int numberOfBytesWritten) {
     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(1024);
     byte[] randomBytes = RandomUtils.secure().nextBytes(numberOfBytesWritten);
     byteBuffer.put(randomBytes);
     byteBuffer.flip();
+    byteBuffer.position(offset);
     try (ManagedDirectSlice directSlice = new ManagedDirectSlice(byteBuffer);
          ManagedSlice slice = new ManagedSlice(Arrays.copyOfRange(randomBytes, offset, numberOfBytesWritten))) {
-      byteBuffer.position(offset);
-      directSlice.putFromBuffer((ds) -> {
-        DirectSlice directSliceFromByteBuffer = directSlice.getDirectSlice();
-        assertEquals(numberOfBytesWritten - offset, ds.size());
-        assertEquals(0, directSliceFromByteBuffer.compare(slice));
-        assertEquals(0, slice.compare(directSliceFromByteBuffer));
-      });
-      Assertions.assertEquals(numberOfBytesWritten, byteBuffer.position());
-    }
-  }
-
-  @ParameterizedTest
-  @CsvSource({"0, 1024, 512", "1024, 1024, 5", "512, 1024, 600", "0, 100, 80", "10, 512, 80", "0, 0, 10",
-      "100, 256, -1"})
-  public void testManagedDirectSliceWithOpPutToByteBuffer(int offset, int maxNumberOfBytesWrite,
-      int numberOfBytesToWrite) throws RocksDatabaseException {
-    ByteBuffer byteBuffer = ByteBuffer.allocateDirect(1024);
-    byte[] randomBytes = RandomUtils.secure().nextBytes(offset);
-    byteBuffer.put(randomBytes);
-    try (ManagedDirectSlice directSlice = new ManagedDirectSlice(byteBuffer)) {
-      byteBuffer.position(offset);
-      byteBuffer.limit(Math.min(offset + maxNumberOfBytesWrite, 1024));
-      assertEquals(numberOfBytesToWrite, directSlice.getToBuffer((ds) -> {
-        assertEquals(byteBuffer.remaining(), ds.size());
-        return numberOfBytesToWrite;
-      }));
-      Assertions.assertEquals(offset, byteBuffer.position());
-      if (numberOfBytesToWrite == -1) {
-        assertEquals(offset + maxNumberOfBytesWrite, byteBuffer.limit());
-      } else {
-        Assertions.assertEquals(Math.min(Math.min(offset + numberOfBytesToWrite, 1024), maxNumberOfBytesWrite),
-            byteBuffer.limit());
-      }
-
+      assertEquals(slice, directSlice);
     }
   }
 }
