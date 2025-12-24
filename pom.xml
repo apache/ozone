@@ -198,7 +198,7 @@
     <protobuf.version>3.25.8</protobuf.version>
     <ranger.version>2.7.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.75.0</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.grpc.version>1.77.0</ratis-thirdparty.grpc.version>
     <ratis-thirdparty.netty.version>4.1.127.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.8</ratis-thirdparty.protobuf.version>
     <ratis.thirdparty.version>1.0.10</ratis.thirdparty.version>
