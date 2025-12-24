@@ -1389,8 +1389,4 @@ class TestKeyDeletingService extends OzoneTestBase {
       throw new UncheckedIOException(e);
     }
   }
-
-  private static String uniqueObjectName(String prefix) {
-    return prefix + String.format("%010d", OBJECT_COUNTER.getAndIncrement());
-  }
 }

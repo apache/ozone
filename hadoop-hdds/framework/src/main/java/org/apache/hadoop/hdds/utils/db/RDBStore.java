@@ -274,7 +274,7 @@ public class RDBStore implements DBStore {
 
   @Override
   public BatchOperation initBatchOperation() {
-    return new RDBBatchOperation();
+    return RDBBatchOperation.newAtomicOperation();
   }
 
   @Override

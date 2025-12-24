@@ -39,10 +39,12 @@ public class RandomAccessFileChannel {
   public RandomAccessFileChannel() {
   }
 
+  /** Is this file open? */
   public synchronized boolean isOpen() {
     return blockFile != null;
   }
 
+  /** Open the given file in read-only mode. */
   public synchronized void open(File file) throws FileNotFoundException {
     Preconditions.assertNull(blockFile, "blockFile");
     blockFile = Objects.requireNonNull(file, "blockFile == null");
@@ -50,6 +52,7 @@ public class RandomAccessFileChannel {
     channel = raf.getChannel();
   }
 
+  /** Similar to {@link FileChannel#position(long)}. */
   public synchronized void position(long newPosition) throws IOException {
     Preconditions.assertTrue(isOpen(), "Not opened");
     final long oldPosition = channel.position();
@@ -59,6 +62,14 @@ public class RandomAccessFileChannel {
     }
   }
 
+  /**
+   * Similar to {@link FileChannel#read(ByteBuffer)} except that
+   * this method tries to fill up the buffer until either
+   * (1) the buffer is full, or (2) it has reached end-of-stream.
+   *
+   * @return ture if the caller should continue to read;
+   *         otherwise, it has reached end-of-stream, return false;
+   */
   public synchronized boolean read(ByteBuffer buffer) throws IOException {
     Preconditions.assertTrue(isOpen(), "Not opened");
     while (buffer.hasRemaining()) {
@@ -70,6 +81,11 @@ public class RandomAccessFileChannel {
     return true;
   }
 
+  /**
+   * Close the underlying channel and file.
+   * In case of exception, this method catches the exception, logs a warning message,
+   * and then continue closing the remaining resources.
+   */
   public synchronized void close() {
     if (blockFile == null) {
       return;
@@ -80,7 +96,6 @@ public class RandomAccessFileChannel {
       channel = null;
     } catch (IOException e) {
       LOG.warn("Failed to close channel for {}", blockFile, e);
-      throw new RuntimeException(e);
     }
     try {
       raf.close();

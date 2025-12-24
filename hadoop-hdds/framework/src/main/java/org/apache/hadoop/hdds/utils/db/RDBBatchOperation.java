@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * Note that a {@link RDBBatchOperation} object only for one batch.
  * Also, this class is not threadsafe.
  */
-public class RDBBatchOperation implements BatchOperation {
+public final class RDBBatchOperation implements BatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
 
   private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
@@ -61,6 +61,14 @@ public class RDBBatchOperation implements BatchOperation {
   private final OpCache opCache = new OpCache();
 
   private enum Op { DELETE, PUT, DELETE_RANGE }
+
+  public static RDBBatchOperation newAtomicOperation() {
+    return newAtomicOperation(new ManagedWriteBatch());
+  }
+
+  public static RDBBatchOperation newAtomicOperation(ManagedWriteBatch writeBatch) {
+    return new RDBBatchOperation(writeBatch);
+  }
 
   private static void debug(Supplier<String> message) {
     if (LOG.isTraceEnabled()) {
@@ -678,11 +686,7 @@ public class RDBBatchOperation implements BatchOperation {
     }
   }
 
-  public RDBBatchOperation() {
-    writeBatch = new ManagedWriteBatch();
-  }
-
-  public RDBBatchOperation(ManagedWriteBatch writeBatch) {
+  private RDBBatchOperation(ManagedWriteBatch writeBatch) {
     this.writeBatch = writeBatch;
   }
 

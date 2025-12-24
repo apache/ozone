@@ -15,14 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.primitives.UnsignedLong;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
@@ -33,20 +31,32 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
   private final long nativeHandle;
   private final Function<KeyValue, T> transformer;
   private final IteratorType type;
+  private boolean closed;
+  private final Buffer keyBuffer;
+  private final Buffer valueBuffer;
 
-  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer, IteratorType type) {
+  ManagedRawSSTFileIterator(String name, long nativeHandle, Function<KeyValue, T> transformer, IteratorType type) {
     this.nativeHandle = nativeHandle;
     this.transformer = transformer;
     this.type = type;
+    this.closed = false;
+    this.keyBuffer = new Buffer(
+        new CodecBuffer.Capacity(name + " iterator-key", 1 << 10),
+        this.type.readKey() ? buffer -> this.getKey(this.nativeHandle, buffer, buffer.position(),
+            buffer.remaining()) : null);
+    this.valueBuffer = new Buffer(
+        new CodecBuffer.Capacity(name + " iterator-value", 4 << 10),
+        this.type.readValue() ? buffer -> this.getValue(this.nativeHandle, buffer, buffer.position(),
+            buffer.remaining()) : null);
   }
 
   private native boolean hasNext(long handle);
 
   private native void next(long handle);
 
-  private native byte[] getKey(long handle);
+  private native int getKey(long handle, ByteBuffer buffer, int bufferOffset, int bufferLen);
 
-  private native byte[] getValue(long handle);
+  private native int getValue(long handle, ByteBuffer buffer, int bufferOffset, int bufferLen);
 
   private native long getSequenceNumber(long handle);
 
@@ -63,10 +73,10 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
       throw new NoSuchElementException();
     }
 
-    KeyValue keyValue = new KeyValue(this.type.readKey() ? this.getKey(nativeHandle) : null,
+    KeyValue keyValue = new KeyValue(this.type.readKey() ? this.keyBuffer.getFromDb() : null,
         UnsignedLong.fromLongBits(this.getSequenceNumber(this.nativeHandle)),
         this.getType(nativeHandle),
-        this.type.readValue() ? this.getValue(nativeHandle) : null);
+        this.type.readValue() ? this.valueBuffer.getFromDb() : null);
     this.next(nativeHandle);
     return this.transformer.apply(keyValue);
   }
@@ -74,8 +84,13 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
   private native void closeInternal(long handle);
 
   @Override
-  public void close() {
-    this.closeInternal(this.nativeHandle);
+  public synchronized void close() {
+    if (!closed) {
+      this.closeInternal(this.nativeHandle);
+      keyBuffer.release();
+      valueBuffer.release();
+    }
+    closed = true;
   }
 
   /**
@@ -83,21 +98,21 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
    */
   public static final class KeyValue {
 
-    private final byte[] key;
+    private final CodecBuffer key;
     private final UnsignedLong sequence;
     private final Integer type;
-    private final byte[] value;
+    private final CodecBuffer value;
 
-    private KeyValue(byte[] key, UnsignedLong sequence, Integer type,
-                     byte[] value) {
+    private KeyValue(CodecBuffer key, UnsignedLong sequence, Integer type,
+                     CodecBuffer value) {
       this.key = key;
       this.sequence = sequence;
       this.type = type;
       this.value = value;
     }
 
-    public byte[] getKey() {
-      return key == null ? null : Arrays.copyOf(key, key.length);
+    public CodecBuffer getKey() {
+      return this.key;
     }
 
     public UnsignedLong getSequence() {
@@ -108,17 +123,17 @@ public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
       return type;
     }
 
-    public byte[] getValue() {
-      return value == null ? null : Arrays.copyOf(value, value.length);
+    public CodecBuffer getValue() {
+      return value;
     }
 
     @Override
     public String toString() {
       return "KeyValue{" +
-          "key=" + (key == null ? null : StringUtils.bytes2String(key)) +
+          "key=" + (key == null ? null : StringCodec.get().fromCodecBuffer(key)) +
           ", sequence=" + sequence +
           ", type=" + type +
-          ", value=" + (value == null ? null : StringUtils.bytes2String(value)) +
+          ", value=" + (value == null ? null : StringCodec.get().fromCodecBuffer(value)) +
           '}';
     }
   }

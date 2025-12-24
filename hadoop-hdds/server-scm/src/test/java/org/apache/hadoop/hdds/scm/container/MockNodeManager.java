@@ -218,7 +218,7 @@ public class MockNodeManager implements NodeManager {
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
     newStat.set(
         (NODES[x % NODES.length].capacity),
-        (NODES[x % NODES.length].used), remaining, 0, 100000);
+        (NODES[x % NODES.length].used), remaining, 0, 100000, 0);
     this.nodeMetricMap.put(datanodeDetails, newStat);
     aggregateStat.add(newStat);
 
