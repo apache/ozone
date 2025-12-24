@@ -42,6 +42,8 @@ public abstract class BackgroundService {
 
   // Executor to launch child tasks
   private ScheduledThreadPoolExecutor exec;
+  // Scheduler for PeriodicalTask
+  private ScheduledThreadPoolExecutor scheduler;
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
@@ -118,7 +120,7 @@ public abstract class BackgroundService {
     }
     LOG.info("Starting service {} with interval {} {}", serviceName,
         interval, unit.name().toLowerCase());
-    exec.scheduleWithFixedDelay(service, 0, interval, unit);
+    scheduler.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
   protected synchronized void setInterval(long newInterval, TimeUnit newUnit) {
@@ -141,15 +143,6 @@ public abstract class BackgroundService {
   public class PeriodicalTask implements Runnable {
     @Override
     public void run() {
-      // wait for previous set of tasks to complete
-      try {
-        future.join();
-      } catch (RuntimeException e) {
-        LOG.error("Background service execution failed.", e);
-      } finally {
-        execTaskCompletion();
-      }
-
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
@@ -187,20 +180,33 @@ public abstract class BackgroundService {
           }, exec).exceptionally(e -> null), (Void1, Void) -> null);
         }
       }
+      // wait for all tasks to complete
+      try {
+        future.join();
+      } catch (RuntimeException e) {
+        LOG.error("Background service execution failed.", e);
+      } finally {
+        execTaskCompletion();
+      }
     }
   }
 
   // shutdown and make sure all threads are properly released.
   public synchronized void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
+    scheduler.shutdown();
     exec.shutdown();
     try {
+      if (!scheduler.awaitTermination(60, TimeUnit.SECONDS)) {
+        scheduler.shutdownNow();
+      }
       if (!exec.awaitTermination(60, TimeUnit.SECONDS)) {
         exec.shutdownNow();
       }
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
+      scheduler.shutdownNow();
       exec.shutdownNow();
     }
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
@@ -216,6 +222,13 @@ public abstract class BackgroundService {
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
     exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+    // Single-thread scheduler for PeriodicalTask
+    ThreadFactory schedulerThreadFactory = new ThreadFactoryBuilder()
+        .setThreadFactory(r -> new Thread(threadGroup, r))
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + serviceName + "-scheduler")
+        .build();
+    scheduler = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(1, schedulerThreadFactory);
   }
 
   protected String getServiceName() {
