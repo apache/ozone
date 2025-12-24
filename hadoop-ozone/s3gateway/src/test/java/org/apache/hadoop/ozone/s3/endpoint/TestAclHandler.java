@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -51,7 +53,6 @@ public class TestAclHandler {
 
   private static final String BUCKET_NAME = OzoneConsts.S3_BUCKET;
   private OzoneClient client;
-  private BucketEndpointContext context;
   private AclHandler aclHandler;
   private HttpHeaders headers;
 
@@ -62,13 +63,11 @@ public class TestAclHandler {
 
     headers = mock(HttpHeaders.class);
 
-    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+    // Build AclHandler using EndpointBuilder since it extends EndpointBase
+    aclHandler = EndpointBuilder.newAclHandlerBuilder()
         .setClient(client)
         .setHeaders(headers)
         .build();
-
-    context = new BucketEndpointContext(bucketEndpoint);
-    aclHandler = new AclHandler();
   }
 
   @AfterEach
@@ -79,19 +78,37 @@ public class TestAclHandler {
   }
 
   @Test
-  public void testGetQueryParamName() {
-    assertEquals("acl", aclHandler.getQueryParamName(),
-        "Query param name should be 'acl'");
+  public void testHandlePutRequestWithAclQueryParam() throws Exception {
+    // Set up query parameter to indicate ACL operation
+    aclHandler.queryParamsForTest().set("acl", "");
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn("id=\"testuser\"");
+
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
+
+    assertNotNull(response, "Handler should handle request with ?acl param");
+    assertEquals(HTTP_OK, response.getStatus(),
+        "PUT ACL should return 200 OK");
+  }
+
+  @Test
+  public void testHandlePutRequestWithoutAclQueryParam() throws Exception {
+    // No "acl" query parameter - handler should not handle request
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn("id=\"testuser\"");
+
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
+
+    assertNull(response, "Handler should return null without ?acl param");
   }
 
   @Test
   public void testHandlePutRequestWithReadHeader() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should return 200 OK");
@@ -99,12 +116,11 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithWriteHeader() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should return 200 OK");
@@ -112,12 +128,11 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithReadAcpHeader() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ_ACP))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should return 200 OK");
@@ -125,12 +140,11 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithWriteAcpHeader() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE_ACP))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should return 200 OK");
@@ -138,12 +152,11 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithFullControlHeader() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should return 200 OK");
@@ -151,14 +164,13 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithMultipleHeaders() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser1\"");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn("id=\"testuser2\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL with multiple headers should return 200 OK");
@@ -166,13 +178,12 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithUnsupportedGranteeType() {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("uri=\"http://example.com\"");
 
-    long startNanos = System.nanoTime();
     OS3Exception exception = assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest(BUCKET_NAME, null, headers, context,
-          startNanos);
+      aclHandler.handlePutRequest(BUCKET_NAME, null);
     }, "Should throw OS3Exception for unsupported grantee type");
 
     assertEquals(HTTP_NOT_IMPLEMENTED, exception.getHttpCode(),
@@ -181,13 +192,12 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithEmailAddressType() {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("emailAddress=\"test@example.com\"");
 
-    long startNanos = System.nanoTime();
     OS3Exception exception = assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest(BUCKET_NAME, null, headers, context,
-          startNanos);
+      aclHandler.handlePutRequest(BUCKET_NAME, null);
     }, "Should throw OS3Exception for email address grantee type");
 
     assertEquals(HTTP_NOT_IMPLEMENTED, exception.getHttpCode(),
@@ -196,18 +206,18 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestBucketNotFound() {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
     assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest("nonexistent-bucket", null, headers,
-          context, startNanos);
+      aclHandler.handlePutRequest("nonexistent-bucket", null);
     }, "Should throw OS3Exception for non-existent bucket");
   }
 
   @Test
   public void testHandlePutRequestWithBody() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     String aclXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
         "<AccessControlPolicy xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\n" +
         "  <Owner>\n" +
@@ -228,9 +238,7 @@ public class TestAclHandler {
     InputStream body = new ByteArrayInputStream(
         aclXml.getBytes(StandardCharsets.UTF_8));
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, body, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, body);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL with body should return 200 OK");
@@ -238,24 +246,22 @@ public class TestAclHandler {
 
   @Test
   public void testHandlePutRequestWithInvalidHeaderFormat() {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("invalid-format");
 
-    long startNanos = System.nanoTime();
     assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest(BUCKET_NAME, null, headers, context,
-          startNanos);
+      aclHandler.handlePutRequest(BUCKET_NAME, null);
     }, "Should throw OS3Exception for invalid header format");
   }
 
   @Test
   public void testHandlePutRequestWithMultipleGrantees() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"user1\",id=\"user2\"");
 
-    long startNanos = System.nanoTime();
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL with multiple grantees should return 200 OK");
@@ -263,15 +269,15 @@ public class TestAclHandler {
 
   @Test
   public void testPutAclReplacesExistingAcls() throws Exception {
+    aclHandler.queryParamsForTest().set("acl", "");
+
     // Set initial ACL
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"user1\"");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(null);
 
-    long startNanos = System.nanoTime();
-    aclHandler.handlePutRequest(BUCKET_NAME, null, headers, context,
-        startNanos);
+    aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     // Replace with new ACL
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -279,8 +285,7 @@ public class TestAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn("id=\"user2\"");
 
-    Response response = aclHandler.handlePutRequest(
-        BUCKET_NAME, null, headers, context, startNanos);
+    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
 
     assertEquals(HTTP_OK, response.getStatus(),
         "PUT ACL should replace existing ACLs");
@@ -288,55 +293,47 @@ public class TestAclHandler {
 
   @Test
   public void testAuditLoggingOnBucketNotFound() throws Exception {
-    // Create a spy of BucketEndpoint to verify audit logging
-    BucketEndpoint spyEndpoint = spy(EndpointBuilder.newBucketEndpointBuilder()
+    // Create a spy of AclHandler to verify audit logging
+    AclHandler spyHandler = spy(EndpointBuilder.newAclHandlerBuilder()
         .setClient(client)
         .setHeaders(headers)
         .build());
 
-    BucketEndpointContext spyContext = new BucketEndpointContext(spyEndpoint);
-
+    spyHandler.queryParamsForTest().set("acl", "");
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    long startNanos = System.nanoTime();
-
     // This should throw exception for non-existent bucket
     assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest("nonexistent-bucket", null, headers,
-          spyContext, startNanos);
+      spyHandler.handlePutRequest("nonexistent-bucket", null);
     });
 
     // Verify that auditWriteFailure was called with PUT_ACL action
-    // Note: getBucket() wraps OMException as OS3Exception, so we catch OS3Exception
-    verify(spyEndpoint, times(1)).auditWriteFailure(
+    verify(spyHandler, times(1)).auditWriteFailure(
         eq(S3GAction.PUT_ACL),
         any(OS3Exception.class));
   }
 
   @Test
   public void testAuditLoggingOnInvalidArgument() throws Exception {
-    // Create a spy of BucketEndpoint to verify audit logging
-    BucketEndpoint spyEndpoint = spy(EndpointBuilder.newBucketEndpointBuilder()
+    // Create a spy of AclHandler to verify audit logging
+    AclHandler spyHandler = spy(EndpointBuilder.newAclHandlerBuilder()
         .setClient(client)
         .setHeaders(headers)
         .build());
 
-    BucketEndpointContext spyContext = new BucketEndpointContext(spyEndpoint);
+    spyHandler.queryParamsForTest().set("acl", "");
 
     // Invalid format will trigger OS3Exception
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("invalid-format");
 
-    long startNanos = System.nanoTime();
-
     assertThrows(OS3Exception.class, () -> {
-      aclHandler.handlePutRequest(BUCKET_NAME, null, headers,
-          spyContext, startNanos);
+      spyHandler.handlePutRequest(BUCKET_NAME, null);
     });
 
     // Verify that auditWriteFailure was called with PUT_ACL action
-    verify(spyEndpoint, times(1)).auditWriteFailure(
+    verify(spyHandler, times(1)).auditWriteFailure(
         eq(S3GAction.PUT_ACL),
         any(OS3Exception.class));
   }
