@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -67,6 +68,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final StorageContainerServiceProvider scmClient;
   private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
   private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<DatanodeID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
@@ -82,6 +84,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerHealthSchemaManager containerHealthSchemaManager,
+      ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2,
       ReconContainerMetadataManager reconContainerMetadataManager,
       SCMHAManager scmhaManager,
       SequenceIdGenerator sequenceIdGen,
@@ -92,6 +95,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.cdbServiceProvider = reconContainerMetadataManager;
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
     this.replicaHistoryMap = new ConcurrentHashMap<>();
@@ -343,6 +347,11 @@ public class ReconContainerManager extends ContainerManagerImpl {
   @VisibleForTesting
   public ContainerHealthSchemaManager getContainerSchemaManager() {
     return containerHealthSchemaManager;
+  }
+
+  @VisibleForTesting
+  public ContainerHealthSchemaManagerV2 getContainerSchemaManagerV2() {
+    return containerHealthSchemaManagerV2;
   }
 
   @VisibleForTesting

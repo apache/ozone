@@ -42,11 +42,14 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -252,7 +255,7 @@ public class TestReconTasks {
 
       // Check if EMPTY_MISSING containers are not added to the DB and their count is logged
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
@@ -290,7 +293,7 @@ public class TestReconTasks {
 
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
@@ -319,7 +322,7 @@ public class TestReconTasks {
                   0L, Optional.empty(), 1000);
 
       Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          unhealthyContainerStateStatsMap = ((ContainerHealthTask) reconScm.getContainerHealthTask())
           .getUnhealthyContainerStateStatsMap();
 
       // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
@@ -341,5 +344,120 @@ public class TestReconTasks {
     });
 
     IOUtils.closeQuietly(client);
+  }
+
+  @Test
+  public void testContainerHealthTaskV2WithSCMSync() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            recon.getReconServer().getReconStorageContainerManager();
+
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
+    PipelineManager scmPipelineManager = scm.getPipelineManager();
+
+    // Make sure Recon's pipeline state is initialized.
+    LambdaTestUtils.await(60000, 5000,
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
+
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+
+    // Create a container in SCM
+    ContainerInfo containerInfo =
+        scmContainerManager.allocateContainer(
+            RatisReplicationConfig.getInstance(ONE), "test");
+    long containerID = containerInfo.getContainerID();
+
+    Pipeline pipeline =
+        scmPipelineManager.getPipeline(containerInfo.getPipelineID());
+    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+    runTestOzoneContainerViaDataNode(containerID, client);
+
+    // Make sure Recon got the container report with new container.
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
+
+    // Bring down the Datanode that had the container replica.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+    // V2 task should detect MISSING container from SCM
+    LambdaTestUtils.await(120000, 6000, () -> {
+      List<UnhealthyContainerRecordV2> allMissingContainers =
+          reconContainerManager.getContainerSchemaManagerV2()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+                  0L, 0L, 1000);
+      return (allMissingContainers.size() == 1);
+    });
+
+    // Restart the Datanode to make sure we remove the missing container.
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+
+    LambdaTestUtils.await(120000, 10000, () -> {
+      List<UnhealthyContainerRecordV2> allMissingContainers =
+          reconContainerManager.getContainerSchemaManagerV2()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+                  0L, 0L, 1000);
+      return (allMissingContainers.isEmpty());
+    });
+
+    IOUtils.closeQuietly(client);
+  }
+
+  /**
+   * Test that ContainerHealthTaskV2 can query MIS_REPLICATED containers.
+   * Steps:
+   * 1. Create a cluster
+   * 2. Verify the query mechanism for MIS_REPLICATED state works
+   *
+   * Note: Creating mis-replication scenarios (placement policy violations)
+   * is very complex in integration tests as it requires:
+   * - Multi-rack cluster setup with rack-aware placement policy
+   * - Or manipulating replica placement to violate policy constraints
+   *
+   * This test verifies the detection infrastructure exists. In production,
+   * mis-replication occurs when:
+   * 1. Replicas don't satisfy rack/node placement requirements
+   * 2. Replicas are on nodes that violate upgrade domain constraints
+   * 3. EC containers have incorrect replica placement
+   *
+   * Note: Tests for UNDER_REPLICATED and OVER_REPLICATED are in
+   * TestReconTasksV2MultiNode as they require multi-node clusters.
+   */
+  @Test
+  public void testContainerHealthTaskV2MisReplicated() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            recon.getReconServer().getReconStorageContainerManager();
+
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+
+    // Verify the query mechanism for MIS_REPLICATED state works
+    List<UnhealthyContainerRecordV2> misReplicatedContainers =
+        reconContainerManager.getContainerSchemaManagerV2()
+            .getUnhealthyContainers(
+                ContainerSchemaDefinitionV2.UnHealthyContainerStates.MIS_REPLICATED,
+                0L, 0L, 1000);
+
+    // Should be empty in normal single-node cluster operation
+    // (mis-replication requires multi-node/rack setup with placement policy)
+    assertEquals(0, misReplicatedContainers.size());
+
+    // Note: Creating actual mis-replication scenarios requires:
+    // 1. Multi-rack cluster configuration
+    // 2. Rack-aware placement policy configuration
+    // 3. Manually placing replicas to violate placement rules
+    //
+    // Example scenario that would create MIS_REPLICATED:
+    // - 3-replica container with rack-aware policy (each replica on different rack)
+    // - All 3 replicas end up on same rack (violates placement policy)
+    // - ContainerHealthTaskV2 would detect this as MIS_REPLICATED
+    //
+    // The detection logic in SCM's ReplicationManager handles this,
+    // and our Recon's RM logic implementation reuses that logic.
   }
 }
