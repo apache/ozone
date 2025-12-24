@@ -31,8 +31,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -95,10 +93,7 @@ public class BucketEndpoint extends EndpointBase {
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
-  private static final List<BucketOperationHandler> PUT_HANDLERS =
-      Collections.unmodifiableList(Arrays.asList(
-          new AclHandler()
-      ));
+  private List<BucketOperationHandler> putHandlers;
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -315,7 +310,7 @@ public class BucketEndpoint extends EndpointBase {
   ) throws IOException, OS3Exception {
 
     // Chain of responsibility: let each handler try to handle the request
-    for (BucketOperationHandler handler : PUT_HANDLERS) {
+    for (BucketOperationHandler handler : putHandlers) {
       Response response = handler.handlePutRequest(bucketName, body);
       if (response != null) {
         return response;  // Handler handled the request
@@ -781,5 +776,13 @@ public class BucketEndpoint extends EndpointBase {
     maxKeysLimit = getOzoneConfiguration().getInt(
         OZONE_S3G_LIST_MAX_KEYS_LIMIT,
         OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
+
+    // Initialize PUT handlers
+    AclHandler aclHandler = new AclHandler();
+    copyDependenciesTo(aclHandler);
+    aclHandler.initialization();
+
+    putHandlers = new ArrayList<>();
+    putHandlers.add(aclHandler);
   }
 }
