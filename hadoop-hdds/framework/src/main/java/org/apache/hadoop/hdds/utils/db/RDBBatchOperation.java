@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.StringUtils.bytes2String;
-
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -30,10 +28,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDirectSlice;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.AbstractSlice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,26 +84,33 @@ public final class RDBBatchOperation implements BatchOperation {
    * To implement {@link #equals(Object)} and {@link #hashCode()}
    * based on the contents of the bytes.
    */
-  static final class Bytes {
-    private final byte[] array;
-    private final CodecBuffer buffer;
+  static final class Bytes implements Closeable {
+    private AbstractSlice<?> slice;
     /** Cache the hash value. */
-    private final int hash;
+    private int hash;
 
     Bytes(CodecBuffer buffer) {
-      this.array = null;
-      this.buffer = Objects.requireNonNull(buffer, "buffer == null");
-      this.hash = buffer.asReadOnlyByteBuffer().hashCode();
+      Objects.requireNonNull(buffer, "buffer == null");
+      if (buffer.isDirect()) {
+        initWithDirectByteBuffer(buffer.asReadOnlyByteBuffer());
+      } else {
+        initWithByteArray(buffer.getArray());
+      }
     }
 
     Bytes(byte[] array) {
-      this.array = array;
-      this.buffer = null;
+      Objects.requireNonNull(array, "array == null");
+      initWithByteArray(array);
+    }
+
+    private void initWithByteArray(byte[] array) {
+      this.slice = new ManagedSlice(array);
       this.hash = ByteBuffer.wrap(array).hashCode();
     }
 
-    ByteBuffer asReadOnlyByteBuffer() {
-      return buffer.asReadOnlyByteBuffer();
+    private void initWithDirectByteBuffer(ByteBuffer byteBuffer) {
+      this.slice = new ManagedDirectSlice(byteBuffer);
+      this.hash = byteBuffer.hashCode();
     }
 
     @Override
@@ -116,11 +124,7 @@ public final class RDBBatchOperation implements BatchOperation {
       if (this.hash != that.hash) {
         return false;
       }
-      final ByteBuffer thisBuf = this.array != null ?
-          ByteBuffer.wrap(this.array) : this.asReadOnlyByteBuffer();
-      final ByteBuffer thatBuf = that.array != null ?
-          ByteBuffer.wrap(that.array) : that.asReadOnlyByteBuffer();
-      return thisBuf.equals(thatBuf);
+      return slice.equals(that.slice);
     }
 
     @Override
@@ -130,14 +134,20 @@ public final class RDBBatchOperation implements BatchOperation {
 
     @Override
     public String toString() {
-      return array != null ? bytes2String(array)
-          : bytes2String(asReadOnlyByteBuffer());
+      return slice.toString();
+    }
+
+    @Override
+    public void close() {
+      slice.close();
     }
   }
 
   private abstract class Operation implements Closeable {
+    private final Bytes keyBytes;
 
-    private Operation() {
+    private Operation(Bytes keyBytes) {
+      this.keyBytes = keyBytes;
     }
 
     abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
@@ -154,6 +164,9 @@ public final class RDBBatchOperation implements BatchOperation {
 
     @Override
     public void close() {
+      if (keyBytes != null) {
+        keyBytes.close();
+      }
     }
   }
 
@@ -163,8 +176,8 @@ public final class RDBBatchOperation implements BatchOperation {
   private final class DeleteOperation extends Operation {
     private final byte[] key;
 
-    private DeleteOperation(byte[] key) {
-      super();
+    private DeleteOperation(byte[] key, Bytes keyBytes) {
+      super(Objects.requireNonNull(keyBytes, "keyBytes == null"));
       this.key = Objects.requireNonNull(key, "key == null");
     }
 
@@ -197,8 +210,8 @@ public final class RDBBatchOperation implements BatchOperation {
     private final CodecBuffer value;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private CodecBufferPutOperation(CodecBuffer key, CodecBuffer value) {
-      super();
+    private CodecBufferPutOperation(CodecBuffer key, CodecBuffer value, Bytes keyBytes) {
+      super(keyBytes);
       this.key = key;
       this.value = value;
     }
@@ -240,8 +253,8 @@ public final class RDBBatchOperation implements BatchOperation {
     private final byte[] key;
     private final byte[] value;
 
-    private ByteArrayPutOperation(byte[] key, byte[] value) {
-      super();
+    private ByteArrayPutOperation(byte[] key, byte[] value, Bytes keyBytes) {
+      super(keyBytes);
       this.key = Objects.requireNonNull(key, "key == null");
       this.value = Objects.requireNonNull(value, "value == null");
     }
@@ -355,19 +368,19 @@ public final class RDBBatchOperation implements BatchOperation {
 
         // always release the key with the value
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new CodecBufferPutOperation(key, value));
+        overWriteOpIfExist(keyBytes, new CodecBufferPutOperation(key, value, keyBytes));
       }
 
       void put(byte[] key, byte[] value) {
         putCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new ByteArrayPutOperation(key, value));
+        overWriteOpIfExist(keyBytes, new ByteArrayPutOperation(key, value, keyBytes));
       }
 
       void delete(byte[] key) {
         delCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new DeleteOperation(key));
+        overWriteOpIfExist(keyBytes, new DeleteOperation(key, keyBytes));
       }
 
       String putString(int keySize, int valueSize) {
