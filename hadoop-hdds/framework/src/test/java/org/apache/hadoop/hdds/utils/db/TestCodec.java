@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
@@ -49,6 +51,7 @@ public final class TestCodec {
 
   static {
     CodecBuffer.enableLeakDetection();
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
 
   @Test
@@ -295,14 +298,13 @@ public final class TestCodec {
   static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
     final byte[] array = codec.toPersistedFormat(object);
     final Bytes fromArray = new Bytes(array);
-
-    try (CodecBuffer buffer = codec.toCodecBuffer(object,
-        CodecBuffer.Allocator.HEAP)) {
-      final Bytes fromBuffer = new Bytes(buffer);
-
-      assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
-      assertEquals(fromArray, fromBuffer);
-      assertEquals(fromBuffer, fromArray);
+    for (CodecBuffer.Allocator allocator : ImmutableList.of(CodecBuffer.Allocator.HEAP, CodecBuffer.Allocator.DIRECT)) {
+      try (CodecBuffer buffer = codec.toCodecBuffer(object, allocator)) {
+        final Bytes fromBuffer = new Bytes(buffer);
+        assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
+        assertEquals(fromArray, fromBuffer);
+        assertEquals(fromBuffer, fromArray);
+      }
     }
   }
 }
