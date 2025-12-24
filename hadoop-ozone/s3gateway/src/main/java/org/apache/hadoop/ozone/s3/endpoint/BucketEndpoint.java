@@ -31,7 +31,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -97,19 +96,7 @@ public class BucketEndpoint extends EndpointBase {
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
-  private BucketEndpointContext context;
-
-  @Inject
-  private OzoneConfiguration ozoneConfiguration;
-
-  public BucketEndpoint() {
-    super();
-    this.context = new BucketEndpointContext(this);
-  }
-
-  private BucketEndpointContext getContext() {
-    return context;
-  }
+  private List<BucketOperationHandler> putHandlers;
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -346,25 +333,6 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
-      // Build map of query parameters
-      Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("acl", aclMarker);
-      // Future handlers: queryParams.put("lifecycle", lifecycleMarker);
-
-      // Check for subresource operations using handlers
-      String queryParam = HANDLER_FACTORY.findFirstSupportedQueryParam(queryParams);
-
-      if (queryParam != null) {
-        BucketOperationHandler handler = HANDLER_FACTORY.getHandler(queryParam);
-        // Delegate to specific handler
-        s3GAction = getActionForQueryParam(queryParam);
-        Response response = handler.handlePutRequest(
-            bucketName, body, headers, getContext(), startNanos);
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
-        return response;
-      }
-
       String location = createS3Bucket(bucketName);
       auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
@@ -627,174 +595,6 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().updateGetAclFailureStats(startNanos);
       throw ex;
     }
-  }
-
-  /**
-   * Implement acl put.
-   * <p>
-   * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
-   */
-  public Response putAcl(String bucketName,
-                         InputStream body) throws IOException, OS3Exception {
-    long startNanos = Time.monotonicNowNanos();
-    String grantReads = getHeaders().getHeaderString(S3Acl.GRANT_READ);
-    String grantWrites = getHeaders().getHeaderString(S3Acl.GRANT_WRITE);
-    String grantReadACP = getHeaders().getHeaderString(S3Acl.GRANT_READ_ACP);
-    String grantWriteACP = getHeaders().getHeaderString(S3Acl.GRANT_WRITE_ACP);
-    String grantFull = getHeaders().getHeaderString(S3Acl.GRANT_FULL_CONTROL);
-
-    try {
-      OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      OzoneVolume volume = getVolume();
-
-      List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
-      List<OzoneAcl> ozoneAclListOnVolume = new ArrayList<>();
-
-      if (grantReads == null && grantWrites == null && grantReadACP == null
-          && grantWriteACP == null && grantFull == null) {
-        S3BucketAcl putBucketAclRequest =
-            new PutBucketAclRequestUnmarshaller().readFrom(body);
-        // Handle grants in body
-        ozoneAclListOnBucket.addAll(
-            S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
-        ozoneAclListOnVolume.addAll(
-            S3Acl.s3AclToOzoneNativeAclOnVolume(putBucketAclRequest));
-      } else {
-
-        // Handle grants in headers
-        if (grantReads != null) {
-          ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantReads,
-              S3Acl.ACLType.READ.getValue()));
-          ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantReads,
-              S3Acl.ACLType.READ.getValue()));
-        }
-        if (grantWrites != null) {
-          ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantWrites,
-              S3Acl.ACLType.WRITE.getValue()));
-          ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantWrites,
-              S3Acl.ACLType.WRITE.getValue()));
-        }
-        if (grantReadACP != null) {
-          ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantReadACP,
-              S3Acl.ACLType.READ_ACP.getValue()));
-          ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantReadACP,
-              S3Acl.ACLType.READ_ACP.getValue()));
-        }
-        if (grantWriteACP != null) {
-          ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantWriteACP,
-              S3Acl.ACLType.WRITE_ACP.getValue()));
-          ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantWriteACP,
-              S3Acl.ACLType.WRITE_ACP.getValue()));
-        }
-        if (grantFull != null) {
-          ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantFull,
-              S3Acl.ACLType.FULL_CONTROL.getValue()));
-          ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantFull,
-              S3Acl.ACLType.FULL_CONTROL.getValue()));
-        }
-      }
-      // A put request will reset all previous ACLs on bucket
-      bucket.setAcl(ozoneAclListOnBucket);
-      // A put request will reset input user/group's permission on volume
-      List<OzoneAcl> acls = bucket.getAcls();
-      List<OzoneAcl> aclsToRemoveOnVolume = new ArrayList<>();
-      List<OzoneAcl> currentAclsOnVolume = volume.getAcls();
-      // Remove input user/group's permission from Volume first
-      if (!currentAclsOnVolume.isEmpty()) {
-        for (OzoneAcl acl : acls) {
-          if (acl.getAclScope() == ACCESS) {
-            aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(
-                acl.getName(), acl.getType(), currentAclsOnVolume));
-          }
-        }
-        for (OzoneAcl acl : aclsToRemoveOnVolume) {
-          volume.removeAcl(acl);
-        }
-      }
-      // Add new permission on Volume
-      for (OzoneAcl acl : ozoneAclListOnVolume) {
-        volume.addAcl(acl);
-      }
-    } catch (OMException exception) {
-      getMetrics().updatePutAclFailureStats(startNanos);
-      auditWriteFailure(S3GAction.PUT_ACL, exception);
-      if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
-      } else if (isAccessDenied(exception)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
-      }
-      throw exception;
-    } catch (OS3Exception ex) {
-      getMetrics().updatePutAclFailureStats(startNanos);
-      throw ex;
-    }
-    getMetrics().updatePutAclSuccessStats(startNanos);
-    return Response.status(HttpStatus.SC_OK).build();
-  }
-
-  /**
-   * Example: x-amz-grant-write: \
-   * uri="http://acs.amazonaws.com/groups/s3/LogDelivery", id="111122223333", \
-   * id="555566667777".
-   */
-  private List<OzoneAcl> getAndConvertAclOnBucket(String value,
-                                                  String permission)
-      throws OS3Exception {
-    List<OzoneAcl> ozoneAclList = new ArrayList<>();
-    if (StringUtils.isEmpty(value)) {
-      return ozoneAclList;
-    }
-    String[] subValues = value.split(",");
-    for (String acl : subValues) {
-      String[] part = acl.split("=");
-      if (part.length != 2) {
-        throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
-      }
-      S3Acl.ACLIdentityType type =
-          S3Acl.ACLIdentityType.getTypeFromHeaderType(part[0]);
-      if (type == null || !type.isSupported()) {
-        LOG.warn("S3 grantee {} is null or not supported", part[0]);
-        throw newError(NOT_IMPLEMENTED, part[0]);
-      }
-      // Build ACL on Bucket
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
-      OzoneAcl defaultOzoneAcl = OzoneAcl.of(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
-      );
-      OzoneAcl accessOzoneAcl = OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
-      ozoneAclList.add(defaultOzoneAcl);
-      ozoneAclList.add(accessOzoneAcl);
-    }
-    return ozoneAclList;
-  }
-
-  private List<OzoneAcl> getAndConvertAclOnVolume(String value,
-                                                  String permission)
-      throws OS3Exception {
-    List<OzoneAcl> ozoneAclList = new ArrayList<>();
-    if (StringUtils.isEmpty(value)) {
-      return ozoneAclList;
-    }
-    String[] subValues = value.split(",");
-    for (String acl : subValues) {
-      String[] part = acl.split("=");
-      if (part.length != 2) {
-        throw newError(S3ErrorTable.INVALID_ARGUMENT, acl);
-      }
-      S3Acl.ACLIdentityType type =
-          S3Acl.ACLIdentityType.getTypeFromHeaderType(part[0]);
-      if (type == null || !type.isSupported()) {
-        LOG.warn("S3 grantee {} is null or not supported", part[0]);
-        throw newError(NOT_IMPLEMENTED, part[0]);
-      }
-      // Build ACL on Volume
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
-          S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl accessOzoneAcl = OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
-      ozoneAclList.add(accessOzoneAcl);
-    }
-    return ozoneAclList;
   }
 
   private void addKey(ListObjectResponse response, OzoneKey next) {
