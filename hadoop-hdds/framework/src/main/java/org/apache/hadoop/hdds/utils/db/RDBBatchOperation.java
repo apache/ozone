@@ -19,14 +19,15 @@ package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -185,6 +186,11 @@ public final class RDBBatchOperation implements BatchOperation {
         keyBytes.close();
       }
     }
+
+    @Override
+    public String toString() {
+      return getOpType() + ", key=" + keyBytes;
+    }
   }
 
   /**
@@ -278,15 +284,13 @@ public final class RDBBatchOperation implements BatchOperation {
   private final class DeleteRangeOperation extends Operation {
     private final byte[] startKey;
     private final byte[] endKey;
-    private final Bytes startKeyBytes;
-    private final Bytes endKeyBytes;
+    private final RangeQueryIndex.Range<Bytes> rangeEntry;
 
     private DeleteRangeOperation(byte[] startKey, byte[] endKey) {
       super(null);
       this.startKey = Objects.requireNonNull(startKey, "startKey == null");
       this.endKey = Objects.requireNonNull(endKey, "endKey == null");
-      this.startKeyBytes = new Bytes(startKey);
-      this.endKeyBytes = new Bytes(endKey);
+      this.rangeEntry = new RangeQueryIndex.Range<>(new Bytes(startKey), new Bytes(endKey));
     }
 
     @Override
@@ -312,12 +316,13 @@ public final class RDBBatchOperation implements BatchOperation {
     @Override
     public void close() {
       super.close();
-      startKeyBytes.close();
-      endKeyBytes.close();
+      rangeEntry.getStartInclusive().close();
+      rangeEntry.getEndExclusive().close();
     }
 
-    private boolean contains(Bytes key) {
-      return startKeyBytes.compareTo(key) <= 0 && endKeyBytes.compareTo(key) > 0;
+    @Override
+    public String toString() {
+      return getOpType() + ", rangeEntry=" + rangeEntry;
     }
   }
 
@@ -379,16 +384,6 @@ public final class RDBBatchOperation implements BatchOperation {
         this.opIndex = new AtomicInteger(0);
       }
 
-      private DeleteRangeOperation findFirstDeleteRangeMatchingRange(Collection<DeleteRangeOperation> deleteRangeOps,
-          Bytes key) {
-        for (DeleteRangeOperation deleteRangeOp : deleteRangeOps) {
-          if (deleteRangeOp.contains(key)) {
-            return deleteRangeOp;
-          }
-        }
-        return null;
-      }
-
       /**
        * Prepares a batch write operation for a RocksDB-backed system.
        *
@@ -420,37 +415,41 @@ public final class RDBBatchOperation implements BatchOperation {
         // Sort Entries based on opIndex and flush the operation to the batch in the same order.
         List<Operation> ops = batchOps.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getKey))
             .map(Map.Entry::getValue).collect(Collectors.toList());
-        TreeMap<Integer, DeleteRangeOperation> deleteRangeIndices = new TreeMap<>();
-        int index = 0;
+        Set<RangeQueryIndex.Range<Bytes>> deleteRangeEntries = new HashSet<>();
         for (Operation op : ops) {
           if (DELETE_RANGE_OP.equals(op.getOpType())) {
             DeleteRangeOperation deleteRangeOp = (DeleteRangeOperation) op;
-            deleteRangeIndices.put(index, deleteRangeOp);
+            deleteRangeEntries.add(deleteRangeOp.rangeEntry);
           }
-          index++;
         }
-
-        for (int idx = 0; idx < ops.size(); idx++) {
-          Operation op = ops.get(idx);
-          if (DELETE_RANGE_OP.equals(op.getOpType())) {
-            op.apply(family, writeBatch);
-          } else {
-            // Find the first delete range op matching which would contain the key after the
-            // operation has occurred. If there is no such operation then perform the operation otherwise discard the
-            // op.
-            DeleteRangeOperation deleteRangeOp = findFirstDeleteRangeMatchingRange(
-                deleteRangeIndices.tailMap(idx, false).values(), op.getKey());
-            if (deleteRangeOp == null) {
+        try {
+          RangeQueryIndex<Bytes> rangeQueryIdx = new RangeQueryIndex<>(deleteRangeEntries);
+          for (Operation op : ops) {
+            if (DELETE_RANGE_OP.equals(op.getOpType())) {
+              DeleteRangeOperation deleteRangeOp = (DeleteRangeOperation) op;
+              rangeQueryIdx.removeRange(deleteRangeOp.rangeEntry);
               op.apply(family, writeBatch);
             } else {
-              debug(() -> String.format("Discarding Operation with Key: %s as it falls within the range of [%s, %s)",
-                  op.getKey(), deleteRangeOp.startKeyBytes, deleteRangeOp.endKeyBytes));
-              discardedCount++;
-              discardedSize += op.totalLength();
+              // Find a delete range op matching which would contain the key after the
+              // operation has occurred. If there is no such operation then perform the operation otherwise discard the
+              // op.
+              if (!rangeQueryIdx.containsIntersectingRange(op.getKey())) {
+                op.apply(family, writeBatch);
+              } else {
+                debug(() -> {
+                  RangeQueryIndex.Range<Bytes> deleteRangeOp = rangeQueryIdx.getFirstIntersectingRange(op.getKey());
+                  return String.format("Discarding Operation with Key: %s as it falls within the range of [%s, %s)",
+                      op.getKey(), deleteRangeOp.getStartInclusive(), deleteRangeOp.getEndExclusive());
+                });
+                discardedCount++;
+                discardedSize += op.totalLength();
+              }
             }
           }
+          debug(this::summary);
+        } catch (IOException e) {
+          throw new RocksDatabaseException("Failed to prepare batch write", e);
         }
-        debug(this::summary);
       }
 
       private String summary() {
