@@ -29,6 +29,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -79,8 +80,8 @@ public class XceiverClientManager extends XceiverClientCreator {
       ScmClientConfig clientConf,
       ClientTrustManager trustManager) throws IOException {
     super(conf, trustManager);
-    Preconditions.checkNotNull(clientConf);
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(clientConf, "clientConf == null");
+    Objects.requireNonNull(conf, "conf == null");
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
 
     this.clientCache = CacheBuilder.newBuilder()
@@ -118,7 +119,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline,
       boolean topologyAware) throws IOException {
-    Preconditions.checkNotNull(pipeline);
+    Objects.requireNonNull(pipeline, "pipeline == null");
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
         NO_REPLICA_FOUND);
@@ -133,7 +134,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void releaseClient(XceiverClientSpi client, boolean invalidateClient,
       boolean topologyAware) {
-    Preconditions.checkNotNull(client);
+    Objects.requireNonNull(client, "client == null");
     synchronized (clientCache) {
       client.decrementReference();
       if (invalidateClient) {
@@ -246,7 +247,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @ConfigGroup(prefix = "scm.container.client")
   public static class ScmClientConfig {
 
-    @Config(key = "max.size",
+    @Config(key = "scm.container.client.max.size",
         defaultValue = "256",
         tags = {OZONE, PERFORMANCE},
         description =
@@ -257,7 +258,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     )
     private int maxSize;
 
-    @Config(key = "idle.threshold",
+    @Config(key = "scm.container.client.idle.threshold",
         type = ConfigType.TIME, timeUnit = MILLISECONDS,
         defaultValue = "10s",
         tags = {OZONE, PERFORMANCE},

@@ -38,10 +38,6 @@
       <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
@@ -89,33 +85,17 @@
             </configuration>
           </execution>
           <execution>
-            <id>compile-proto-${protobuf2.version}</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <excludes>
                 <exclude>DatanodeClientProtocol.proto</exclude>
               </excludes>
-              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf2.version}</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-proto-for-hadoop</id>
-            <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-            </goals>
-            <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${hadoop-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <includes>
-                <include>hdds.proto</include>
-                <include>ReconfigureProtocol.proto</include>
-              </includes>
-              <outputDirectory>target/generated-sources/proto-java-for-hadoop</outputDirectory>
+              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
@@ -136,12 +116,6 @@
                 <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
                 <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
                 <replace dir="target/generated-sources/proto-java-for-ratis" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
-
-                <!-- use protobuf from hadoop-thirdparty -->
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="com.google.protobuf" value="org.apache.hadoop.thirdparty.protobuf" />
-                <!-- rename package to avoid conflict -->
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="org.apache.hadoop.hdds.protocol.proto" value="org.apache.hadoop.hdds.protocol.hadoop_proto" />
-                <move file="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/hdds/protocol/proto" tofile="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/hdds/protocol/hadoop_proto" />
               </target>
             </configuration>
           </execution>

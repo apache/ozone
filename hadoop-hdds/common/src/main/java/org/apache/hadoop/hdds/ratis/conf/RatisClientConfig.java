@@ -34,7 +34,7 @@ import org.apache.ratis.client.RaftClientConfigKeys;
  */
 @ConfigGroup(prefix = RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY)
 public class RatisClientConfig {
-  @Config(key = "client.request.watch.type",
+  @Config(key = "hdds.ratis.client.request.watch.type",
       defaultValue = "ALL_COMMITTED",
       type = ConfigType.STRING,
       tags = { OZONE, CLIENT, PERFORMANCE },
@@ -44,21 +44,21 @@ public class RatisClientConfig {
           "due to read retries to different datanodes.")
   private String watchType;
 
-  @Config(key = "client.request.write.timeout",
+  @Config(key = "hdds.ratis.client.request.write.timeout",
       defaultValue = "5m",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client write request.")
   private Duration writeRequestTimeout = Duration.ofMinutes(5);
 
-  @Config(key = "client.request.watch.timeout",
+  @Config(key = "hdds.ratis.client.request.watch.timeout",
       defaultValue = "3m",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client watch request.")
   private Duration watchRequestTimeout = Duration.ofMinutes(3);
 
-  @Config(key = "client.multilinear.random.retry.policy",
+  @Config(key = "hdds.ratis.client.multilinear.random.retry.policy",
       defaultValue = "5s, 5, 10s, 5, 15s, 5, 20s, 5, 25s, 5, 60s, 10",
       type = ConfigType.STRING,
       tags = { OZONE, CLIENT, PERFORMANCE },
@@ -69,7 +69,7 @@ public class RatisClientConfig {
           + " duration is t1 on average, and so on.")
   private String multilinearPolicy;
 
-  @Config(key = "client.exponential.backoff.base.sleep",
+  @Config(key = "hdds.ratis.client.exponential.backoff.base.sleep",
       defaultValue = "4s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
@@ -79,7 +79,7 @@ public class RatisClientConfig {
           + "random number in the range [0.5, 1.5).")
   private Duration exponentialPolicyBaseSleep = Duration.ofSeconds(4);
 
-  @Config(key = "client.exponential.backoff.max.sleep",
+  @Config(key = "hdds.ratis.client.exponential.backoff.max.sleep",
       defaultValue = "40s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
@@ -89,14 +89,14 @@ public class RatisClientConfig {
           + "details.")
   private Duration exponentialPolicyMaxSleep = Duration.ofSeconds(40);
 
-  @Config(key = "client.exponential.backoff.max.retries",
+  @Config(key = "hdds.ratis.client.exponential.backoff.max.retries",
       defaultValue =  "2147483647",
       type = ConfigType.INT,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Client's max retry value for the exponential backoff policy.")
   private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
 
-  @Config(key = "client.retrylimited.retry.interval",
+  @Config(key = "hdds.ratis.client.retrylimited.retry.interval",
       defaultValue = "1s",
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
@@ -104,14 +104,14 @@ public class RatisClientConfig {
           + "a ratis client request.")
   private long retrylimitedRetryInterval;
 
-  @Config(key = "client.retrylimited.max.retries",
+  @Config(key = "hdds.ratis.client.retrylimited.max.retries",
       defaultValue = "180",
       type = ConfigType.INT,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Number of retries for ratis client request.")
   private int retrylimitedMaxRetries;
 
-  @Config(key = "client.retry.policy",
+  @Config(key = "hdds.ratis.client.retry.policy",
       defaultValue = "org.apache.hadoop.hdds.ratis.retrypolicy."
           + "RequestTypeDependentRetryPolicyCreator",
       type = ConfigType.STRING,
@@ -195,7 +195,7 @@ public class RatisClientConfig {
       RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY + "." +
           RaftClientConfigKeys.PREFIX)
   public static class RaftConfig {
-    @Config(key = "async.outstanding-requests.max",
+    @Config(key = "hdds.ratis.raft.client.async.outstanding-requests.max",
         defaultValue = "32",
         type = ConfigType.INT,
         tags = { OZONE, CLIENT, PERFORMANCE },
@@ -204,7 +204,7 @@ public class RatisClientConfig {
                 + " be handled by the Standalone as well as Ratis client.")
     private int maxOutstandingRequests = 32;
 
-    @Config(key = "rpc.request.timeout",
+    @Config(key = "hdds.ratis.raft.client.rpc.request.timeout",
         defaultValue = "60s",
         type = ConfigType.TIME,
         tags = { OZONE, CLIENT, PERFORMANCE },
@@ -214,7 +214,7 @@ public class RatisClientConfig {
                 + "election timeout in Ratis.")
     private Duration rpcRequestTimeout = Duration.ofSeconds(60);
 
-    @Config(key = "rpc.watch.request.timeout",
+    @Config(key = "hdds.ratis.raft.client.rpc.watch.request.timeout",
         defaultValue = "180s",
         type = ConfigType.TIME,
         tags = { OZONE, CLIENT, PERFORMANCE },

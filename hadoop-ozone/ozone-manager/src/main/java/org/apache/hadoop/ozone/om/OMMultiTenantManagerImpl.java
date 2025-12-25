@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -363,7 +364,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       tenantCacheLock.readLock().lock();
       try {
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "Cache entry for tenant '" + tenantId + "' does not exist");
 
         final String tenantUserRoleName =
@@ -608,7 +609,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       tenantCacheLock.writeLock().lock();
       try {
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "Cache entry for tenant '" + tenantId + "' does not exist");
 
         LOG.info("Adding to cache: user '{}' accessId '{}' in tenant '{}'",
@@ -686,7 +687,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   @Override
   public String getUserNameGivenAccessId(String accessId) {
 
-    Preconditions.checkNotNull(accessId);
+    Objects.requireNonNull(accessId, "accessId == null");
 
     tenantCacheLock.readLock().lock();
     try {
@@ -878,7 +879,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // If the TenantState doesn't exist, it means the accessId entry is
         //  orphaned or incorrect, likely metadata inconsistency
         CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "OmDBTenantState should have existed for " + tenantId);
 
         cachedTenantState.getAccessIdInfoMap().put(accessId,

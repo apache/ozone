@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_GENERATION_MISMATCH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -1404,20 +1405,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         keyDetails.getMetadata())) {
       out.write(newContent);
     }
-  }
-
-  private static OzoneKeyDetails assertKeyContent(
-      OzoneBucket bucket, String keyName, byte[] expectedContent
-  ) throws IOException {
-    OzoneKeyDetails updatedKeyDetails = bucket.getKey(keyName);
-
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[expectedContent.length];
-      IOUtils.readFully(is, fileContent);
-      assertArrayEquals(expectedContent, fileContent);
-    }
-
-    return updatedKeyDetails;
   }
 
   private OzoneBucket createBucket(BucketLayout layout) throws IOException {

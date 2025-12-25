@@ -65,7 +65,6 @@ import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -87,6 +86,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
@@ -657,7 +657,7 @@ public class KeyValueHandler extends Handler {
 
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -720,7 +720,7 @@ public class KeyValueHandler extends Handler {
       checkContainerOpen(kvContainer);
       BlockID blockID = BlockID.getFromProtobuf(
           request.getFinalizeBlock().getBlockID());
-      Preconditions.checkNotNull(blockID);
+      Objects.requireNonNull(blockID, "blockID == null");
 
       LOG.info("Finalized Block request received {} ", blockID);
 
@@ -950,7 +950,7 @@ public class KeyValueHandler extends Handler {
           request.getReadChunk().getBlockID());
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
 
@@ -988,8 +988,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    Preconditions.checkNotNull(data, "Chunk data is null");
-
+    Objects.requireNonNull(data, "data == null");
     return getReadChunkResponse(request, data, byteBufferToByteString);
   }
 
@@ -1047,7 +1046,7 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo,  "chunkInfo == null");
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
@@ -1110,9 +1109,9 @@ public class KeyValueHandler extends Handler {
   public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
                                            ChunkBuffer data, KeyValueContainer kvContainer)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(chunkInfo);
-    Preconditions.checkNotNull(data);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(chunkInfo, "chunkInfo == null");
+    Objects.requireNonNull(data, "data == null");
     long writeChunkStartTime = Time.monotonicNowNanos();
     if (!checkContainerClose(kvContainer)) {
       throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
@@ -1141,8 +1140,8 @@ public class KeyValueHandler extends Handler {
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
                                          long blockCommitSequenceId, boolean overwriteBscId)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(blockData);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(blockData, "blockData == null");
     long startTime = Time.monotonicNowNanos();
 
     if (!checkContainerClose(kvContainer)) {
@@ -1186,11 +1185,11 @@ public class KeyValueHandler extends Handler {
 
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
 
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
@@ -1356,8 +1355,8 @@ public class KeyValueHandler extends Handler {
       final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
+    assertTrue(originalContainerData instanceof KeyValueContainerData,
+        () -> "Expected KeyValueContainerData but " + originalContainerData.getClass());
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         (KeyValueContainerData) originalContainerData);
@@ -2251,7 +2250,7 @@ public class KeyValueHandler extends Handler {
     // List files left over
     File chunksPath = new
         File(container.getContainerData().getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
+    assertTrue(chunksPath.isDirectory(), () -> chunksPath + " is not a directory");
     boolean notEmpty = false;
     try (DirectoryStream<Path> dir
              = Files.newDirectoryStream(chunksPath.toPath())) {

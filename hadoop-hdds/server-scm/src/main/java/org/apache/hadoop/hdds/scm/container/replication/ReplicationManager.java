@@ -1084,7 +1084,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
-    @Config(key = "thread.interval",
+    @Config(key = "hdds.scm.replication.thread.interval",
         type = ConfigType.TIME,
         defaultValue = "300s",
         reconfigurable = true,
@@ -1099,7 +1099,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which the Under Replicated queue is processed.
      */
-    @Config(key = "under.replicated.interval",
+    @Config(key = "hdds.scm.replication.under.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
         reconfigurable = true,
@@ -1112,7 +1112,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which the Over Replicated queue is processed.
      */
-    @Config(key = "over.replicated.interval",
+    @Config(key = "hdds.scm.replication.over.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
         reconfigurable = true,
@@ -1126,7 +1126,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * Timeout for container replication & deletion command issued by
      * ReplicationManager.
      */
-    @Config(key = "event.timeout",
+    @Config(key = "hdds.scm.replication.event.timeout",
         type = ConfigType.TIME,
         defaultValue = "12m",
         reconfigurable = true,
@@ -1141,7 +1141,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * slightly less. This duration is the number of seconds to subtract from
      * the SCM deadline to give a datanode deadline.
      */
-    @Config(key = "event.timeout.datanode.offset",
+    @Config(key = "hdds.scm.replication.event.timeout.datanode.offset",
         type = ConfigType.TIME,
         defaultValue = "6m",
         reconfigurable = true,
@@ -1157,7 +1157,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * The number of container replica which must be available for a node to
      * enter maintenance.
      */
-    @Config(key = "maintenance.replica.minimum",
+    @Config(key = "hdds.scm.replication.maintenance.replica.minimum",
         type = ConfigType.INT,
         defaultValue = "2",
         reconfigurable = true,
@@ -1175,7 +1175,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * need to consider removing the "maintenance.replica.minimum" setting
      * and having both Ratis and EC use this new one.
      */
-    @Config(key = "maintenance.remaining.redundancy",
+    @Config(key = "hdds.scm.replication.maintenance.remaining.redundancy",
         type = ConfigType.INT,
         defaultValue = "1",
         reconfigurable = true,
@@ -1197,7 +1197,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int maintenanceRemainingRedundancy = 1;
 
-    @Config(key = "push",
+    @Config(key = "hdds.scm.replication.push",
         type = ConfigType.BOOLEAN,
         defaultValue = "true",
         tags = { SCM, DATANODE },
@@ -1207,7 +1207,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private boolean push = true;
 
-    @Config(key = "datanode.replication.limit",
+    @Config(key = "hdds.scm.replication.datanode.replication.limit",
         type = ConfigType.INT,
         defaultValue = "20",
         reconfigurable = true,
@@ -1219,7 +1219,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeReplicationLimit = 20;
 
-    @Config(key = "datanode.reconstruction.weight",
+    @Config(key = "hdds.scm.replication.datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
         reconfigurable = true,
@@ -1231,7 +1231,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int reconstructionCommandWeight = 3;
 
-    @Config(key = "datanode.delete.container.limit",
+    @Config(key = "hdds.scm.replication.datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
         reconfigurable = true,
@@ -1243,7 +1243,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeDeleteLimit = 40;
 
-    @Config(key = "inflight.limit.factor",
+    @Config(key = "hdds.scm.replication.inflight.limit.factor",
         type = ConfigType.DOUBLE,
         defaultValue = "0.75",
         reconfigurable = true,
@@ -1261,7 +1261,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private double inflightReplicationLimitFactor = 0.75;
 
-    @Config(key = "container.sample.limit",
+    @Config(key = "hdds.scm.replication.container.sample.limit",
         type = ConfigType.INT,
         defaultValue = "100",
         reconfigurable = true,

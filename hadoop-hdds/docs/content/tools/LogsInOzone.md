@@ -61,6 +61,7 @@ The default log appender is a rolling appender. The following configurations can
 
 ```
 appender.rolling.strategy.type=DefaultRolloverStrategy
+appender.rolling.strategy.max=3000
 appender.rolling.strategy.delete.type=Delete
 appender.rolling.strategy.delete.basePath=${sys:hadoop.log.dir}
 appender.rolling.strategy.delete.maxDepth=1

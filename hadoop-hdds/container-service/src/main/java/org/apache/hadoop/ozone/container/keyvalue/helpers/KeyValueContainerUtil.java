@@ -27,6 +27,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -81,8 +82,8 @@ public final class KeyValueContainerUtil {
   public static void createContainerMetaData(
       File containerMetaDataPath, File chunksPath, File dbFile,
       String schemaVersion, ConfigurationSource conf) throws IOException {
-    Preconditions.checkNotNull(containerMetaDataPath);
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(containerMetaDataPath,  "containerMetaDataPath == null");
+    Objects.requireNonNull(conf, "conf == null");
 
     if (!containerMetaDataPath.mkdirs()) {
       LOG.error("Unable to create directory for metadata storage. Path: {}",
@@ -130,7 +131,7 @@ public final class KeyValueContainerUtil {
   public static void removeContainer(
       KeyValueContainerData containerData, ConfigurationSource conf)
       throws IOException {
-    Preconditions.checkNotNull(containerData);
+    Objects.requireNonNull(containerData, "containerData == null");
     KeyValueContainerUtil.removeContainerDB(containerData, conf);
     KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
         containerData.getVolume());
@@ -175,8 +176,8 @@ public final class KeyValueContainerUtil {
                                             containerData,
                                             boolean bCheckChunksFilePath)
       throws IOException {
-    Preconditions.checkNotNull(store);
-    Preconditions.checkNotNull(containerData);
+    Objects.requireNonNull(store, "store == null");
+    Objects.requireNonNull(containerData, "containerData == null");
     if (containerData.isOpen()) {
       return false;
     }

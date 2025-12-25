@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -93,6 +94,7 @@ public class TestPermissionCheck {
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
   }
 
   /**
@@ -130,7 +132,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.put("bucketName", null, null));
+        bucketEndpoint.put("bucketName", null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -167,9 +169,7 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "bucketName", null, null, null, 1000,
-        null, null, null, null, null, null, null, 0));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -213,9 +213,8 @@ public class TestPermissionCheck {
         .setClient(client)
         .setHeaders(headers)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-            "bucketName", null, null, null, 1000, null, null, null, null, "acl",
-            null, null, 0), "Expected OS3Exception with FORBIDDEN http code.");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -236,8 +235,9 @@ public class TestPermissionCheck {
         .setClient(client)
         .setHeaders(headers)
         .build();
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
     try {
-      bucketEndpoint.put("bucketName", "acl", null);
+      bucketEndpoint.put("bucketName", null);
     } catch (Exception e) {
       assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);

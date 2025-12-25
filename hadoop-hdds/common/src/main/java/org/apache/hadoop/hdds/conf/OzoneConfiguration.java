@@ -22,7 +22,6 @@ import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
-import com.google.common.base.Preconditions;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +32,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -87,7 +87,7 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
   }
 
   public static OzoneConfiguration of(Configuration conf) {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
 
     return conf instanceof OzoneConfiguration
         ? (OzoneConfiguration) conf

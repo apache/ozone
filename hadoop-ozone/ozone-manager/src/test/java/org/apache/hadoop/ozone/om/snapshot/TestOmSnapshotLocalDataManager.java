@@ -339,7 +339,8 @@ public class TestOmSnapshotLocalDataManager {
                  read ? localDataManager.getOmSnapshotLocalData(endSnapshotId, startSnapshotId) :
                      localDataManager.getWritableOmSnapshotLocalData(endSnapshotId, startSnapshotId)) {
           OmSnapshotLocalData snapshotLocalData = omSnapshotLocalDataProvider.getSnapshotLocalData();
-          OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
+          OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData()
+              .orElse(null);
           assertEquals(endSnapshotId, snapshotLocalData.getSnapshotId());
           if (startSnapshotId == null) {
             assertNull(previousSnapshot);
@@ -388,7 +389,7 @@ public class TestOmSnapshotLocalDataManager {
                read ? localDataManager.getOmSnapshotLocalData(snapId) :
                    localDataManager.getWritableOmSnapshotLocalData(snapId)) {
         OmSnapshotLocalData snapshotLocalData = omSnapshotLocalDataProvider.getSnapshotLocalData();
-        OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
+        OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData().orElse(null);
         assertEquals(snapId, snapshotLocalData.getSnapshotId());
         assertEquals(expectedPreviousSnapId, previousSnapshot == null ? null :
             previousSnapshot.getSnapshotId());
@@ -695,7 +696,7 @@ public class TestOmSnapshotLocalDataManager {
     }
     addVersionsToLocalData(localDataManager, snapshotIds.get(1), ImmutableMap.of(1, 3, 2, previousVersion));
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(1))) {
-      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().getVersion(), snap.needsDefrag());
+      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().orElse(null).getVersion(), snap.needsDefrag());
     }
   }
 
@@ -738,7 +739,7 @@ public class TestOmSnapshotLocalDataManager {
               localDataManager.getOmSnapshotLocalData(snapId, prevSnapId) :
               localDataManager.getWritableOmSnapshotLocalData(snapId, prevSnapId)) {
             OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
-            OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData();
+            OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData().orElse(null);
             assertEquals(prevSnapshotLocalData.getSnapshotId(), snapshotLocalData.getPreviousSnapshotId());
             assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
             assertEquals(snapId, snapshotLocalData.getSnapshotId());

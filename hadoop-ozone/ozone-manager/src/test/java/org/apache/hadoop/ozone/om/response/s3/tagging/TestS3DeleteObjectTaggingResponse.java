@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -55,7 +56,9 @@ public class TestS3DeleteObjectTaggingResponse extends TestOMKeyResponse {
     assertNotNull(omKeyInfo);
     assertEquals(2, omKeyInfo.getTags().size());
 
-    omKeyInfo.getTags().clear();
+    omKeyInfo = omKeyInfo.toBuilder()
+        .setTags(Collections.emptyMap())
+        .build();
 
     S3DeleteObjectTaggingResponse deleteObjectTaggingResponse = getDeleteObjectTaggingResponse(omKeyInfo, omResponse);
 

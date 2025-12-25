@@ -80,7 +80,7 @@ public class TestRDBBatchOperation {
           }).when(writeBatch).delete(Mockito.any(ColumnFamilyHandle.class), Mockito.any(byte[].class));
 
         });
-         RDBBatchOperation batchOperation = new RDBBatchOperation()) {
+         RDBBatchOperation batchOperation = RDBBatchOperation.newAtomicOperation()) {
       ColumnFamilyHandle columnFamilyHandle = Mockito.mock(ColumnFamilyHandle.class);
       RocksDatabase.ColumnFamily columnFamily = Mockito.mock(RocksDatabase.ColumnFamily.class);
       doAnswer((i) -> {

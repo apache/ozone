@@ -32,6 +32,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -247,14 +248,14 @@ public final class SelfSignedCertificate {
     // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public Builder addDnsName(String dnsName) {
-      Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
+      Objects.requireNonNull(dnsName, "dnsName cannot be null");
       this.addAltName(GeneralName.dNSName, dnsName);
       return this;
     }
 
     // IP address is subject to change which is optional for now.
     public Builder addIpAddress(String ip) {
-      Preconditions.checkNotNull(ip, "Ip address cannot be null");
+      Objects.requireNonNull(ip, "Ip address cannot be null");
       this.addAltName(GeneralName.iPAddress, ip);
       return this;
     }
@@ -293,7 +294,7 @@ public final class SelfSignedCertificate {
 
     public X509Certificate build()
         throws SCMSecurityException, IOException {
-      Preconditions.checkNotNull(key, "Key cannot be null");
+      Objects.requireNonNull(key, "Key cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject),
           "Subject " + "cannot be blank");
       Preconditions.checkArgument(StringUtils.isNotBlank(clusterID),

@@ -146,8 +146,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
-    Preconditions.checkNotNull(name.getScheme(),
-        "No scheme provided in %s", name);
+    Objects.requireNonNull(name.getScheme(),
+        () -> "No scheme provided in " + name);
     Preconditions.checkArgument(getScheme().equals(name.getScheme()),
         "Invalid scheme provided in %s", name);
 
@@ -1018,7 +1018,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path,
         ozoneConfiguration);
-    return this.makeQualified(ofsPath.getTrashRoot());
+    return this.makeQualified(ofsPath.getTrashRoot(getUsername()));
   }
 
   /**
@@ -1184,7 +1184,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
     return new OzoneFileStatusIterator<>(f,
-        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat : new LocatedFileStatus(stat, null),
+        (stat) -> stat instanceof LocatedFileStatus ? (LocatedFileStatus) stat :
+            new LocatedFileStatus(stat, stat.isFile() ? new BlockLocation[0] : null),
         false);
   }
 

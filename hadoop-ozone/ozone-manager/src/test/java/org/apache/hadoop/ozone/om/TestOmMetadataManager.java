@@ -695,13 +695,15 @@ public class TestOmMetadataManager {
 
     int numOpenKeys = 3;
     for (int i = 0; i < numOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyPrefix + i,
-              RatisReplicationConfig.getInstance(ONE))
-          .build();
+      OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyPrefix + i,
+          RatisReplicationConfig.getInstance(ONE));
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -811,14 +813,16 @@ public class TestOmMetadataManager {
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
       final long creationTime = i < numExpiredOpenKeys ?
           expiredOpenKeyCreationTime : Time.now();
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
               volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
-          .setCreationTime(creationTime)
-          .build();
+          .setCreationTime(creationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -883,10 +887,13 @@ public class TestOmMetadataManager {
     // Ensure that "expired" MPU-related open keys are not fetched.
     // MPU-related open keys, identified by isMultipartKey = false
     for (int i = 0; i < numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "expired" + i,
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "expired" + i,
               RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
-          .setCreationTime(expiredOpenKeyCreationTime)
-          .build();
+          .setCreationTime(expiredOpenKeyCreationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
       assertThat(keyInfo.getModificationTime()).isPositive();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
@@ -896,7 +903,6 @@ public class TestOmMetadataManager {
               HddsProtos.ReplicationFactor.ONE, 0L);
 
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {
@@ -916,10 +922,13 @@ public class TestOmMetadataManager {
     // HDDS-9017. Although these open keys are MPU-related,
     // the isMultipartKey flags are set to false
     for (int i = numExpiredMPUOpenKeys; i < 2 * numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
               volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
-          .setCreationTime(expiredOpenKeyCreationTime)
-          .build();
+          .setCreationTime(expiredOpenKeyCreationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
@@ -928,7 +937,6 @@ public class TestOmMetadataManager {
               HddsProtos.ReplicationFactor.ONE, 0L);
 
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {

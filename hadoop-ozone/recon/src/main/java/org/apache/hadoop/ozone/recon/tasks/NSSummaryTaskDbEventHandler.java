@@ -61,7 +61,7 @@ public class NSSummaryTaskDbEventHandler {
 
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
@@ -84,8 +84,7 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap) throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -182,10 +181,11 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
-  protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
-                                      Map<Long, NSSummary> nsSummaryMap)
-      throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+  protected void handleDeleteKeyEvent(
+      OmKeyInfo keyInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      long parentObjectId
+  ) throws IOException {
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {

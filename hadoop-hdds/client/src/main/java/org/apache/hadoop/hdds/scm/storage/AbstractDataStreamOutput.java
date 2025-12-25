@@ -105,7 +105,7 @@ public abstract class AbstractDataStreamOutput
     if (Thread.currentThread().isInterrupted()) {
       setExceptionAndThrow(exception);
     }
-    Objects.requireNonNull(action);
+    Objects.requireNonNull(action, "action == null");
     Preconditions.checkArgument(
         action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
     if (action.delayMillis > 0) {

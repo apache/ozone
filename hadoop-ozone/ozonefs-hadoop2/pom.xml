@@ -29,10 +29,6 @@
       <artifactId>hadoop-hdfs-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem-shaded</artifactId>
       <optional>true</optional>
