@@ -20,20 +20,17 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -41,43 +38,40 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.stubbing.Answer;
-import org.rocksdb.RocksIterator;
 
 /**
  * This test is similar to {@link TestRDBStoreByteArrayIterator}
  * except that this test is for {@link RDBStoreCodecBufferIterator}.
  */
-public class TestRDBStoreCodecBufferIterator {
+public class TestRDBStoreCodecBufferIterator extends TestRDBStoreAbstractIterator<RDBStoreCodecBufferIterator> {
 
-  private RocksIterator rocksIteratorMock;
-  private ManagedRocksIterator managedRocksIterator;
-  private RDBTable rdbTableMock;
+  @BeforeAll
+  public static void init() {
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
+  }
 
   @BeforeEach
-  public void setup() {
+  public void setupTest() {
     CodecBuffer.enableLeakDetection();
-    rocksIteratorMock = mock(RocksIterator.class);
-    managedRocksIterator = newManagedRocksIterator();
-    rdbTableMock = mock(RDBTable.class);
-    Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);
   }
 
   ManagedRocksIterator newManagedRocksIterator() {
-    return new ManagedRocksIterator(rocksIteratorMock);
+    return new ManagedRocksIterator(getRocksDBIteratorMock());
   }
 
-  RDBStoreCodecBufferIterator newIterator() {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
+  @Override
+  RDBStoreCodecBufferIterator newIterator() throws RocksDatabaseException {
+    return new RDBStoreCodecBufferIterator(getItrInitializer(), null, null, KEY_AND_VALUE);
   }
 
-  RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
+  @Override
+  RDBStoreCodecBufferIterator newIterator(byte[] prefix) throws RocksDatabaseException {
+    return new RDBStoreCodecBufferIterator(getItrInitializer(), getRocksTableMock(), prefix, KEY_AND_VALUE);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {
@@ -98,16 +92,14 @@ public class TestRDBStoreCodecBufferIterator {
 
   @Test
   public void testForEachRemaining() throws Exception {
-    when(rocksIteratorMock.isValid())
-        .thenReturn(true, true, true, true, true, true, true, false);
-    when(rocksIteratorMock.key(any()))
-        .then(newAnswerInt("key1", 0x00))
+    when(getRocksDBIteratorMock().isValid())
+        .thenReturn(true, true, true, true, true, true, false);
+    when(getRocksDBIteratorMock().key(any()))
         .then(newAnswerInt("key2", 0x00))
         .then(newAnswerInt("key3", 0x01))
         .then(newAnswerInt("key4", 0x02))
         .thenThrow(new NoSuchElementException());
-    when(rocksIteratorMock.value(any()))
-        .then(newAnswerInt("val1", 0x7f))
+    when(getRocksDBIteratorMock().value(any()))
         .then(newAnswerInt("val2", 0x7f))
         .then(newAnswerInt("val3", 0x7e))
         .then(newAnswerInt("val4", 0x7d))
@@ -132,7 +124,7 @@ public class TestRDBStoreCodecBufferIterator {
 
   @Test
   public void testHasNextDependsOnIsvalid() throws Exception {
-    when(rocksIteratorMock.isValid()).thenReturn(true, true, false);
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true, false);
 
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       assertTrue(i.hasNext());
@@ -145,16 +137,16 @@ public class TestRDBStoreCodecBufferIterator {
   @Test
   public void testNextCallsIsValidThenGetsTheValueAndStepsToNext()
       throws Exception {
-    when(rocksIteratorMock.isValid()).thenReturn(true);
-    InOrder verifier = inOrder(rocksIteratorMock);
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true);
+    InOrder verifier = inOrder(getRocksDBIteratorMock());
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       i.next();
     }
 
-    verifier.verify(rocksIteratorMock).isValid();
-    verifier.verify(rocksIteratorMock).key(any());
-    verifier.verify(rocksIteratorMock).value(any());
-    verifier.verify(rocksIteratorMock).next();
+    verifier.verify(getRocksDBIteratorMock()).isValid();
+    verifier.verify(getRocksDBIteratorMock()).key(any());
+    verifier.verify(getRocksDBIteratorMock()).value(any());
+    verifier.verify(getRocksDBIteratorMock()).next();
 
     CodecTestUtil.gc();
   }
@@ -163,7 +155,7 @@ public class TestRDBStoreCodecBufferIterator {
   public void testConstructorSeeksToFirstElement() throws Exception {
     newIterator().close();
 
-    verify(rocksIteratorMock, times(1)).seekToFirst();
+    verify(getRocksDBIteratorMock(), times(1)).seekToFirst();
 
     CodecTestUtil.gc();
   }
@@ -173,7 +165,7 @@ public class TestRDBStoreCodecBufferIterator {
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       i.seekToFirst();
     }
-    verify(rocksIteratorMock, times(2)).seekToFirst();
+    verify(getRocksDBIteratorMock(), times(2)).seekToFirst();
 
     CodecTestUtil.gc();
   }
@@ -184,32 +176,32 @@ public class TestRDBStoreCodecBufferIterator {
       i.seekToLast();
     }
 
-    verify(rocksIteratorMock, times(1)).seekToLast();
+    verify(getRocksDBIteratorMock(), times(1)).seekToLast();
 
     CodecTestUtil.gc();
   }
 
   @Test
   public void testSeekReturnsTheActualKey() throws Exception {
-    when(rocksIteratorMock.isValid()).thenReturn(true);
-    when(rocksIteratorMock.key(any()))
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true);
+    when(getRocksDBIteratorMock().key(any()))
         .then(newAnswerInt("key1", 0x00));
-    when(rocksIteratorMock.value(any()))
+    when(getRocksDBIteratorMock().value(any()))
         .then(newAnswerInt("val1", 0x7f));
 
     try (RDBStoreCodecBufferIterator i = newIterator();
          CodecBuffer target = CodecBuffer.wrap(new byte[]{0x55})) {
       final Table.KeyValue<CodecBuffer, CodecBuffer> val = i.seek(target);
 
-      InOrder verifier = inOrder(rocksIteratorMock);
+      InOrder verifier = inOrder(getRocksDBIteratorMock());
 
-      verify(rocksIteratorMock, times(1)).seekToFirst(); //at construct time
-      verify(rocksIteratorMock, never()).seekToLast();
-      verifier.verify(rocksIteratorMock, times(1))
+      verify(getRocksDBIteratorMock(), times(1)).seekToFirst(); //at construct time
+      verify(getRocksDBIteratorMock(), never()).seekToLast();
+      verifier.verify(getRocksDBIteratorMock(), times(1))
           .seek(any(ByteBuffer.class));
-      verifier.verify(rocksIteratorMock, times(1)).isValid();
-      verifier.verify(rocksIteratorMock, times(1)).key(any());
-      verifier.verify(rocksIteratorMock, times(1)).value(any());
+      verifier.verify(getRocksDBIteratorMock(), times(1)).isValid();
+      verifier.verify(getRocksDBIteratorMock(), times(1)).key(any());
+      verifier.verify(getRocksDBIteratorMock(), times(1)).value(any());
       assertArrayEquals(new byte[]{0x00}, val.getKey().getArray());
       assertArrayEquals(new byte[]{0x7f}, val.getValue().getArray());
     }
@@ -219,8 +211,8 @@ public class TestRDBStoreCodecBufferIterator {
 
   @Test
   public void testGettingTheKeyIfIteratorIsValid() throws Exception {
-    when(rocksIteratorMock.isValid()).thenReturn(true);
-    when(rocksIteratorMock.key(any()))
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true);
+    when(getRocksDBIteratorMock().key(any()))
         .then(newAnswerInt("key1", 0x00));
 
     byte[] key = null;
@@ -230,10 +222,10 @@ public class TestRDBStoreCodecBufferIterator {
       }
     }
 
-    InOrder verifier = inOrder(rocksIteratorMock);
+    InOrder verifier = inOrder(getRocksDBIteratorMock());
 
-    verifier.verify(rocksIteratorMock, times(1)).isValid();
-    verifier.verify(rocksIteratorMock, times(1)).key(any());
+    verifier.verify(getRocksDBIteratorMock(), times(2)).isValid();
+    verifier.verify(getRocksDBIteratorMock(), times(1)).key(any());
     assertArrayEquals(new byte[]{0x00}, key);
 
     CodecTestUtil.gc();
@@ -241,10 +233,10 @@ public class TestRDBStoreCodecBufferIterator {
 
   @Test
   public void testGettingTheValueIfIteratorIsValid() throws Exception {
-    when(rocksIteratorMock.isValid()).thenReturn(true);
-    when(rocksIteratorMock.key(any()))
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true);
+    when(getRocksDBIteratorMock().key(any()))
         .then(newAnswerInt("key1", 0x00));
-    when(rocksIteratorMock.value(any()))
+    when(getRocksDBIteratorMock().value(any()))
         .then(newAnswerInt("val1", 0x7f));
 
     byte[] key = null;
@@ -257,10 +249,10 @@ public class TestRDBStoreCodecBufferIterator {
       }
     }
 
-    InOrder verifier = inOrder(rocksIteratorMock);
+    InOrder verifier = inOrder(getRocksDBIteratorMock());
 
-    verifier.verify(rocksIteratorMock, times(1)).isValid();
-    verifier.verify(rocksIteratorMock, times(1)).key(any());
+    verifier.verify(getRocksDBIteratorMock(), times(2)).isValid();
+    verifier.verify(getRocksDBIteratorMock(), times(1)).key(any());
     assertArrayEquals(new byte[]{0x00}, key);
     assertArrayEquals(new byte[]{0x7f}, value);
 
@@ -271,18 +263,19 @@ public class TestRDBStoreCodecBufferIterator {
   public void testRemovingFromDBActuallyDeletesFromTable() throws Exception {
     final byte[] testKey = new byte[10];
     ThreadLocalRandom.current().nextBytes(testKey);
-    when(rocksIteratorMock.isValid()).thenReturn(true);
-    when(rocksIteratorMock.key(any()))
+    when(getRocksDBIteratorMock().isValid()).thenReturn(true);
+    when(getRocksDBIteratorMock().key(any()))
         .then(newAnswer("key1", testKey));
 
     try (RDBStoreCodecBufferIterator i = newIterator(null)) {
+      i.next();
       i.removeFromDB();
     }
 
-    InOrder verifier = inOrder(rocksIteratorMock, rdbTableMock);
+    InOrder verifier = inOrder(getRocksDBIteratorMock(), getRocksTableMock());
 
-    verifier.verify(rocksIteratorMock, times(1)).isValid();
-    verifier.verify(rdbTableMock, times(1))
+    verifier.verify(getRocksDBIteratorMock(), times(1)).isValid();
+    verifier.verify(getRocksTableMock(), times(1))
         .delete(ByteBuffer.wrap(testKey));
 
     CodecTestUtil.gc();
@@ -302,7 +295,7 @@ public class TestRDBStoreCodecBufferIterator {
   public void testCloseCloses() throws Exception {
     newIterator().close();
 
-    verify(rocksIteratorMock, times(1)).close();
+    verify(getRocksDBIteratorMock(), times(1)).close();
 
     CodecTestUtil.gc();
   }
@@ -310,48 +303,20 @@ public class TestRDBStoreCodecBufferIterator {
   @Test
   public void testNullPrefixedIterator() throws Exception {
     try (RDBStoreCodecBufferIterator i = newIterator()) {
-      verify(rocksIteratorMock, times(1)).seekToFirst();
-      clearInvocations(rocksIteratorMock);
+      verify(getRocksDBIteratorMock(), times(1)).seekToFirst();
+      clearInvocations(getRocksDBIteratorMock());
 
       i.seekToFirst();
-      verify(rocksIteratorMock, times(1)).seekToFirst();
-      clearInvocations(rocksIteratorMock);
+      verify(getRocksDBIteratorMock(), times(1)).seekToFirst();
+      clearInvocations(getRocksDBIteratorMock());
 
-      when(rocksIteratorMock.isValid()).thenReturn(true);
+      when(getRocksDBIteratorMock().isValid()).thenReturn(true);
       assertTrue(i.hasNext());
-      verify(rocksIteratorMock, times(1)).isValid();
-      verify(rocksIteratorMock, times(0)).key(any());
+      verify(getRocksDBIteratorMock(), times(1)).isValid();
+      verify(getRocksDBIteratorMock(), times(0)).key(any());
 
       i.seekToLast();
-      verify(rocksIteratorMock, times(1)).seekToLast();
-    }
-
-    CodecTestUtil.gc();
-  }
-
-  @Test
-  public void testNormalPrefixedIterator() throws Exception {
-    final byte[] prefixBytes = "sample".getBytes(StandardCharsets.UTF_8);
-    try (RDBStoreCodecBufferIterator i = newIterator(
-        CodecBuffer.wrap(prefixBytes))) {
-      final ByteBuffer prefix = ByteBuffer.wrap(prefixBytes);
-      verify(rocksIteratorMock, times(1)).seek(prefix);
-      clearInvocations(rocksIteratorMock);
-
-      i.seekToFirst();
-      verify(rocksIteratorMock, times(1)).seek(prefix);
-      clearInvocations(rocksIteratorMock);
-
-      when(rocksIteratorMock.isValid()).thenReturn(true);
-      when(rocksIteratorMock.key(any()))
-          .then(newAnswer("key1", prefixBytes));
-      assertTrue(i.hasNext());
-      verify(rocksIteratorMock, times(1)).isValid();
-      verify(rocksIteratorMock, times(1)).key(any());
-
-      Exception e =
-          assertThrows(Exception.class, () -> i.seekToLast(), "Prefixed iterator does not support seekToLast");
-      assertInstanceOf(UnsupportedOperationException.class, e);
+      verify(getRocksDBIteratorMock(), times(1)).seekToLast();
     }
 
     CodecTestUtil.gc();
