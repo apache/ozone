@@ -21,14 +21,15 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -256,14 +257,12 @@ public final class RDBBatchOperation implements BatchOperation {
   private final class DeleteRangeOperation extends Op {
     private final byte[] startKey;
     private final byte[] endKey;
-    private final Bytes startKeyBytes;
-    private final Bytes endKeyBytes;
+    private final RangeQueryIndex.Range<Bytes> rangeEntry;
 
     private DeleteRangeOperation(byte[] startKey, byte[] endKey) {
       this.startKey = Objects.requireNonNull(startKey, "startKey == null");
       this.endKey = Objects.requireNonNull(endKey, "endKey == null");
-      this.startKeyBytes = new Bytes(startKey);
-      this.endKeyBytes = new Bytes(endKey);
+      this.rangeEntry = new RangeQueryIndex.Range<>(new Bytes(startKey), new Bytes(endKey));
     }
 
     @Override
@@ -279,14 +278,10 @@ public final class RDBBatchOperation implements BatchOperation {
     @Override
     boolean closeImpl() {
       if (super.closeImpl()) {
-        IOUtils.close(LOG, startKeyBytes, endKeyBytes);
+        IOUtils.close(LOG, rangeEntry.getStartInclusive(), rangeEntry.getEndExclusive());
         return true;
       }
       return false;
-    }
-
-    private boolean contains(Bytes key) {
-      return startKeyBytes.compareTo(key) <= 0 && endKeyBytes.compareTo(key) > 0;
     }
   }
 
@@ -349,16 +344,6 @@ public final class RDBBatchOperation implements BatchOperation {
         this.opIndex = new AtomicInteger(0);
       }
 
-      private DeleteRangeOperation findFirstDeleteRangeMatchingRange(Collection<DeleteRangeOperation> deleteRangeOps,
-          Bytes key) {
-        for (DeleteRangeOperation deleteRangeOp : deleteRangeOps) {
-          if (deleteRangeOp.contains(key)) {
-            return deleteRangeOp;
-          }
-        }
-        return null;
-      }
-
       /**
        * Prepares a batch write operation for a RocksDB-backed system.
        *
@@ -390,38 +375,43 @@ public final class RDBBatchOperation implements BatchOperation {
         // Sort Entries based on opIndex and flush the operation to the batch in the same order.
         List<Op> opList = ops.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getKey))
             .map(Map.Entry::getValue).collect(Collectors.toList());
-        TreeMap<Integer, DeleteRangeOperation> deleteRangeIndices = new TreeMap<>();
-        int index = 0;
+        Set<RangeQueryIndex.Range<Bytes>> deleteRangeEntries = new HashSet<>();
         for (Op op : opList) {
           if (op instanceof DeleteRangeOperation) {
             DeleteRangeOperation deleteRangeOp = (DeleteRangeOperation) op;
-            deleteRangeIndices.put(index, deleteRangeOp);
+            deleteRangeEntries.add(deleteRangeOp.rangeEntry);
           }
-          index++;
         }
-        index = 0;
-        for (Op op : opList) {
-          if (op instanceof DeleteRangeOperation) {
-            op.apply(family, writeBatch);
-          } else {
-            // Find the first delete range op matching which would contain the key after the
-            // operation has occurred. If there is no such operation then perform the operation otherwise discard the
-            // op.
-            SingleKeyOp singleKeyOp = (SingleKeyOp) op;
-            DeleteRangeOperation deleteRangeOp = findFirstDeleteRangeMatchingRange(
-                deleteRangeIndices.tailMap(index, false).values(), singleKeyOp.getKeyBytes());
-            if (deleteRangeOp == null) {
+        try {
+          RangeQueryIndex<Bytes> rangeQueryIdx = new RangeQueryIndex<>(deleteRangeEntries);
+          for (Op op : opList) {
+            if (op instanceof DeleteRangeOperation) {
+              DeleteRangeOperation deleteRangeOp = (DeleteRangeOperation) op;
+              rangeQueryIdx.removeRange(deleteRangeOp.rangeEntry);
               op.apply(family, writeBatch);
             } else {
-              debug(() -> String.format("Discarding Operation with Key: %s as it falls within the range of [%s, %s)",
-                  singleKeyOp.getKeyBytes(), deleteRangeOp.startKeyBytes, deleteRangeOp.endKeyBytes));
-              discardedCount++;
-              discardedSize += op.totalLength();
+              // Find a delete range op matching which would contain the key after the
+              // operation has occurred. If there is no such operation then perform the operation otherwise discard the
+              // op.
+              SingleKeyOp singleKeyOp = (SingleKeyOp) op;
+              if (!rangeQueryIdx.containsIntersectingRange(singleKeyOp.getKeyBytes())) {
+                op.apply(family, writeBatch);
+              } else {
+                debug(() -> {
+                  RangeQueryIndex.Range<Bytes> deleteRangeOp =
+                      rangeQueryIdx.getFirstIntersectingRange(singleKeyOp.getKeyBytes());
+                  return String.format("Discarding Operation with Key: %s as it falls within the range of [%s, %s)",
+                      singleKeyOp.getKeyBytes(), deleteRangeOp.getStartInclusive(), deleteRangeOp.getEndExclusive());
+                });
+                discardedCount++;
+                discardedSize += op.totalLength();
+              }
             }
           }
-          index++;
+          debug(this::summary);
+        } catch (IOException e) {
+          throw new RocksDatabaseException("Failed to prepare batch write", e);
         }
-        debug(this::summary);
       }
 
       private String summary() {
