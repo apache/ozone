@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlock
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -82,10 +83,17 @@ public class ECBlockOutputStream extends BlockOutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> executorServiceSupplier
+      Supplier<ExecutorService> executorServiceSupplier,
+      String volumeName,
+      String bucketName,
+      String keyName,
+      long objectID,
+      long parentObjectID,
+      Instant creationTime
   ) throws IOException {
     super(blockID, -1, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier,
+        volumeName, bucketName, keyName, objectID, parentObjectID, creationTime);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }

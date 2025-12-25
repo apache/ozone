@@ -20,6 +20,14 @@ package org.apache.hadoop.hdds.scm.storage;
 import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.BUCKET_NAME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.CREATION_TIME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.KEY_NAME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.OBJECT_ID;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.PARENT_OBJECT_ID;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.TYPE;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.TYPE_KEY;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.VOLUME_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -29,6 +37,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -177,15 +186,38 @@ public class BlockOutputStream extends OutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      String volumeName,
+      String bucketName,
+      String keyName,
+      long objectID,
+      long parentObjectID,
+      Instant creationTime
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
     this.blockSize = blockSize;
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-    KeyValue keyValue =
-        KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
+    
+    // Use provided creation timestamp if available (for reconstruction),
+    // otherwise capture current timestamp (for new writes)
+    String creationTimeIso = creationTime != null ? creationTime.toString() : Instant.now().toString();
+    
+    KeyValue typeKeyValue =
+        KeyValue.newBuilder().setKey(TYPE).setValue(TYPE_KEY).build();
+    KeyValue volumeKeyValue =
+        KeyValue.newBuilder().setKey(VOLUME_NAME).setValue(volumeName).build();
+    KeyValue bucketKeyValue =
+        KeyValue.newBuilder().setKey(BUCKET_NAME).setValue(bucketName).build();
+    KeyValue keyNameKeyValue =
+        KeyValue.newBuilder().setKey(KEY_NAME).setValue(keyName).build();
+    KeyValue objectIdKeyValue =
+        KeyValue.newBuilder().setKey(OBJECT_ID).setValue(String.valueOf(objectID)).build();
+    KeyValue parentObjectIdKeyValue =
+        KeyValue.newBuilder().setKey(PARENT_OBJECT_ID).setValue(String.valueOf(parentObjectID)).build();
+    KeyValue creationTimeKeyValue =
+        KeyValue.newBuilder().setKey(CREATION_TIME).setValue(creationTimeIso).build();
 
     ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
         ContainerProtos.DatanodeBlockID.newBuilder()
@@ -196,7 +228,14 @@ public class BlockOutputStream extends OutputStream {
       blkIDBuilder.setReplicaIndex(replicationIndex);
     }
     this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+        blkIDBuilder.build())
+        .addMetadata(typeKeyValue)
+        .addMetadata(volumeKeyValue)
+        .addMetadata(bucketKeyValue)
+        .addMetadata(keyNameKeyValue)
+        .addMetadata(objectIdKeyValue)
+        .addMetadata(parentObjectIdKeyValue)
+        .addMetadata(creationTimeKeyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
     this.supportIncrementalChunkList = canEnableIncrementalChunkList();
