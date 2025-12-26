@@ -341,6 +341,9 @@ public class ObjectEndpoint extends EndpointBase {
           .build();
     } catch (OMException ex) {
       auditSuccess = false;
+      LOG.error("Failed to {} object: bucket={}, key={}, errorCode={}, uploadId={}, partNumber={}",
+          s3GAction, bucketName, keyPath, ex.getResult(),
+          uploadID != null ? uploadID : "N/A", partNumber, ex);
       auditWriteFailure(s3GAction, ex);
       if (taggingMarker != null) {
         getMetrics().updatePutObjectTaggingFailureStats(startNanos);
@@ -369,6 +372,9 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } catch (Exception ex) {
       auditSuccess = false;
+      LOG.error("Unexpected error during {}: bucket={}, key={}, uploadId={}, partNumber={}",
+          s3GAction, bucketName, keyPath,
+          uploadID != null ? uploadID : "N/A", partNumber, ex);
       auditWriteFailure(s3GAction, ex);
       if (aclMarker != null) {
         getMetrics().updatePutObjectAclFailureStats(startNanos);
@@ -547,6 +553,9 @@ public class ObjectEndpoint extends EndpointBase {
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       return responseBuilder.build();
     } catch (OMException ex) {
+      LOG.error("Failed to {} object: bucket={}, key={}, errorCode={}, uploadId={}, partNumber={}, maxParts={}",
+          s3GAction, bucketName, keyPath, ex.getResult(),
+          uploadId != null ? uploadId : "N/A", partNumber, maxParts, ex);
       auditReadFailure(s3GAction, ex);
       if (taggingMarker != null) {
         getMetrics().updateGetObjectTaggingFailureStats(startNanos);
@@ -565,6 +574,9 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
+      LOG.error("Unexpected error during {}: bucket={}, key={}, uploadId={}, partNumber={}",
+          s3GAction, bucketName, keyPath,
+          uploadId != null ? uploadId : "N/A", partNumber, ex);
       auditReadFailure(s3GAction, ex);
       throw ex;
     }
@@ -616,6 +628,8 @@ public class ObjectEndpoint extends EndpointBase {
       isFile(keyPath, key);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
+      LOG.error("Failed to {} object: bucket={}, key={}, errorCode={}",
+          s3GAction, bucketName, keyPath, ex.getResult(), ex);
       auditReadFailure(s3GAction, ex);
       getMetrics().updateHeadKeyFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
@@ -629,6 +643,8 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
+      LOG.error("Unexpected error during {}: bucket={}, key={}",
+          s3GAction, bucketName, keyPath, ex);
       auditReadFailure(s3GAction, ex);
       throw ex;
     }
@@ -694,11 +710,17 @@ public class ObjectEndpoint extends EndpointBase {
       getClientProtocol().abortMultipartUpload(volume.getName(), bucket,
           key, uploadId);
     } catch (OMException ex) {
+      LOG.error("Failed to abort multipart upload: bucket={}, key={}, uploadId={}, errorCode={}",
+          bucket, key, uploadId, ex.getResult(), ex);
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
+      throw ex;
+    } catch (Exception ex) {
+      LOG.error("Unexpected error during abort multipart upload: bucket={}, key={}, uploadId={}",
+          bucket, key, uploadId, ex);
       throw ex;
     }
     getMetrics().updateAbortMultipartUploadSuccessStats(startNanos);
@@ -745,6 +767,10 @@ public class ObjectEndpoint extends EndpointBase {
       getClientProtocol().deleteKey(volume.getName(), bucketName,
           keyPath, false);
     } catch (OMException ex) {
+      LOG.error("Failed to {} object: bucket={}, key={}, errorCode={}, uploadId={}, taggingMarker={}",
+          s3GAction, bucketName, keyPath, ex.getResult(),
+          uploadId != null && !uploadId.equals("") ? uploadId : "N/A",
+          taggingMarker != null ? "present" : "N/A", ex);
       auditWriteFailure(s3GAction, ex);
       if (uploadId != null && !uploadId.equals("")) {
         getMetrics().updateAbortMultipartUploadFailureStats(startNanos);
@@ -770,6 +796,10 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
+      LOG.error("Unexpected error during {}: bucket={}, key={}, uploadId={}, taggingMarker={}",
+          s3GAction, bucketName, keyPath,
+          uploadId != null && !uploadId.equals("") ? uploadId : "N/A",
+          taggingMarker != null ? "present" : "N/A", ex);
       auditWriteFailure(s3GAction, ex);
       if (taggingMarker != null) {
         getMetrics().updateDeleteObjectTaggingFailureStats(startNanos);
@@ -832,6 +862,8 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
+      LOG.error("Failed to {}: bucket={}, key={}, errorCode={}",
+          s3GAction, bucket, key, ex.getResult(), ex);
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
       if (isAccessDenied(ex)) {
@@ -839,6 +871,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } catch (Exception ex) {
+      LOG.error("Unexpected error during {}: bucket={}, key={}",
+          s3GAction, bucket, key, ex);
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
       throw ex;
@@ -900,6 +934,9 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
+      LOG.error("Failed to {}: bucket={}, key={}, uploadId={}, errorCode={}, partsCount={}",
+          s3GAction, bucket, key, uploadID, ex.getResult(),
+          partList != null ? partList.size() : 0, ex);
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.INVALID_PART) {
@@ -929,7 +966,11 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } catch (Exception ex) {
+      LOG.error("Unexpected error during {}: bucket={}, key={}, uploadId={}, partsCount={}",
+          s3GAction, bucket, key, uploadID,
+          partList != null ? partList.size() : 0, ex);
       auditWriteFailure(s3GAction, ex);
+      getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       throw ex;
     }
   }
@@ -1076,6 +1117,9 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
     } catch (OMException ex) {
+      LOG.error("Failed to create multipart key: bucket={}, key={}, uploadId={}, partNumber={}, errorCode={}, isCopy={}",
+          bucketName, key, uploadID, partNumber, ex.getResult(),
+          copyHeader != null ? "true" : "false", ex);
       if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
       } else {
@@ -1152,6 +1196,8 @@ public class ObjectEndpoint extends EndpointBase {
         listPartsResponse.addPart(part);
       });
     } catch (OMException ex) {
+      LOG.error("Failed to list parts: bucket={}, key={}, uploadId={}, partNumberMarker={}, maxParts={}, errorCode={}",
+          bucketName, key, uploadID, partNumberMarker, maxParts, ex.getResult(), ex);
       getMetrics().updateListPartsFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
@@ -1298,6 +1344,8 @@ public class ObjectEndpoint extends EndpointBase {
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
       return copyObjectResponse;
     } catch (OMException ex) {
+      LOG.error("Failed to copy object: sourceBucket={}, sourceKey={}, destBucket={}, destKey={}, errorCode={}",
+          sourceBucket, sourceKey, destBucket, destkey, ex.getResult(), ex);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
@@ -1306,6 +1354,10 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             destBucket + "/" + destkey, ex);
       }
+      throw ex;
+    } catch (Exception ex) {
+      LOG.error("Unexpected error during copy object: sourceBucket={}, sourceKey={}, destBucket={}, destKey={}",
+          sourceBucket, sourceKey, destBucket, destkey, ex);
       throw ex;
     } finally {
       // Reset the thread-local message digest instance in case of exception
