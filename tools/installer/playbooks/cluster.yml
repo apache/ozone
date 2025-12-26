@@ -1,11 +1,12 @@
 ---
-- name: "Ozone Non-HA Cluster Deployment"
+- name: "Ozone Cluster Deployment"
   hosts: all
   gather_facts: false
   any_errors_fatal: true
   vars:
-    cluster_mode: "non-ha"
-    ha_enabled: false
+    # Expect cluster_mode to be passed in (non-ha | ha). Fallback to non-ha.
+    cluster_mode: "{{ cluster_mode | default('non-ha') }}"
+    ha_enabled: "{{ cluster_mode == 'ha' }}"
   pre_tasks:
     - name: "Pre-install: Ensure python3 present"
       raw: |
@@ -18,15 +19,36 @@
         executable: /bin/bash
       changed_when: false
       failed_when: false
+
     - name: "Pre-install: Gather facts"
       setup:
-  roles:
-    - role: ozone_user
-    - role: ssh_bootstrap
-    - role: java
-    - role: ozone_layout
-    - role: ozone_fetch
-    - role: ozone_config
-    - role: ozone_service_non_ha
-      when: start_after_install | bool
 
+    - name: "Pre-install: Ensure Ansible remote tmp exists"
+      file:
+        path: "{{ (ansible_env.TMPDIR | default('/tmp')) ~ '/.ansible-' ~ ansible_user_id }}"
+        state: directory
+        mode: "0700"
+        owner: "{{ ansible_user_id }}"
+
+  roles:
+    - role: cleanup
+      tags: ["cleanup"]
+      when: (do_cleanup | default(false))
+    - role: ozone_user
+      tags: ["ozone_user"]
+    - role: ssh_bootstrap
+      tags: ["ssh_bootstrap"]
+    - role: java
+      tags: ["java"]
+    - role: ozone_layout
+      tags: ["ozone_layout"]
+    - role: ozone_fetch
+      tags: ["ozone_fetch"]
+    - role: ozone_config
+      tags: ["ozone_config"]
+    - role: ozone_service_{{ cluster_mode }}
+      tags: ["ozone_service_{{ cluster_mode }}"]
+      when: start_after_install | bool
+    - role: ozone_smoke
+      tags: ["ozone_smoke"]
+      when: start_after_install | bool

@@ -27,6 +27,7 @@ use_sudo: true
 start_after_install: true
 ozone_opts: "-Xmx1024m -XX:ParallelGCThreads=8"
 service_command_timeout: 300  # seconds for service init/start commands
+ansible_remote_tmp: "/tmp/.ansible-{{ ansible_user_id }}"
 
 # SSH bootstrap
 allow_cluster_ssh_key_deploy: false

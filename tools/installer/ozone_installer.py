@@ -9,10 +9,14 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 ANSIBLE_ROOT = Path(__file__).resolve().parent
 ANSIBLE_CFG = ANSIBLE_ROOT / "ansible.cfg"
 PLAYBOOKS_DIR = ANSIBLE_ROOT / "playbooks"
+LOGS_DIR = ANSIBLE_ROOT / "logs"
+LAST_FAILED_FILE = LOGS_DIR / "last_failed_task.txt"
+LAST_RUN_FILE = LOGS_DIR / "last_run.json"
 
 DEFAULTS = {
     "install_base": "/opt/ozone",
@@ -49,13 +53,22 @@ def parse_args(argv):
     p.add_argument("-S", "--use-sudo", action="store_true", help="Run remote commands via sudo (default)")
     p.add_argument("-u", "--service-user", help="Service user (default: ozone)")
     p.add_argument("-g", "--service-group", help="Service group (default: ozone)")
-    p.add_argument("--deploy", action="store_true", help="Provision hosts via cdep before install")
     # Local extras
-    p.add_argument("--local-shared-path", help="Local shared path on target for snapshot")
-    p.add_argument("--local-ozone-dirname", help="Local ozone dir name (ozone-*-SNAPSHOT)")
+    p.add_argument("--local-path", help="Path to local Ozone build (contains bin/ozone)")
     p.add_argument("--dl-url", help="Upstream download base URL")
     p.add_argument("--yes", action="store_true", help="Non-interactive; accept defaults for missing values")
+    p.add_argument("-R", "--resume", action="store_true", help="Resume play at last failed task (if available)")
     return p.parse_args(argv)
+
+def _validate_local_ozone_dir(path: Path) -> bool:
+    """
+    Returns True if 'path/bin/ozone' exists and is executable.
+    """
+    ozone_bin = path / "bin" / "ozone"
+    try:
+        return ozone_bin.exists() and os.access(str(ozone_bin), os.X_OK)
+    except OSError:
+        return False
 
 def prompt(prompt_text, default=None, secret=False, yes_mode=False):
     if yes_mode:
@@ -75,6 +88,64 @@ def prompt(prompt_text, default=None, secret=False, yes_mode=False):
         return val
     except EOFError:
         return default
+
+def _semver_key(v: str) -> Tuple[int, int, int, str]:
+    """
+    Convert version like '2.0.0' or '2.1.0-RC0' to a sortable key.
+    Pre-release suffix sorts before final.
+    """
+    try:
+        core, *rest = v.split("-", 1)
+        major, minor, patch = core.split(".")
+        suffix = rest[0] if rest else ""
+        return (int(major), int(minor), int(patch), suffix)
+    except Exception:
+        return (0, 0, 0, v)
+
+def fetch_available_versions(dl_url: str, limit: int = 30) -> List[str]:
+    """
+    Fetch available Ozone versions from the download base. Returns newest-first.
+    """
+    try:
+        import urllib.request
+        with urllib.request.urlopen(dl_url, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+        # Apache directory listing usually has anchors like href="2.0.0/"
+        candidates = set(m.group(1) for m in re.finditer(r'href="([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?)\/"', html))
+        versions = sorted(candidates, key=_semver_key, reverse=True)
+        if limit and len(versions) > limit:
+            versions = versions[:limit]
+        return versions
+    except Exception:
+        return []
+
+def choose_version_interactive(versions: List[str], default_version: str, yes_mode: bool) -> Optional[str]:
+    """
+    Present a numbered list and prompt user to choose a version.
+    Returns selected version string or None if not chosen.
+    """
+    if not versions:
+        return None
+    if yes_mode:
+        return versions[0]
+    print("Available Ozone versions:")
+    for idx, ver in enumerate(versions, start=1):
+        print(f"  {idx}) {ver}")
+    while True:
+        choice = prompt("Select version by number or type a version string (or 'local')", default="1", yes_mode=False)
+        if choice is None or str(choice).strip() == "":
+            return versions[0]
+        choice = str(choice).strip()
+        if choice.lower() == "local":
+            return "local"
+        if choice.isdigit():
+            i = int(choice)
+            if 1 <= i <= len(versions):
+                return versions[i - 1]
+        # allow typing a specific version not listed
+        if re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?$", choice):
+            return choice
+        print("Invalid selection. Please enter a number from the list, a valid version (e.g., 2.0.0) or 'local'.")
 
 def expand_braces(expr):
     # Supports simple pattern like prefix{1..N}suffix
@@ -160,7 +231,7 @@ def _render_inv_groups(om, scm, dn, recon, ssh_user=None, keyfile=None, password
     sections.append("\n")
     return "\n".join(sections)
 
-def run_playbook(playbook, inventory_path, extra_vars_path, ask_pass=False, become=True):
+def run_playbook(playbook, inventory_path, extra_vars_path, ask_pass=False, become=True, start_at_task=None, tags=None):
     cmd = [
         "ansible-playbook",
         "-i", str(inventory_path),
@@ -171,24 +242,44 @@ def run_playbook(playbook, inventory_path, extra_vars_path, ask_pass=False, beco
         cmd.append("-k")
     if become:
         cmd.append("--become")
+    if start_at_task:
+        cmd += ["--start-at-task", str(start_at_task)]
+    if tags:
+        cmd += ["--tags", ",".join(tags)]
     env = os.environ.copy()
     env["ANSIBLE_CONFIG"] = str(ANSIBLE_CFG)
+    if start_at_task:
+        print(f"Resuming from task: {start_at_task}")
+    if tags:
+        print(f"Using tags: {','.join(tags)}")
     print(f"Running: {' '.join(shlex.quote(c) for c in cmd)}")
     return subprocess.call(cmd, env=env)
 
 def main(argv):
     args = parse_args(argv)
-    yes = bool(args.yes)
+    # Resume mode: reuse last provided configs and suppress prompts when possible
+    resuming = bool(getattr(args, "resume", False))
+    yes = True if resuming else bool(args.yes)
+    last_cfg = None
+    if resuming and LAST_RUN_FILE.exists():
+        try:
+            last_cfg = json.loads(LAST_RUN_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            last_cfg = None
 
     # Gather inputs interactively where missing
-    hosts_raw = args.host or prompt("Target host(s) [non-ha: host | HA: h1,h2,h3 or brace expansion]", default="", yes_mode=yes)
+    hosts_raw_default = (last_cfg.get("hosts_raw") if last_cfg else None)
+    hosts_raw = args.host or hosts_raw_default or prompt("Target host(s) [non-ha: host | HA: h1,h2,h3 or brace expansion]", default="", yes_mode=yes)
     hosts = parse_hosts(hosts_raw) if hosts_raw else []
     if not hosts:
         print("Error: No hosts provided (-H/--host).", file=sys.stderr)
         return 2
     # Decide HA vs Non-HA with user input; default depends on host count
+    resume_cluster_mode = (last_cfg.get("cluster_mode") if last_cfg else None)
     if args.cluster_mode:
         cluster_mode = args.cluster_mode
+    elif resume_cluster_mode:
+        cluster_mode = resume_cluster_mode
     else:
         default_mode = "ha" if len(hosts) >= 3 else "non-ha"
         selected = prompt("Deployment type (ha|non-ha)", default=default_mode, yes_mode=yes)
@@ -199,18 +290,39 @@ def main(argv):
         print("Error: HA requires at least 3 hosts (to map 3 OMs and 3 SCMs).", file=sys.stderr)
         return 2
 
-    ozone_version = args.version or prompt("Ozone version (e.g., 2.0.0 | local)", default=DEFAULTS["ozone_version"], yes_mode=yes)
-    jdk_major = args.jdk_version or int(prompt("JDK major (17|21)", default=str(DEFAULTS["jdk_major"]), yes_mode=yes))
-    install_base = args.install_dir or prompt("Install base directory", default=DEFAULTS["install_base"], yes_mode=yes)
-    data_base = args.data_dir or prompt("Data base directory", default=DEFAULTS["data_base"], yes_mode=yes)
+    # Resolve download base early for version selection
+    dl_url = args.dl_url or (last_cfg.get("dl_url") if last_cfg else None) or DEFAULTS["dl_url"]
+    ozone_version = args.version or (last_cfg.get("ozone_version") if last_cfg else None)
+    if not ozone_version:
+        # Try to fetch available versions from dl_url and offer selection
+        versions = fetch_available_versions(dl_url or DEFAULTS["dl_url"])
+        selected = choose_version_interactive(versions, DEFAULTS["ozone_version"], yes_mode=yes)
+        if selected:
+            ozone_version = selected
+        else:
+            # Fallback prompt if fetch failed
+            ozone_version = prompt("Ozone version (e.g., 2.0.0 | local)", default=DEFAULTS["ozone_version"], yes_mode=yes)
+    jdk_major = args.jdk_version if args.jdk_version is not None else ((last_cfg.get("jdk_major") if last_cfg else None))
+    if jdk_major is None:
+        _jdk_val = prompt("JDK major (17|21)", default=str(DEFAULTS["jdk_major"]), yes_mode=yes)
+        try:
+            jdk_major = int(str(_jdk_val)) if _jdk_val is not None else DEFAULTS["jdk_major"]
+        except Exception:
+            jdk_major = DEFAULTS["jdk_major"]
+    install_base = args.install_dir or (last_cfg.get("install_base") if last_cfg else None) \
+        or prompt("Install base directory", default=DEFAULTS["install_base"], yes_mode=yes)
+    data_base = args.data_dir or (last_cfg.get("data_base") if last_cfg else None) \
+        or prompt("Data base directory", default=DEFAULTS["data_base"], yes_mode=yes)
 
     # Auth (before service user/group)
-    auth_method = args.auth_method or prompt("Auth method (key|password)", default="password", yes_mode=yes)
+    auth_method = args.auth_method or (last_cfg.get("auth_method") if last_cfg else None) \
+        or prompt("Auth method (key|password)", default="password", yes_mode=yes)
     if auth_method not in ("key", "password"):
         auth_method = "password"
-    ssh_user = args.ssh_user or prompt("SSH username", default="root", yes_mode=yes)
-    password = args.password
-    keyfile = args.keyfile
+    ssh_user = args.ssh_user or (last_cfg.get("ssh_user") if last_cfg else None) \
+        or prompt("SSH username", default="root", yes_mode=yes)
+    password = args.password or ((last_cfg.get("password") if last_cfg else None))  # persisted for resume on request
+    keyfile = args.keyfile or (last_cfg.get("keyfile") if last_cfg else None)
     if auth_method == "password" and not password:
         password = prompt("SSH password", default="", secret=True, yes_mode=yes)
     if auth_method == "key" and not keyfile:
@@ -220,26 +332,64 @@ def main(argv):
         keyfile = None
     elif auth_method == "key":
         password = None
-    service_user = args.service_user or prompt("Service user", default=DEFAULTS["service_user"], yes_mode=yes)
-    service_group = args.service_group or prompt("Service group", default=DEFAULTS["service_group"], yes_mode=yes)
-    dl_url = args.dl_url or DEFAULTS["dl_url"]
-    start_after_install = args.start or DEFAULTS["start_after_install"]
-    use_sudo = args.use_sudo or DEFAULTS["use_sudo"]
+    service_user = args.service_user or (last_cfg.get("service_user") if last_cfg else None) \
+        or prompt("Service user", default=DEFAULTS["service_user"], yes_mode=yes)
+    service_group = args.service_group or (last_cfg.get("service_group") if last_cfg else None) \
+        or prompt("Service group", default=DEFAULTS["service_group"], yes_mode=yes)
+    dl_url = args.dl_url or (last_cfg.get("dl_url") if last_cfg else None) or DEFAULTS["dl_url"]
+    start_after_install = (args.start or (last_cfg.get("start_after_install") if last_cfg else None)
+                           or DEFAULTS["start_after_install"])
+    use_sudo = (args.use_sudo or (last_cfg.get("use_sudo") if last_cfg else None)
+                or DEFAULTS["use_sudo"])
 
-    # Local specifics
-    local_shared_path = args.local_shared_path
-    local_oz_dir = args.local_ozone_dirname
+    # Local specifics (single path to local build)
+    local_path = (getattr(args, "local_path", None) or (last_cfg.get("local_path") if last_cfg else None))
+    local_shared_path = None
+    local_oz_dir = None
     if ozone_version and ozone_version.lower() == "local":
-        local_shared_path = local_shared_path or prompt("Local shared path on controller (contains ozone-*/)", default="", yes_mode=yes)
-        local_oz_dir = local_oz_dir or prompt("Local ozone dir (e.g., ozone-2.1.0-SNAPSHOT)", default="", yes_mode=yes)
+        # Accept a direct path to the ozone build dir (relative or absolute) and validate it.
+        # Backward-compat: if only legacy split values were saved previously, resolve them.
+        candidate = None
+        if local_path:
+            candidate = Path(local_path).expanduser().resolve()
+        else:
+            legacy_shared = (last_cfg.get("local_shared_path") if last_cfg else None)
+            legacy_dir = (last_cfg.get("local_ozone_dirname") if last_cfg else None)
+            if legacy_shared and legacy_dir:
+                candidate = Path(legacy_shared).expanduser().resolve() / legacy_dir
 
-    # Optional provisioning
-    do_deploy = bool(args.deploy)
-    hosts_base_for_deploy = hosts_raw or ""
+        def ask_for_path():
+            val = prompt("Path to local Ozone build", default="", yes_mode=yes)
+            return Path(val).expanduser().resolve() if val else None
+
+        if candidate is None or not _validate_local_ozone_dir(candidate):
+            if yes:
+                print("Error: For -v local, a valid Ozone build path containing bin/ozone is required.", file=sys.stderr)
+                return 2
+            while True:
+                maybe = ask_for_path()
+                if maybe and _validate_local_ozone_dir(maybe):
+                    candidate = maybe
+                    break
+                print("Invalid path. Expected an Ozone build directory with bin/ozone. Please try again.", file=sys.stderr)
+
+        # Normalize back to shared path + dirname for Ansible vars and persistable single path
+        local_shared_path = str(candidate.parent)
+        local_oz_dir = candidate.name
+        local_path = str(candidate)
 
     # Prepare dynamic inventory and extra-vars
     inventory_text = build_inventory(hosts, ssh_user=ssh_user, keyfile=keyfile, password=password,
                                      cluster_mode=cluster_mode)
+    # Decide cleanup behavior up-front (so we can pass it into the unified play)
+    do_cleanup = False
+    if args.clean:
+        do_cleanup = True
+    else:
+        answer = prompt(f"Cleanup existing install at {install_base} (if present)? (y/N)", default="n", yes_mode=yes)
+        if str(answer).strip().lower().startswith("y"):
+            do_cleanup = True
+
     extra_vars = {
         "cluster_mode": cluster_mode,
         "install_base": install_base,
@@ -251,6 +401,7 @@ def main(argv):
         "ozone_version": ozone_version,
         "start_after_install": bool(start_after_install),
         "use_sudo": bool(use_sudo),
+        "do_cleanup": bool(do_cleanup),
         "JAVA_MARKER": DEFAULTS["JAVA_MARKER"],
         "ENV_MARKER": DEFAULTS["ENV_MARKER"],
     }
@@ -267,46 +418,64 @@ def main(argv):
         ev_path = Path(tdir) / "vars.json"
         inv_path.write_text(inventory_text or "", encoding="utf-8")
         ev_path.write_text(json.dumps(extra_vars, indent=2), encoding="utf-8")
+        # Persist last run configs (and use them for execution)
+        try:
+            os.makedirs(LOGS_DIR, exist_ok=True)
+            # Save inventory/vars for direct reuse
+            persisted_inv = LOGS_DIR / "last_inventory.ini"
+            persisted_ev = LOGS_DIR / "last_vars.json"
+            persisted_inv.write_text(inventory_text or "", encoding="utf-8")
+            persisted_ev.write_text(json.dumps(extra_vars, indent=2), encoding="utf-8")
+            # Point playbook execution to persisted files (consistent first run and reruns)
+            inv_path = persisted_inv
+            ev_path = persisted_ev
+            # Save effective simple config for future resume
+            LAST_RUN_FILE.write_text(json.dumps({
+                "hosts_raw": hosts_raw,
+                "cluster_mode": cluster_mode,
+                "ozone_version": ozone_version,
+                "jdk_major": jdk_major,
+                "install_base": install_base,
+                "data_base": data_base,
+                "auth_method": auth_method,
+                "ssh_user": ssh_user,
+                "password": password if auth_method == "password" else None,
+                "keyfile": str(keyfile) if keyfile else None,
+                "service_user": service_user,
+                "service_group": service_group,
+                "dl_url": dl_url,
+                "start_after_install": bool(start_after_install),
+                "use_sudo": bool(use_sudo),
+                "local_shared_path": local_shared_path or "",
+                "local_ozone_dirname": local_oz_dir or "",
+            }, indent=2), encoding="utf-8")
+        except Exception:
+            # Fall back to temp files if persisting fails
+            pass
         # Roles order removed (no resume via tags)
 
-        # Optional provisioning run
-        if do_deploy:
-            prov_vars = {
-                "hosts_base": hosts_base_for_deploy,
-            }
-            prov_path = Path(tdir) / "prov.json"
-            prov_path.write_text(json.dumps(prov_vars, indent=2), encoding="utf-8")
-            rc = run_playbook(PLAYBOOKS_DIR / "provision.yml", inv_path, prov_path, ask_pass=False, become=False)
-            if rc != 0:
-                print("Provisioning failed.", file=sys.stderr)
-                return rc
-        # Cleanup before install:
-        # - If --clean is provided, always run cleanup
-        # - Otherwise, ask for confirmation (defaults to no) and run if accepted
-        do_cleanup = False
-        if args.clean:
-            do_cleanup = True
-        else:
-            answer = prompt(f"Cleanup existing install at {install_base} (if present)? (y/N)", default="n", yes_mode=yes)
-            if str(answer).strip().lower().startswith("y"):
-                do_cleanup = True
-        if do_cleanup:
-            rc = run_playbook(PLAYBOOKS_DIR / "cleanup.yml", inv_path, ev_path, ask_pass=ask_pass, become=True)
-            if rc != 0:
-                print("Cleanup failed.", file=sys.stderr)
-                return rc
-
-        # Install + (optional) start
-        playbook = PLAYBOOKS_DIR / ("ha-cluster.yml" if cluster_mode == "ha" else "non-ha-cluster.yml")
-        rc = run_playbook(playbook, inv_path, ev_path, ask_pass=ask_pass, become=True)
+        # Install + (optional) start (single merged playbook)
+        playbook = PLAYBOOKS_DIR / "cluster.yml"
+        start_at = None
+        use_tags = None
+        if args.resume:
+            if LAST_FAILED_FILE.exists():
+                try:
+                    # use first line (task name)
+                    contents = LAST_FAILED_FILE.read_text(encoding="utf-8").splitlines()
+                    start_at = contents[0].strip() if contents else None
+                    # derive role tag if present
+                    role_line = next((l for l in contents if l.startswith("# role:")), None)
+                    if role_line:
+                        role_name = role_line.split(":", 1)[1].strip()
+                        if role_name:
+                            use_tags = [role_name]
+                except Exception:
+                    start_at = None
+        rc = run_playbook(playbook, inv_path, ev_path, ask_pass=ask_pass, become=True, start_at_task=start_at, tags=use_tags)
         if rc != 0:
             return rc
 
-        # Smoke test (only if started)
-        if extra_vars.get("start_after_install"):
-            rc = run_playbook(PLAYBOOKS_DIR / "smoke.yml", inv_path, ev_path, ask_pass=ask_pass, become=True)
-            if rc != 0:
-                return rc
 
     print("All done.")
     return 0
