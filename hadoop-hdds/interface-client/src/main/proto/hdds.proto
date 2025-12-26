@@ -479,6 +479,7 @@ message ReplicationManagerReportProto {
     required int64 timestamp = 1;
     repeated KeyIntValue stat = 2;
     repeated KeyContainerIDList statSample = 3;
+    optional int32 sampleLimit = 4 [default = 100];
 }
 
 message ContainerBalancerConfigurationProto {

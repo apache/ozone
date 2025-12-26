@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Condition;
@@ -357,7 +358,7 @@ public class KeyOutputStream extends OutputStream
     }
 
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -384,7 +385,7 @@ public class KeyOutputStream extends OutputStream
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);

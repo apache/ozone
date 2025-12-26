@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
@@ -84,7 +84,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
 import org.apache.hadoop.ozone.recon.ReconContext;
@@ -197,11 +196,11 @@ public class OzoneManagerServiceProviderImpl
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
     omDBSnapshotUrl = "http://" + ozoneManagerHttpAddress +
-        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
     if (policy.isHttpsEnabled()) {
       omDBSnapshotUrl = "https://" + ozoneManagerHttpsAddress +
-          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     }
 
     boolean flushParam = configuration.getBoolean(
@@ -272,6 +271,7 @@ public class OzoneManagerServiceProviderImpl
         throw new RuntimeException(runtimeException);
       }
     }
+    reconTaskController.updateOMMetadataManager(omMetadataManager);
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
@@ -425,7 +425,7 @@ public class OzoneManagerServiceProviderImpl
           omLeaderUrl = (policy.isHttpsEnabled() ?
               "https://" + info.getServiceAddress(Type.HTTPS) :
               "http://" + info.getServiceAddress(Type.HTTP)) +
-              OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
+              OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
         }
       }
     }
@@ -482,7 +482,6 @@ public class OzoneManagerServiceProviderImpl
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
           tarExtractor.extractTar(inputStream, untarredDbDir);
-          OmSnapshotUtils.createHardLinks(untarredDbDir, true);
         } catch (IOException | InterruptedException e) {
           reconContext.updateHealthStatus(new AtomicBoolean(false));
           reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -490,7 +489,6 @@ public class OzoneManagerServiceProviderImpl
         }
         return null;
       });
-
       // Validate extracted files
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
       if (sstFiles != null && sstFiles.length > 0) {
@@ -658,7 +656,7 @@ public class OzoneManagerServiceProviderImpl
             writeBatch.iterate(omdbUpdatesHandler);
             // Commit the OM DB transactions in recon rocks DB and sync here.
             try (RDBBatchOperation rdbBatchOperation =
-                     new RDBBatchOperation(writeBatch)) {
+                     RDBBatchOperation.newAtomicOperation(writeBatch)) {
               try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
                 rdbBatchOperation.commit(rocksDB, wOpts);
               }
@@ -752,11 +750,11 @@ public class OzoneManagerServiceProviderImpl
               fullSnapshotReconTaskUpdater.updateDetails();
               // Update the current OM metadata manager in task controller
               reconTaskController.updateOMMetadataManager(omMetadataManager);
-              
+
               // Pass on DB update events to tasks that are listening.
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
-              
+
               // Check if task reinitialization is needed due to buffer overflow or task failures
               boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
               boolean tasksFailed = reconTaskController.hasTasksFailed();

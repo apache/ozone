@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 

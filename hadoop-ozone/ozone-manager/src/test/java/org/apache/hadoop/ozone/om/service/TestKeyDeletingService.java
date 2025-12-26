@@ -54,7 +54,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -468,6 +467,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       service.runPeriodicalTaskNow();
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
       snapshotDeletingService.resume();
+      snapshotDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount, metadataManager);
       keyDeletingService.resume();
     }
@@ -475,7 +476,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testRenamedKeyReclaimation(boolean testForSnapshot)
-        throws IOException, InterruptedException, TimeoutException, ExecutionException {
+        throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -1387,9 +1388,5 @@ class TestKeyDeletingService extends OzoneTestBase {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
-  }
-
-  private static String uniqueObjectName(String prefix) {
-    return prefix + String.format("%010d", OBJECT_COUNTER.getAndIncrement());
   }
 }

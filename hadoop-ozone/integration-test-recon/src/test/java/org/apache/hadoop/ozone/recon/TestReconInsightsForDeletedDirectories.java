@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.recon.api.OMDBInsightEndpoint;
+import org.apache.hadoop.ozone.recon.api.ReconGlobalMetricsService;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -245,9 +246,14 @@ public class TestReconInsightsForDeletedDirectories {
         (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, reconNamespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(ReconGlobalStatsManager.class), reconNamespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class),
+            reconNamespaceSummaryManager, reconGlobalMetricsService);
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
@@ -329,13 +335,19 @@ public class TestReconInsightsForDeletedDirectories {
     // Create an Instance of OMDBInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
         recon.getReconServer().getReconStorageContainerManager();
+
     ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
         (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, namespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(ReconGlobalStatsManager.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager,
+            reconGlobalMetricsService);
 
     // Delete the entire root directory dir1.
     fs.delete(new Path("/dir1/dir2/dir3"), true);
@@ -416,9 +428,15 @@ public class TestReconInsightsForDeletedDirectories {
     ReconOMMetadataManager reconOmMetadataManagerInstance =
         (ReconOMMetadataManager) recon.getReconServer()
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
+
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, namespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(ReconGlobalStatsManager.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager,
+            reconGlobalMetricsService);
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();

@@ -174,7 +174,7 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
@@ -283,7 +283,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final OzoneConfiguration configuration;
+  private OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -601,6 +601,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public OzoneConfiguration getConfiguration() {
     return configuration;
+  }
+
+  @VisibleForTesting
+  public void setConfiguration(OzoneConfiguration conf) {
+    this.configuration = conf;
   }
 
   /**
@@ -1173,9 +1178,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmhaNodeDetails.getLocalNodeDetails().getNodeId());
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     final String fetchedId = scmInfo.getClusterId();
-    Preconditions.checkNotNull(fetchedId);
+    Objects.requireNonNull(fetchedId, "fetchedId == null");
     if (state == StorageState.INITIALIZED) {
-      Preconditions.checkNotNull(scmStorageConfig.getScmId());
+      Objects.requireNonNull(scmStorageConfig.getScmId(), "scmId == null");
       if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
             "Could not bootstrap as SCM is already initialized with cluster "
@@ -1260,7 +1265,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
           // clusterId must be an UUID
-          Preconditions.checkNotNull(UUID.fromString(clusterId));
+          Objects.requireNonNull(UUID.fromString(clusterId), "clusterId UUID == null");
           scmStorageConfig.setClusterId(clusterId);
         }
 
@@ -1344,7 +1349,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       ConfigurationSource conf) throws IOException {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
         conf);
-    Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
+    Objects.requireNonNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
     if (HddsUtils.getScmServiceId(conf) != null) {
@@ -1532,10 +1537,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     getBlockProtocolServer().start();
 
-    // If HA is enabled, start datanode protocol server once leader is ready.
-    if (!scmStorageConfig.isSCMHAEnabled()) {
-      getDatanodeProtocolServer().start();
-    }
+    // start datanode protocol server
+    getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
@@ -2186,9 +2189,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
-        getConfiguration(), scmStarterUser);
+    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfigValue(
+        newVal, scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
@@ -2196,9 +2198,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneReadOnlyAdmins(String newVal) {
-    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
-    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
-        getConfiguration());
+    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfigValue(
+        newVal);
     scmReadOnlyAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now read only admins are: {}",
         OZONE_READONLY_ADMINISTRATORS,
@@ -2228,8 +2229,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
         "removePeerFromHARing");
 
-    Preconditions.checkNotNull(getScmHAManager().getRatisServer()
-        .getDivision().getGroup());
+    Objects.requireNonNull(getScmHAManager().getRatisServer()
+        .getDivision().getGroup(), "Group == null");
 
     // check valid scmid in ratis peers list
     if (getScmHAManager().getRatisServer().getDivision()
@@ -2247,6 +2248,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     return getScmHAManager().removeSCM(request);
 
+  }
+
+  /**
+   * Check if the input scmId exists in the peers list.
+   * @return true if the nodeId is self, or it exists in peer node list,
+   *         false otherwise.
+   */
+  @VisibleForTesting
+  public boolean doesPeerExist(String scmId) {
+    if (getScmId().equals(scmId)) {
+      return true;
+    }
+    return getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeer(RaftPeerId.valueOf(scmId)) != null;
   }
 
   public void scmHAMetricsUpdate(String leaderId) {

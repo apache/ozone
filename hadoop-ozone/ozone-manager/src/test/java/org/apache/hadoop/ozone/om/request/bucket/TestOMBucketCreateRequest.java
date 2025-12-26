@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -27,10 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -48,6 +52,8 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OMBucketCreateRequest class, which handles CreateBucket request.
@@ -317,6 +323,44 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     when(ozoneManager.isStrictS3()).thenReturn(false);
     for (String bucketName : nonS3CompliantBucketName) {
       acceptBucketCreationHelper(volumeName, bucketName);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 10000L);
+
+    // create a bucket
+    String acl = "user:ozone:a";
+    OzoneManagerProtocolProtos.BucketInfo.Builder builder =
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setStorageType(HddsProtos.StorageTypeProto.SSD)
+            .setIsVersionEnabled(false)
+            .setQuotaInBytes(5000L)
+            .addAcls(OzoneAcl.toProtobuf(OzoneAcl.parseAcl(acl)));
+    OMRequest originalRequest = newCreateBucketRequest(builder).build();
+    OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(originalRequest);
+    OMRequest modifiedRequest = omBucketCreateRequest.preExecute(ozoneManager);
+    OMBucketCreateRequest testRequest = new OMBucketCreateRequest(modifiedRequest);
+    testRequest.setUGI(UserGroupInformation.getCurrentUser());
+    OMClientResponse resp = testRequest.validateAndUpdateCache(ozoneManager, 1);
+    assertEquals(resp.getOMResponse().getStatus().toString(), OMException.ResultCodes.OK.toString());
+
+    // Check ACLs
+    OmBucketInfo bucket =
+        omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    List<OzoneAcl> aclList = bucket.getAcls();
+    if (ignoreClientACLs) {
+      assertFalse(aclList.contains(OzoneAcl.parseAcl(acl)));
+    } else {
+      assertTrue(aclList.contains(OzoneAcl.parseAcl(acl)));
     }
   }
 

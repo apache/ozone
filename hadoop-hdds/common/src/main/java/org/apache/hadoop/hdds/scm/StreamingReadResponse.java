@@ -29,11 +29,15 @@ public class StreamingReadResponse {
 
   private final DatanodeDetails dn;
   private final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
+  private final String name;
 
   public StreamingReadResponse(DatanodeDetails dn,
       ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver) {
     this.dn = dn;
     this.requestObserver = requestObserver;
+
+    final String s = dn.getID().toString();
+    this.name = "dn" + s.substring(s.lastIndexOf('-')) + "_stream";
   }
 
   public DatanodeDetails getDatanodeDetails() {
@@ -42,5 +46,10 @@ public class StreamingReadResponse {
 
   public ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> getRequestObserver() {
     return requestObserver;
+  }
+
+  @Override
+  public String toString() {
+    return name;
   }
 }

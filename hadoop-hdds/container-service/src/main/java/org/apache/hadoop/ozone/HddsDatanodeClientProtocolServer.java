@@ -39,8 +39,8 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslator
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.utils.VersionInfo;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

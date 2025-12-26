@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.RefreshVolumeUsageCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
@@ -51,7 +51,7 @@ public class RefreshVolumeUsageCommand
 
   public static RefreshVolumeUsageCommand getFromProtobuf(
       RefreshVolumeUsageCommandProto refreshVolumeUsageProto) {
-    Preconditions.checkNotNull(refreshVolumeUsageProto);
+    Objects.requireNonNull(refreshVolumeUsageProto);
     return new RefreshVolumeUsageCommand();
   }
 

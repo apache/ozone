@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -61,7 +62,9 @@ public class TestOmKeyInfo {
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
+    assertNotNull(keyAfterSerialization);
     assertEquals(key, keyAfterSerialization);
+    assertEquals(key.getFileName(), keyAfterSerialization.getFileName());
 
     assertFalse(key.isHsync());
     key = key.withMetadataMutations(
@@ -186,9 +189,11 @@ public class TestOmKeyInfo {
       }
     }
 
-    key.setAcls(Arrays.asList(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE)));
+    key = key.toBuilder()
+        .setAcls(Arrays.asList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, "user1",
+            ACCESS, IAccessAuthorizer.ACLType.WRITE)))
+        .build();
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);
@@ -201,7 +206,9 @@ public class TestOmKeyInfo {
     assertEquals(key.getAcls(), cloneKey.getAcls());
 
     // Change object tags and check
-    key.setTags(Collections.singletonMap("tagKey3", "tagValue3"));
+    key = key.toBuilder()
+        .setTags(Collections.singletonMap("tagKey3", "tagValue3"))
+        .build();
 
     assertNotEquals(key, cloneKey);
   }

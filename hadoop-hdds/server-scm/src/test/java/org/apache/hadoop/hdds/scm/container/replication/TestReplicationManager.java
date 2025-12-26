@@ -49,7 +49,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -117,6 +117,7 @@ public class TestReplicationManager {
 
   private OzoneConfiguration configuration;
   private ReplicationManager replicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -137,6 +138,7 @@ public class TestReplicationManager {
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
+    rmConf = configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     containerManager = mock(ContainerManager.class);
     ratisPlacementPolicy = mock(PlacementPolicy.class);
     when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
@@ -174,7 +176,7 @@ public class TestReplicationManager {
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     repQueue = new ReplicationQueue();
 
     // Ensure that RM will run when asked.
@@ -201,7 +203,7 @@ public class TestReplicationManager {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
-        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
+        rmConf,
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -1004,7 +1006,7 @@ public class TestReplicationManager {
         .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
             Lists.newArrayList(2, 1, 1, 1)));
 
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
@@ -1164,7 +1166,7 @@ public class TestReplicationManager {
 
     ReconstructECContainersCommand command = new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sourceNodes, targetNodes,
-        Proto2Utils.unsafeByteString(missingIndexes), ecRepConfig);
+        ProtoUtils.unsafeByteString(missingIndexes), ecRepConfig);
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target4);
 
@@ -1213,8 +1215,6 @@ public class TestReplicationManager {
 
     // Ensure that the command deadline is set to current time
     // + evenTime * factor
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
             rmConf.getDatanodeTimeoutOffset();
     assertEquals(expectedDeadline, command.getDeadline());
@@ -1279,8 +1279,6 @@ public class TestReplicationManager {
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
 
     // check the command's deadline
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
         rmConf.getDatanodeTimeoutOffset();
     assertEquals(expectedDeadline, command.getDeadline());
@@ -1308,8 +1306,6 @@ public class TestReplicationManager {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
 
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long scmDeadline = clock.millis() + rmConf.getEventTimeout();
     long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
 
@@ -1490,7 +1486,7 @@ public class TestReplicationManager {
     byte[] missingIndexes = new byte[]{4, 5};
     return new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sources,
-        Arrays.asList(targets), Proto2Utils.unsafeByteString(missingIndexes),
+        Arrays.asList(targets), ProtoUtils.unsafeByteString(missingIndexes),
         (ECReplicationConfig) repConfig);
   }
 
@@ -1602,20 +1598,17 @@ public class TestReplicationManager {
     when(nodeManager.getNodeCount(isNull(), eq(HddsProtos.NodeState.HEALTHY)))
         .thenReturn(healthyNodes);
 
-    config.setInflightReplicationLimitFactor(0.0);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(0.0);
     ReplicationManager rm = createReplicationManager();
     assertEquals(0, rm.getReplicationInFlightLimit());
 
-    config.setInflightReplicationLimitFactor(1);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(1);
     rm = createReplicationManager();
     assertEquals(
         healthyNodes * config.getDatanodeReplicationLimit(),
         rm.getReplicationInFlightLimit());
 
-    config.setInflightReplicationLimitFactor(0.75);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(0.75);
     rm = createReplicationManager();
     assertEquals(
         (int) Math.ceil(healthyNodes
@@ -1713,6 +1706,61 @@ public class TestReplicationManager {
     assertEquals(processAllCalled.get(), queueIsEmpty);
 
     customRM.stop();
+  }
+
+  @Test
+  public void testReconfigureContainerSampleLimit() {
+    // Create 120 under replicated containers
+    int totalContainers = 120;
+    for (int i = 0; i < totalContainers; i++) {
+      ContainerInfo container = createContainerInfo(
+          RatisReplicationConfig.getInstance(THREE), i,
+          HddsProtos.LifeCycleState.CLOSED);
+      containerInfoSet.add(container);
+
+      Set<ContainerReplica> replicas = new HashSet<>();
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, ContainerReplicaProto.State.CLOSED));
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, ContainerReplicaProto.State.CLOSED));
+      containerReplicaMap.put(container.containerID(), replicas);
+    }
+
+    enableProcessAll();
+
+    // First report with default sample limit 100
+    replicationManager.processAll();
+
+    ReplicationManagerReport report1 = replicationManager.getContainerReport();
+    assertEquals(totalContainers, report1.getStat(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    List<ContainerID> sample1 = report1.getSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+    assertEquals(100, report1.getSampleLimit(),
+        "First report should have sample limit of 100");
+    assertEquals(100, sample1.size(),
+        "First report should have 100 samples with initial config");
+
+    // Reconfigure to new limit
+    int newLimit = 50;
+    rmConf.setContainerSampleLimit(newLimit);
+
+    assertEquals(newLimit, rmConf.getContainerSampleLimit(),
+        "Config should be updated to new limit");
+
+    replicationManager.processAll();
+
+    ReplicationManagerReport report2 = replicationManager.getContainerReport();
+    assertEquals(totalContainers, report2.getStat(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    List<ContainerID> sample2 = report2.getSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+    assertEquals(newLimit, report2.getSampleLimit(),
+        "Second report should have sample limit of 50");
+    assertEquals(newLimit, sample2.size(),
+        "Second report should have 50 samples after reconfiguration");
   }
 
   @SafeVarargs
