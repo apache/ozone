@@ -26,19 +26,20 @@ import org.rocksdb.DirectSlice;
 
 /**
  * Managed {@link DirectSlice} for leak detection.
+ *
+ *  The {@link DirectSlice} class is designed to handle specific memory slicing operations while ensuring that the
+ *  provided ByteBuffer’s constraints are respected.
+ *
  * NOTE: This class should be only with ByteBuffer whose position and limit is going be immutable in the lifetime of
  *  this ManagedDirectSlice instance. This means that the ByteBuffer's position and limit should not be modified
- *  externally while the ManagedDirectSlice is in use. The value in the byte buffer should be only accessed via the
- *  instance.
+ *  externally while the ManagedDirectSlice is in use.
  */
 public class ManagedDirectSlice extends DirectSlice {
 
   private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedDirectSlice(ByteBuffer buffer) {
-    super(Objects.requireNonNull(buffer, "buffer == null"));
-    removePrefix(buffer.position());
-    setLength(buffer.remaining());
+    super(Objects.requireNonNull(buffer, "buffer == null").slice(), buffer.remaining());
   }
 
   @Override
