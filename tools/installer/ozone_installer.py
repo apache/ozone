@@ -114,14 +114,14 @@ def auto_cluster_mode(hosts, forced=None):
         return forced
     return "ha" if len(hosts) >= 3 else "non-ha"
 
-def build_inventory(hosts, ssh_user=None, keyfile=None, password=None, cluster_mode="single"):
+def build_inventory(hosts, ssh_user=None, keyfile=None, password=None, cluster_mode="non-ha"):
     """
     Returns INI inventory text for our groups: [om], [scm], [datanodes], [recon]
     """
     if not hosts:
         return ""
-    # Non-HA mapping: single OM/SCM on first host; all hosts as datanodes; recon on first
-    if cluster_mode == "single":
+    # Non-HA mapping: OM/SCM on first host; all hosts as datanodes; recon on first
+    if cluster_mode == "non-ha":
         h = hosts[0]
         return _render_inv_groups(
             om=[h], scm=[h], dn=hosts, recon=[h],

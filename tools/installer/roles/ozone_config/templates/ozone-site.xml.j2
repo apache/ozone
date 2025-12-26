@@ -2,14 +2,16 @@
   <!-- Minimal Ozone site config; extend via group_vars if needed -->
 {% set _om_all = groups.get('om', [])| list %}
 {% set _scm_all = groups.get('scm', []) | list %}
+{% set _all_dn_count = groups.get('datanodes', []) | list | length %}
 {% set recon_hosts = groups.get('recon', []) | list %}
 {% set om_hosts = (_om_all[:1] if not (ha_enabled | default(false)) else _om_all) %}
 {% set scm_hosts = (_scm_all[:1] if not (ha_enabled | default(false)) else _scm_all) %}
 
+
 {% if scm_hosts|length > 0 %}
   <property>
     <name>ozone.scm.names</name>
-    <value>{{ scm_hosts | join(':9860,') }}:9860</value>
+    <value>{{ scm_hosts | join(',') }}</value>
   </property>
   <property>
     <name>ozone.scm.client.address</name>
@@ -102,6 +104,14 @@
   <property>
     <name>ozone.scm.skip.bootstrap.validation</name>
     <value>true</value>
+  </property>
+  <property>
+    <name>ozone.replication</name>
+{% if _all_dn_count < 3 %}
+    <value>ONE</value>
+{% else %}
+    <value>THREE</value>
+{% endif %}
   </property>
 </configuration>
 
