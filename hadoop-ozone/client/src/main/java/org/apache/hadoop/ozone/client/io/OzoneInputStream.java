@@ -20,9 +20,13 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.function.IntFunction;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 
 /**
  * OzoneInputStream is used to read data from Ozone.
@@ -119,6 +123,28 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
     } else {
       throw new UnsupportedOperationException("Seek is not supported on the " +
           "underlying inputStream");
+    }
+  }
+
+  /**
+   * Read data from multiple byte ranges asynchronously.
+   * This allows reading multiple discontiguous ranges from the same file
+   * efficiently with a single API call.
+   *
+   * @param ranges list of file ranges to read
+   * @param allocate function to allocate ByteBuffer for each range
+   * @throws IOException if there is an error performing the reads
+   */
+  public void readVectored(
+      List<? extends FileRange> ranges,
+      IntFunction<ByteBuffer> allocate
+  ) throws IOException {
+    if (inputStream instanceof MultipartInputStream) {
+      ((MultipartInputStream) inputStream).readVectored(ranges, allocate);
+    } else {
+      throw new UnsupportedOperationException("Vectored read is not supported " +
+          "on the underlying inputStream of type " +
+          inputStream.getClass().getName());
     }
   }
 }
