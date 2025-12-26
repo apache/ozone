@@ -500,7 +500,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * DB.
    */
   @VisibleForTesting
-  final class KeyDeletingTask implements BackgroundTask {
+  final class KeyDeletingTask extends BackgroundTask {
     private final UUID snapshotId;
 
     KeyDeletingTask(UUID snapshotId) {
