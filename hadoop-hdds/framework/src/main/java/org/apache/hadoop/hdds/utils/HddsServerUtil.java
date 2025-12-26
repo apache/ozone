@@ -30,6 +30,8 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
@@ -77,6 +79,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -855,4 +858,24 @@ public final class HddsServerUtil {
     return scmNodeAddress;
   }
 
+  /**
+   * Retrieve the socket addresses of recon.
+   *
+   * @return Recon address
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static InetSocketAddress getReconAddressForDatanodes(
+      ConfigurationSource conf) {
+    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+    Optional<String> hostname = getHostName(name);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Recon: "
+          + name);
+    }
+    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return NetUtils.createSocketAddr(hostname.get(), port);
+  }
 }

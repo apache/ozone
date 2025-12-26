@@ -25,8 +25,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
@@ -57,7 +55,6 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -272,27 +269,6 @@ public final class HddsUtils {
       }
     }
     return OptionalInt.empty();
-  }
-
-  /**
-   * Retrieve the socket addresses of recon.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
   }
 
   /**

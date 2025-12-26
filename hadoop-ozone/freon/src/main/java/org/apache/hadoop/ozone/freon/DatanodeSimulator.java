@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.freon;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconAddressForDatanodes;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
@@ -430,7 +430,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
       scmClients.put(address, createScmClient(address));
     }
 
-    reconAddress = getReconAddresses(conf);
+    reconAddress = getReconAddressForDatanodes(conf);
     reconClient = createReconClient(reconAddress);
 
     heartbeatScheduler = Executors.newScheduledThreadPool(threadCount);
