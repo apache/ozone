@@ -17,24 +17,15 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
+
 import java.nio.ByteBuffer;
+import java.util.Objects;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.DirectSlice;
 
 /**
- * ManagedDirectSlice is a class that extends the {@link DirectSlice} class and provides additional
- * management for slices of direct {@link ByteBuffer} memory. This class initializes the slice with
- * the given ByteBuffer and sets its prefix and length properties based on the buffer's position
- * and remaining capacity.
- *
- * The class is designed to handle specific memory slicing operations while ensuring that the
- * provided ByteBuffer’s constraints are respected. ManagedDirectSlice leverages its parent
- * {@link DirectSlice} functionalities to deliver optimized direct buffer handling.
- *
- * Constructor:
- * - Initializes the ManagedDirectSlice instance with a provided ByteBuffer.
- * - Sets the slice length to the buffer's remaining capacity.
- * - Removes the prefix based on the buffer's position.
- *
+ * Managed {@link DirectSlice} for leak detection.
  * NOTE: This class should be only with ByteBuffer whose position and limit is going be immutable in the lifetime of
  *  this ManagedDirectSlice instance. This means that the ByteBuffer's position and limit should not be modified
  *  externally while the ManagedDirectSlice is in use. The value in the byte buffer should be only accessed via the
@@ -42,9 +33,26 @@ import org.rocksdb.DirectSlice;
  */
 public class ManagedDirectSlice extends DirectSlice {
 
-  public ManagedDirectSlice(ByteBuffer data) {
-    super(data);
-    this.removePrefix(data.position());
-    this.setLength(data.remaining());
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
+  public ManagedDirectSlice(ByteBuffer buffer) {
+    super(Objects.requireNonNull(buffer, "buffer == null").slice());
+    setLength(buffer.remaining());
+  }
+
+  @Override
+  public synchronized long getNativeHandle() {
+    return super.getNativeHandle();
+  }
+
+  @Override
+  protected void disposeInternal() {
+    // RocksMutableObject.close is final thus can't be decorated.
+    // So, we decorate disposeInternal instead to track closure.
+    try {
+      super.disposeInternal();
+    } finally {
+      leakTracker.close();
+    }
   }
 }
