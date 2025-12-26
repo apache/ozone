@@ -51,15 +51,33 @@ public abstract class BackgroundService {
   private final String threadNamePrefix;
   private final PeriodicalTask service;
   private CompletableFuture<Void> future;
+  private final SchedulingMode schedulingMode;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
-    this(serviceName, interval, unit, threadPoolSize, serviceTimeout, "");
+    this(serviceName, interval, unit, threadPoolSize, serviceTimeout, "", SchedulingMode.FIXED_RATE);
   }
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
       String threadNamePrefix) {
+    this(serviceName, interval, unit, threadPoolSize, serviceTimeout, threadNamePrefix, SchedulingMode.FIXED_RATE);
+  }
+
+  /**
+   * Constructor with scheduling mode option.
+   *
+   * @param serviceName name of the service
+   * @param interval interval between executions
+   * @param unit time unit for interval
+   * @param threadPoolSize size of thread pool
+   * @param serviceTimeout timeout for service execution
+   * @param threadNamePrefix prefix for thread names
+   * @param schedulingMode the scheduling mode to use (FIXED_RATE or FIXED_DELAY)
+   */
+  public BackgroundService(String serviceName, long interval,
+      TimeUnit unit, int threadPoolSize, long serviceTimeout,
+      String threadNamePrefix, SchedulingMode schedulingMode) {
     this.interval = interval;
     this.unit = unit;
     this.serviceName = serviceName;
@@ -67,6 +85,7 @@ public abstract class BackgroundService {
             .toLong(TimeUnit.NANOSECONDS);
     this.threadPoolSize = threadPoolSize;
     this.threadNamePrefix = threadNamePrefix;
+    this.schedulingMode = schedulingMode != null ? schedulingMode : SchedulingMode.FIXED_RATE;
     initExecutorAndThreadGroup();
     service = new PeriodicalTask();
     this.future = CompletableFuture.completedFuture(null);
@@ -116,9 +135,20 @@ public abstract class BackgroundService {
     if (exec == null || exec.isShutdown() || exec.isTerminated()) {
       initExecutorAndThreadGroup();
     }
-    LOG.info("Starting service {} with interval {} {}", serviceName,
-        interval, unit.name().toLowerCase());
-    exec.scheduleWithFixedDelay(service, 0, interval, unit);
+    
+    if (schedulingMode == SchedulingMode.FIXED_DELAY) {
+      LOG.info("Starting service {} with fixed delay {} {} after task completion", 
+          serviceName, interval, unit.name().toLowerCase());
+      // Use minimal delay for scheduleWithFixedDelay, actual interval controlled in run()
+      exec.scheduleWithFixedDelay(service, 0, 1, TimeUnit.MILLISECONDS);
+    } else if (schedulingMode == SchedulingMode.FIXED_RATE) {
+      LOG.info("Starting service {} with fixed rate interval {} {}", serviceName,
+          interval, unit.name().toLowerCase());
+      exec.scheduleWithFixedDelay(service, 0, interval, unit);
+    } else {
+      throw new UnsupportedOperationException("SchedulingMode " + schedulingMode +
+          " is not supported");
+    }
   }
 
   protected synchronized void setInterval(long newInterval, TimeUnit newUnit) {
@@ -148,6 +178,18 @@ public abstract class BackgroundService {
         LOG.error("Background service execution failed.", e);
       } finally {
         execTaskCompletion();
+      }
+
+      if (schedulingMode.shouldSleepAfterCompletion()) {
+        try {
+          long delayMillis = getIntervalMillis();
+          LOG.debug("Waiting {} ms after task completion before next execution", delayMillis);
+          Thread.sleep(delayMillis);
+        } catch (InterruptedException e) {
+          LOG.warn("Interrupted while waiting for fixed interval");
+          execTaskCompletion();
+          return;
+        }
       }
 
       if (LOG.isDebugEnabled()) {
