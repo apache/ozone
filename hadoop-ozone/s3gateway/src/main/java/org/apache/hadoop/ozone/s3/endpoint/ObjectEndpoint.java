@@ -1117,7 +1117,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
     } catch (OMException ex) {
-      LOG.error("Failed to create multipart key: bucket={}, key={}, uploadId={}, partNumber={}, errorCode={}, isCopy={}",
+      LOG.error("Failed to create multipart key: bucket={}, key={}, uploadId={}, "
+              + "partNumber={}, errorCode={}, isCopy={}",
           bucketName, key, uploadID, partNumber, ex.getResult(),
           copyHeader != null ? "true" : "false", ex);
       if (copyHeader != null) {
