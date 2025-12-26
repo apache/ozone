@@ -17,98 +17,34 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB.NOT_FOUND;
-
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
-import org.apache.ratis.util.function.CheckedConsumer;
-import org.apache.ratis.util.function.CheckedFunction;
 import org.rocksdb.DirectSlice;
-import org.rocksdb.RocksDBException;
 
 /**
- * ManagedDirectSlice is a managed wrapper around the DirectSlice object. It ensures
- * proper handling of native resources associated with DirectSlice, utilizing
- * the ManagedObject infrastructure to prevent resource leaks. It works in tandem
- * with a ByteBuffer, which acts as the data source for the managed slice.
+ * ManagedDirectSlice is a class that extends the {@link DirectSlice} class and provides additional
+ * management for slices of direct {@link ByteBuffer} memory. This class initializes the slice with
+ * the given ByteBuffer and sets its prefix and length properties based on the buffer's position
+ * and remaining capacity.
  *
- * This class overrides certain operations to tightly control the lifecycle and
- * behavior of the DirectSlice it manages. It specifically caters to use cases
- * where the slice is used in RocksDB operations, providing methods for safely
- * interacting with the slice for put-like operations.
+ * The class is designed to handle specific memory slicing operations while ensuring that the
+ * provided ByteBuffer’s constraints are respected. ManagedDirectSlice leverages its parent
+ * {@link DirectSlice} functionalities to deliver optimized direct buffer handling.
+ *
+ * Constructor:
+ * - Initializes the ManagedDirectSlice instance with a provided ByteBuffer.
+ * - Sets the slice length to the buffer's remaining capacity.
+ * - Removes the prefix based on the buffer's position.
+ *
+ * NOTE: This class should be only with ByteBuffer whose position and limit is going be immutable in the lifetime of
+ *  this ManagedDirectSlice instance. This means that the ByteBuffer's position and limit should not be modified
+ *  externally while the ManagedDirectSlice is in use. The value in the byte buffer should be only accessed via the
+ *  instance.
  */
-public class ManagedDirectSlice extends ManagedObject<DirectSlice> {
-
-  private final ByteBuffer data;
+public class ManagedDirectSlice extends DirectSlice {
 
   public ManagedDirectSlice(ByteBuffer data) {
-    super(new DirectSlice(data));
-    this.data = data;
-  }
-
-  @Override
-  public DirectSlice get() {
-    throw new UnsupportedOperationException("get() is not supported.");
-  }
-
-  /**
-   * Executes the provided consumer on the internal {@code DirectSlice} after
-   * adjusting the slice's prefix and length based on the current position and
-   * remaining data in the associated {@code ByteBuffer}. If the consumer throws
-   * a {@code RocksDBException}, it is wrapped and rethrown as a
-   * {@code RocksDatabaseException}.
-   *
-   * @param consumer the operation to perform on the managed {@code DirectSlice}.
-   *                 The consumer must handle a {@code DirectSlice} and may throw
-   *                 a {@code RocksDBException}.
-   * @throws RocksDatabaseException if the provided consumer throws a
-   *                                {@code RocksDBException}.
-   */
-  public void putFromBuffer(CheckedConsumer<DirectSlice, ? extends RocksDBException> consumer)
-      throws RocksDatabaseException {
-    DirectSlice slice = super.get();
-    slice.removePrefix(this.data.position());
-    slice.setLength(this.data.remaining());
-    try {
-      consumer.accept(slice);
-    } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error while performing put op with directSlice", e);
-    }
-    data.position(data.limit());
-  }
-
-  /**
-   * Retrieves data from the associated DirectSlice into the buffer managed by this instance.
-   * The supplied function is applied to the DirectSlice to process the data, and the method
-   * adjusts the buffer's position and limit based on the result.
-   *
-   * @param function a function that operates on a DirectSlice and returns the number
-   *                 of bytes written to the buffer, or a specific "not found" value
-   *                 if the operation fails. The function may throw a RocksDBException.
-   * @return the number of bytes written to the buffer if successful, or a specific
-   *         "not found" value indicating the requested data was absent.
-   * @throws RocksDatabaseException if the provided function throws a RocksDBException,
-   *                                wrapping the original exception.
-   */
-  public int getToBuffer(CheckedFunction<DirectSlice, Integer, ? extends RocksDBException> function)
-      throws RocksDatabaseException {
-    DirectSlice slice = super.get();
-    slice.removePrefix(this.data.position());
-    slice.setLength(this.data.remaining());
-    try {
-      int lengthWritten = function.apply(slice);
-      if (lengthWritten != NOT_FOUND) {
-        this.data.limit(Math.min(data.limit(), data.position() + lengthWritten));
-      }
-      return lengthWritten;
-    } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error while performing put op with directSlice", e);
-    }
-  }
-
-  @VisibleForTesting
-  DirectSlice getDirectSlice() {
-    return super.get();
+    super(data);
+    this.removePrefix(data.position());
+    this.setLength(data.remaining());
   }
 }
