@@ -85,11 +85,9 @@ public class RDBSstFileWriter implements Closeable {
 
   public void delete(CodecBuffer key) throws RocksDatabaseException {
     try (ManagedDirectSlice slice = new ManagedDirectSlice(key.asReadOnlyByteBuffer())) {
-      slice.putFromBuffer(directSlice -> {
-        sstFileWriter.delete(directSlice);
-        keyCounter.incrementAndGet();
-      });
-    } catch (RocksDatabaseException e) {
+      sstFileWriter.delete(slice);
+      keyCounter.incrementAndGet();
+    } catch (RocksDBException e) {
       closeOnFailure();
       throw new RocksDatabaseException("Failed to delete key (length=" + key.readableBytes()
           + "), sstFile=" + sstFile.getAbsolutePath(), e);

@@ -1077,6 +1077,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-managed-rocksdb</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-rocks-native</artifactId>
         <version>${hdds.rocks.native.version}</version>
       </dependency>
@@ -1965,6 +1971,7 @@
                       <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
                       <allowedImport>org.rocksdb.Env</allowedImport>
                       <allowedImport>org.rocksdb.Statistics</allowedImport>
+                      <allowedImport>org.rocksdb.AbstractSlice</allowedImport>
                       <!-- Allow RocksDB constants and static methods to be used. -->
                       <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
                     </allowedImports>
