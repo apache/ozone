@@ -272,9 +272,23 @@ public abstract class SCMCommonPlacementPolicy implements
   public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
-    List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
-        .collect(Collectors.toList());
+    List<String> rejectedNodes = new ArrayList<>();
+    List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d -> {
+      SCMDatanodeCapacityInfo capacityInfo = checkSpace(d, metadataSizeRequired, dataSizeRequired, conf);
+      if (!capacityInfo.hasEnoughSpace()) {
+        rejectedNodes.add(capacityInfo.getInsufficientSpaceMessage());
+        return false;
+      }
+
+      return true;
+    }).collect(Collectors.toList());
+
+    if (!rejectedNodes.isEmpty()) {
+      LOG.info("Container placement rejected {} nodes due to insufficient space:", rejectedNodes.size());
+      for (String message : rejectedNodes) {
+        LOG.info("  {}", message);
+      }
+    }
 
     if (nodesWithSpace.size() < nodesRequired) {
       String msg = String.format("Unable to find enough nodes that meet the " +
@@ -300,46 +314,67 @@ public abstract class SCMCommonPlacementPolicy implements
                                        long metadataSizeRequired,
                                        long dataSizeRequired,
                                        ConfigurationSource conf) {
-    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
-
-    boolean enoughForData = false;
-    boolean enoughForMeta = false;
-
-    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-
-    if (dataSizeRequired > 0) {
-      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
-          enoughForData = true;
-          break;
-        }
-      }
-    } else {
-      enoughForData = true;
-    }
-
-    if (!enoughForData) {
-      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
-              "bytes for data.", datanodeDetails, dataSizeRequired);
+    SCMDatanodeCapacityInfo result = checkSpace(datanodeDetails, metadataSizeRequired, dataSizeRequired, conf);
+    if (!result.hasEnoughSpace()) {
+      LOG.debug(result.getInsufficientSpaceMessage());
       return false;
     }
 
-    if (metadataSizeRequired > 0) {
-      for (MetadataStorageReportProto reportProto
-          : datanodeInfo.getMetadataStorageReports()) {
-        if (reportProto.getRemaining() > metadataSizeRequired) {
-          enoughForMeta = true;
+    return true;
+  }
+
+  /**
+   * Checks whether a datanode has sufficient space to accommodate the specified
+   * data and metadata storage requirements.
+   * @param datanodeDetails      the datanode to assess (must be a DatanodeInfo instance)
+   * @param metadataSizeRequired minimum bytes needed for metadata storage, or 0 if not required
+   * @param dataSizeRequired     minimum bytes needed for data storage, or 0 if not required
+   * @param conf                 configuration source for any policy-specific settings (currently unused)
+   * @return a {@link SCMDatanodeCapacityInfo}
+   */
+  public static SCMDatanodeCapacityInfo checkSpace(
+      DatanodeDetails datanodeDetails, long metadataSizeRequired, long dataSizeRequired, ConfigurationSource conf) {
+    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
+
+    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
+
+    SCMDatanodeCapacityInfo capacityInfo =
+        new SCMDatanodeCapacityInfo(datanodeDetails, dataSizeRequired, metadataSizeRequired);
+    if (dataSizeRequired > 0) {
+      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+
+        long dataVolumeSpace = VolumeUsage.getUsableSpace(reportProto);
+        capacityInfo.updateMostAvailableSpaceForData(dataVolumeSpace);
+
+        if (dataVolumeSpace > dataSizeRequired) {
+          capacityInfo.markEnoughSpaceFoundForData();
           break;
+        } else {
+          capacityInfo.addFullDataVolume(reportProto, dataVolumeSpace);
         }
       }
-    } else {
-      enoughForMeta = true;
     }
-    if (!enoughForMeta) {
-      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
-              "bytes for metadata.", datanodeDetails, metadataSizeRequired);
+
+    if (!capacityInfo.hasEnoughDataSpace()) {
+      // bail out early if no data volumes
+      return capacityInfo;
     }
-    return enoughForMeta;
+
+    if (metadataSizeRequired > 0) {
+      for (MetadataStorageReportProto reportProto : datanodeInfo.getMetadataStorageReports()) {
+        long metaSpaceRemaining = reportProto.getRemaining();
+        capacityInfo.updateMostAvailableSpaceForMeta(metaSpaceRemaining);
+
+        if (metaSpaceRemaining > metadataSizeRequired) {
+          capacityInfo.markEnoughSpaceFoundForMeta();
+          break;
+        } else {
+          capacityInfo.addFullMetaVolume(reportProto);
+        }
+      }
+    }
+
+    return capacityInfo;
   }
 
   /**
