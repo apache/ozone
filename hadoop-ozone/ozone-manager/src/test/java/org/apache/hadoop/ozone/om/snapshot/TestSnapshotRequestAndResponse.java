@@ -226,7 +226,7 @@ public class TestSnapshotRequestAndResponse {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
+        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotInfo.getSnapshotId(), 0));
     // Check the DB is still there
     assertTrue(Files.exists(snapshotDirPath));
     return snapshotDirPath;

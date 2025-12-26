@@ -51,6 +51,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "chain",
     description = "CLI to update global and path previous snapshot for a snapshot in case snapshot chain is corrupted."
+        + " OM should be stopped for this tool."
 )
 public class SnapshotChainRepair extends RepairTool {
 

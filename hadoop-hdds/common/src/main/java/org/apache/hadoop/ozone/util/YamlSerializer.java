@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.util;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Objects;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.hadoop.hdds.server.YamlUtils;
@@ -70,7 +70,7 @@ public abstract class YamlSerializer<T extends WithChecksum<T>> implements Objec
    */
   @Override
   public T load(File yamlFile) throws IOException {
-    Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
+    Objects.requireNonNull(yamlFile, "yamlFile cannot be null");
     try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
       return load(inputFileStream);
     }
@@ -103,7 +103,7 @@ public abstract class YamlSerializer<T extends WithChecksum<T>> implements Objec
    */
   @Override
   public boolean verifyChecksum(T data) throws IOException {
-    Preconditions.checkNotNull(data, "data cannot be null");
+    Objects.requireNonNull(data, "data cannot be null");
 
     // Get the stored checksum
     String storedChecksum = data.getChecksum();

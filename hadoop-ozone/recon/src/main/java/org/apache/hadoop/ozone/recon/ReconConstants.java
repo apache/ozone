@@ -93,7 +93,9 @@ public final class ReconConstants {
   // For file-size count reprocessing: ensure only one task truncates the table.
   public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
 
-  public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
+  // For container key mapper reprocessing: ensure only one task performs initialization
+  // (truncates tables + clears shared map)
+  public static final AtomicBoolean CONTAINER_KEY_MAPPER_INITIALIZED = new AtomicBoolean(false);
 
   private ReconConstants() {
     // Never Constructed
@@ -105,6 +107,6 @@ public final class ReconConstants {
    */
   public static void resetTableTruncatedFlags() {
     FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
-    CONTAINER_KEY_TABLES_TRUNCATED.set(false);
+    CONTAINER_KEY_MAPPER_INITIALIZED.set(false);
   }
 }

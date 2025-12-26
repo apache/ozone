@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
 import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -29,7 +30,6 @@ import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,7 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -83,6 +86,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.slf4j.event.Level;
 
 /**
@@ -217,7 +223,7 @@ class TestOmSnapshotManager {
 
     snapshotChainManager.addSnapshot(first);
     snapshotChainManager.addSnapshot(second);
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
@@ -232,7 +238,7 @@ class TestOmSnapshotManager {
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
 
     // create second snapshot checkpoint (which will be used for eviction)
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         second, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -373,20 +379,26 @@ class TestOmSnapshotManager {
     Files.move(hardLinkList, Paths.get(candidateDir.toString(),
         OM_HARDLINK_FILE));
 
-    // Pointers to follower links to be created.
-    File f1FileLink = new File(followerSnapDir2, "f1.sst");
-    File s1FileLink = new File(followerSnapDir2, "s1.sst");
+    Path snapshot2Path = Paths.get(candidateDir.getPath(),
+        OM_SNAPSHOT_CHECKPOINT_DIR, followerSnapDir2.getName());
 
+    // Pointers to follower links to be created.
+    File f1FileLink = new File(snapshot2Path.toFile(), "f1.sst");
+    File s1FileLink = new File(snapshot2Path.toFile(), "s1.sst");
+    Object s1FileInode = getINode(s1File.toPath());
+    Object f1FileInode = getINode(f1File.toPath());
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(candidateDir.toPath());
+    assertNotNull(obtainedCheckpoint);
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
-    assertEquals(getINode(s1File.toPath()),
+    assertEquals(s1FileInode,
         getINode(s1FileLink.toPath()), "link matches original file");
 
     assertTrue(f1FileLink.exists());
-    assertEquals(getINode(f1File.toPath()),
+    assertEquals(f1FileInode,
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 
@@ -663,6 +675,43 @@ class TestOmSnapshotManager {
         destAddNonSstToCopiedFiles);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPath(int version) {
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    RDBStore store = mock(RDBStore.class);
+    when(metadataManager.getStore()).thenReturn(store);
+    File file = new File("test-db");
+    when(store.getDbLocation()).thenReturn(file);
+    String path = "dir1/dir2";
+    when(store.getSnapshotsParentDir()).thenReturn(path);
+    UUID snapshotId = UUID.randomUUID();
+    String snapshotPath = OmSnapshotManager.getSnapshotPath(metadataManager, snapshotId, version).toString();
+    String expectedPath = "dir1/dir2/test-db-" + snapshotId;
+    if (version != 0) {
+      expectedPath = expectedPath + "-" + version;
+    }
+    assertEquals(expectedPath, snapshotPath);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 10, 100})
+  public void testGetSnapshotPathFromConf(int version) {
+    try (MockedStatic<OMStorage> mocked = mockStatic(OMStorage.class)) {
+      String omDir = "dir1/dir2";
+      mocked.when(() -> OMStorage.getOmDbDir(any())).thenReturn(new File(omDir));
+      OzoneConfiguration conf = mock(OzoneConfiguration.class);
+      SnapshotInfo snapshotInfo = createSnapshotInfo("volumeName", "bucketname");
+      String snapshotPath = OmSnapshotManager.getSnapshotPath(conf, snapshotInfo, version);
+      String expectedPath = omDir + OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+          OM_DB_NAME + "-" + snapshotInfo.getSnapshotId();
+      if (version != 0) {
+        expectedPath = expectedPath + "-" + version;
+      }
+      assertEquals(expectedPath, snapshotPath);
+    }
+  }
+
   @Test
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
@@ -700,7 +749,7 @@ class TestOmSnapshotManager {
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -709,7 +758,7 @@ class TestOmSnapshotManager {
     logCapturer.clearOutput();
 
     // Create checkpoint again for the same snapshot.
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);

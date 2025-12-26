@@ -709,7 +709,7 @@ public abstract class TestOmSnapshotFileSystem implements NonHATests.TestCase {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(snapshot.getVolumeName(), snapshot.getBucketName(), snapshotName));
-    String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
+    String snapshotDirName = getSnapshotPath(conf, snapshotInfo, 0) +
         OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         1000, 120000);

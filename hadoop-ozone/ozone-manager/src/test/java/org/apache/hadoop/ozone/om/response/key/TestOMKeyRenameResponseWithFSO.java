@@ -25,7 +25,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 
@@ -83,16 +82,12 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     String toKeyParentName = UUID.randomUUID().toString();
     fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fromKeyParentName, replicationConfig)
         .setObjectID(bucketId + 100L)
+        .setParentObjectID(bucketId)
         .build();
     toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, toKeyParentName, replicationConfig)
         .setObjectID(bucketId + 101L)
+        .setParentObjectID(bucketId)
         .build();
-    fromKeyParent.setParentObjectID(bucketId);
-    toKeyParent.setParentObjectID(bucketId);
-    fromKeyParent.setFileName(OzoneFSUtils.getFileName(
-        fromKeyParent.getKeyName()));
-    toKeyParent.setFileName(OzoneFSUtils.getFileName(
-        toKeyParent.getKeyName()));
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     bucketInfo = TestOMResponseUtils.createBucket(volumeName, bucketName);

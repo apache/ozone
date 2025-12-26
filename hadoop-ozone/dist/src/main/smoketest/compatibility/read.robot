@@ -155,3 +155,16 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
     Execute    ozone admin om lease recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
+
+Key Info File Flag Should Be Set Correctly
+    Pass Execution If    '${CLUSTER_VERSION}' <= '${EC_VERSION}'   Cluster does not support 'file' flag
+    Pass Execution If    '${CLIENT_VERSION}' <= '${EC_VERSION}'    Client does not support 'file' flag
+
+    ${dirpath} =      Set Variable    /vol1/fso-bucket-${DATA_VERSION}/dir/subdir/
+    ${filepath} =     Set Variable    ${dirpath}file
+
+    ${key_info} =     Execute    ozone sh key info ${filepath}
+    Should Contain    ${key_info}    \"file\" : true
+
+    ${dir_info} =     Execute    ozone sh key info ${dirpath}
+    Should Contain    ${dir_info}    \"file\" : false

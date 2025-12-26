@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -57,9 +54,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final String bucketName;
   /**
-   * ACL Information (mutable).
+   * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -76,7 +73,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * modification time of bucket.
    */
-  private long modificationTime;
+  private final long modificationTime;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -108,13 +105,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final BucketLayout bucketLayout;
 
-  private String owner;
+  private final String owner;
 
   private OmBucketInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
@@ -158,36 +155,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
-  }
-
-  /**
-   * Add an ozoneAcl to list of existing Acl set.
-   * @param ozoneAcl
-   * @return true - if successfully added, false if not added or acl is
-   * already existing in the acl list.
-   */
-  public boolean addAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.addAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Remove acl from existing acl list.
-   * @param ozoneAcl
-   * @return true - if successfully removed, false if not able to remove due
-   * to that acl is not in the existing acl list.
-   */
-  public boolean removeAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.removeAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Reset the existing acl list.
-   * @param ozoneAcls
-   * @return true - if successfully able to reset.
-   */
-  public boolean setAcls(List<OzoneAcl> ozoneAcls) {
-    return OzoneAclUtil.setAcl(acls, ozoneAcls);
+    return acls;
   }
 
   /**
@@ -335,14 +303,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return owner;
   }
 
-  public void setModificationTime(long modificationTime) {
-    this.modificationTime = modificationTime;
-  }
-
-  public void setOwner(String ownerName) {
-    this.owner = ownerName;
-  }
-
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -396,17 +356,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   @Override
   public OmBucketInfo copyObject() {
-    Builder builder = toBuilder();
-
-    if (bekInfo != null) {
-      builder.setBucketEncryptionKey(bekInfo.copy());
-    }
-
-    if (defaultReplicationConfig != null) {
-      builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
-    }
-
-    return builder.build();
+    return toBuilder().build();
   }
 
   public Builder toBuilder() {
@@ -420,7 +370,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketEncryptionKey(bekInfo)
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
-        .setAcls(acls)
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
@@ -435,10 +384,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * Builder for OmBucketInfo.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
     private String volumeName;
     private String bucketName;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private final AclListBuilder acls;
     private boolean isVersionEnabled;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
@@ -457,10 +406,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private long snapshotUsedNamespace;
 
     public Builder() {
+      acls = AclListBuilder.empty();
     }
 
     private Builder(OmBucketInfo obj) {
       super(obj);
+      acls = AclListBuilder.of(obj.acls);
     }
 
     public Builder setVolumeName(String volume) {
@@ -475,12 +426,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls.set(listOfAcls);
       }
       return this;
     }
 
-    public List<OzoneAcl> getAcls() {
+    public AclListBuilder acls() {
       return acls;
     }
 
@@ -520,12 +471,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
-      return this;
-    }
-
-    @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
       return this;
     }
 
@@ -605,15 +550,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
-    /**
-     * Constructs the OmBucketInfo.
-     * @return instance of OmBucketInfo.
-     */
-    public OmBucketInfo build() {
-      Preconditions.checkNotNull(volumeName);
-      Preconditions.checkNotNull(bucketName);
-      Preconditions.checkNotNull(acls);
-      Preconditions.checkNotNull(storageType);
+    @Override
+    protected void validate() {
+      super.validate();
+      Objects.requireNonNull(volumeName, "volumeName == null");
+      Objects.requireNonNull(bucketName, "bucketName == null");
+      Objects.requireNonNull(acls, "acls == null");
+      Objects.requireNonNull(storageType, "storageType == null");
+    }
+
+    @Override
+    protected OmBucketInfo buildObject() {
       return new OmBucketInfo(this);
     }
   }
@@ -661,20 +608,21 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
-    return getFromProtobuf(bucketInfo, null);
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo, null);
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * Parses BucketInfo protobuf and creates OmBucketInfo Builder.
    * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * @param buckLayout
+   * @return Builder instance
    */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+  public static Builder builderFromProtobuf(BucketInfo bucketInfo,
       BucketLayout buckLayout) {
     Builder obib = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
@@ -725,7 +673,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
     }
-    return obib.build();
+    return obib;
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
+    return builderFromProtobuf(bucketInfo).build();
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @param buckLayout
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
+      BucketLayout buckLayout) {
+    return builderFromProtobuf(bucketInfo, buckLayout).build();
   }
 
   @Override

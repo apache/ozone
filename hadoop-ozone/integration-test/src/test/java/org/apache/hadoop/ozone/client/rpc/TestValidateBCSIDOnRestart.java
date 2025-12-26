@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
@@ -81,11 +80,6 @@ public class TestValidateBCSIDOnRestart {
   private static String volumeName;
   private static String bucketName;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -137,9 +131,6 @@ public class TestValidateBCSIDOnRestart {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);

@@ -69,7 +69,7 @@ public class TestReportSubCommand {
   @Test
   public void testCorrectValuesAppearInEmptyReport() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport());
+    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport(100));
 
     cmd.execute(scmClient);
 
@@ -96,7 +96,7 @@ public class TestReportSubCommand {
     // More complete testing of the Report JSON output is in
     // TestReplicationManagerReport.
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport());
+    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport(100));
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--json");
@@ -149,7 +149,7 @@ public class TestReportSubCommand {
   }
 
   private ReplicationManagerReport createReport() {
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(100);
 
     int counter = SEED;
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {

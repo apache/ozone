@@ -77,6 +77,8 @@ package hadoop.hdds.datanode;
  *  18. CopyContainer - Copies a container from a remote machine.
  *
  *  19. FinalizeBlock - Finalize block request from client.
+ *
+ *  20. ReadBlock - Allows us to read a block.
  */
 
 enum Type {
@@ -108,6 +110,7 @@ enum Type {
   FinalizeBlock = 21;
   Echo = 22;
   GetContainerChecksumInfo = 23;
+  ReadBlock = 24;
 }
 
 
@@ -218,6 +221,7 @@ message ContainerCommandRequestProto {
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
+  optional   ReadBlockRequestProto readBlock = 28;
 }
 
 message ContainerCommandResponseProto {
@@ -250,6 +254,7 @@ message ContainerCommandResponseProto {
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
   optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
+  optional   ReadBlockResponseProto readBlock = 25;
 }
 
 message ContainerDataProto {
@@ -391,6 +396,19 @@ message ListBlockRequestProto {
 
 message ListBlockResponseProto {
   repeated BlockData blockData = 1;
+}
+
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  optional uint64 length = 3;
+  optional uint32 responseDataSize = 4;
+}
+
+message ReadBlockResponseProto {
+  required ChecksumData checksumData = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
 }
 
 message EchoRequestProto {

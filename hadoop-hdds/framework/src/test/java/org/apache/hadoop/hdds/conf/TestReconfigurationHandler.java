@@ -83,20 +83,20 @@ class TestReconfigurationHandler {
   @Test
   void callsReconfigurationFunction() throws ReconfigurationException {
     final String newA = "newA";
-    subject.reconfigurePropertyImpl(PROP_A, newA);
+    subject.reconfigureProperty(PROP_A, newA);
     assertEquals(newA, refA.get());
 
     final String newB = "newB";
-    subject.reconfigurePropertyImpl(PROP_B, newB);
+    subject.reconfigureProperty(PROP_B, newB);
     assertEquals(newB, refB.get());
 
     final boolean newCompressionEnabled = !object.isCompressionEnabled();
-    subject.reconfigurePropertyImpl(COMPRESSION_ENABLED,
+    subject.reconfigureProperty(COMPRESSION_ENABLED,
         Boolean.toString(newCompressionEnabled));
     assertEquals(newCompressionEnabled, object.isCompressionEnabled());
 
     final long newWaitTime = object.getWaitTime() + 5;
-    subject.reconfigurePropertyImpl(WAIT, Long.toString(newWaitTime));
+    subject.reconfigureProperty(WAIT, Long.toString(newWaitTime));
     assertEquals(newWaitTime, object.getWaitTime());
   }
 
@@ -104,14 +104,18 @@ class TestReconfigurationHandler {
   void validatesNewConfiguration() {
     final long oldWaitTime = object.getWaitTime();
     assertThrows(ReconfigurationException.class,
-        () -> subject.reconfigurePropertyImpl(WAIT, "0"));
+        () -> subject.reconfigureProperty(WAIT, "0"));
     assertEquals(oldWaitTime, object.getWaitTime());
   }
 
   @Test
-  void ignoresUnknownProperty() {
+  void testUnknownProperty() {
+    // reconfigurePropertyImpl should not throw anything
     assertDoesNotThrow(() ->
         subject.reconfigurePropertyImpl("foobar", "some value"));
+    // reconfigureProperty should throw exception
+    assertThrows(ReconfigurationException.class, () ->
+        subject.reconfigureProperty("foobar", "some value"));
   }
 
   @Test

@@ -86,6 +86,7 @@ message ScmContainerLocationRequest {
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
+  optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
 }
 
 message ScmContainerLocationResponse {
@@ -143,6 +144,7 @@ message ScmContainerLocationResponse {
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
+  optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
 
   enum Status {
     OK = 1;
@@ -199,6 +201,7 @@ enum Type {
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
+  GetDeletedBlocksTransactionSummary = 46;
 }
 
 /**
@@ -543,6 +546,13 @@ message ResetDeletedBlockRetryCountRequestProto {
 
 message ResetDeletedBlockRetryCountResponseProto {
   required int32 resetCount = 1;
+}
+
+message GetDeletedBlocksTxnSummaryRequestProto {
+}
+
+message GetDeletedBlocksTxnSummaryResponseProto {
+  optional DeletedBlocksTransactionSummary summary = 1;
 }
 
 message FinalizeScmUpgradeRequestProto {

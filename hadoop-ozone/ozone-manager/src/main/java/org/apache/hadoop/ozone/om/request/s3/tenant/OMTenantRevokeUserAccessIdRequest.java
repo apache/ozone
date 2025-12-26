@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -185,12 +185,12 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
-      Preconditions.checkNotNull(omDBAccessIdInfo);
+      Objects.requireNonNull(omDBAccessIdInfo, "omDBAccessIdInfo == null");
       userPrincipal = omDBAccessIdInfo.getUserPrincipal();
-      Preconditions.checkNotNull(userPrincipal);
+      Objects.requireNonNull(userPrincipal, "userPrincipal == null");
       OmDBUserPrincipalInfo principalInfo = omMetadataManager
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
-      Preconditions.checkNotNull(principalInfo);
+      Objects.requireNonNull(principalInfo, "principalInfo == null");
       principalInfo.removeAccessId(accessId);
       CacheValue<OmDBUserPrincipalInfo> cacheValue =
           !principalInfo.getAccessIds().isEmpty()
@@ -225,7 +225,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredVolumeLock) {
-        Preconditions.checkNotNull(volumeName);
+        Objects.requireNonNull(volumeName, "volumeName == null");
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
                 volumeName));

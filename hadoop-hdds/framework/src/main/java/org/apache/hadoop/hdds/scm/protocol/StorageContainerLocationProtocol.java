@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -360,6 +362,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   @Deprecated
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+
+  /**
+   * Get deleted block summary.
+   * @throws IOException
+   */
+  @Nullable
+  DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException;
 
   /**
    * Check if SCM is in safe mode.

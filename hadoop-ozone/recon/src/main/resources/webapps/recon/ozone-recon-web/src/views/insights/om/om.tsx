@@ -32,6 +32,7 @@ import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 import {IOption} from "@/components/multiSelect/multiSelect";
 
 import './om.less';
+import { ReplicationInfo } from '@/v2/types/insights.types';
 
 
 const size = filesize.partial({ standard: 'iec' });
@@ -200,34 +201,29 @@ const OPEN_KEY_TAB_COLUMNS = [
     }
   },
   {
-    title: 'Replication Factor',
+    title: 'Replication Type',
     dataIndex: 'replicationInfo',
-    key: 'replicationfactor',
-    render: (replicationInfo: any) => (
+    key: 'replicationtype',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
-        {
-          <div >
-            {Object.values(replicationInfo)[0]}
-          </div>
-        }
+        {replicationInfo.replicationType}
       </div>
     )
   },
   {
-    title: 'Replication Type',
+    title: 'Replication Factor',
     dataIndex: 'replicationInfo',
-    key: 'replicationtype',
-    render: (replicationInfo: any) => (
+    key: 'replicationfactor',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          <div >
-            {Object.values(replicationInfo)[2]}
-          </div>
+          (replicationInfo.replicationType === "RATIS")
+          ? replicationInfo.replicationFactor
+          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
         }
       </div>
     )
   }
-
 ];
 
 const PENDING_TAB_COLUMNS = [

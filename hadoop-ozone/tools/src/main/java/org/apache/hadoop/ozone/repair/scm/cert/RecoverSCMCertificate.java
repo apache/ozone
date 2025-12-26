@@ -63,7 +63,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "recover",
-    description = "Recover Deleted SCM Certificate from RocksDB")
+    description = "Recover Deleted SCM Certificate from RocksDB."  +
+        " SCM should be stopped for this tool.")
 public class RecoverSCMCertificate extends RepairTool {
   @CommandLine.Option(names = {"--db"},
       required = true,

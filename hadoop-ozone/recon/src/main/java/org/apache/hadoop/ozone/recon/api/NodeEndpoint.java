@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -173,11 +174,14 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    long capacity = nodeStat.getCapacity().get();
-    long used = nodeStat.getScmUsed().get();
-    long remaining = nodeStat.getRemaining().get();
-    long committed = nodeStat.getCommitted().get();
-    return new DatanodeStorageReport(capacity, used, remaining, committed);
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(nodeStat.getCapacity().get())
+        .setUsed(nodeStat.getScmUsed().get())
+        .setRemaining(nodeStat.getRemaining().get())
+        .setCommitted(nodeStat.getCommitted().get())
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
+        .build();
+    return storageReport;
   }
 
   /**
@@ -195,7 +199,7 @@ public class NodeEndpoint {
     List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
     Map<String, String> failedNodeErrorResponseMap = new HashMap<>();
 
-    Preconditions.checkNotNull(uuids, "Datanode list argument should not be null");
+    Objects.requireNonNull(uuids, "Datanode list argument should not be null");
     Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
     try {
       for (String uuid : uuids) {
@@ -330,7 +334,7 @@ public class NodeEndpoint {
   public Response getDecommissionInfoForDatanode(@QueryParam("uuid") String uuid,
                                                  @QueryParam("ipAddress") String ipAddress) {
     if (StringUtils.isEmpty(uuid)) {
-      Preconditions.checkNotNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
+      Objects.requireNonNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
       Preconditions.checkArgument(!ipAddress.isEmpty(),
           "Either uuid or ipAddress of a datanode should be provided !!!");
     }

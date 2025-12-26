@@ -183,7 +183,8 @@ public class VolumeInfoMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
     registry.snapshot(builder, all);
-    volume.getVolumeUsage().ifPresent(volumeUsage -> {
+    VolumeUsage volumeUsage = volume.getVolumeUsage();
+    if (volumeUsage != null) {
       SpaceUsageSource usage = volumeUsage.getCurrentUsage();
       long reserved = volumeUsage.getReservedInBytes();
       builder
@@ -192,6 +193,6 @@ public class VolumeInfoMetrics implements MetricsSource {
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
           .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved);
-    });
+    }
   }
 }

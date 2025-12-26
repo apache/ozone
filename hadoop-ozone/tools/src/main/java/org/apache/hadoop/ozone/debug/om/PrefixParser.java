@@ -134,9 +134,7 @@ public class PrefixParser implements Callable<Void> {
     final long volumeObjectId = metadataManager.getVolumeId(
             info.getVolumeName());
     long lastObjectId = info.getObjectID();
-    WithParentObjectId objectBucketId = new WithParentObjectId();
-    objectBucketId.setObjectID(lastObjectId);
-    dumpInfo(Types.BUCKET, effectivePath, objectBucketId,
+    dumpInfo(info, Types.BUCKET, effectivePath,
         metadataManager.getBucketKey(vol, buck));
 
     Iterator<Path> pathIterator =  p.iterator();
@@ -202,16 +200,25 @@ public class PrefixParser implements Callable<Void> {
     return new org.apache.hadoop.fs.Path(currentPath, name);
   }
 
-  private void dumpInfo(Types level, org.apache.hadoop.fs.Path effectivePath,
-                        WithParentObjectId id,  String key) {
+  private void dumpInfo(Types level, org.apache.hadoop.fs.Path effectivePath, String key) {
     parserStats[level.ordinal()]++;
     System.out.println("Type:" + level);
     System.out.println("Path: " + effectivePath);
     System.out.println("DB Path: " + key);
+  }
+
+  private void dumpInfo(OmBucketInfo bucketInfo, Types level, org.apache.hadoop.fs.Path effectivePath, String key) {
+    dumpInfo(level, effectivePath, key);
+    System.out.println("Object Id: " + bucketInfo.getObjectID());
+    System.out.println();
+  }
+
+  private void dumpInfo(Types level, org.apache.hadoop.fs.Path effectivePath,
+        WithParentObjectId id,  String key) {
+    dumpInfo(level, effectivePath, key);
     System.out.println("Object Id: " + id.getObjectID());
     System.out.println("Parent object Id: " + id.getParentObjectID());
     System.out.println();
-
   }
 
   private static KeyPrefixFilter getPrefixFilter(long volumeId, long bucketId, long parentId) {

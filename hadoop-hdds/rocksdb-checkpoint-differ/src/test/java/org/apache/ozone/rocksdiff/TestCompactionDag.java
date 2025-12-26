@@ -55,19 +55,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -169,11 +172,21 @@ public class TestCompactionDag {
              Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
       mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary)
           .thenReturn(true);
+      ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+      Function<Boolean, UncheckedAutoCloseable> dummyLock = (readLock) -> {
+        if (readLock) {
+          readWriteLock.readLock().lock();
+          return (UncheckedAutoCloseable) () -> readWriteLock.readLock().unlock();
+        } else {
+          readWriteLock.writeLock().lock();
+          return (UncheckedAutoCloseable) () -> readWriteLock.writeLock().unlock();
+        }
+      };
       rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
           SST_BACK_UP_DIR_NAME,
           COMPACTION_LOG_DIR_NAME,
           ACTIVE_DB_DIR_NAME,
-          config);
+          config, dummyLock);
     }
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
@@ -699,8 +712,8 @@ public class TestCompactionDag {
 
     Future<Boolean> future;
     // Take the lock and start the consumer.
-    try (BootstrapStateHandler.Lock lock =
-             differ.getBootstrapStateLock().lock()) {
+    try (UncheckedAutoCloseable lock =
+             differ.getBootstrapStateLock().acquireWriteLock()) {
       future = executorService.submit(
           () -> {
             c.accept(differ);

@@ -65,6 +65,8 @@ env:
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
   JAVA_VERSION: ${{ github.event.inputs.java-version }}
+  SPLITS: ${{ github.event.inputs.splits }}
+  SUBMODULE: ${{ github.event.inputs.submodule }}
   # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
   # SUREFIRE-1722, SUREFIRE-1815
   SUREFIRE_VERSION: 3.0.0-M4
@@ -82,7 +84,7 @@ jobs:
         name: Generate test matrix
         run: |
           splits=()
-          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+          for ((i = 1; i <= $SPLITS; i++)); do
             splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
@@ -95,7 +97,7 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   build:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
@@ -129,8 +131,8 @@ jobs:
           java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
-          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
@@ -138,7 +140,7 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          args="$args -am -pl :${{ github.event.inputs.submodule }}"
+          args="$args -am -pl :$SUBMODULE"
 
           hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
@@ -149,7 +151,7 @@ jobs:
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
   run-test:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
@@ -199,8 +201,8 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
@@ -208,7 +210,7 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          args="$args -pl :${{ github.event.inputs.submodule }}"
+          args="$args -pl :$SUBMODULE"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"

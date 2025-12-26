@@ -131,7 +131,7 @@ public class TestOMSnapshotCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Confirm snapshot directory was created
-    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
+    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo, 0);
     assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry

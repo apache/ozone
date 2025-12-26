@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -500,8 +501,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // We have to add the key to the key table, as validateAndUpdateCache only
     // updates the cache and not the DB.
     OmKeyInfo keyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig).build();
-    keyInfo.setMetadata(initialMetadata);
+        replicationConfig).setMetadata(initialMetadata).build();
     omMetadataManager.getKeyTable(initialOmKeyCreateRequest.getBucketLayout())
         .put(getOzoneKey(), keyInfo);
 
@@ -562,6 +562,34 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         overwriteOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
     // Verify the new metadata is correctly applied in the response
     verifyMetadataInResponse(overwriteResponse, overwriteMetadata);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(true, true));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    // create file
+    String ozoneAll = "user:ozone:a";
+    List<OzoneAcl> aclList = new ArrayList<>();
+    aclList.add(OzoneAcl.parseAcl(ozoneAll));
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(false, 0, keyName, emptyMap(), emptyMap(), aclList));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
+        omKeyCreateRequest.getBucketLayout());
+
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    if (ignoreClientACLs) {
+      assertFalse(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    } else {
+      assertTrue(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
   }
 
   private void verifyMetadataInResponse(OMClientResponse response,

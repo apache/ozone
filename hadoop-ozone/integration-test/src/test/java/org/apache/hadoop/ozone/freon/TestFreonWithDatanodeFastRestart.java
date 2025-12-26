@@ -41,12 +41,6 @@ import picocli.CommandLine;
 public class TestFreonWithDatanodeFastRestart {
   private static MiniOzoneCluster cluster;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -57,9 +51,6 @@ public class TestFreonWithDatanodeFastRestart {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

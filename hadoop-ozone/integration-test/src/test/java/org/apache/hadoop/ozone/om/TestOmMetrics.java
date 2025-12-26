@@ -106,9 +106,6 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
 
   @BeforeAll
   public void setup() throws Exception {
@@ -132,9 +129,6 @@ public class TestOmMetrics {
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);

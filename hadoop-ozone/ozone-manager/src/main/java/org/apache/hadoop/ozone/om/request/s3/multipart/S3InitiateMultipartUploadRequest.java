@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -82,7 +82,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         super.preExecute(ozoneManager).getInitiateMultiPartUploadRequest();
-    Preconditions.checkNotNull(multipartInfoInitiateRequest);
+    Objects.requireNonNull(multipartInfoInitiateRequest, "multipartInfoInitiateRequest == null");
 
     KeyArgs keyArgs = multipartInfoInitiateRequest.getKeyArgs();
 
@@ -117,7 +117,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     KeyArgs keyArgs =
         multipartInfoInitiateRequest.getKeyArgs();
 
-    Preconditions.checkNotNull(keyArgs.getMultipartUploadID());
+    Objects.requireNonNull(keyArgs.getMultipartUploadID(), "multipartUploadID == null");
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.UPLOAD_ID, keyArgs.getMultipartUploadID());

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -112,7 +113,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   }
 
   private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    Objects.requireNonNull(subKeyInfo.getPipeline(), "subKeyInfo.getPipeline() == null");
     BlockDataStreamOutputEntry.Builder builder =
         new BlockDataStreamOutputEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
@@ -276,7 +277,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       currentStreamIndex++;
     }
     if (streamEntries.size() <= currentStreamIndex) {
-      Preconditions.checkNotNull(omClient);
+      Objects.requireNonNull(omClient, "omClient == null");
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
       allocateNewBlock();

@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -556,7 +556,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         createDbStore(any());
     Map volumeMap = new HashMap<String, StorageVolume>();
     volumeMap.put(dataVolume.getStorageID(), volume);
-    dsm.getContainer().getVolumeSet().setVolumeMap(volumeMap);
+    dsm.getContainer().getVolumeSet().setVolumeMapForTesting(volumeMap);
 
     // Finalize will fail because of DB creation failure
     try {

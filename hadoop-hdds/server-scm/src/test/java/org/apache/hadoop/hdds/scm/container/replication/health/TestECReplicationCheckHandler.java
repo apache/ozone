@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.He
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,7 +85,9 @@ public class TestECReplicationCheckHandler {
     healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(maintenanceRedundancy)
@@ -139,8 +142,8 @@ public class TestECReplicationCheckHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 1, 2, 4, 5);
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -197,8 +200,8 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 3), Pair.of(DECOMMISSIONING, 4),
         Pair.of(IN_SERVICE, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -228,8 +231,8 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
         Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
@@ -369,8 +372,8 @@ public class TestECReplicationCheckHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -508,10 +511,10 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1));
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -665,9 +668,9 @@ public class TestECReplicationCheckHandler {
     replicas.add(unhealthyReplica);
 
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(DELETE,
+    pendingOps.add(new ContainerReplicaOp(DELETE,
         unhealthyReplica.getDatanodeDetails(),
-        unhealthyReplica.getReplicaIndex()));
+        unhealthyReplica.getReplicaIndex(), null, Long.MAX_VALUE, 0));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)

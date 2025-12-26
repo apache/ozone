@@ -547,7 +547,7 @@ class TestOzoneFsSnapshot {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
-    String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
+    String snapshotDirName = getSnapshotPath(conf, snapshotInfo, 0) +
         OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         1000, 100000);

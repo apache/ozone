@@ -42,6 +42,15 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
       description = "Simulate repair, but do not make any changes")
   private boolean dryRun;
 
+  private Scanner scanner;
+
+  protected Scanner getScanner() {
+    if (scanner == null) {
+      scanner = new Scanner(System.in, StandardCharsets.UTF_8.name());
+    }
+    return scanner;
+  }
+
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
 
@@ -53,14 +62,18 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   @Override
   public final Void call() throws Exception {
-    final Component service = serviceToBeOffline();
-    if (!dryRun && service != null) { // offline tool
-      confirmUser();
+    try {
+      final Component service = serviceToBeOffline();
+      if (!dryRun && service != null) { // offline tool
+        confirmUser();
+      }
+      if (isServiceStateOK()) {
+        execute();
+      }
+      return null;
+    } finally {
+      scanner = null;
     }
-    if (isServiceStateOK()) {
-      execute();
-    }
-    return null;
   }
 
   private boolean isServiceStateOK() {
@@ -68,6 +81,11 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
     if (service == null) {
       return true; // online tool
+    }
+
+    if (dryRun) {
+      info("Skipping %s service check in dry run mode.", service);
+      return true;
     }
 
     if (!isServiceRunning(service)) {
@@ -151,9 +169,7 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   private String getConsoleReadLineWithFormat(String currentUser) {
     err().printf(WARNING_SYS_USER_MESSAGE, currentUser);
-    return new Scanner(System.in, StandardCharsets.UTF_8.name())
-        .nextLine()
-        .trim();
+    return getScanner().nextLine().trim();
   }
 
   /** Ozone component for offline tools. */

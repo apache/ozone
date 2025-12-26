@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
@@ -157,6 +158,7 @@ public final class DatanodeAdminMonitorTestUtil {
       HddsProtos.NodeOperationalState...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
+    mockReplicationManagerConfig(repManager);
     when(repManager.getContainerReplicaCount(
         any(ContainerID.class)))
         .thenAnswer(invocation ->
@@ -185,6 +187,7 @@ public final class DatanodeAdminMonitorTestUtil {
           Integer>...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
+    mockReplicationManagerConfig(repManager);
     when(repManager.getContainerReplicaCount(
             any(ContainerID.class)))
         .thenAnswer(invocation ->
@@ -195,6 +198,7 @@ public final class DatanodeAdminMonitorTestUtil {
 
   static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
       throws ContainerNotFoundException {
+    mockReplicationManagerConfig(repManager);
     when(repManager.checkContainerStatus(any(ContainerInfo.class),
             any(ReplicationManagerReport.class)))
         .then(invocation -> {
@@ -205,6 +209,16 @@ public final class DatanodeAdminMonitorTestUtil {
           }
           return false;
         });
+  }
+
+  /**
+   * Mocks the ReplicationManagerConfiguration to return default sample limit of 100.
+   */
+  static void mockReplicationManagerConfig(ReplicationManager repManager) {
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    when(repManager.getConfig()).thenReturn(rmConf);
+    when(rmConf.getContainerSampleLimit()).thenReturn(100);
   }
 
   /**

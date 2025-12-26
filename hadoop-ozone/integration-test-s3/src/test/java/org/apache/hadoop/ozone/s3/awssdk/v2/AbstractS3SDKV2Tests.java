@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk.v2;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
@@ -55,7 +55,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -65,11 +64,11 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -171,39 +170,28 @@ import software.amazon.awssdk.utils.IoUtils;
  *   - https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/crt-based-s3-client.html
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static S3Client s3Client = null;
-  private static S3AsyncClient s3AsyncClient = null;
+  private MiniOzoneCluster cluster;
+  private S3Client s3Client;
+  private S3AsyncClient s3AsyncClient;
 
-  /**
-   * Create a MiniOzoneCluster with S3G enabled for testing.
-   * @param conf Configurations to start the cluster
-   * @throws Exception exception thrown when waiting for the cluster to be ready.
-   */
-  static void startCluster(OzoneConfiguration conf) throws Exception {
-    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .addService(s3g)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    S3ClientFactory s3Factory = new S3ClientFactory(s3g.getConf());
+  @BeforeAll
+  void createClient() throws Exception {
+    cluster = cluster();
+    S3ClientFactory s3Factory = new S3ClientFactory(cluster.getConf());
     s3Client = s3Factory.createS3ClientV2();
     s3AsyncClient = s3Factory.createS3AsyncClientV2();
   }
 
-  /**
-   * Shutdown the MiniOzoneCluster.
-   */
-  static void shutdownCluster() throws IOException {
+  @AfterAll
+  void closeClient() {
     if (s3Client != null) {
       s3Client.close();
     }
-    if (cluster != null) {
-      cluster.shutdown();
+    if (s3AsyncClient != null) {
+      s3AsyncClient.close();
     }
   }
 
@@ -460,7 +448,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   class PresignedUrlTests {
     private static final String CONTENT = "bar";
-    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String BUCKET_NAME = "v2-presigned-url-bucket";
     private final SdkHttpClient sdkHttpClient = ApacheHttpClient.create();
     // The URL will expire in 10 minutes.
     private final Duration duration = Duration.ofMinutes(10);
@@ -970,7 +958,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       for (CompletedPart part : parts) {
         xml.append("  <Part>\n");
         xml.append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n");
-        xml.append("    <ETag>").append(part.eTag()).append("</ETag>\n");
+        xml.append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n");
         xml.append("  </Part>\n");
       }
       xml.append("</CompleteMultipartUpload>");
@@ -1077,16 +1065,16 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     return getBucketName("");
   }
 
-  private String getBucketName(String suffix) {
-    return (getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+  private String getBucketName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String getKeyName() {
     return getKeyName("");
   }
 
-  private String getKeyName(String suffix) {
-    return (getTestName() +  "key" + suffix).toLowerCase(Locale.ROOT);
+  private String getKeyName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String multipartUpload(String bucketName, String key, File file, int partSize,
@@ -1142,11 +1130,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             RequestBody.fromByteBuffer(bb));
 
         assertEquals(DatatypeConverter.printHexBinary(
-            calculateDigest(fileInputStream, 0, partSize)).toLowerCase(), partResponse.eTag());
+            calculateDigest(fileInputStream, 0, partSize)).toLowerCase(), stripQuotes(partResponse.eTag()));
 
         CompletedPart part = CompletedPart.builder()
             .partNumber(partNumber)
-            .eTag(partResponse.eTag())
+            .eTag(stripQuotes(partResponse.eTag()))
             .build();
         completedParts.add(part);
 
@@ -1643,7 +1631,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
         CompletedMultipartUpload completedUpload = CompletedMultipartUpload.builder()
             .parts(
-                CompletedPart.builder().partNumber(1).eTag(uploadPartResponse.eTag()).build()
+                CompletedPart.builder().partNumber(1).eTag(stripQuotes(uploadPartResponse.eTag())).build()
             ).build();
 
 

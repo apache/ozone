@@ -237,15 +237,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
     omKeyInfoBuilder.setExpectedDataGeneration(1L);
-    OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
-    omKeyInfo.appendNewBlocks(allocatedLocationList, false);
-    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
-    omKeyInfo.addAcl(acls.get(0));
+    omKeyInfoBuilder.addAcl(acls.get(0));
 
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
     assertEquals(acls, openKeyInfo.getAcls());
@@ -935,7 +933,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Nonnull
-  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo) throws Exception {
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo.Builder keyInfoBuilder)
+      throws Exception {
+    OmKeyInfo keyInfo = keyInfoBuilder.build();
+    keyInfo.appendNewBlocks(locationList, false);
     OMRequestTestUtils.addKeyToTable(true, false, keyInfo, clientID, 0, omMetadataManager);
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,

@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdfs.util.EnumCounters;
@@ -785,5 +786,29 @@ public class DatanodeStateMachine implements Closeable {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  /**
+   * Sets the next heartbeat time. Setting to current time will trigger HB immediately as will be less than time
+   * compared to Time.monotonicNow() when compared.
+   * @param time
+   */
+  public void setNextHB(long time) {
+    nextHB.set(time);
+  }
+
+  @VisibleForTesting
+  public ExecutorService getExecutorService() {
+    return executorService;
+  }
+
+  /**
+   * Resize the executor based on the number of active endpoint tasks.
+   */
+  public void resizeExecutor(int size) {
+    if (executorService instanceof ThreadPoolExecutor) {
+      ThreadPoolExecutor tpe = (ThreadPoolExecutor) executorService;
+      HddsServerUtil.setPoolSize(tpe, size, LOG);
+    }
   }
 }

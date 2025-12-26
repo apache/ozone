@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -82,7 +82,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
 
-    Preconditions.checkNotNull(setVolumePropertyRequest);
+    Objects.requireNonNull(setVolumePropertyRequest, "setVolumePropertyRequest == null");
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -120,25 +120,22 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume));
       acquireVolumeLock = getOmLockDetails().isLockAcquired();
 
-      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs.Builder builder = getVolumeInfo(omMetadataManager, volume).toBuilder();
       if (checkQuotaBytesValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInBytes(), volume)) {
-        omVolumeArgs.setQuotaInBytes(
+        builder.setQuotaInBytes(
             setVolumePropertyRequest.getQuotaInBytes());
-      } else {
-        omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
       if (checkQuotaNamespaceValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInNamespace(), volume)) {
-        omVolumeArgs.setQuotaInNamespace(
+        builder.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
-      } else {
-        omVolumeArgs.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
       }
 
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-      omVolumeArgs.setModificationTime(
-          setVolumePropertyRequest.getModificationTime());
+      OmVolumeArgs omVolumeArgs = builder
+          .setModificationTime(setVolumePropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(

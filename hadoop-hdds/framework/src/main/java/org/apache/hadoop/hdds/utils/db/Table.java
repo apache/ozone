@@ -135,14 +135,6 @@ public interface Table<KEY, VALUE> {
   void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException;
 
   /**
-   * Deletes a range of keys from the metadata store as part of a batch operation.
-   * @param batch Batch operation to perform the delete operation.
-   * @param beginKey start metadata key, inclusive.
-   * @param endKey end metadata key, exclusive.
-   */
-  void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException;
-
-  /**
    * Deletes a range of keys from the metadata store.
    *
    * @param beginKey start metadata key
@@ -152,12 +144,12 @@ public interface Table<KEY, VALUE> {
 
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {
-    return iterator(null, KeyValueIterator.Type.KEY_AND_VALUE);
+    return iterator(null, IteratorType.KEY_AND_VALUE);
   }
 
   /** The same as iterator(prefix, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    return iterator(prefix, KeyValueIterator.Type.KEY_AND_VALUE);
+    return iterator(prefix, IteratorType.KEY_AND_VALUE);
   }
 
   /**
@@ -174,7 +166,7 @@ public interface Table<KEY, VALUE> {
    * @param type Specify whether key and/or value are required.
    * @return an iterator.
    */
-  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
+  KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException;
 
   /**
@@ -182,7 +174,7 @@ public interface Table<KEY, VALUE> {
    * @return a key-only iterator
    */
   default TableIterator<KEY, KEY> keyIterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.KEY_ONLY);
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, IteratorType.KEY_ONLY);
     return TableIterator.convert(i, KeyValue::getKey);
   }
 
@@ -196,7 +188,7 @@ public interface Table<KEY, VALUE> {
    * @return a value-only iterator.
    */
   default TableIterator<KEY, VALUE> valueIterator(KEY prefix) throws RocksDatabaseException, CodecException {
-    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, KeyValueIterator.Type.VALUE_ONLY);
+    final KeyValueIterator<KEY, VALUE> i = iterator(prefix, IteratorType.VALUE_ONLY);
     return TableIterator.convert(i, KeyValue::getValue);
   }
 
@@ -268,7 +260,7 @@ public interface Table<KEY, VALUE> {
   /**
    * Create the metrics datasource that emits table cache metrics.
    */
-  default TableCacheMetrics createCacheMetrics() throws RocksDatabaseException {
+  default TableCacheMetrics createCacheMetrics() {
     throw new NotImplementedException("getCacheValue is not implemented");
   }
 
@@ -399,24 +391,5 @@ public interface Table<KEY, VALUE> {
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
 
-    /** The iterator type. */
-    enum Type {
-      /** Neither read key nor value. */
-      NEITHER,
-      /** Read key only. */
-      KEY_ONLY,
-      /** Read value only. */
-      VALUE_ONLY,
-      /** Read both key and value. */
-      KEY_AND_VALUE;
-
-      boolean readKey() {
-        return (this.ordinal() & KEY_ONLY.ordinal()) != 0;
-      }
-
-      boolean readValue() {
-        return (this.ordinal() & VALUE_ONLY.ordinal()) != 0;
-      }
-    }
   }
 }

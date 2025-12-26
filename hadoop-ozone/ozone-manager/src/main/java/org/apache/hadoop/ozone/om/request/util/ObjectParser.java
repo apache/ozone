@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.request.util;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
@@ -39,7 +39,7 @@ public class ObjectParser {
    * @param path
    */
   public ObjectParser(String path, ObjectType objectType) throws OMException {
-    Preconditions.checkNotNull(path);
+    Objects.requireNonNull(path, "path == null");
     String[] tokens = StringUtils.split(path, OZONE_URI_DELIMITER, 3);
     if (objectType == ObjectType.VOLUME && tokens.length == 1) {
       volume = tokens[0];

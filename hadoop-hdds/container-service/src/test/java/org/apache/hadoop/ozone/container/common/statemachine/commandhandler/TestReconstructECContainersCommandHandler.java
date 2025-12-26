@@ -24,7 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.ProtoUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -77,7 +78,7 @@ public class TestReconstructECContainersCommandHandler {
     CommandHandlerMetrics metrics = CommandHandlerMetrics.create(handlerMap);
     try {
       byte[] missingIndexes = {1, 2};
-      ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(missingIndexes);
+      ByteString missingContainerIndexes = ProtoUtils.unsafeByteString(missingIndexes);
       ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
       List<DatanodeDetails> dnDetails = getDNDetails(5);
       List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources =
@@ -91,7 +92,7 @@ public class TestReconstructECContainersCommandHandler {
 
       commandHandler.handle(reconstructECContainersCommand, ozoneContainer,
           stateContext, connectionManager);
-      String metricsName = "ECReconstructions";
+      String metricsName = ECReconstructionCoordinatorTask.METRIC_NAME;
       assertEquals(commandHandler.getMetricsName(), metricsName);
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 1);

@@ -44,12 +44,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * intervention may be needed in some cases.
  *
  * To aid debugging, when containers are in one of the health states, a list of
- * up to SAMPLE_LIMIT container IDs are recorded in the report for each of the
+ * up to sampleLimit container IDs are recorded in the report for each of the
  * states.
  */
 public class ReplicationManagerReport {
 
-  public static final int SAMPLE_LIMIT = 100;
+  private int sampleLimit;
   private long reportTimeStamp;
 
   private final Map<String, LongAdder> stats;
@@ -57,7 +57,7 @@ public class ReplicationManagerReport {
 
   public static ReplicationManagerReport fromProtobuf(
       HddsProtos.ReplicationManagerReportProto proto) {
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(proto.getSampleLimit());
     report.setTimestamp(proto.getTimestamp());
     for (HddsProtos.KeyIntValue stat : proto.getStatList()) {
       report.setStat(stat.getKey(), stat.getValue());
@@ -71,8 +71,13 @@ public class ReplicationManagerReport {
     return report;
   }
 
-  public ReplicationManagerReport() {
+  public ReplicationManagerReport(int sampleLimit) {
+    this.sampleLimit = sampleLimit;
     stats = createStatsMap();
+  }
+
+  public int getSampleLimit() {
+    return sampleLimit;
   }
 
   public void increment(HealthState stat) {
@@ -220,7 +225,7 @@ public class ReplicationManagerReport {
     List<ContainerID> list = containerSample
         .computeIfAbsent(stat, k -> new ArrayList<>());
     synchronized (list) {
-      if (list.size() < SAMPLE_LIMIT) {
+      if (list.size() < sampleLimit) {
         list.add(container);
       }
     }
@@ -241,6 +246,7 @@ public class ReplicationManagerReport {
     HddsProtos.ReplicationManagerReportProto.Builder proto =
         HddsProtos.ReplicationManagerReportProto.newBuilder();
     proto.setTimestamp(getReportTimeStamp());
+    proto.setSampleLimit(getSampleLimit());
 
     for (Map.Entry<String, LongAdder> e : stats.entrySet()) {
       proto.addStat(HddsProtos.KeyIntValue.newBuilder()
