@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -24,7 +26,8 @@ import org.apache.ratis.util.function.CheckedFunction;
 /**
  * RocksDB store iterator using the byte[] API.
  */
-class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
+class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[], KeyValue<byte[], byte[]>>
+    implements KeyValueIterator<byte[], byte[]> {
 
   RDBStoreByteArrayIterator(
       CheckedFunction<ManagedReadOptions, ManagedRocksIterator, RocksDatabaseException> itrSupplier,
@@ -34,7 +37,7 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   @Override
-  Table.KeyValue<byte[], byte[]> getKeyValue() {
+  KeyValue<byte[], byte[]> getKeyValue() {
     final ManagedRocksIterator i = getRocksDBIterator();
     final byte[] key = getType().readKey() ? i.get().key() : null;
     final byte[] value = getType().readValue() ? i.get().value() : null;

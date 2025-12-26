@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
@@ -26,7 +28,8 @@ import org.apache.ratis.util.function.CheckedFunction;
 /**
  * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
  */
-class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> {
+class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>>
+    implements KeyValueIterator<CodecBuffer, CodecBuffer> {
 
   private final Buffer keyBuffer;
   private final Buffer valueBuffer;
@@ -52,7 +55,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
+  KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
     assertOpen();
     return Table.newKeyValue(keyBuffer.getFromDb(), valueBuffer.getFromDb());
   }

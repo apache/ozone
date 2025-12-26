@@ -49,7 +49,7 @@ import org.rocksdb.RocksIterator;
  * Abstract class for testing RDBStoreAbstractIterator.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestRDBStoreAbstractIterator<T extends RDBStoreAbstractIterator<?>> {
+public abstract class TestRDBStoreAbstractIterator<T extends RDBStoreAbstractIterator<?, ? extends Table.KeyValue>> {
 
   private RocksIterator rocksDBIteratorMock;
   private CheckedFunction<ManagedReadOptions, ManagedRocksIterator, RocksDatabaseException> itrInitializer;

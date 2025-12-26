@@ -32,8 +32,7 @@ import org.slf4j.LoggerFactory;
  * NOTE: This class only works with RocksDB when comparator is set to Rocksdb's ByteWiseComparator.
  * @param <RAW> the raw type.
  */
-abstract class RDBStoreAbstractIterator<RAW>
-    implements Table.KeyValueIterator<RAW, RAW> {
+abstract class RDBStoreAbstractIterator<RAW, KV extends Table.KeyValue<RAW, RAW>> implements TableIterator<RAW, KV> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
@@ -41,7 +40,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   private final ManagedReadOptions readOptions;
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
-  private Table.KeyValue<RAW, RAW> currentEntry;
+  private KV currentEntry;
 
   private final IteratorType type;
 
@@ -74,7 +73,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   /** @return the {@link Table.KeyValue} for the current entry. */
-  abstract Table.KeyValue<RAW, RAW> getKeyValue();
+  abstract KV getKeyValue();
 
   /** Seek to the given key. */
   abstract void seek0(RAW key);
@@ -92,7 +91,7 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final void forEachRemaining(
-      Consumer<? super Table.KeyValue<RAW, RAW>> action) {
+      Consumer<? super KV> action) {
     while (hasNext()) {
       action.accept(next());
     }
@@ -112,7 +111,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final Table.KeyValue<RAW, RAW> next() {
+  public final KV next() {
     setCurrentEntry();
     if (currentEntry != null) {
       rocksDBIterator.get().next();
@@ -132,7 +131,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final Table.KeyValue<RAW, RAW> seek(RAW key) {
+  public final KV seek(RAW key) {
     seek0(key);
     setCurrentEntry();
     return currentEntry;

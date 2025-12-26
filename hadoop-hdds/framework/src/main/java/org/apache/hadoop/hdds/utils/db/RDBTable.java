@@ -200,7 +200,6 @@ class RDBTable implements Table<byte[], byte[]> {
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
-
   }
 
   @Override
@@ -214,6 +213,12 @@ class RDBTable implements Table<byte[], byte[]> {
       byte[] prefix, IteratorType type) throws RocksDatabaseException {
     return new RDBStoreCodecBufferIterator(readOptions -> db.newIterator(family, readOptions),
         this, prefix, type);
+  }
+
+  CloseableKeyValueIterator<CodecBuffer, CodecBuffer> newCloseableCodecBufferIterator(
+      byte[] prefix, IteratorType type, int numberOfObjectsNeededConcurrently) throws RocksDatabaseException {
+    return new RDBStorePoolBackedCodecBufferIterator(readOptions -> db.newIterator(family, readOptions),
+        this, prefix, type, numberOfObjectsNeededConcurrently);
   }
 
   @Override
