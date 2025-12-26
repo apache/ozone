@@ -36,7 +36,8 @@ public class ManagedDirectSlice extends DirectSlice {
   private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedDirectSlice(ByteBuffer buffer) {
-    super(Objects.requireNonNull(buffer, "buffer == null").slice());
+    super(Objects.requireNonNull(buffer, "buffer == null"));
+    removePrefix(buffer.position());
     setLength(buffer.remaining());
   }
 
