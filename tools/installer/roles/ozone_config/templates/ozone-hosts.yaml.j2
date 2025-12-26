@@ -1,0 +1,30 @@
+om:
+{% if (ha_enabled | default(false)) %}
+{%   for h in (groups.get('om', []) | default([])) %}
+  - {{ h | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{%   endfor %}
+{% else %}
+{%   if (groups.get('om', []) | default([])) | length > 0 %}
+  - {{ (groups.get('om', [])[0]) | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{%   endif %}
+{% endif %}
+scm:
+{% if (ha_enabled | default(false)) %}
+{%   for h in (groups.get('scm', []) | default([])) %}
+  - {{ h | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{%   endfor %}
+{% else %}
+{%   if (groups.get('scm', []) | default([])) | length > 0 %}
+  - {{ (groups.get('scm', [])[0]) | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{%   endif %}
+{% endif %}
+datanodes:
+{% for h in (groups.get('datanodes', []) | default([])) %}
+  - {{ h | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{% endfor %}
+recon:
+{% if (groups.get('recon', []) | default([])) | length > 0 %}
+  - {{ (groups.get('recon', [])[0]) | regex_replace('^.*@','') | regex_replace(':.*$','') }}
+{% endif %}
+
+

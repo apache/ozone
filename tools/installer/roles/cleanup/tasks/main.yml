@@ -1,0 +1,88 @@
+---
+- name: "Check install_base presence"
+  stat:
+    path: "{{ install_base }}"
+  register: _st_install_base
+  become: true
+
+- name: "Set presence flag"
+  set_fact:
+    install_present: "{{ _st_install_base.stat.exists | default(false) }}"
+
+- name: "Skip cleanup when install_base is absent on this host"
+  debug:
+    msg: "install_base '{{ install_base }}' not present; skipping cleanup on this host"
+  when: not install_present
+  changed_when: false
+
+- name: "Perform cleanup when install_base exists"
+  when: install_present
+  block:
+    - name: "Set ozone bin path"
+      set_fact:
+        ozone_bin: "{{ install_base }}/current/bin/ozone"
+
+    - name: "Stop Recon (if running)"
+      command: "{{ ozone_bin }} --daemon stop recon"
+      args:
+        chdir: "{{ install_base }}/current"
+      become: true
+      become_user: "{{ service_user }}"
+      run_once: true
+      delegate_to: "{{ groups['recon'][0] }}"
+      when: groups.get('recon', []) | length > 0
+      failed_when: false
+      changed_when: false
+
+    - name: "Stop OMs (if running)"
+      command: "{{ ozone_bin }} --daemon stop om"
+      args:
+        chdir: "{{ install_base }}/current"
+      become: true
+      become_user: "{{ service_user }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups.get('om', []) }}"
+      loop_control:
+        label: "{{ item }}"
+      failed_when: false
+      changed_when: false
+
+    - name: "Stop SCMs (if running)"
+      command: "{{ ozone_bin }} --daemon stop scm"
+      args:
+        chdir: "{{ install_base }}/current"
+      become: true
+      become_user: "{{ service_user }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups.get('scm', []) }}"
+      loop_control:
+        label: "{{ item }}"
+      failed_when: false
+      changed_when: false
+
+    - name: "Stop Datanodes (if running)"
+      command: "{{ ozone_bin }} --daemon stop datanode"
+      args:
+        chdir: "{{ install_base }}/current"
+      become: true
+      become_user: "{{ service_user }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups.get('datanodes', []) }}"
+      loop_control:
+        label: "{{ item }}"
+      failed_when: false
+      changed_when: false
+
+    - name: "Remove install base"
+      file:
+        path: "{{ install_base }}"
+        state: absent
+      become: true
+
+    - name: "Remove data base"
+      file:
+        path: "{{ data_base }}"
+        state: absent
+      become: true
+
+

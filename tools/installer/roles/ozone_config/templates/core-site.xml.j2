@@ -1,0 +1,15 @@
+<configuration>
+{% set om_hosts = (groups.get('om', []) | list) %}
+{% if (ha_enabled | default(false)) and (om_hosts|length > 1) %}
+  <property>
+    <name>fs.defaultFS</name>
+    <value>ofs://omservice</value>
+  </property>
+{% else %}
+  <property>
+    <name>fs.defaultFS</name>
+    <value>ofs://{{ om_hosts[0] }}:9862</value>
+  </property>
+{% endif %}
+</configuration>
+

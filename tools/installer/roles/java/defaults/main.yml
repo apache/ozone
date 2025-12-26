@@ -1,0 +1,12 @@
+---
+jdk_major: 17
+
+# Candidate JAVA_HOME directories to probe; first existing will be used
+java_home_candidates:
+  - "/usr/lib/jvm/java-{{ jdk_major }}-openjdk"
+  - "/usr/lib/jvm/jre-{{ jdk_major }}-openjdk"
+  - "/usr/lib/jvm/jdk-{{ jdk_major }}"
+  - "/usr/lib/jvm/java-{{ jdk_major }}-openjdk-amd64"
+  - "/usr/lib64/jvm/java-{{ jdk_major }}-openjdk"
+
+

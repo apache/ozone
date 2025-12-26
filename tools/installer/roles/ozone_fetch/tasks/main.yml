@@ -1,0 +1,95 @@
+---
+- name: "Ensure install_base exists"
+  file:
+    path: "{{ install_base }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0755"
+  become: true
+
+- name: "Normalize source mode"
+  set_fact:
+    _src_mode: "{{ ozone_version | lower }}"
+
+- name: "Upstream | Download tarball"
+  get_url:
+    url: "{{ dl_url | trim('/') }}/{{ ozone_version }}/ozone-{{ ozone_version }}.tar.gz"
+    dest: "{{ install_base }}/ozone-{{ ozone_version }}.tar.gz"
+    mode: "0644"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    timeout: 60
+  register: download_result
+  retries: 5
+  delay: 10
+  until: download_result is succeeded
+  when: _src_mode != 'local'
+  become: true
+
+- name: "Upstream | Ensure tarball ownership"
+  file:
+    path: "{{ install_base }}/ozone-{{ ozone_version }}.tar.gz"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    state: file
+  when: _src_mode != 'local'
+  become: true
+
+- name: "Upstream | Unarchive to install_base"
+  unarchive:
+    src: "{{ install_base }}/ozone-{{ ozone_version }}.tar.gz"
+    dest: "{{ install_base }}"
+    remote_src: true
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+  when: _src_mode != 'local'
+  become: true
+
+- name: "Upstream | Link current"
+  file:
+    src: "{{ install_base }}/ozone-{{ ozone_version }}"
+    dest: "{{ install_base }}/current"
+    state: link
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+  when: _src_mode != 'local'
+  become: true
+
+- name: "Local | Create tarball on controller"
+  delegate_to: localhost
+  run_once: true
+  command:
+    argv:
+      - tar
+      - -czf
+      - "/tmp/{{ local_ozone_dirname }}.tar.gz"
+      - "{{ local_ozone_dirname }}"
+  args:
+    chdir: "{{ local_shared_path }}"
+    creates: "/tmp/{{ local_ozone_dirname }}.tar.gz"
+  when: _src_mode == 'local'
+
+- name: "Local | Unarchive uploaded tarball to install_base"
+  unarchive:
+    src: "/tmp/{{ local_ozone_dirname }}.tar.gz"
+    dest: "{{ install_base }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "u+rwX,g+rX,o+rX"
+    remote_src: false
+    keep_newer: true
+  when: _src_mode == 'local'
+  become: true
+
+- name: "Local | Link current"
+  file:
+    src: "{{ install_base }}/{{ local_ozone_dirname }}"
+    dest: "{{ install_base }}/current"
+    state: link
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+  when: _src_mode == 'local'
+  become: true
+
+

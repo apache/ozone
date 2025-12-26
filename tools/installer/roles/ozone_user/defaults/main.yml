@@ -1,0 +1,6 @@
+---
+service_user: "ozone"
+service_group: "ozone"
+service_shell: "/bin/bash"
+
+

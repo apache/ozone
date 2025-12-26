@@ -1,0 +1,96 @@
+---
+- name: "Set ozone bin path"
+  set_fact:
+    ozone_bin: "{{ install_base }}/current/bin/ozone"
+
+# Ensure only the first SCM host orchestrates; others exit the role
+- name: "Skip orchestration on non-first-SCM hosts"
+  meta: end_host
+  when: inventory_hostname != (groups['scm'][0] if (groups['scm'] | length) > 0 else inventory_hostname)
+
+# Common service command context for HA and Non-HA
+- name: "Run Ozone service commands"
+  become: true
+  become_user: "{{ service_user }}"
+  become_flags: "-i"
+  environment: "{{ ozone_runtime_env }}"
+  vars:
+    ozone_command_chdir: "{{ install_base }}/current"
+  block:
+    - name: "Initialize SCM"
+      command: "{{ ozone_bin }} scm --init"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+        creates: "{{ data_base }}/meta/scm"
+      run_once: true
+      delegate_to: "{{ groups['scm'][0] }}"
+
+    - name: "Start SCM"
+      command: "{{ ozone_bin }} --daemon start scm"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+      run_once: true
+      delegate_to: "{{ groups['scm'][0] }}"
+      register: scm_start
+      failed_when: scm_start.rc != 0
+
+    - name: "Initialize OM"
+      command: "{{ ozone_bin }} om --init"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+        creates: "{{ data_base }}/meta/om"
+      run_once: true
+      delegate_to: "{{ groups['om'][0] }}"
+
+    - name: "Start OM"
+      command: "{{ ozone_bin }} --daemon start om"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+      run_once: true
+      delegate_to: "{{ groups['om'][0] }}"
+      register: om_start
+      failed_when: om_start.rc != 0
+
+    # Datanodes: start on all
+    - name: "Start Datanode on all datanodes"
+      command: "{{ ozone_bin }} --daemon start datanode"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups.get('datanodes', []) }}"
+      loop_control:
+        label: "{{ item }}"
+      when: groups.get('datanodes', []) | length > 0
+      register: dn_start
+      failed_when: dn_start.rc != 0
+
+    # Recon: start only on first recon host if any
+    - name: "Start Recon on first recon host"
+      command: "{{ ozone_bin }} --daemon start recon"
+      args:
+        chdir: "{{ ozone_command_chdir }}"
+      run_once: true
+      delegate_to: "{{ groups['recon'][0] }}"
+      when: groups.get('recon', []) | length > 0
+      register: recon_start
+      failed_when: recon_start.rc != 0
+
+
+## Print service UI endpoints
+- name: "Compute service UI URLs"
+  run_once: true
+  set_fact:
+    _om_hosts_ui: "{{ groups.get('om', []) | list }}"
+    _scm_hosts_ui: "{{ groups.get('scm', []) | list }}"
+    _datanode_hosts_ui: "{{ (groups.get('datanodes', []) | list)[:3] }}"
+    _recon_hosts_ui: "{{ groups.get('recon', []) | list }}"
+
+- name: "Show OM/SCM/Datanode/Recon UI endpoints"
+  run_once: true
+  debug:
+    msg:
+      - "OM UI: {{ _om_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9874') | list }}"
+      - "SCM UI: {{ _scm_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9876') | list }}"
+      - "Datanode UI (first 3): {{ _datanode_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9878') | list }}"
+      - "Recon UI: {{ (_recon_hosts_ui | length > 0) | ternary(['http://' + _recon_hosts_ui[0] + ':9888'], []) }}"
+

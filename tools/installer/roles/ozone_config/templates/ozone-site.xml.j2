@@ -1,0 +1,108 @@
+<configuration>
+  <!-- Minimal Ozone site config; extend via group_vars if needed -->
+{% set _om_all = groups.get('om', [])| list %}
+{% set _scm_all = groups.get('scm', []) | list %}
+{% set recon_hosts = groups.get('recon', []) | list %}
+{% set om_hosts = (_om_all[:1] if not (ha_enabled | default(false)) else _om_all) %}
+{% set scm_hosts = (_scm_all[:1] if not (ha_enabled | default(false)) else _scm_all) %}
+
+{% if scm_hosts|length > 0 %}
+  <property>
+    <name>ozone.scm.names</name>
+    <value>{{ scm_hosts | join(':9860,') }}:9860</value>
+  </property>
+  <property>
+    <name>ozone.scm.client.address</name>
+    <value>{{ scm_hosts | join(':9860,') }}:9860</value>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.address</name>
+    <value>{{ scm_hosts | join(':9861,') }}:9861</value>
+  </property>
+{% endif %}
+{% if scm_hosts|length > 1 %}
+  <property>
+    <name>ozone.scm.primordial.node.id</name>
+    <value>{{ scm_hosts[0] }}</value>
+  </property>
+  <property>
+    <name>ozone.scm.service.ids</name>
+    <value>scmservice</value>
+  </property>
+  <property>
+    <name>ozone.scm.nodes.scmservice</name>
+    <value>{% for i in range(scm_hosts|length) %}{{ 'scm' ~ (i+1) }}{% if not loop.last %},{% endif %}{% endfor %}</value>
+  </property>
+{% for h in scm_hosts %}
+  <property>
+    <name>ozone.scm.address.scmservice.scm{{ loop.index }}</name>
+    <value>{{ h }}</value>
+  </property>
+{% endfor %}
+{% endif %}
+{% if om_hosts|length == 1 %}
+  <property>
+    <name>ozone.om.address</name>
+    <value>{{ om_hosts[0] }}:9862</value>
+  </property>
+{% elif om_hosts|length > 1 %}
+  <property>
+    <name>ozone.om.service.ids</name>
+    <value>omservice</value>
+  </property>
+  <property>
+    <name>ozone.om.nodes.omservice</name>
+    <value>{% for i in range(om_hosts|length) %}{{ 'om' ~ (i+1) }}{% if not loop.last %},{% endif %}{% endfor %}</value>
+  </property>
+{% for h in om_hosts %}
+  <property>
+    <name>ozone.om.address.omservice.om{{ loop.index }}</name>
+    <value>{{ h }}:9862</value>
+  </property>
+{% endfor %}
+{% endif %}
+{% if recon_hosts|length > 0 %}
+  <property>
+    <name>ozone.recon.http-address</name>
+    <value>{{ recon_hosts[0] }}:9888</value>
+  </property>
+  <property>
+    <name>ozone.recon.address</name>
+    <value>{{ recon_hosts[0] }}:9891</value>
+  </property>
+{% endif %}
+  <property>
+    <name>ozone.metadata.dirs</name>
+    <value>{{ data_base }}/meta</value>
+  </property>
+  <property>
+    <name>hdds.datanode.dir</name>
+    <value>{{ data_base }}/dn</value>
+  </property>
+  <property>
+    <name>dfs.container.ratis.datanode.storage.dir</name>
+    <value>{{ data_base }}/meta/dn</value>
+  </property>
+  <property>
+    <name>ozone.om.db.dirs</name>
+    <value>{{ data_base }}/data/om</value>
+  </property>
+  <property>
+    <name>ozone.om.ratis.snapshot.dir</name>
+    <value>{{ data_base }}/meta/om</value>
+  </property>
+  <property>
+    <name>ozone.scm.db.dirs</name>
+    <value>{{ data_base }}/data/scm</value>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.id.dir</name>
+    <value>{{ data_base }}/meta/scm</value>
+  </property>
+  <property>
+    <name>ozone.scm.skip.bootstrap.validation</name>
+    <value>true</value>
+  </property>
+</configuration>
+
+

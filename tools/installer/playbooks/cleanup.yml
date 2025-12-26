@@ -1,0 +1,9 @@
+---
+- name: "Ozone Cleanup"
+  hosts: all
+  gather_facts: false
+  any_errors_fatal: true
+  roles:
+    - role: cleanup
+
+

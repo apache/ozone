@@ -1,0 +1,14 @@
+---
+# Whether to deploy a cluster-wide SSH identity (private key) to the service user
+allow_cluster_ssh_key_deploy: false
+
+# Optional paths on the controller for installer SSH keys
+ssh_public_key_path: ""
+ssh_private_key_path: ""
+
+# Target users for authorized_keys installation
+authorized_key_users:
+  - "{{ service_user }}"
+  - "root"
+
+

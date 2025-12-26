@@ -1,0 +1,26 @@
+---
+- name: "Ozone Smoke Test"
+  hosts: "{{ groups['om'][0] }}"
+  gather_facts: false
+  tasks:
+    - name: "Wait for services to settle"
+      wait_for:
+        timeout: 15
+
+    - name: "Run basic smoke commands"
+      shell: |
+        set -euo pipefail
+        OZONE_BIN="{{ install_base }}/current/bin/ozone"
+        dd if=/dev/zero of=/tmp/oz_smoke.bin bs=1M count=1 status=none
+        "$OZONE_BIN" admin safemode status
+        "$OZONE_BIN" sh vol create demovol || true
+        "$OZONE_BIN" sh bucket create demovol/demobuck || true
+        "$OZONE_BIN" sh key put demovol/demobuck/demokey /tmp/oz_smoke.bin
+        "$OZONE_BIN" sh key info demovol/demobuck/demokey >/dev/null
+        rm -f /tmp/oz_smoke.bin
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: "{{ service_user }}"
+
+

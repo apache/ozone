@@ -1,0 +1,40 @@
+---
+# Global defaults
+cluster_mode: "non-ha"        # non-ha | ha
+
+# Source selection
+ozone_version: "2.0.0"        # "2.0.0" | "local"
+dl_url: "https://dlcdn.apache.org/ozone"
+
+# Local snapshot settings
+local_shared_path: ""
+local_ozone_dirname: ""
+
+# Install and data directories
+install_base: "/opt/ozone"
+data_base: "/data/ozone"
+
+# Java settings
+jdk_major: 17
+ozone_java_home: ""           # autodetected if empty
+
+# Service user/group
+service_user: "ozone"
+service_group: "ozone"
+
+# Runtime and behavior
+use_sudo: true
+start_after_install: true
+ozone_opts: "-Xmx1024m -XX:ParallelGCThreads=8"
+service_command_timeout: 300  # seconds for service init/start commands
+
+# SSH bootstrap
+allow_cluster_ssh_key_deploy: false
+ssh_public_key_path: ""       # optional path on controller to a public key to install
+ssh_private_key_path: ""      # optional path to private key to copy for cluster identity
+
+# Markers for profile management
+JAVA_MARKER: "Apache Ozone Installer Java Home"
+ENV_MARKER: "Apache Ozone Installer Env"
+
+

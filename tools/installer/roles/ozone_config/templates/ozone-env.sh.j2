@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Managed by Ansible
+{% if ozone_java_home | default('') | length > 0 %}
+export JAVA_HOME="{{ ozone_java_home }}"
+export PATH="$PATH:{{ ozone_java_home }}/bin"
+{% endif %}
+export OZONE_HOME="{{ install_base }}/current"
+export PATH="$PATH:{{ install_base }}/current/bin"
+
+

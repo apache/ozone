@@ -1,0 +1,3 @@
+---
+install_base: "/opt/ozone"
+data_base: "/data/ozone"
