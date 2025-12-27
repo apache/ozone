@@ -2,7 +2,6 @@
 - name: "Ozone Cluster Deployment"
   hosts: all
   gather_facts: false
-  any_errors_fatal: true
   vars:
     # Expect cluster_mode to be passed in (non-ha | ha). Fallback to non-ha.
     cluster_mode: "{{ cluster_mode | default('non-ha') }}"
@@ -46,9 +45,15 @@
       tags: ["ozone_fetch"]
     - role: ozone_config
       tags: ["ozone_config"]
-    - role: ozone_service_{{ cluster_mode }}
-      tags: ["ozone_service_{{ cluster_mode }}"]
+    - role: ozone_service
+      tags: ["ozone_service"]
       when: start_after_install | bool
+
+- name: "Ozone Smoke Test"
+  hosts: "{{ groups['om'] | list | first }}"
+  gather_facts: false
+  roles:
+    - role: ozone_ui
+      tags: ["ozone_ui"]
     - role: ozone_smoke
       tags: ["ozone_smoke"]
-      when: start_after_install | bool

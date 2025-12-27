@@ -22,7 +22,6 @@
   register: smoke_commands_result
   failed_when: smoke_commands_result.rc != 0
   run_once: true
-  delegate_to: "{{ groups['om'][0] }}"
   become: true
   become_user: "{{ service_user }}"
 
@@ -33,7 +32,6 @@
   register: key_info
   failed_when: key_info.rc != 0
   run_once: true
-  delegate_to: "{{ groups['om'][0] }}"
   become: true
   become_user: "{{ service_user }}"
 

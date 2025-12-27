@@ -38,6 +38,27 @@
       OZONE_CONF_DIR: "{{ install_base }}/current/etc/hadoop"
       HADOOP_CONF_DIR: "{{ install_base }}/current/etc/hadoop"
 
+- name: "Persist ozone_runtime_env for resume (controller)"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  vars:
+    last_vars_path: "{{ playbook_dir }}/../logs/last_vars.json"
+  block:
+    - name: "last_vars.json | Read"
+      slurp:
+        src: "{{ last_vars_path }}"
+      register: last_vars_slurp
+
+    - name: "last_vars.json | Merge ozone_runtime_env"
+      vars:
+        last_vars_json: "{{ (last_vars_slurp.content | b64decode | from_json) if (last_vars_slurp is defined and last_vars_slurp.content is defined) else {} }}"
+        merged_all: "{{ last_vars_json | combine({'ozone_runtime_env': ozone_runtime_env}, recursive=True) }}"
+      copy:
+        dest: "{{ last_vars_path }}"
+        content: "{{ merged_all | to_nice_json }}"
+        mode: "0644"
+
 - name: "Export JAVA_HOME and update PATH in profile.d/ozone.sh"
   blockinfile:
     path: "/etc/profile.d/ozone.sh"

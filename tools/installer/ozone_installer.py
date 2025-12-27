@@ -476,6 +476,19 @@ def main(argv):
         if rc != 0:
             return rc
 
+        # Successful completion: remove last_* persisted files so a fresh run starts clean
+        try:
+            for f in LOGS_DIR.glob("last_*"):
+                try:
+                    f.unlink()
+                except FileNotFoundError:
+                    pass
+                except Exception:
+                    # Best-effort cleanup; ignore failures
+                    pass
+        except Exception:
+            pass
+
 
     print("All done.")
     return 0

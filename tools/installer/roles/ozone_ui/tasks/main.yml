@@ -1,0 +1,17 @@
+
+
+## Print service UI endpoints
+- name: "Compute service UI URLs"
+  set_fact:
+    _om_hosts_ui: "{{ groups.get('om', []) | list }}"
+    _scm_hosts_ui: "{{ groups.get('scm', []) | list }}"
+    _datanode_hosts_ui: "{{ (groups.get('datanodes', []) | list)[:3] }}"
+    _recon_hosts_ui: "{{ groups.get('recon', []) | list }}"
+
+- name: "Show OM/SCM/Datanode/Recon UI endpoints"
+  debug:
+    msg:
+      - "OM UI: {{ _om_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9874') | list }}"
+      - "SCM UI: {{ _scm_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9876') | list }}"
+      - "Datanode UI (first 3): {{ _datanode_hosts_ui | map('regex_replace','^(.*)$','http://\\1:9878') | list }}"
+      - "Recon UI: {{ (_recon_hosts_ui | length > 0) | ternary(['http://' + _recon_hosts_ui[0] + ':9888'], []) }}"
