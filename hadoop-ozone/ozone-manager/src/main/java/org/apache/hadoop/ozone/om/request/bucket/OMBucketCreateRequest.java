@@ -92,9 +92,11 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
-    // Verify resource name
-    OmUtils.validateBucketName(bucketInfo.getBucketName(),
-        ozoneManager.isStrictS3());
+
+    BucketLayout bucketLayout = BucketLayout.fromProto(bucketInfo.getBucketLayout());
+    boolean strict = ozoneManager.isStrictS3()
+        || bucketLayout.isObjectStore(ozoneManager.getConfig().isFileSystemPathEnabled());
+    OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {

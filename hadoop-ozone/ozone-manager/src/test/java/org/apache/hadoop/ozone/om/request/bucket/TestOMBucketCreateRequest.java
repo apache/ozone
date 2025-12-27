@@ -322,8 +322,36 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         {"bucket_underscore", "_bucket___multi_underscore_", "bucket_"};
     when(ozoneManager.isStrictS3()).thenReturn(false);
     for (String bucketName : nonS3CompliantBucketName) {
-      acceptBucketCreationHelper(volumeName, bucketName);
+      acceptFSOBucketCreationHelper(volumeName, bucketName);
     }
+  }
+
+  @Test
+  public void testNonS3BucketNameRejectedForObjectStoreWhenStrictDisabled()
+      throws Exception {
+
+    // strict mode disabled
+    ozoneManager.getConfiguration().setBoolean(
+        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false);
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket_with_underscore"; // non-S3-compliant
+    addCreateVolumeToTable(volumeName, omMetadataManager);
+
+    // Explicitly set bucket layout to OBJECT_STORE so the test doesn't depend on
+    // defaults or mocked OM behavior.
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.OBJECT_STORE);
+
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
+    OMBucketCreateRequest req = new OMBucketCreateRequest(originalRequest);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+
+    assertEquals(OMException.ResultCodes.INVALID_BUCKET_NAME, ex.getResult());
   }
 
   @ParameterizedTest
@@ -477,5 +505,26 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
     OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+  }
+
+  protected OMBucketCreateRequest doPreExecute(String volumeName,
+      String bucketName,
+      OzoneManagerProtocolProtos.BucketLayoutProto layout) throws Exception {
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(layout);
+    if (layout == OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED) {
+      bucketInfo.addMetadata(OMRequestTestUtils.fsoMetadata());
+    }
+    return doPreExecute(bucketInfo);
+  }
+
+  private void acceptFSOBucketCreationHelper(String volumeName, String bucketName)
+      throws Exception {
+    OMBucketCreateRequest omBucketCreateRequest =
+        doPreExecute(volumeName, bucketName,
+            OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED);
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
   }
 }
