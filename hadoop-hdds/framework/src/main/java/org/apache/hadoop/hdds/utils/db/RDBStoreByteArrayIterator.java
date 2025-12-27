@@ -29,9 +29,18 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table, byte[] prefix, IteratorType type) {
+                            RDBTable table, byte[] prefix, IteratorType type) {
+    this(iterator, table, prefix, type, null);
+  }
+
+  RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+                            RDBTable table, byte[] prefix, IteratorType type, byte[] seekKey) {
     super(iterator, table, copyPrefix(prefix), type);
-    seekToFirst();
+    if (seekKey != null) {
+      seek(seekKey);
+    } else {
+      seekToFirst();
+    }
   }
 
   @Override
