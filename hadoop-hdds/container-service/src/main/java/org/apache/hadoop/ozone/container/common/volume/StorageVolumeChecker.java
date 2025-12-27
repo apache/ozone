@@ -150,6 +150,11 @@ public class StorageVolumeChecker {
     if (started.compareAndSet(false, true)) {
       long periodicDiskCheckIntervalMinutes =
           dnConf.getPeriodicDiskCheckIntervalMinutes();
+      if (periodicDiskCheckIntervalMinutes < 0) {
+        LOG.warn("StorageVolumeChecker is DISABLED because " +
+            "hdds.datanode.periodic.disk.check.interval.minutes = {} (negative).", periodicDiskCheckIntervalMinutes);
+        return;
+      }
       periodicDiskChecker =
           diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
               periodicDiskCheckIntervalMinutes,
