@@ -20,12 +20,18 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -48,20 +54,21 @@ public class TestObjectHead {
   private String bucketName = "b1";
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
+  private OzoneClient client;
 
   @BeforeEach
   public void setup() throws IOException {
     //Create client stub and object store stub.
-    OzoneClient clientStub = new OzoneClientStub();
+    client = new OzoneClientStub();
 
     // Create volume and bucket
-    clientStub.getObjectStore().createS3Bucket(bucketName);
+    client.getObjectStore().createS3Bucket(bucketName);
 
-    bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    bucket = client.getObjectStore().getS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
-        .setClient(clientStub)
+        .setClient(client)
         .build();
   }
 
@@ -184,5 +191,98 @@ public class TestObjectHead {
     // THEN
     assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
     bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testHeadWithRangeHeader() throws Exception {
+    //GIVEN
+    String value = "0123456789";
+    OzoneOutputStream out = bucket.createKey("key1",
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    //WHEN
+    Response response = keyEndpoint.head(bucketName, "key1");
+
+    //THEN
+    assertEquals(206, response.getStatus());
+    assertEquals("1", response.getHeaderString("Content-Length"));
+    assertEquals(String.format("bytes 0-0/%d", value.length()),
+        response.getHeaderString("Content-Range"));
+    assertEquals("bytes", response.getHeaderString("Accept-Ranges"));
+
+    // Test range from start to end
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
+    response = keyEndpoint.head(bucketName, "key1");
+    assertEquals(206, response.getStatus());
+    assertEquals(String.valueOf(value.length()),
+        response.getHeaderString("Content-Length"));
+    assertEquals(String.format("bytes 0-%d/%d", value.length() - 1, value.length()),
+        response.getHeaderString("Content-Range"));
+
+    bucket.deleteKey("key1");
+  }
+
+  @Test
+  public void testHeadWithInvalidRangeHeader() throws Exception {
+    //GIVEN
+    String value = "0123456789"; // length = 10
+    OzoneOutputStream out = bucket.createKey("key1",
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    HttpHeaders headers = mock(HttpHeaders.class);
+    // Invalid range: both start and end are beyond file length
+    // According to RangeHeaderParserUtil, bytes=11-10 with length=10 will trigger isInValidRange()
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=11-10");
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    //WHEN/THEN
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> keyEndpoint.head(bucketName, "key1"));
+    assertEquals("InvalidRange", ex.getCode());
+    assertEquals(416, ex.getHttpCode());
+
+    bucket.deleteKey("key1");
+  }
+
+  @Test
+  public void testHeadWithoutRangeHeader() throws Exception {
+    //GIVEN
+    String value = "0123456789";
+    OzoneOutputStream out = bucket.createKey("key1",
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    //WHEN
+    Response response = keyEndpoint.head(bucketName, "key1");
+
+    //THEN
+    assertEquals(200, response.getStatus());
+    assertEquals(String.valueOf(value.length()),
+        response.getHeaderString("Content-Length"));
+    assertEquals("bytes", response.getHeaderString("Accept-Ranges"));
+    assertNull(response.getHeaderString("Content-Range"));
+
+    bucket.deleteKey("key1");
   }
 }

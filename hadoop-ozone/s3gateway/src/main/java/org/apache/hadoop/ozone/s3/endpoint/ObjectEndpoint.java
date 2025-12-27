@@ -606,6 +606,7 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.HEAD_KEY;
 
     OzoneKey key;
+    RangeHeader rangeHeader = null;
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
         OzoneBucket bucket = getBucket(bucketName);
@@ -614,7 +615,6 @@ public class ObjectEndpoint extends EndpointBase {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
-      // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
       getMetrics().updateHeadKeyFailureStats(startNanos);
@@ -637,10 +637,38 @@ public class ObjectEndpoint extends EndpointBase {
         S3StorageType.STANDARD :
         S3StorageType.fromReplicationConfig(key.getReplicationConfig());
 
-    ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
-        .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
-        .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
+    long length = key.getDataSize();
+    String rangeHeaderVal = getHeaders() != null ?
+        getHeaders().getHeaderString(RANGE_HEADER) : null;
+
+    // Parse Range header if present
+    if (rangeHeaderVal != null) {
+      rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal, length);
+      if (rangeHeader.isInValidRange()) {
+        throw newError(S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
+      }
+    }
+
+    ResponseBuilder response;
+
+    if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
+      response = Response.ok().status(HttpStatus.SC_OK)
+          .header(HttpHeaders.CONTENT_LENGTH, length);
+    } else {
+      long startOffset = rangeHeader.getStartOffset();
+      long endOffset = rangeHeader.getEndOffset();
+      long contentLength = endOffset - startOffset + 1;
+      String contentRangeVal = RANGE_HEADER_SUPPORTED_UNIT + " " +
+          startOffset + "-" + endOffset + "/" + length;
+
+      response = Response.status(Status.PARTIAL_CONTENT)
+          .header(HttpHeaders.CONTENT_LENGTH, contentLength)
+          .header(CONTENT_RANGE_HEADER, contentRangeVal);
+    }
+
+    response.header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
+        .header(STORAGE_CLASS_HEADER, s3StorageType.toString())
+        .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
     String eTag = key.getMetadata().get(OzoneConsts.ETAG);
     if (eTag != null) {
