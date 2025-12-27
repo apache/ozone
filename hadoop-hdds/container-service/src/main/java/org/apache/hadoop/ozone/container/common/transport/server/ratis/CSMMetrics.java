@@ -52,9 +52,9 @@ public class CSMMetrics {
   private final EnumMap<Type, MutableRate> opsLatencyMs;
   private final EnumMap<Type, MutableRate> opsQueueingDelay;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
+  // MetricsRegistry must be kept as instance field to prevent GC and ensure metrics work correctly
   @SuppressWarnings("PMD.SingularField")
-  private MetricsRegistry registry;
+  private final MetricsRegistry registry;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
