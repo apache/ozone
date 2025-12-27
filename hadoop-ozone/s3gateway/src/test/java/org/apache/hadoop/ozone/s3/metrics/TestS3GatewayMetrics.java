@@ -39,6 +39,7 @@ import java.io.InputStream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -658,5 +659,15 @@ public class TestS3GatewayMetrics {
             "</Tagging>";
 
     return new ByteArrayInputStream(xml.getBytes(UTF_8));
+  }
+
+  @Test
+  public void testPutObjectAclLatencyMetricsSnapshot() {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    metrics.getMetrics(collector, true);
+    String metricsString = collector.getRecords().toString();
+    assertThat(metricsString)
+        .contains("PutObjectAclSuccessLatencyNs")
+        .contains("PutObjectAclFailureLatencyNs");
   }
 }
