@@ -144,13 +144,13 @@ public final class RDBBatchOperation implements BatchOperation {
 
     abstract int keyLen();
 
-    abstract int valLen();
+    int valLen() {
+      return 0;
+    }
 
     int totalLength() {
       return keyLen() + valLen();
     }
-
-    abstract String getOpType();
 
     @Override
     public void close() {
@@ -176,16 +176,6 @@ public final class RDBBatchOperation implements BatchOperation {
     @Override
     public int keyLen() {
       return key.length;
-    }
-
-    @Override
-    public int valLen() {
-      return 0;
-    }
-
-    @Override
-    public String getOpType() {
-      return DELETE_OP;
     }
   }
 
@@ -216,11 +206,6 @@ public final class RDBBatchOperation implements BatchOperation {
     @Override
     public int valLen() {
       return value.readableBytes();
-    }
-
-    @Override
-    public String getOpType() {
-      return PUT_OP;
     }
 
     @Override
@@ -259,11 +244,6 @@ public final class RDBBatchOperation implements BatchOperation {
     @Override
     public int valLen() {
       return value.length;
-    }
-
-    @Override
-    public String getOpType() {
-      return PUT_OP;
     }
   }
 
@@ -332,7 +312,8 @@ public final class RDBBatchOperation implements BatchOperation {
           previous.close();
           discardedSize += previous.totalLength();
           discardedCount++;
-          debug(() -> String.format("%s overwriting a previous %s[valLen => %s]", this, previous.getOpType(),
+          debug(() -> String.format("%s overwriting a previous %s[valLen => %s]", this,
+              previous instanceof DeleteOp ? DELETE_OP : PUT_OP,
               previous.valLen()));
         }
       }
@@ -345,7 +326,7 @@ public final class RDBBatchOperation implements BatchOperation {
         Preconditions.checkState(overwritten == null);
 
         debug(() -> String.format("%s %s, %s; key=%s", this,
-            DELETE_OP.equals(operation.getOpType()) ? delString(operation.totalLength()) : putString(operation.keyLen(),
+            operation instanceof DeleteOp ? delString(operation.totalLength()) : putString(operation.keyLen(),
                 operation.valLen()),
             batchSizeDiscardedString(), key));
       }
