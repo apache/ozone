@@ -45,9 +45,6 @@ import org.slf4j.LoggerFactory;
 public final class RDBBatchOperation implements BatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
 
-  private static final String PUT_OP = "PUT";
-  private static final String DELETE_OP = "DELETE";
-
   private static final AtomicInteger BATCH_COUNT = new AtomicInteger();
 
   private final String name = "Batch-" + BATCH_COUNT.getAndIncrement();
@@ -313,8 +310,7 @@ public final class RDBBatchOperation implements BatchOperation {
           discardedSize += previous.totalLength();
           discardedCount++;
           debug(() -> String.format("%s overwriting a previous %s[valLen => %s]", this,
-              previous instanceof DeleteOp ? DELETE_OP : PUT_OP,
-              previous.valLen()));
+              previous.getClass().getName(), previous.valLen()));
         }
       }
 
