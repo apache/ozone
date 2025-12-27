@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.awssdk.v2;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
@@ -47,8 +49,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -57,7 +61,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -79,6 +82,9 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -109,6 +115,7 @@ import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -368,6 +375,215 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", copyObjectResponse.copyObjectResult().eTag());
+  }
+
+  @Test
+  public void testPutAndGetObjectTagging() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("env").value("test").build(),
+        Tag.builder().key("project").value("ozone").build()
+    );
+
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    GetObjectTaggingResponse getResponse = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+
+    assertEquals(tags.size(), getResponse.tagSet().size());
+    Map<String, String> tagMap = getResponse.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals("test", tagMap.get("env"));
+    assertEquals("ozone", tagMap.get("project"));
+  }
+
+  @Test
+  public void testDeleteObjectTagging() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("temp").value("data").build()
+    );
+
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    GetObjectTaggingResponse beforeDelete = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertEquals(1, beforeDelete.tagSet().size());
+
+    s3Client.deleteObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+
+    GetObjectTaggingResponse afterDelete = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertTrue(afterDelete.tagSet().isEmpty());
+  }
+
+  @Test
+  public void testPutObjectTaggingExceedsLimit() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    List<Tag> tags = new ArrayList<>();
+    for (int i = 1; i <= 11; i++) {
+      tags.add(Tag.builder().key("key" + i).value("value" + i).build());
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(tags).build())));
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, exception.statusCode());
+  }
+
+  @Test
+  public void testPutObjectTaggingReplacesExistingTags() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    List<Tag> initialTags = Arrays.asList(
+        Tag.builder().key("tag1").value("value1").build(),
+        Tag.builder().key("tag2").value("value2").build()
+    );
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(initialTags).build()));
+
+    List<Tag> replacementTags = Arrays.asList(
+        Tag.builder().key("tag3").value("value3").build()
+    );
+    s3Client.putObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .tagging(Tagging.builder().tagSet(replacementTags).build()));
+
+    GetObjectTaggingResponse response = s3Client.getObjectTagging(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    assertEquals(1, response.tagSet().size());
+    Map<String, String> tagMap = response.tagSet().stream()
+        .collect(Collectors.toMap(Tag::key, Tag::value));
+    assertEquals("value3", tagMap.get("tag3"));
+    assertFalse(tagMap.containsKey("tag1"));
+    assertFalse(tagMap.containsKey("tag2"));
+  }
+
+  private static String repeatChar(char c, int count) {
+    StringBuilder sb = new StringBuilder(count);
+    for (int i = 0; i < count; i++) {
+      sb.append(c);
+    }
+    return sb.toString();
+  }
+
+  private static Stream<Arguments> invalidTagConstraintsProvider() {
+    return Stream.of(
+        Arguments.of(
+            Arrays.asList(Tag.builder().key(repeatChar('a', 129)).value("value").build()),
+            HTTP_BAD_REQUEST
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("valid-key").value(repeatChar('b', 257)).build()),
+            HTTP_BAD_REQUEST
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("t$ag@#invalid").value("value").build()),
+            HTTP_BAD_REQUEST
+        ),
+        Arguments.of(
+            Arrays.asList(Tag.builder().key("aws:test").value("value").build()),
+            HTTP_BAD_REQUEST
+        )
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTagConstraintsProvider")
+  public void testPutObjectTaggingInvalidConstraints(List<Tag> invalidTags, int expectedStatusCode) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("content"));
+
+    S3Exception exception = assertThrows(S3Exception.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(invalidTags).build())));
+    assertEquals(expectedStatusCode, exception.statusCode());
+  }
+
+  @Test
+  public void testPutAndGetObjectTaggingOnNonExistentObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("env").value("test").build()
+    );
+
+    NoSuchKeyException exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.putObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .tagging(Tagging.builder().tagSet(tags).build())));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
+
+    exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.getObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
+  }
+
+  @Test
+  public void testDeleteObjectTaggingOnNonExistentObject() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    NoSuchKeyException exception = assertThrows(NoSuchKeyException.class, () ->
+        s3Client.deleteObjectTagging(b -> b
+            .bucket(bucketName)
+            .key(keyName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, exception.statusCode());
   }
 
   @Test
@@ -1258,7 +1474,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .expectedBucketOwner(WRONG_OWNER)
             .build();
         S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.headBucket(wrongRequest));
-        assertEquals(403, exception.statusCode());
+        assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       }
 
       @Test
@@ -1531,7 +1747,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .expectedBucketOwner(WRONG_OWNER)
             .build();
         S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.headObject(wrongRequest));
-        assertEquals(403, exception.statusCode());
+        assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       }
 
       @Test
@@ -1658,29 +1874,35 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class LinkBucketTests {
-      private static final String NON_S3_VOLUME_NAME = "link-bucket-volume";
+      private String nonS3VolumeName;
+      private String linkBucketName;
+      private String danglingSourceBucketName;
+      private String danglingLinkBucketName;
       private OzoneVolume nonS3Volume;
       private OzoneVolume s3Volume;
 
       @BeforeAll
       public void setup() throws Exception {
         try (OzoneClient ozoneClient = cluster.newClient()) {
-          ozoneClient.getObjectStore().createVolume(NON_S3_VOLUME_NAME);
-          nonS3Volume = ozoneClient.getObjectStore().getVolume(NON_S3_VOLUME_NAME);
+          nonS3VolumeName = randomName("link-vol");
+          linkBucketName = randomName("link-bucket");
+          danglingSourceBucketName = randomName("link-source");
+          danglingLinkBucketName = randomName("link-bucket-dangling");
+          ozoneClient.getObjectStore().createVolume(nonS3VolumeName);
+          nonS3Volume = ozoneClient.getObjectStore().getVolume(nonS3VolumeName);
           s3Volume = ozoneClient.getObjectStore().getS3Volume();
         }
       }
 
       @Test
       public void setBucketVerificationOnLinkBucket() throws Exception {
-        // create link bucket
-        String linkBucketName = "link-bucket";
-        nonS3Volume.createBucket(OzoneConsts.BUCKET);
+        String sourceBucketName = randomName("source");
+        nonS3Volume.createBucket(sourceBucketName);
         BucketArgs.Builder bb = new BucketArgs.Builder()
             .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
-            .setSourceVolume(NON_S3_VOLUME_NAME)
-            .setSourceBucket(OzoneConsts.BUCKET);
+            .setSourceVolume(nonS3VolumeName)
+            .setSourceBucket(sourceBucketName);
         s3Volume.createBucket(linkBucketName, bb.build());
 
         GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
@@ -1703,35 +1925,38 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
       @Test
       public void testDanglingBucket() throws Exception {
-        String sourceBucket = "source-bucket";
-        String linkBucket = "link-bucket-dangling";
-        nonS3Volume.createBucket(sourceBucket);
+        nonS3Volume.createBucket(danglingSourceBucketName);
         BucketArgs.Builder bb = new BucketArgs.Builder()
             .setStorageType(StorageType.DEFAULT)
             .setVersioning(false)
-            .setSourceVolume(NON_S3_VOLUME_NAME)
-            .setSourceBucket(sourceBucket);
-        s3Volume.createBucket(linkBucket, bb.build());
+            .setSourceVolume(nonS3VolumeName)
+            .setSourceBucket(danglingSourceBucketName);
+        s3Volume.createBucket(danglingLinkBucketName, bb.build());
 
         // remove source bucket to make dangling bucket
-        nonS3Volume.deleteBucket(sourceBucket);
+        nonS3Volume.deleteBucket(danglingSourceBucketName);
 
         GetBucketAclRequest wrongRequest = GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .expectedBucketOwner(WRONG_OWNER)
             .build();
 
         verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.getBucketAcl(wrongRequest));
 
         String owner = s3Client.getBucketAcl(GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .build()).owner().displayName();
         GetBucketAclRequest correctRequest = GetBucketAclRequest.builder()
-            .bucket(linkBucket)
+            .bucket(danglingLinkBucketName)
             .expectedBucketOwner(owner)
             .build();
 
         verifyPassBucketOwnershipVerification(() -> s3Client.getBucketAcl(correctRequest));
+      }
+
+      private String randomName(String prefix) {
+        return (prefix + "-" + RandomStringUtils.secure().nextAlphanumeric(8))
+            .toLowerCase(Locale.ROOT);
       }
     }
 
@@ -1741,7 +1966,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     private void verifyBucketOwnershipVerificationAccessDenied(Executable function) {
       S3Exception exception = assertThrows(S3Exception.class, function);
-      assertEquals(403, exception.statusCode());
+      assertEquals(HTTP_FORBIDDEN, exception.statusCode());
       assertEquals("Access Denied", exception.awsErrorDetails().errorCode());
     }
   }

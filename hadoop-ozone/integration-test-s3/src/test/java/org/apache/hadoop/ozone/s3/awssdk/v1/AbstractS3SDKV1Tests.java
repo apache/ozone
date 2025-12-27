@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -41,6 +42,7 @@ import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.GetBucketAclRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
@@ -94,6 +96,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -105,7 +108,9 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -1042,7 +1047,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
             RandomStringUtils.secure().nextAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(403, ase.getStatusCode());
+    assertEquals(HttpURLConnection.HTTP_FORBIDDEN, ase.getStatusCode());
     assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
@@ -1355,6 +1360,86 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
       // Verify the object is deleted
       assertFalse(s3Client.doesObjectExist(BUCKET_NAME, keyName));
+    }
+  }
+
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class LinkBucketTests {
+    private String nonS3VolumeName;
+    private String linkBucketName;
+    private String sourceBucketName;
+    private String danglingSourceBucketName;
+    private String danglingLinkBucketName;
+    private OzoneVolume nonS3Volume;
+    private OzoneVolume s3Volume;
+
+    @BeforeAll
+    public void setup() throws Exception {
+      nonS3VolumeName = randomName("link-vol");
+      linkBucketName = randomName("link-bucket");
+      sourceBucketName = randomName("source");
+      danglingSourceBucketName = randomName("link-source");
+      danglingLinkBucketName = randomName("link-bucket-dangling");
+      try (OzoneClient ozoneClient = cluster.newClient()) {
+        ObjectStore store = ozoneClient.getObjectStore();
+        store.createVolume(nonS3VolumeName);
+        nonS3Volume = store.getVolume(nonS3VolumeName);
+        s3Volume = store.getS3Volume();
+      }
+    }
+
+    @Test
+    public void setBucketVerificationOnLinkBucket() throws Exception {
+      nonS3Volume.createBucket(sourceBucketName);
+      BucketArgs.Builder bb = new BucketArgs.Builder()
+          .setStorageType(StorageType.DEFAULT)
+          .setVersioning(false)
+          .setSourceVolume(nonS3VolumeName)
+          .setSourceBucket(sourceBucketName);
+      s3Volume.createBucket(linkBucketName, bb.build());
+
+      GetBucketAclRequest wrongRequest = new GetBucketAclRequest(linkBucketName)
+          .withExpectedBucketOwner("wrong-owner");
+      AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
+          () -> s3Client.getBucketAcl(wrongRequest));
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
+      assertEquals("AccessDenied", wrongOwner.getErrorCode());
+
+      Owner owner = s3Client.getBucketAcl(linkBucketName).getOwner();
+      GetBucketAclRequest correctRequest = new GetBucketAclRequest(linkBucketName)
+          .withExpectedBucketOwner(owner.getDisplayName());
+      assertDoesNotThrow(() -> s3Client.getBucketAcl(correctRequest));
+    }
+
+    @Test
+    public void testDanglingBucket() throws Exception {
+      nonS3Volume.createBucket(danglingSourceBucketName);
+      BucketArgs.Builder bb = new BucketArgs.Builder()
+          .setStorageType(StorageType.DEFAULT)
+          .setVersioning(false)
+          .setSourceVolume(nonS3VolumeName)
+          .setSourceBucket(danglingSourceBucketName);
+      s3Volume.createBucket(danglingLinkBucketName, bb.build());
+
+      nonS3Volume.deleteBucket(danglingSourceBucketName);
+
+      GetBucketAclRequest wrongRequest = new GetBucketAclRequest(danglingLinkBucketName)
+          .withExpectedBucketOwner("wrong-owner");
+      AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
+          () -> s3Client.getBucketAcl(wrongRequest));
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
+      assertEquals("AccessDenied", wrongOwner.getErrorCode());
+
+      Owner owner = s3Client.getBucketAcl(danglingLinkBucketName).getOwner();
+      GetBucketAclRequest correctRequest = new GetBucketAclRequest(danglingLinkBucketName)
+          .withExpectedBucketOwner(owner.getDisplayName());
+      assertDoesNotThrow(() -> s3Client.getBucketAcl(correctRequest));
+    }
+
+    private String randomName(String prefix) {
+      return (prefix + "-" + RandomStringUtils.secure().nextAlphanumeric(8))
+          .toLowerCase(Locale.ROOT);
     }
   }
 
