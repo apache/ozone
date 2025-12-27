@@ -141,6 +141,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
+  public void syncChunks(Container container, BlockID blockID) throws IOException {
+    selectHandler(container).syncChunks(container, blockID);
+  }
+
+  @Override
   public void shutdown() {
     handlers.values().forEach(ChunkManager::shutdown);
   }

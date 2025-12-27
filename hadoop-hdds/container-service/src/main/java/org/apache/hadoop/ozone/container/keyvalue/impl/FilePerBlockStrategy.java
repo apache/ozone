@@ -270,6 +270,17 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
   }
 
+  @Override
+  public void syncChunks(Container container, BlockID blockID) throws IOException {
+    final File chunkFile = getChunkFile(container, blockID);
+    try {
+      files.sync(chunkFile);
+    } catch (IOException e) {
+      onFailure(container.getContainerData().getVolume());
+      throw e;
+    }
+  }
+
   private void deleteChunk(Container container, BlockID blockID,
       ChunkInfo info, boolean verifyLength)
       throws StorageContainerException {
@@ -367,15 +378,28 @@ public class FilePerBlockStrategy implements ChunkManager {
         }
       }
     }
+
+    public void sync(File file) throws IOException {
+      if (file != null) {
+        OpenFile openFile = files.getIfPresent(file.getPath());
+        if (openFile != null) {
+          openFile.syncIfNeeded();
+        }
+      }
+    }
   }
 
   private static final class OpenFile {
 
     private final RandomAccessFile file;
+    private final boolean sync;
 
     private OpenFile(File file, boolean sync) throws FileNotFoundException {
-      String mode = sync ? "rws" : "rw";
-      this.file = new RandomAccessFile(file, mode);
+      // We should only trigger fsync before the block file is closed (before PutBlock)
+      // instead of every write (by using "rws") since block is only visible to user after PutBlock
+      // and doing sync I/O for each write will cause unnecessary I/O overhead.
+      this.file = new RandomAccessFile(file, "rw");
+      this.sync = sync;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Opened file {}", file);
       }
@@ -385,8 +409,16 @@ public class FilePerBlockStrategy implements ChunkManager {
       return file.getChannel();
     }
 
+    private void syncIfNeeded() throws IOException {
+      if (sync) {
+        // ensure data and metadata is persisted
+        getChannel().force(true);
+      }
+    }
+
     public void close() {
       try {
+        syncIfNeeded();
         file.close();
       } catch (IOException e) {
         throw new UncheckedIOException(e);

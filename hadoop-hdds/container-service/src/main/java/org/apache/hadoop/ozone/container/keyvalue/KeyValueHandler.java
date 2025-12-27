@@ -671,6 +671,11 @@ public class KeyValueHandler extends Handler {
           chunkManager.finishWriteChunks(kvContainer, blockData);
         }
         endOfBlock = true;
+      } else {
+        // If sync I/O is enabled, we should sync the changes made by the previous WriteChunk(s)
+        // to ensure that once PutBlock is complete, the data has been synced to the underlying
+        // persistent storage. Note that finishWriteChunks will also trigger sync I/O if enabled.
+        chunkManager.syncChunks(kvContainer, blockData.getBlockID());
       }
 
       // Note: checksum held inside blockData. But no extra checksum validation here with handlePutBlock.
