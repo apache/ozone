@@ -29,10 +29,6 @@ import org.rocksdb.DirectSlice;
  *
  *  The {@link DirectSlice} class is designed to handle specific memory slicing operations while ensuring that the
  *  provided ByteBuffer’s constraints are respected.
- *
- * NOTE: This class should be only with ByteBuffer whose position and limit is going be immutable in the lifetime of
- *  this ManagedDirectSlice instance. This means that the ByteBuffer's position and limit should not be modified
- *  externally while the ManagedDirectSlice is in use.
  */
 public class ManagedDirectSlice extends DirectSlice {
 
