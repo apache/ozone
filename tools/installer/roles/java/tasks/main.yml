@@ -1,0 +1,56 @@
+---
+- name: "Print OS family"
+  debug:
+    var: ansible_os_family
+
+- name: "Install OpenJDK on RedHat/Rocky/Suse family"
+  package:
+    name:
+      - "java-{{ jdk_major }}-openjdk"
+      - "java-{{ jdk_major }}-openjdk-devel"
+    state: present
+  when: ansible_os_family == "RedHat" or ansible_os_family == "Rocky" or ansible_os_family == "Suse"
+  become: true
+
+- name: "Install OpenJDK on Debian/Ubuntu family"
+  package:
+    name:
+      - "openjdk-{{ jdk_major }}-jdk"
+  when: ansible_os_family == "Debian" or ansible_os_family == "Ubuntu"
+  become: true
+
+- name: "Detect JAVA_HOME candidate"
+  stat:
+    path: "{{ item }}"
+  loop: "{{ java_home_candidates }}"
+  register: java_candidates
+  become: false
+
+- name: "Set ozone_java_home from first existing candidate"
+  set_fact:
+    ozone_java_home: "{{ (java_candidates.results | selectattr('stat.exists', 'defined') | selectattr('stat.exists') | map(attribute='item') | list | first) | default('') }}"
+
+- name: "Compute runtime environment for Ozone commands"
+  set_fact:
+    ozone_runtime_env:
+      JAVA_HOME: "{{ ozone_java_home }}"
+      PATH: "{{ (ansible_env.PATH | default('/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')) }}:{{ install_base }}/current/bin{{ (':' + ozone_java_home + '/bin') if (ozone_java_home | length > 0) else '' }}"
+      OZONE_CONF_DIR: "{{ install_base }}/current/etc/hadoop"
+      HADOOP_CONF_DIR: "{{ install_base }}/current/etc/hadoop"
+
+- name: "Export JAVA_HOME and update PATH in profile.d/ozone.sh"
+  blockinfile:
+    path: "/etc/profile.d/ozone.sh"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+    marker: "# {mark} {{ JAVA_MARKER }}"
+    block: |
+      {% if ozone_java_home | length > 0 %}
+      export JAVA_HOME="{{ ozone_java_home }}"
+      export PATH="$PATH:{{ ozone_java_home }}/bin"
+      {% endif %}
+  become: true
+
+

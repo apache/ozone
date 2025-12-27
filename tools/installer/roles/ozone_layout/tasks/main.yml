@@ -1,0 +1,29 @@
+---
+- name: "Create install and data directories"
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0755"
+  loop:
+    - "{{ install_base }}"
+    - "{{ data_base }}"
+    - "{{ data_base }}/dn"
+    - "{{ data_base }}/meta"
+  become: true
+
+- name: "Ensure OZONE_HOME and PATH are in profile.d/ozone.sh"
+  blockinfile:
+    path: "/etc/profile.d/ozone.sh"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+    marker: "# {mark} {{ ENV_MARKER }}"
+    block: |
+      export OZONE_HOME="{{ install_base }}/current"
+      export PATH="$PATH:{{ install_base }}/current/bin"
+  become: true
+
+

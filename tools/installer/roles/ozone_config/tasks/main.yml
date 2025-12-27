@@ -1,0 +1,57 @@
+---
+- name: "Create etc dir"
+  file:
+    path: "{{ install_base }}/current/etc/hadoop"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0755"
+  become: true
+
+- name: "Render ozone-hosts.yaml"
+  template:
+    src: "ozone-hosts.yaml.j2"
+    dest: "{{ install_base }}/current/etc/hadoop/ozone-hosts.yaml"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0644"
+  become: true
+
+- name: "Render ozone-site.xml"
+  template:
+    src: "ozone-site.xml.j2"
+    dest: "{{ install_base }}/current/etc/hadoop/ozone-site.xml"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0644"
+  become: true
+
+- name: "Render core-site.xml"
+  template:
+    src: "core-site.xml.j2"
+    dest: "{{ install_base }}/current/etc/hadoop/core-site.xml"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0644"
+  become: true
+
+- name: "Render ozone-env.sh"
+  template:
+    src: "ozone-env.sh.j2"
+    dest: "{{ install_base }}/current/etc/hadoop/ozone-env.sh"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0755"
+  become: true
+
+- name: "Render workers file for datanodes"
+  template:
+    src: "workers.j2"
+    dest: "{{ install_base }}/current/etc/hadoop/workers"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0644"
+  when: groups.get('datanodes', []) | length > 0
+  become: true
+
+

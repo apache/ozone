@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Managed by Ansible
+{% if ozone_java_home | default('') | length > 0 %}
+export JAVA_HOME="{{ ozone_java_home }}"
+export PATH="$PATH:{{ ozone_java_home }}/bin"
+{% endif %}
+export OZONE_HOME="{{ install_base }}/current"
+export PATH="$PATH:{{ install_base }}/current/bin"
+
+# Relaxed module access for Java 17/21 (needed by Ozone and dependencies)
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED -Dcom.sun.xml.bind.v2.bytecode.ClassTailor.noOptimize=true"
+
+{% if ozone_opts | default('') | length > 0 %}
+# Extra JVM options for all Ozone components
+export OZONE_OPTS="{{ ozone_opts }}"
+{% endif %}
+
+

@@ -1,0 +1,72 @@
+---
+- name: "Ensure .ssh directory exists for target users"
+  file:
+    path: "{{ (item == 'root') | ternary('/root/.ssh', '/home/' + item + '/.ssh') }}"
+    state: directory
+    owner: "{{ (item == 'root') | ternary('root', item) }}"
+    group: "{{ (item == 'root') | ternary('root', item) }}"
+    mode: "0700"
+  loop: "{{ authorized_key_users | unique }}"
+  when: item | length > 0
+  become: true
+
+- name: "Install authorized public key for users (if provided)"
+  file:
+    path: "{{ (item == 'root') | ternary('/root/.ssh/authorized_keys', '/home/' + item + '/.ssh/authorized_keys') }}"
+    state: touch
+    owner: "{{ (item == 'root') | ternary('root', item) }}"
+    group: "{{ (item == 'root') | ternary('root', item) }}"
+    mode: "0600"
+  loop: "{{ authorized_key_users | unique }}"
+  when:
+    - ssh_public_key_path | length > 0
+    - item | length > 0
+  become: true
+
+- name: "Append authorized public key for users"
+  lineinfile:
+    path: "{{ (item == 'root') | ternary('/root/.ssh/authorized_keys', '/home/' + item + '/.ssh/authorized_keys') }}"
+    create: yes
+    line: "{{ lookup('file', ssh_public_key_path) }}"
+    state: present
+    insertafter: EOF
+  loop: "{{ authorized_key_users | unique }}"
+  when:
+    - ssh_public_key_path | length > 0
+    - item | length > 0
+  become: true
+
+- name: "Deploy cluster SSH private key to service user (opt-in)"
+  copy:
+    src: "{{ ssh_private_key_path }}"
+    dest: "{{ (service_user == 'root') | ternary('/root/.ssh/id_ed25519', '/home/' + service_user + '/.ssh/id_ed25519') }}"
+    owner: "{{ (service_user == 'root') | ternary('root', service_user) }}"
+    group: "{{ (service_user == 'root') | ternary('root', service_user) }}"
+    mode: "0600"
+  when:
+    - allow_cluster_ssh_key_deploy | bool
+    - ssh_private_key_path | length > 0
+  become: true
+
+- name: "Ensure public half exists for deployed private key"
+  shell: "ssh-keygen -y -f {{ (service_user == 'root') | ternary('/root/.ssh/id_ed25519', '/home/' + service_user + '/.ssh/id_ed25519') }} > {{ (service_user == 'root') | ternary('/root/.ssh/id_ed25519.pub', '/home/' + service_user + '/.ssh/id_ed25519.pub') }}"
+  args:
+    creates: "{{ (service_user == 'root') | ternary('/root/.ssh/id_ed25519.pub', '/home/' + service_user + '/.ssh/id_ed25519.pub') }}"
+  when: allow_cluster_ssh_key_deploy | bool
+  become: true
+
+- name: "Add passwordless SSH config for users"
+  copy:
+    dest: "{{ (item == 'root') | ternary('/root/.ssh/config', '/home/' + item + '/.ssh/config') }}"
+    owner: "{{ (item == 'root') | ternary('root', item) }}"
+    group: "{{ (item == 'root') | ternary('root', item) }}"
+    mode: "0600"
+    content: |
+      Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+  loop: "{{ authorized_key_users | unique }}"
+  when: item | length > 0
+  become: true
+
+
