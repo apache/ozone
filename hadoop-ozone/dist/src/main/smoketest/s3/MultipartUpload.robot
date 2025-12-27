@@ -188,7 +188,7 @@ Test abort Multipart upload
     ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey4    ${uploadID}    0
 
 Test abort Multipart upload with invalid uploadId
-    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey5    "random"    255
+    ${result} =         Abort MPU    ${BUCKET}    ${PREFIX}/multipartKey5    "random"    0
 
 Upload part with Incorrect uploadID
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
