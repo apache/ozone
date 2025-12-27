@@ -22,56 +22,19 @@
       set_fact:
         ozone_bin: "{{ install_base }}/current/bin/ozone"
 
-    - name: "Stop Recon (if running)"
-      command: "{{ ozone_bin }} --daemon stop recon"
-      args:
-        chdir: "{{ install_base }}/current"
+    - name: "Kill OMs/SCMs/Datanodes/Recon (if running)"
+      shell: |
+        pkill -KILL -f "{{ item }}"
       become: true
-      become_user: "{{ service_user }}"
-      run_once: true
-      delegate_to: "{{ groups['recon'][0] }}"
-      when: groups.get('recon', []) | length > 0
       failed_when: false
       changed_when: false
-
-    - name: "Stop OMs (if running)"
-      command: "{{ ozone_bin }} --daemon stop om"
-      args:
-        chdir: "{{ install_base }}/current"
-      become: true
-      become_user: "{{ service_user }}"
-      delegate_to: "{{ item }}"
-      loop: "{{ groups.get('om', []) }}"
+      loop:
+        - "org.apache.hadoop.ozone.om.OzoneManagerStarter"
+        - "org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter"
+        - "org.apache.hadoop.ozone.HddsDatanodeService"
+        - "org.apache.hadoop.ozone.recon.ReconServer"
       loop_control:
         label: "{{ item }}"
-      failed_when: false
-      changed_when: false
-
-    - name: "Stop SCMs (if running)"
-      command: "{{ ozone_bin }} --daemon stop scm"
-      args:
-        chdir: "{{ install_base }}/current"
-      become: true
-      become_user: "{{ service_user }}"
-      delegate_to: "{{ item }}"
-      loop: "{{ groups.get('scm', []) }}"
-      loop_control:
-        label: "{{ item }}"
-      failed_when: false
-      changed_when: false
-
-    - name: "Stop Datanodes (if running)"
-      command: "{{ ozone_bin }} --daemon stop datanode"
-      args:
-        chdir: "{{ install_base }}/current"
-      become: true
-      become_user: "{{ service_user }}"
-      delegate_to: "{{ item }}"
-      loop: "{{ groups.get('datanodes', []) }}"
-      loop_control:
-        label: "{{ item }}"
-      failed_when: false
-      changed_when: false
 
     - name: "Remove install base"
       file:

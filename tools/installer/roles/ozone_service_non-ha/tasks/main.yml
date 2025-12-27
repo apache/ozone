@@ -52,7 +52,7 @@
       failed_when: om_start.rc != 0
 
     # Datanodes: start on all
-    - name: "Start Datanode on all datanodes"
+    - name: "Start Datanode on all datanodes (launch async)"
       command: "{{ ozone_bin }} --daemon start datanode"
       args:
         chdir: "{{ ozone_command_chdir }}"
@@ -61,8 +61,22 @@
       loop_control:
         label: "{{ item }}"
       when: groups.get('datanodes', []) | length > 0
-      register: dn_start
-      failed_when: dn_start.rc != 0
+      async: 300
+      poll: 0
+      register: dn_jobs
+
+    - name: "Wait for Datanode starts to complete"
+      async_status:
+        jid: "{{ item.ansible_job_id }}"
+      delegate_to: "{{ item.item }}"
+      loop: "{{ dn_jobs.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      register: dn_wait
+      until: dn_wait.finished
+      retries: 60
+      delay: 2
+      when: (groups.get('datanodes', []) | length) > 0
 
     # Recon: start only on first recon host if any
     - name: "Start Recon on first recon host"
