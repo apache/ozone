@@ -7,7 +7,6 @@
 {% set om_hosts = (_om_all[:1] if not (ha_enabled | default(false)) else _om_all) %}
 {% set scm_hosts = (_scm_all[:1] if not (ha_enabled | default(false)) else _scm_all) %}
 
-
 {% if scm_hosts|length > 0 %}
   <property>
     <name>ozone.scm.names</name>

@@ -1,18 +1,53 @@
 #!/usr/bin/env bash
 # Managed by Ansible
+
+export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
+
 {% if ozone_java_home | default('') | length > 0 %}
 export JAVA_HOME="{{ ozone_java_home }}"
 export PATH="$PATH:{{ ozone_java_home }}/bin"
 {% endif %}
 export OZONE_HOME="{{ install_base }}/current"
 export PATH="$PATH:{{ install_base }}/current/bin"
+export OZONE_CONF_DIR="{{ install_base }}/current/etc/hadoop"
+export HADOOP_CONF_DIR="{{ install_base }}/current/etc/hadoop"
 
 # Relaxed module access for Java 17/21 (needed by Ozone and dependencies)
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED -Dcom.sun.xml.bind.v2.bytecode.ClassTailor.noOptimize=true"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS} --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED"
 
-{% if ozone_opts | default('') | length > 0 %}
+{% if ozone_opts | default('-XX:ParallelGCThreads=8') | length > 0 %}
 # Extra JVM options for all Ozone components
-export OZONE_OPTS="{{ ozone_opts }}"
+export OZONE_OPTS="{{ ozone_opts | default('-XX:ParallelGCThreads=8') }}"
 {% endif %}
 
+export OZONE_OM_USER="{{ service_user }}"
+
+# export OZONE_HEAPSIZE_MAX=
+# export OZONE_HEAPSIZE_MIN=
+# export OZONE_OPTS="-Djava.net.preferIPv4Stack=true -Dsun.security.krb5.debug=true -Dsun.security.spnego.debug"
+# export OZONE_CLIENT_OPTS=""
+# export OZONE_CLASSPATH="/some/cool/path/on/your/machine"
+# export OZONE_USER_CLASSPATH_FIRST="yes"
+# export OZONE_USE_CLIENT_CLASSLOADER=true
+# export OZONE_SSH_OPTS="-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10s"
+# export OZONE_SSH_PARALLEL=10
+# export OZONE_WORKERS="${OZONE_CONF_DIR}/workers"
+# export OZONE_LOG_DIR=${OZONE_HOME}/logs
+# export OZONE_IDENT_STRING=$USER
+# export OZONE_STOP_TIMEOUT=5
+# export OZONE_PID_DIR=/tmp
+# export OZONE_ROOT_LOGGER=INFO,console
+# export OZONE_DAEMON_ROOT_LOGGER=INFO,RFA
+# export OZONE_SECURITY_LOGGER=INFO,NullAppender
+# export OZONE_NICENESS=0
+# export OZONE_POLICYFILE="hadoop-policy.xml"
+# export OZONE_GC_SETTINGS="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps"
+# export JSVC_HOME=/usr/bin
+# export OZONE_SECURE_PID_DIR=${OZONE_PID_DIR}
+# export OZONE_SECURE_LOG=${OZONE_LOG_DIR}
+# export OZONE_SECURE_IDENT_PRESERVE="true"
+# export OZONE_OM_OPTS=""
+# export OZONE_DATANODE_OPTS=""
+# export OZONE_SCM_OPTS=""
+# export OZONE_ENABLE_BUILD_PATHS="true"
 

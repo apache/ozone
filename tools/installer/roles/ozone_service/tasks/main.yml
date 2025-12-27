@@ -1,20 +1,17 @@
 ---
 
 # Common service command context for HA and Non-HA
-- name: "Run Ozone service commands"
+- name: "Ozone Service: Start SCM/OM"
   become: true
   become_user: "{{ service_user }}"
   become_flags: "-i"
   environment: "{{ ozone_runtime_env }}"
-  vars:
-    ozone_command_chdir: "{{ install_base }}/current/bin"
   block:
     - name: "Initialize/Start first SCM/OM"
       block:
         - name: "Initialize first SCM"
           command: "ozone scm --init"
           args:
-            chdir: "{{ ozone_command_chdir }}"
             creates: "{{ data_base }}/meta/scm"
           when: (groups['scm'] | length > 0) and (inventory_hostname == groups['scm'][0])
           register: scm_init_first
@@ -22,8 +19,6 @@
 
         - name: "Start first SCM"
           command: "ozone --daemon start scm"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: (groups['scm'] | length > 0) and (inventory_hostname == groups['scm'][0])
           register: scm_start_first
           failed_when: scm_start_first.rc != 0
@@ -31,7 +26,6 @@
         - name: "Initialize first OM"
           command: "ozone om --init"
           args:
-            chdir: "{{ ozone_command_chdir }}"
             creates: "{{ data_base }}/meta/om"
           when: (groups['om'] | length > 0) and (inventory_hostname == groups['om'][0])
           register: om_init_first
@@ -39,8 +33,6 @@
 
         - name: "Start first OM"
           command: "ozone --daemon start om"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: (groups['om'] | length > 0) and (inventory_hostname == groups['om'][0])
           register: om_start_first
           failed_when: om_start_first.rc != 0
@@ -50,61 +42,53 @@
       block:
         - name: "SCM bootstrap on remaining SCMs"
           command: "ozone scm --bootstrap"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: "'scm' in groups and (groups['scm'] | length > 1) and (inventory_hostname in groups['scm'][1:])"
           register: scm_bootstrap_rest
           failed_when: scm_bootstrap_rest.rc != 0
 
         - name: "Start SCM on remaining SCMs"
           command: "ozone --daemon start scm"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: "'scm' in groups and (groups['scm'] | length > 1) and (inventory_hostname in groups['scm'][1:])"
           register: scm_start_rest
           failed_when: scm_start_rest.rc != 0
 
         - name: "OM init on remaining OMs"
           command: "ozone om --init"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: "'om' in groups and (groups['om'] | length > 1) and (inventory_hostname in groups['om'][1:])"
           register: om_init_rest
           failed_when: om_init_rest.rc != 0
 
         - name: "Start OM on remaining OMs"
           command: "ozone --daemon start om"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
           when: "'om' in groups and (groups['om'] | length > 1) and (inventory_hostname in groups['om'][1:])"
           register: om_start_rest
           failed_when: om_start_rest.rc != 0
 
-    - name: "Start Datanodes and Recon"
-      block:
-        - name: "Start Datanodes"
-          command: "ozone --daemon start datanode"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
-          when: inventory_hostname in (groups.get('datanodes', []))
-          async: 300
-          poll: 0
-          register: dn_job
+- name: "Ozone Service: Start Datanodes and Recon"
+  become: true
+  become_user: "{{ service_user }}"
+  become_flags: "-i"
+  environment: "{{ ozone_runtime_env }}"
+  block:
+    - name: "Start Datanodes"
+      command: "ozone --daemon start datanode"
+      when: inventory_hostname in (groups.get('datanodes', []))
+      async: 300
+      poll: 0
+      register: dn_job
 
-        - name: "Wait for Datanode start to complete"
-          when: inventory_hostname in (groups.get('datanodes', []))
-          async_status:
-            jid: "{{ dn_job.ansible_job_id }}"
-          register: dn_wait
-          until: dn_wait.finished
-          failed_when: (dn_wait.rc | default(0)) != 0
+    - name: "Wait for Datanode start to complete"
+      when: inventory_hostname in (groups.get('datanodes', []))
+      async_status:
+        jid: "{{ dn_job.ansible_job_id }}"
+      register: dn_wait
+      until: dn_wait.finished
+      failed_when: (dn_wait.rc | default(0)) != 0
 
-        - name: "Start Recon on first recon host"
-          command: "ozone --daemon start recon"
-          args:
-            chdir: "{{ ozone_command_chdir }}"
-          when: (groups.get('recon', []) | length > 0) and (inventory_hostname == groups['recon'][0])
-          register: recon_start
-          failed_when: recon_start.rc != 0
+    - name: "Start Recon on first recon host"
+      command: "ozone --daemon start recon"
+      when: (groups.get('recon', []) | length > 0) and (inventory_hostname == groups['recon'][0])
+      register: recon_start
+      failed_when: recon_start.rc != 0
 
 
