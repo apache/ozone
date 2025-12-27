@@ -76,7 +76,7 @@ public final class RDBBatchOperation implements BatchOperation {
   }
 
   /**
-   * The key type of {@link RDBBatchOperation.OpCache.FamilyCache#batchOps}.
+   * The key type of {@link RDBBatchOperation.OpCache.FamilyCache#ops}.
    * To implement {@link #equals(Object)} and {@link #hashCode()}
    * based on the contents of the bytes.
    */
@@ -263,7 +263,7 @@ public final class RDBBatchOperation implements BatchOperation {
        * It supports operations such as additions and deletions while maintaining the ability to overwrite
        * existing entries when necessary.
        */
-      private final Map<Bytes, Op> batchOps = new HashMap<>();
+      private final Map<Bytes, Op> ops = new HashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -280,7 +280,7 @@ public final class RDBBatchOperation implements BatchOperation {
       void prepareBatchWrite() throws RocksDatabaseException {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
-        for (Op op : batchOps.values()) {
+        for (Op op : ops.values()) {
           op.apply(family, writeBatch);
         }
         debug(this::summary);
@@ -295,8 +295,8 @@ public final class RDBBatchOperation implements BatchOperation {
         final boolean warn = !isCommit && batchSize > 0;
         String details = warn ? summary() : null;
 
-        IOUtils.close(LOG, batchOps.values());
-        batchOps.clear();
+        IOUtils.close(LOG, ops.values());
+        ops.clear();
 
         if (warn) {
           LOG.warn("discarding changes {}", details);
@@ -304,7 +304,7 @@ public final class RDBBatchOperation implements BatchOperation {
       }
 
       private void deleteIfExist(Bytes key) {
-        final Op previous = batchOps.remove(key);
+        final Op previous = ops.remove(key);
         if (previous != null) {
           previous.close();
           discardedSize += previous.totalLength();
@@ -318,7 +318,7 @@ public final class RDBBatchOperation implements BatchOperation {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         deleteIfExist(key);
         batchSize += operation.totalLength();
-        Op overwritten = batchOps.put(key, operation);
+        Op overwritten = ops.put(key, operation);
         Preconditions.checkState(overwritten == null);
 
         debug(() -> String.format("%s %s, %s; key=%s", this,
