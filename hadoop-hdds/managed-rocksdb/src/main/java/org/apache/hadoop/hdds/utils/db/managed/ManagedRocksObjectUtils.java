@@ -18,12 +18,9 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import jakarta.annotation.Nullable;
-import java.io.File;
 import java.time.Duration;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.LeakDetector;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDB;
 import org.rocksdb.util.Environment;
@@ -63,22 +60,6 @@ public final class ManagedRocksObjectUtils {
 
   static String formatStackTrace(@Nullable StackTraceElement[] elements) {
     return HddsUtils.formatStackTrace(elements, 4);
-  }
-
-  /**
-   * Wait for file to be deleted.
-   * @param file File to be deleted.
-   * @param maxDuration poll max duration.
-   * @throws RocksDatabaseException in case of failure.
-   */
-  public static void waitForFileDelete(File file, Duration maxDuration)
-      throws RocksDatabaseException {
-    if (!RatisHelper.attemptUntilTrue(() -> !file.exists(), POLL_INTERVAL_DURATION, maxDuration)) {
-      String msg = String.format("File: %s didn't get deleted in %s secs.",
-          file.getAbsolutePath(), maxDuration.getSeconds());
-      LOG.warn(msg);
-      throw new RocksDatabaseException(msg);
-    }
   }
 
   /**

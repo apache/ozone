@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -25,8 +24,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for {@link CheckNative}.
@@ -40,21 +37,13 @@ class TestCheckNative {
     out = GenericTestUtils.captureOut();
   }
 
-  @DisabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
   @Test
   void testCheckNativeNotLoaded() {
     executeCheckNative();
-    assertOutput(false);
+    assertOutput();
   }
 
-  @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-  @Test
-  void testCheckNativeRocksToolsLoaded() {
-    executeCheckNative();
-    assertOutput(true);
-  }
-
-  private void assertOutput(boolean expectedRocksNative) {
+  private void assertOutput() {
     // trims multiple spaces
     String stdOut = out.get()
         .replaceAll("  +", " ");
@@ -62,8 +51,7 @@ class TestCheckNative {
         .contains("Native library checking:")
         .contains("hadoop: false")
         .contains("ISA-L: false")
-        .contains("OpenSSL: false")
-        .contains("rocks-tools: " + expectedRocksNative);
+        .contains("OpenSSL: false");
   }
 
   @AfterEach

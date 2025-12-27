@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
@@ -309,9 +307,6 @@ public class TestSnapshotDiffManager {
         .getInt(OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
             OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT))
         .thenReturn(OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT);
-    when(configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
-        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT))
-        .thenReturn(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT);
 
     for (int i = 0; i < jobStatuses.size(); i++) {
       when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,

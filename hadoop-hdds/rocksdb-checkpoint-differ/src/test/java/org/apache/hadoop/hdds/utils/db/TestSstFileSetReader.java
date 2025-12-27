@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,12 +37,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.util.ClosableIterator;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -189,12 +186,10 @@ class TestSstFileSetReader {
    * This test is only enabled when the native RocksDB tools library is available.
    * Unlike testGetKeyStream, this method returns ALL keys within bounds, including tombstones.
    */
-  @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, CodecException {
-    assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     Pair<SortedMap<String, Integer>, List<Path>> data =
         createDummyData(numberOfFiles);
     List<Path> files = data.getRight();

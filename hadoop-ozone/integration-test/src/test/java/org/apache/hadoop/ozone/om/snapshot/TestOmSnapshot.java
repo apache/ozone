@@ -69,6 +69,7 @@ import com.google.common.collect.Lists;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -79,6 +80,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -104,10 +106,10 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSstFileIterator;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
@@ -218,10 +220,6 @@ public abstract class TestOmSnapshot {
     this.counter = new AtomicInteger();
     this.createLinkedBucket = createLinkedBucket;
     init();
-
-    if (!disableNativeDiff) {
-      assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
-    }
   }
 
   private void init() throws Exception {
@@ -2523,13 +2521,15 @@ public abstract class TestOmSnapshot {
                 java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
                 if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
                   assertTrue(f.isPruned());
-                  try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(
-                          managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
-                       ManagedRawSSTFileIterator<CodecBuffer> itr = sstFileReader.newIterator(
-                           ManagedRawSSTFileIterator.KeyValue::getValue, null, null, KEY_AND_VALUE)) {
+                  try (ManagedRawSstFileIterator<CodecBuffer> itr =
+                           new ManagedRawSstFileIterator<>(file.toFile().getAbsolutePath(), managedOptions,
+                               Optional.empty(), Optional.empty(),
+                               KEY_AND_VALUE, ManagedRawSstFileIterator.KeyValue::getValue)) {
                     while (itr.hasNext()) {
                       assertEquals(0, itr.next().readableBytes());
                     }
+                  } catch (RocksDatabaseException e) {
+                    throw new UncheckedIOException(e);
                   }
                 } else {
                   assertFalse(f.isPruned());

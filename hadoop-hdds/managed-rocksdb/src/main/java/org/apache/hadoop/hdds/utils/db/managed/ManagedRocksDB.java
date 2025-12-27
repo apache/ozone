@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import java.io.File;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -115,19 +114,20 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
    * Delete liveMetaDataFile from rocks db using RocksDB#deleteFile Api.
    * This function makes the RocksDB#deleteFile Api synchronized by waiting
    * for the deletes to happen.
-   * @param fileToBeDeleted File to be deleted.
+   * @param columnFamilyHandle column family handle.
+   * @param ranges list of ranges to be deleted.
    * @throws RocksDatabaseException if the underlying db throws an exception
    *                                or the file is not deleted within a time limit.
    */
-  public void deleteFile(LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
-    String sstFileName = fileToBeDeleted.fileName();
-    File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
+  public void deleteFile(ColumnFamilyHandle columnFamilyHandle, List<byte[]> ranges) throws RocksDatabaseException {
+    String columnFamilyName = null;
     try {
-      get().deleteFile(sstFileName);
+      columnFamilyName = StringUtils.bytes2String(columnFamilyHandle.getName());
+      get().deleteFilesInRanges(columnFamilyHandle, ranges, false);
     } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Failed to delete " + file, e);
+      throw new RocksDatabaseException("Failed to delete files in ranges corresponding to columnFamily: "
+          + columnFamilyName, e);
     }
-    ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 
   public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
