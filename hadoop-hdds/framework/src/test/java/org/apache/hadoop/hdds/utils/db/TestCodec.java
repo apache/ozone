@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
+import static org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes.newBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
@@ -292,19 +292,18 @@ public final class TestCodec {
   public static <T> void runTest(Codec<T> codec, T original,
       Integer serializedSize) throws Exception {
     CodecTestUtil.runTest(codec, original, serializedSize, null);
-    runTestBytes(original, codec);
+    runTestBytes(original, codec, CodecBuffer.Allocator.HEAP);
+    runTestBytes(original, codec, CodecBuffer.Allocator.DIRECT);
   }
 
-  static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
+  static <T> void runTestBytes(T object, Codec<T> codec, CodecBuffer.Allocator allocator) throws IOException {
     final byte[] array = codec.toPersistedFormat(object);
     final Bytes fromArray = new Bytes(array);
-    for (CodecBuffer.Allocator allocator : ImmutableList.of(CodecBuffer.Allocator.HEAP, CodecBuffer.Allocator.DIRECT)) {
-      try (CodecBuffer buffer = codec.toCodecBuffer(object, allocator)) {
-        final Bytes fromBuffer = new Bytes(buffer);
-        assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
-        assertEquals(fromArray, fromBuffer);
-        assertEquals(fromBuffer, fromArray);
-      }
+    try (CodecBuffer buffer = codec.toCodecBuffer(object, allocator)) {
+      final Bytes fromBuffer = newBytes(buffer);
+      assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
+      assertEquals(fromArray, fromBuffer);
+      assertEquals(fromBuffer, fromArray);
     }
   }
 }

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.ratis.util.Preconditions.assertTrue;
+
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -82,32 +84,25 @@ public final class RDBBatchOperation implements BatchOperation {
    * based on the contents of the bytes.
    */
   static final class Bytes implements Closeable {
-    private AbstractSlice<?> slice;
+    private final AbstractSlice<?> slice;
     /** Cache the hash value. */
-    private int hash;
+    private final int hash;
 
-    Bytes(CodecBuffer buffer) {
+    static Bytes newBytes(CodecBuffer buffer) {
+      return buffer.isDirect() ? new Bytes(buffer.asReadOnlyByteBuffer()) : new Bytes(buffer.getArray());
+    }
+
+    Bytes(ByteBuffer buffer) {
       Objects.requireNonNull(buffer, "buffer == null");
-      if (buffer.isDirect()) {
-        initWithDirectByteBuffer(buffer.asReadOnlyByteBuffer());
-      } else {
-        initWithByteArray(buffer.getArray());
-      }
+      assertTrue(buffer.isDirect(), "buffer must be direct");
+      this.slice = new ManagedDirectSlice(buffer);
+      this.hash = buffer.hashCode();
     }
 
     Bytes(byte[] array) {
       Objects.requireNonNull(array, "array == null");
-      initWithByteArray(array);
-    }
-
-    private void initWithByteArray(byte[] array) {
       this.slice = new ManagedSlice(array);
       this.hash = ByteBuffer.wrap(array).hashCode();
-    }
-
-    private void initWithDirectByteBuffer(ByteBuffer byteBuffer) {
-      this.slice = new ManagedDirectSlice(byteBuffer);
-      this.hash = byteBuffer.hashCode();
     }
 
     @Override
@@ -342,7 +337,7 @@ public final class RDBBatchOperation implements BatchOperation {
       void put(CodecBuffer key, CodecBuffer value) {
         putCount++;
         // always release the key with the value
-        Bytes keyBytes = new Bytes(key);
+        Bytes keyBytes = Bytes.newBytes(key);
         overwriteIfExists(keyBytes, new PutOp(key, value, keyBytes));
       }
 
