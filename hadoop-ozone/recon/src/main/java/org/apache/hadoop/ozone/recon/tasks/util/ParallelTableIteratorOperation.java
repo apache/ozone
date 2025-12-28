@@ -214,7 +214,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
       }));
     }
 
-    // ===== STEP 7: WAIT FOR EVERYONE TO FINISH =====
+    // ===== STEP 5: WAIT FOR EVERYONE TO FINISH =====
     // Wait for all 5 iterator threads to finish reading
     waitForQueueSize(iterFutures, 0);
     
