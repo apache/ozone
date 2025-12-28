@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.tasks.util;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -28,7 +27,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -56,37 +54,26 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
   // Thread Pools
   private final ExecutorService iteratorExecutor; // 5
-  private final ExecutorService valueExecutors; // 20
-
-  private final int maxNumberOfVals;
+  private final long maxNumberOfVals;
   private final OMMetadataManager metadataManager;
   private final int maxIteratorTasks;
-  private final int maxWorkerTasks;
   private final long logCountThreshold;
 
   private static final Logger LOG = LoggerFactory.getLogger(ParallelTableIteratorOperation.class);
 
   public ParallelTableIteratorOperation(OMMetadataManager metadataManager, Table<K, V> table, Codec<K> keyCodec,
-                                        int iteratorCount, int workerCount, int maxNumberOfValsInMemory,
-                                        long logThreshold) {
+                                        int iteratorCount, long logThreshold) {
     this.table = table;
     this.keyCodec = keyCodec;
     this.metadataManager = metadataManager;
     this.maxIteratorTasks = 2 * iteratorCount;  // Allow up to 10 pending iterator tasks
-    this.maxWorkerTasks = workerCount * 2;      // Allow up to 40 pending worker tasks
 
     // Create team of 5 iterator threads with UNLIMITED queue
     // LinkedBlockingQueue() with no size = can hold infinite pending tasks
     this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
                     new LinkedBlockingQueue<>());
-
-    // Create team of 20 worker threads with UNLIMITED queue
-    this.valueExecutors = new ThreadPoolExecutor(workerCount, workerCount, 1, TimeUnit.MINUTES,
-            new LinkedBlockingQueue<>());
-
-    // Calculate batch size per worker (e.g., 2000 / 20 = 100 keys per batch per worker)
-    this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
     this.logCountThreshold = logThreshold;
+    this.maxNumberOfVals = Math.max(1000, this.logCountThreshold / (iteratorCount));
   }
 
   private List<K> getBounds(K startKey, K endKey) throws IOException {
@@ -166,9 +153,6 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     // Queue to track iterator threads (5 threads creating work)
     Queue<Future<?>> iterFutures = new LinkedList<>();
 
-    // Queue to track worker threads (20 threads doing work)
-    Queue<Future<?>> workerFutures = new ConcurrentLinkedQueue<>();
-
     AtomicLong keyCounter = new AtomicLong();
     AtomicLong prevLogCounter = new AtomicLong();
     Object logLock = new Object();
@@ -190,75 +174,42 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
       iterFutures.add(iteratorExecutor.submit(() -> {
         try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter  = table.iterator()) {
           iter.seek(beg);
+          int count = 0;
           while (iter.hasNext()) {
-            List<Table.KeyValue<K, V>> keyValues = new ArrayList<>();
-            boolean reachedEnd = false;
-            while (iter.hasNext()) {
-              Table.KeyValue<K, V> kv = iter.next();
-              K key = kv.getKey();
-              
-              // Check if key is within this segment's range
-              boolean withinBounds;
-              if (inclusive) {
-                // Last segment: include everything from beg onwards (or until endKey if specified)
-                withinBounds = (endKey == null || key.compareTo(endKey) <= 0);
-              } else {
-                // Middle segment: include keys in range [beg, end)
-                withinBounds = key.compareTo(end) < 0;
-              }
-              
-              if (withinBounds) {
-                keyValues.add(kv);
-              } else {
-                reachedEnd = true;
-                break;
-              }
-
-              // If batch is full (2000 keys), stop collecting
-              if (keyValues.size() >= maxNumberOfVals) {
-                break;
-              }
+            Table.KeyValue<K, V> kv = iter.next();
+            K key = kv.getKey();
+            // Check if key is within this segment's range
+            boolean withinBounds;
+            if (inclusive) {
+              // Last segment: include everything from beg onwards (or until endKey if specified)
+              withinBounds = (endKey == null || key.compareTo(endKey) <= 0);
+            } else {
+              // Middle segment: include keys in range [beg, end)
+              withinBounds = key.compareTo(end) < 0;
             }
-
-            // ===== STEP 5: HAND BATCH TO WORKER THREAD =====
-            if (!keyValues.isEmpty()) {
-              // WAIT if worker queue is too full (max 39 pending tasks)
-              waitForQueueSize(workerFutures, maxWorkerTasks - 1);
-
-              // Submit batch to worker thread pool
-              workerFutures.add(valueExecutors.submit(() -> {
-                for (Table.KeyValue<K, V> kv : keyValues) {
-                  keyOperation.apply(kv);
-                }
-                keyCounter.addAndGet(keyValues.size());
-                if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
-                  synchronized (logLock) {
-                    if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
-                      long cnt = keyCounter.get();
-                      LOG.debug("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
-                      prevLogCounter.set(cnt);
-                    }
-                  }
-                }
-                // Worker task done! Future is now complete.
-              }));
-            }
-            // If we reached the end of our segment, stop reading
-            if (reachedEnd) {
+            if (!withinBounds) {
               break;
             }
+            keyOperation.apply(kv);
+            count++;
+            if (count % maxNumberOfVals == 0) {
+              keyCounter.addAndGet(count);
+              count = 0;
+              if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
+                synchronized (logLock) {
+                  if (keyCounter.get() - prevLogCounter.get() > logCountThreshold) {
+                    long cnt = keyCounter.get();
+                    LOG.debug("Iterated through {} keys while performing task: {}", keyCounter.get(), taskName);
+                    prevLogCounter.set(cnt);
+                  }
+                }
+              }
+            }
           }
+          keyCounter.addAndGet(count);
         } catch (IOException e) {
           LOG.error("IO error during parallel iteration on table {}", taskName, e);
           throw new RuntimeException("IO error during iteration", e);
-        } catch (InterruptedException e) {
-          LOG.warn("Parallel iteration interrupted for task {}", taskName, e);
-          Thread.currentThread().interrupt();
-          throw new RuntimeException("Iteration interrupted", e);
-        } catch (ExecutionException e) {
-          Throwable cause = e.getCause();
-          LOG.error("Task execution failed for {}: {}", taskName, cause.getMessage(), cause);
-          throw new RuntimeException("Task execution failed", cause);
         }
       }));
     }
@@ -266,8 +217,6 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     // ===== STEP 7: WAIT FOR EVERYONE TO FINISH =====
     // Wait for all 5 iterator threads to finish reading
     waitForQueueSize(iterFutures, 0);
-    // Wait for all 20 worker threads to finish processing
-    waitForQueueSize(workerFutures, 0);
     
     // Log final stats
     LOG.info("{}: Parallel iteration completed - Total keys processed: {}", taskName, keyCounter.get());
@@ -276,17 +225,12 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   @Override
   public void close() throws IOException {
     iteratorExecutor.shutdown();
-    valueExecutors.shutdown();
     try {
       if (!iteratorExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
         iteratorExecutor.shutdownNow();
       }
-      if (!valueExecutors.awaitTermination(60, TimeUnit.SECONDS)) {
-        valueExecutors.shutdownNow();
-      }
     } catch (InterruptedException e) {
       iteratorExecutor.shutdownNow();
-      valueExecutors.shutdownNow();
       Thread.currentThread().interrupt();
     }
   }

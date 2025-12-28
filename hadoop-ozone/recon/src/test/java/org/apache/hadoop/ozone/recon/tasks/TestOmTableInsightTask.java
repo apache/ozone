@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -869,7 +870,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testSequentialProcessingWithCodecBuffer()
+  public void testSequentialProcessingWithCodecBufferCodec()
       throws Exception {
     OmTableInsightTask task =
         new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager) {
@@ -903,5 +904,68 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Long count = task.initializeCountMap().get(countKey);
     assertEquals(3L, count,
         "Sequential iterator must count all keys");
+  }
+  @Test
+  public void testParallelProcessingWithCodecBufferCodec()
+      throws Exception {
+    // Parallel processing is enabled only for string tables (tables with string keys).
+    OmTableInsightTask task =
+        new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager)
+        {
+          @Override
+          public Collection<String> getTaskTables()
+          {
+            return Collections.singletonList(KEY_TABLE);
+          }
+        };
+
+    OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(omMetadataManager.getStore()).thenReturn(store);
+
+    @SuppressWarnings("unchecked")
+    Table<String, CodecBuffer> mockCodecBufferTable =
+        (Table<String, CodecBuffer>) mock(Table.class);
+
+    // Mock KeyValueIterator returned by iterator().
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, CodecBuffer> kvIterator =
+        (Table.KeyValueIterator<String, CodecBuffer>)
+            mock(Table.KeyValueIterator.class);
+
+    @SuppressWarnings("unchecked")
+    Table.KeyValue<String, CodecBuffer> kv =
+        (Table.KeyValue<String, CodecBuffer>) mock(Table.KeyValue.class);
+
+    when(kv.getKey()).thenReturn("/vol1/buck1/key-001");
+    when(kv.getValue()).thenReturn(mock(CodecBuffer.class));
+
+    // Simulate KeyValueIterator with 5 entries.
+    when(kvIterator.hasNext())
+        .thenReturn(true, true, true, true, true, false);
+    when(kvIterator.next()).thenReturn(kv);
+
+    when(mockCodecBufferTable.iterator()).thenReturn(kvIterator);
+    when(mockCodecBufferTable.getEstimatedKeyCount()).thenReturn(5L);
+
+    // DBStore.getTable(...) must return CodecBuffer table.
+    when(store.getTable(
+        eq(KEY_TABLE),
+        eq(StringCodec.get()),
+        any(CodecBufferCodec.class),
+        eq(TableCache.CacheType.NO_CACHE)))
+        .thenReturn((Table) mockCodecBufferTable);
+
+    // Invoke reprocess (which triggers parallel processing for table with string keys).
+    ReconOmTask.TaskResult result = task.reprocess(omMetadataManager);
+    assertTrue(result.isTaskSuccess(),
+        "Parallel processing should succeed");
+
+    String countKey =
+        OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE);
+    Long count = task.initializeCountMap().get(countKey);
+    // Validate iterator count
+    assertEquals(5L, count,
+        "Parallel iterator must count all keys");
   }
 }

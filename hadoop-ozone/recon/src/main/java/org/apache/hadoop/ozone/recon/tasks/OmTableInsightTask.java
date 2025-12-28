@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -194,8 +193,8 @@ public class OmTableInsightTask implements ReconOmTask {
   private void processTableInParallel(String tableName, OMMetadataManager omMetadataManager) throws Exception {
     int workerCount = 2;  // Only 2 workers needed for simple counting
     
-    Table<String, byte[]> table = omMetadataManager.getStore()
-        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    Table<String, CodecBuffer> table = omMetadataManager.getStore()
+        .getTable(tableName, StringCodec.get(), CodecBufferCodec.get(true), TableCache.CacheType.NO_CACHE);
     
     long estimatedCount = 100000;  // Default
     try {
@@ -207,9 +206,8 @@ public class OmTableInsightTask implements ReconOmTask {
     
     AtomicLong count = new AtomicLong(0);
 
-    try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
-        omMetadataManager, table, StringCodec.get(),
-        maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
+    try (ParallelTableIteratorOperation<String, CodecBuffer> parallelIter = new ParallelTableIteratorOperation<>(
+        omMetadataManager, table, StringCodec.get(), maxIterators, loggingThreshold)) {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
