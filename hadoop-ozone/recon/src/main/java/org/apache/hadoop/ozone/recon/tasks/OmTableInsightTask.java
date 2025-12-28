@@ -66,7 +66,6 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
-  private final int maxKeysInMemory;
   private final int maxIterators;
 
   @Inject
@@ -81,9 +80,6 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
     tableHandlers.put(MULTIPART_INFO_TABLE, new MultipartInfoInsightHandler());
-    this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
     this.maxIterators = reconOMMetadataManager.getOzoneConfiguration().getInt(
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);

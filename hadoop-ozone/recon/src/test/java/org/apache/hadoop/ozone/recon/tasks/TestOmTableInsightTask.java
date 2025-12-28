@@ -905,16 +905,15 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(3L, count,
         "Sequential iterator must count all keys");
   }
+
   @Test
   public void testParallelProcessingWithCodecBufferCodec()
       throws Exception {
     // Parallel processing is enabled only for string tables (tables with string keys).
     OmTableInsightTask task =
-        new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager)
-        {
+        new OmTableInsightTask(reconGlobalStatsManager, reconOMMetadataManager) {
           @Override
-          public Collection<String> getTaskTables()
-          {
+          public Collection<String> getTaskTables() {
             return Collections.singletonList(KEY_TABLE);
           }
         };
