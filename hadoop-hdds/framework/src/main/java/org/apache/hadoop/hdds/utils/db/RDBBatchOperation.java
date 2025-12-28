@@ -308,7 +308,7 @@ public final class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      void overWriteIfExist(Bytes key, Op op) {
+      void overwriteIfExists(Bytes key, Op op) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         deleteIfExist(key);
         batchSize += op.totalLength();
@@ -324,19 +324,19 @@ public final class RDBBatchOperation implements BatchOperation {
         putCount++;
         // always release the key with the value
         Bytes keyBytes = new Bytes(key);
-        overWriteIfExist(keyBytes, new PutOp(key, value));
+        overwriteIfExists(keyBytes, new PutOp(key, value));
       }
 
       void put(byte[] key, byte[] value) {
         putCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteIfExist(keyBytes, new ByteArrayPutOp(key, value));
+        overwriteIfExists(keyBytes, new ByteArrayPutOp(key, value));
       }
 
       void delete(byte[] key) {
         delCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteIfExist(keyBytes, new DeleteOp(key));
+        overwriteIfExists(keyBytes, new DeleteOp(key));
       }
 
       String putString(int keySize, int valueSize) {
