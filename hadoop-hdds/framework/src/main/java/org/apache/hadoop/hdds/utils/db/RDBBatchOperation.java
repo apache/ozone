@@ -134,9 +134,6 @@ public final class RDBBatchOperation implements BatchOperation {
 
   private abstract static class Op implements Closeable {
 
-    private Op() {
-    }
-
     abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
 
     abstract int keyLen();
@@ -161,7 +158,6 @@ public final class RDBBatchOperation implements BatchOperation {
     private final byte[] key;
 
     private DeleteOp(byte[] key) {
-      super();
       this.key = Objects.requireNonNull(key, "key == null");
     }
 
@@ -179,13 +175,12 @@ public final class RDBBatchOperation implements BatchOperation {
   /**
    * Put operation to be applied to a {@link ColumnFamily} batch using the CodecBuffer api.
    */
-  private final class CodecBufferPutOp extends Op {
+  private final class PutOp extends Op {
     private final CodecBuffer key;
     private final CodecBuffer value;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private CodecBufferPutOp(CodecBuffer key, CodecBuffer value) {
-      super();
+    private PutOp(CodecBuffer key, CodecBuffer value) {
       this.key = key;
       this.value = value;
     }
@@ -223,7 +218,6 @@ public final class RDBBatchOperation implements BatchOperation {
     private final byte[] value;
 
     private ByteArrayPutOp(byte[] key, byte[] value) {
-      super();
       this.key = Objects.requireNonNull(key, "key == null");
       this.value = Objects.requireNonNull(value, "value == null");
     }
@@ -314,37 +308,35 @@ public final class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      void overWriteOpIfExist(Bytes key, Op operation) {
+      void overWriteIfExist(Bytes key, Op op) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         deleteIfExist(key);
-        batchSize += operation.totalLength();
-        Op overwritten = ops.put(key, operation);
+        batchSize += op.totalLength();
+        Op overwritten = ops.put(key, op);
         Preconditions.checkState(overwritten == null);
 
         debug(() -> String.format("%s %s, %s; key=%s", this,
-            operation instanceof DeleteOp ? delString(operation.totalLength()) : putString(operation.keyLen(),
-                operation.valLen()),
+            op instanceof DeleteOp ? delString(op.totalLength()) : putString(op.keyLen(), op.valLen()),
             batchSizeDiscardedString(), key));
       }
 
       void put(CodecBuffer key, CodecBuffer value) {
         putCount++;
-
         // always release the key with the value
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new CodecBufferPutOp(key, value));
+        overWriteIfExist(keyBytes, new PutOp(key, value));
       }
 
       void put(byte[] key, byte[] value) {
         putCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new ByteArrayPutOp(key, value));
+        overWriteIfExist(keyBytes, new ByteArrayPutOp(key, value));
       }
 
       void delete(byte[] key) {
         delCount++;
         Bytes keyBytes = new Bytes(key);
-        overWriteOpIfExist(keyBytes, new DeleteOp(key));
+        overWriteIfExist(keyBytes, new DeleteOp(key));
       }
 
       String putString(int keySize, int valueSize) {
@@ -353,14 +345,12 @@ public final class RDBBatchOperation implements BatchOperation {
       }
 
       String delString(int keySize) {
-        return String.format("del(key: %s), #del=%s",
-            byteSize2String(keySize), delCount);
+        return String.format("del(key: %s), #del=%s", byteSize2String(keySize), delCount);
       }
 
       String batchSizeDiscardedString() {
         return String.format("batchSize=%s, discarded: %s",
-            byteSize2String(batchSize),
-            countSize2String(discardedCount, discardedSize));
+            byteSize2String(batchSize), countSize2String(discardedCount, discardedSize));
       }
 
       @Override
@@ -392,7 +382,7 @@ public final class RDBBatchOperation implements BatchOperation {
       return this::clear;
     }
 
-    void clear() {
+    private void clear() {
       for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
         e.getValue().clear();
       }
