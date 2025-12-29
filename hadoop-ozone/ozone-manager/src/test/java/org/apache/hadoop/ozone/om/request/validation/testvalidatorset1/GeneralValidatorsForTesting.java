@@ -130,9 +130,9 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = POST_PROCESS,
-      requestType = CreateKey,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      requestType = CreateKey)
   public static OMResponse postProcessCreateKeyBucketLayoutClientValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("postProcessCreateKeyBucketLayoutClientValidator");
@@ -140,12 +140,13 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = PRE_PROCESS,
-      requestType = CreateVolume,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT)
-  @OMLayoutVersionValidator(processingPhase = PRE_PROCESS,
-      requestType = CreateVolume,
-      applyBefore = OMLayoutFeature.QUOTA)
+      requestType = CreateVolume)
+  @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.QUOTA,
+      processingPhase = PRE_PROCESS,
+      requestType = CreateVolume)
   public static OMRequest multiPurposePreProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator(
       OMRequest req, ValidationContext ctx) {
     fireValidationEvent("multiPurposePreProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator");
@@ -153,12 +154,13 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = POST_PROCESS,
-      requestType = CreateVolume,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT)
-  @OMLayoutVersionValidator(processingPhase = POST_PROCESS,
-      requestType = CreateVolume,
-      applyBefore = OMLayoutFeature.QUOTA)
+      requestType = CreateVolume)
+  @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.QUOTA,
+      processingPhase = POST_PROCESS,
+      requestType = CreateVolume)
   public static OMResponse multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx) {
     fireValidationEvent("multiPurposePostProcessCreateVolumeBucketLayoutCLientQuotaLayoutValidator");
@@ -166,9 +168,9 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = PRE_PROCESS,
-      requestType = DeleteKeys,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = DeleteKeys
   )
   public static OMRequest throwingPreProcessDeleteKeyBucketLayoutClientValidator(
       OMRequest req, ValidationContext ctx) throws IOException {
@@ -180,9 +182,9 @@ public final class GeneralValidatorsForTesting {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = POST_PROCESS,
-      requestType = DeleteKeys,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = DeleteKeys
   )
   public static OMResponse throwingPostProcessDeleteKeyBucketLayoutClientValidator(
       OMRequest req, OMResponse resp, ValidationContext ctx)

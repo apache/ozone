@@ -410,9 +410,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateKey,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.CreateKey
   )
   public static OMRequest disallowCreateKeyWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -440,9 +440,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateKey,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.CreateKey
   )
   public static OMRequest blockCreateKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

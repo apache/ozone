@@ -278,9 +278,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AllocateBlock,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.AllocateBlock
   )
   public static OMRequest disallowAllocateBlockWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -308,9 +308,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AllocateBlock,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.AllocateBlock
   )
   public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

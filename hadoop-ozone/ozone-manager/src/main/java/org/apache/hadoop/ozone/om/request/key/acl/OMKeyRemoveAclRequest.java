@@ -163,9 +163,9 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.RemoveAcl,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.RemoveAcl
   )
   public static OMRequest blockRemoveAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

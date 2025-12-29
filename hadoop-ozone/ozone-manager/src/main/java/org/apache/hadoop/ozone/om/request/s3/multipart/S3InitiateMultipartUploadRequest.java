@@ -286,9 +286,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.InitiateMultiPartUpload,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.InitiateMultiPartUpload
   )
   public static OMRequest
       disallowInitiateMultiPartUploadWithECReplicationConfig(
@@ -319,9 +319,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.InitiateMultiPartUpload,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.InitiateMultiPartUpload
   )
   public static OMRequest blockInitiateMPUWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

@@ -772,9 +772,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListKeys,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      requestType = Type.ListKeys
   )
   public static OMResponse disallowListKeysResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -799,9 +799,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListKeys,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.ListKeys
   )
   public static OMResponse disallowListKeysWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -840,9 +840,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListTrash,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      requestType = Type.ListTrash
   )
   public static OMResponse disallowListTrashWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -870,9 +870,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListTrash,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.ListTrash
   )
   public static OMResponse disallowListTrashWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1086,9 +1086,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.GetFileStatus,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      requestType = Type.GetFileStatus
   )
   public static OMResponse disallowGetFileStatusWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1115,9 +1115,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.GetFileStatus,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.GetFileStatus
   )
   public static OMResponse disallowGetFileStatusWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1164,9 +1164,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupFile,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      requestType = Type.LookupFile
   )
   public static OMResponse disallowLookupFileWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1192,9 +1192,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupFile,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.LookupFile
   )
   public static OMResponse disallowLookupFileWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1274,9 +1274,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListStatus,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      requestType = Type.ListStatus
   )
   public static OMResponse disallowListStatusResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -1302,9 +1302,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.ListStatus,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.ListStatus
   )
   public static OMResponse disallowListStatusResponseWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)

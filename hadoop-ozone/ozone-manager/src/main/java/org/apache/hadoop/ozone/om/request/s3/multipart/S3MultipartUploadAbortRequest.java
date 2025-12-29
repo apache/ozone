@@ -257,9 +257,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AbortMultiPartUpload,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.AbortMultiPartUpload
   )
   public static OMRequest disallowAbortMultiPartUploadWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -288,9 +288,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AbortMultiPartUpload,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.AbortMultiPartUpload
   )
   public static OMRequest blockMPUAbortWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

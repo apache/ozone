@@ -372,9 +372,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CommitMultiPartUpload,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.CommitMultiPartUpload
   )
   public static OMRequest disallowCommitMultiPartUploadWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -403,9 +403,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CommitMultiPartUpload,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.CommitMultiPartUpload
   )
   public static OMRequest blockMPUCommitWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

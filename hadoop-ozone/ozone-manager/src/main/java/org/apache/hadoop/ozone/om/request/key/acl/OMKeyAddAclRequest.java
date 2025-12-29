@@ -162,9 +162,9 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AddAcl,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.AddAcl
   )
   public static OMRequest blockAddAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

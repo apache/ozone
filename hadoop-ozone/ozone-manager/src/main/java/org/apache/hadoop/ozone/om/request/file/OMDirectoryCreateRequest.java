@@ -264,9 +264,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateDirectory,
-      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      requestType = Type.CreateDirectory
   )
   public static OMRequest disallowCreateDirectoryWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -297,9 +297,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @throws OMException if the request is invalid
    */
   @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateDirectory,
-      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
+      requestType = Type.CreateDirectory
   )
   public static OMRequest blockCreateDirectoryWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
