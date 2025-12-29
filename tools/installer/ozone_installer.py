@@ -8,8 +8,16 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import logging
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+# Optional nicer interactive prompts (fallback to built-in prompts if unavailable)
+try:
+    import click  # type: ignore
+except Exception:
+    click = None  # type: ignore
 
 ANSIBLE_ROOT = Path(__file__).resolve().parent
 ANSIBLE_CFG = ANSIBLE_ROOT / "ansible.cfg"
@@ -32,7 +40,24 @@ DEFAULTS = {
     "use_sudo": True,
 }
 
-def parse_args(argv):
+def get_logger(log_path: Optional[Path] = None) -> logging.Logger:
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    logger = logging.getLogger("ozone_installer")
+    logger.setLevel(logging.INFO)
+    # Avoid duplicate handlers if re-invoked
+    if not logger.handlers:
+        dest = log_path or (LOGS_DIR / "ansible.log")
+        fh = logging.FileHandler(dest)
+        fh.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    return logger
+
+def parse_args(argv: List[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Ozone Ansible Installer (Python trigger) - mirrors bash installer flags"
     )
@@ -70,9 +95,18 @@ def _validate_local_ozone_dir(path: Path) -> bool:
     except OSError:
         return False
 
-def prompt(prompt_text, default=None, secret=False, yes_mode=False):
+def prompt(prompt_text: str, default: Optional[str] = None, secret: bool = False, yes_mode: bool = False) -> Optional[str]:
     if yes_mode:
         return default
+    if click is not None and sys.stdout.isatty():
+        try:
+            if secret:
+                # Hide input for secrets (passwords)
+                return click.prompt(prompt_text, default=default, hide_input=True, show_default=default is not None)
+            return click.prompt(prompt_text, default=default, show_default=default is not None)
+        except (EOFError, KeyboardInterrupt):
+            return default
+    # Fallback to built-in input/getpass
     try:
         if default:
             text = f"{prompt_text} [{default}]: "
@@ -102,6 +136,40 @@ def _semver_key(v: str) -> Tuple[int, int, int, str]:
     except Exception:
         return (0, 0, 0, v)
 
+def _render_table(rows: List[Tuple[str, str]]) -> str:
+    """
+    Returns a simple two-column table string without extra dependencies.
+    """
+    if not rows:
+        return ""
+    col1_width = max(len(k) for k, _ in rows)
+    col2_width = max(len(str(v)) for _, v in rows)
+    sep = f"+-{'-' * col1_width}-+-{'-' * col2_width}-+"
+    out = [sep, f"| {'Field'.ljust(col1_width)} | {'Value'.ljust(col2_width)} |", sep]
+    for k, v in rows:
+        out.append(f"| {k.ljust(col1_width)} | {str(v).ljust(col2_width)} |")
+    out.append(sep)
+    return "\n".join(out)
+
+def _confirm_summary(rows: List[Tuple[str, str]], yes_mode: bool) -> bool:
+    """
+    Print the input summary table and ask user to continue. Returns True if confirmed.
+    """
+    logger = get_logger()
+    table = _render_table(rows)
+    if click is not None:
+        click.echo(table)
+        logger.info("\n" + table)
+        if yes_mode:
+            return True
+        return click.confirm("Proceed with these settings?", default=True)
+    else:
+        logger.info("\n" + table)
+        if yes_mode:
+            return True
+        answer = prompt("Proceed with these settings? (Y/n)", default="Y", yes_mode=False)
+        return str(answer or "Y").strip().lower() in ("y", "yes")
+
 def fetch_available_versions(dl_url: str, limit: int = 30) -> List[str]:
     """
     Fetch available Ozone versions from the download base. Returns newest-first.
@@ -128,26 +196,53 @@ def choose_version_interactive(versions: List[str], default_version: str, yes_mo
         return None
     if yes_mode:
         return versions[0]
-    print("Available Ozone versions:")
-    for idx, ver in enumerate(versions, start=1):
-        print(f"  {idx}) {ver}")
-    while True:
-        choice = prompt("Select version by number or type a version string (or 'local')", default="1", yes_mode=False)
-        if choice is None or str(choice).strip() == "":
-            return versions[0]
-        choice = str(choice).strip()
-        if choice.lower() == "local":
-            return "local"
-        if choice.isdigit():
-            i = int(choice)
-            if 1 <= i <= len(versions):
-                return versions[i - 1]
-        # allow typing a specific version not listed
-        if re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?$", choice):
-            return choice
-        print("Invalid selection. Please enter a number from the list, a valid version (e.g., 2.0.0) or 'local'.")
+    # Use click when available and interactive; otherwise fallback to basic prompt
+    if click is not None and sys.stdout.isatty():
+        click.echo("Available Ozone versions:")
+        for idx, ver in enumerate(versions, start=1):
+            click.echo(f"  {idx}) {ver}")
+        while True:
+            choice = click.prompt(
+                "Select number, type a version (e.g., 2.0.0) or 'local'",
+                default="1",
+                show_default=True,
+            )
+            if choice is None:
+                return versions[0]
+            choice = str(choice).strip()
+            if choice == "":
+                return versions[0]
+            if choice.lower() == "local":
+                return "local"
+            if choice.isdigit():
+                i = int(choice)
+                if 1 <= i <= len(versions):
+                    return versions[i - 1]
+            if re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?$", choice):
+                return choice
+            click.echo("Invalid selection. Enter a number, a valid version, or 'local'.")
+    else:
+        logger = get_logger()
+        logger.info("Available Ozone versions:")
+        for idx, ver in enumerate(versions, start=1):
+            logger.info(f"  {idx}) {ver}")
+        while True:
+            choice = prompt("Select version by number or type a version string (or 'local')", default="1", yes_mode=False)
+            if choice is None or str(choice).strip() == "":
+                return versions[0]
+            choice = str(choice).strip()
+            if choice.lower() == "local":
+                return "local"
+            if choice.isdigit():
+                i = int(choice)
+                if 1 <= i <= len(versions):
+                    return versions[i - 1]
+            # allow typing a specific version not listed
+            if re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?$", choice):
+                return choice
+            logger.info("Invalid selection. Please enter a number from the list, a valid version (e.g., 2.0.0) or 'local'.")
 
-def expand_braces(expr):
+def expand_braces(expr: str) -> List[str]:
     # Supports simple pattern like prefix{1..N}suffix
     if not expr or "{" not in expr or ".." not in expr or "}" not in expr:
         return [expr]
@@ -157,7 +252,7 @@ def expand_braces(expr):
     pre, a, b, post = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
     return [f"{pre}{i}{post}" for i in range(a, b + 1)]
 
-def parse_hosts(hosts_raw):
+def parse_hosts(hosts_raw: Optional[str]) -> List[dict]:
     """
     Accepts comma-separated hosts; each may contain brace expansion.
     Returns list of dicts: {host, user, port}
@@ -180,12 +275,12 @@ def parse_hosts(hosts_raw):
             out.append({"host": host, "user": user, "port": port})
     return out
 
-def auto_cluster_mode(hosts, forced=None):
+def auto_cluster_mode(hosts: List[dict], forced: Optional[str] = None) -> str:
     if forced in ("non-ha", "ha"):
         return forced
     return "ha" if len(hosts) >= 3 else "non-ha"
 
-def build_inventory(hosts, ssh_user=None, keyfile=None, password=None, cluster_mode="non-ha"):
+def build_inventory(hosts: List[dict], ssh_user: Optional[str] = None, keyfile: Optional[str] = None, password: Optional[str] = None, cluster_mode: str = "non-ha") -> str:
     """
     Returns INI inventory text for our groups: [om], [scm], [datanodes], [recon]
     """
@@ -206,7 +301,7 @@ def build_inventory(hosts, ssh_user=None, keyfile=None, password=None, cluster_m
     return _render_inv_groups(om=om, scm=scm, dn=dn, recon=recon,
                               ssh_user=ssh_user, keyfile=keyfile, password=password)
 
-def _render_inv_groups(om, scm, dn, recon, ssh_user=None, keyfile=None, password=None):
+def _render_inv_groups(om: List[dict], scm: List[dict], dn: List[dict], recon: List[dict], ssh_user: Optional[str] = None, keyfile: Optional[str] = None, password: Optional[str] = None) -> str:
     def hostline(hd):
         parts = [hd["host"]]
         if ssh_user or hd.get("user"):
@@ -231,7 +326,7 @@ def _render_inv_groups(om, scm, dn, recon, ssh_user=None, keyfile=None, password
     sections.append("\n")
     return "\n".join(sections)
 
-def run_playbook(playbook, inventory_path, extra_vars_path, ask_pass=False, become=True, start_at_task=None, tags=None):
+def run_playbook(playbook: Path, inventory_path: Path, extra_vars_path: Path, ask_pass: bool = False, become: bool = True, start_at_task: Optional[str] = None, tags: Optional[List[str]] = None) -> int:
     cmd = [
         "ansible-playbook",
         "-i", str(inventory_path),
@@ -248,14 +343,27 @@ def run_playbook(playbook, inventory_path, extra_vars_path, ask_pass=False, beco
         cmd += ["--tags", ",".join(tags)]
     env = os.environ.copy()
     env["ANSIBLE_CONFIG"] = str(ANSIBLE_CFG)
+    # Route Ansible logs to the same file as the Python logger
+    log_path = LOGS_DIR / "ansible.log"
+    try:
+        logger = get_logger()
+        for h in logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                # type: ignore[attr-defined]
+                log_path = Path(getattr(h, "baseFilename"))  # type: ignore
+                break
+    except Exception:
+        pass
+    env["ANSIBLE_LOG_PATH"] = str(log_path)
+    logger = get_logger()
     if start_at_task:
-        print(f"Resuming from task: {start_at_task}")
+        logger.info(f"Resuming from task: {start_at_task}")
     if tags:
-        print(f"Using tags: {','.join(tags)}")
-    print(f"Running: {' '.join(shlex.quote(c) for c in cmd)}")
+        logger.info(f"Using tags: {','.join(tags)}")
+    logger.info(f"Running: {' '.join(shlex.quote(c) for c in cmd)}")
     return subprocess.call(cmd, env=env)
 
-def main(argv):
+def main(argv: List[str]) -> int:
     args = parse_args(argv)
     # Resume mode: reuse last provided configs and suppress prompts when possible
     resuming = bool(getattr(args, "resume", False))
@@ -271,8 +379,21 @@ def main(argv):
     hosts_raw_default = (last_cfg.get("hosts_raw") if last_cfg else None)
     hosts_raw = args.host or hosts_raw_default or prompt("Target host(s) [non-ha: host | HA: h1,h2,h3 or brace expansion]", default="", yes_mode=yes)
     hosts = parse_hosts(hosts_raw) if hosts_raw else []
+    # Initialize per-run logger as soon as we have hosts_raw
+    try:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        raw_hosts_for_name = (hosts_raw or "").strip()
+        safe_hosts = re.sub(r"[^A-Za-z0-9_.-]+", "-", raw_hosts_for_name)[:80] or "hosts"
+        run_log_path = LOGS_DIR / f"ansible-{ts}-{safe_hosts}.log"
+        logger = get_logger(run_log_path)
+        logger.info(f"Logging to: {run_log_path}")
+    except Exception:
+        run_log_path = LOGS_DIR / "ansible.log"
+        logger = get_logger(run_log_path)
+        logger.info(f"Logging to: {run_log_path} (fallback)")
+
     if not hosts:
-        print("Error: No hosts provided (-H/--host).", file=sys.stderr)
+        logger.error("Error: No hosts provided (-H/--host).")
         return 2
     # Decide HA vs Non-HA with user input; default depends on host count
     resume_cluster_mode = (last_cfg.get("cluster_mode") if last_cfg else None)
@@ -287,7 +408,7 @@ def main(argv):
         if cluster_mode not in ("ha", "non-ha"):
             cluster_mode = default_mode
     if cluster_mode == "ha" and len(hosts) < 3:
-        print("Error: HA requires at least 3 hosts (to map 3 OMs and 3 SCMs).", file=sys.stderr)
+        logger.error("Error: HA requires at least 3 hosts (to map 3 OMs and 3 SCMs).")
         return 2
 
     # Resolve download base early for version selection
@@ -364,19 +485,43 @@ def main(argv):
 
         if candidate is None or not _validate_local_ozone_dir(candidate):
             if yes:
-                print("Error: For -v local, a valid Ozone build path containing bin/ozone is required.", file=sys.stderr)
+                logger.error("Error: For -v local, a valid Ozone build path containing bin/ozone is required.")
                 return 2
             while True:
                 maybe = ask_for_path()
                 if maybe and _validate_local_ozone_dir(maybe):
                     candidate = maybe
                     break
-                print("Invalid path. Expected an Ozone build directory with bin/ozone. Please try again.", file=sys.stderr)
+                logger.warning("Invalid path. Expected an Ozone build directory with bin/ozone. Please try again.")
 
         # Normalize back to shared path + dirname for Ansible vars and persistable single path
         local_shared_path = str(candidate.parent)
         local_oz_dir = candidate.name
         local_path = str(candidate)
+
+    # Build a human-friendly summary table of inputs before continuing
+    host_list_display = str(hosts_raw or "")
+    summary_rows: List[Tuple[str, str]] = [
+        ("Hosts", host_list_display),
+        ("Cluster mode", cluster_mode),
+        ("Ozone version", str(ozone_version)),
+        ("JDK major", str(jdk_major)),
+        ("Install base", str(install_base)),
+        ("Data base", str(data_base)),
+        ("SSH user", str(ssh_user)),
+        ("Auth method", str(auth_method))
+    ]
+    if keyfile:
+        summary_rows.append(("Key file", str(keyfile)))
+    summary_rows.extend([("Use sudo", str(bool(use_sudo))),
+                        ("Service user", str(service_user)),
+                        ("Service group", str(service_group)),
+                        ("Start after install", str(bool(start_after_install)))])
+    if ozone_version and str(ozone_version).lower() == "local":
+        summary_rows.append(("Local Ozone path", str(local_path or "")))
+    if not _confirm_summary(summary_rows, yes_mode=yes):
+        logger.info("Aborted by user.")
+        return 1
 
     # Prepare dynamic inventory and extra-vars
     inventory_text = build_inventory(hosts, ssh_user=ssh_user, keyfile=keyfile, password=password,
@@ -490,7 +635,7 @@ def main(argv):
             pass
 
 
-    print("All done.")
+    logger.info("All done.")
     return 0
 
 if __name__ == "__main__":
