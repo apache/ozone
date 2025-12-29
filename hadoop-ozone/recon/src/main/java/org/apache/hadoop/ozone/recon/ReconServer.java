@@ -34,7 +34,6 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -381,7 +380,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      InetSocketAddress socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,

@@ -15,27 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 /**
- * Builder for ObjectEndpoint in tests.
+ * Native rocksdb utilities.
  */
-public class ObjectEndpointBuilder extends
-    EndpointBuilder<ObjectEndpoint> {
-
-  public ObjectEndpointBuilder() {
-    super(ObjectEndpoint::new);
-  }
-
-  @Override
-  public ObjectEndpoint build() {
-    ObjectEndpoint endpoint = super.build();
-    final OzoneConfiguration config = getConfig();
-    endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
-    endpoint.setHeaders(getHeaders());
-    endpoint.setContext(getContext());
-    return endpoint;
-  }
-}
+package org.apache.hadoop.hdds.utils.db;

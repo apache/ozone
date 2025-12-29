@@ -185,9 +185,6 @@
                   <bannedImports>
                     <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
-                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator</bannedImport>
                   </bannedImports>
                 </restrictImports>
               </rules>

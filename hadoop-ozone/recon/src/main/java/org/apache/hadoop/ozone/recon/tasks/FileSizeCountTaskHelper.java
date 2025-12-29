@@ -274,7 +274,7 @@ public abstract class FileSizeCountTaskHelper {
       return;
     }
 
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
         FileSizeCountKey key = entry.getKey();
         Long deltaCount = entry.getValue();
