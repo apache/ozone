@@ -606,7 +606,6 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.HEAD_KEY;
 
     OzoneKey key;
-    RangeHeader rangeHeader = null;
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
         OzoneBucket bucket = getBucket(bucketName);
@@ -641,7 +640,7 @@ public class ObjectEndpoint extends EndpointBase {
     String rangeHeaderVal = getHeaders() != null ?
         getHeaders().getHeaderString(RANGE_HEADER) : null;
 
-    // Parse Range header if present
+    RangeHeader rangeHeader = null;
     if (rangeHeaderVal != null) {
       rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal, length);
       if (rangeHeader.isInValidRange()) {
