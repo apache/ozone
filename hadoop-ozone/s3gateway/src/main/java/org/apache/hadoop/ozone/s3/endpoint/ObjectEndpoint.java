@@ -273,9 +273,12 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType, storageConfig);
 
-      boolean enableEC = (replicationConfig != null &&
+      boolean enableEC = false;
+      if ((replicationConfig != null &&
           replicationConfig.getReplicationType() == EC) ||
-          bucket.getReplicationConfig() instanceof ECReplicationConfig;
+          bucket.getReplicationConfig() instanceof ECReplicationConfig) {
+        enableEC = true;
+      }
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
