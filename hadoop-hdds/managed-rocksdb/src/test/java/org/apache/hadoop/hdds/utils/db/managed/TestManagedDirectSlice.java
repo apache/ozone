@@ -36,10 +36,12 @@ public class TestManagedDirectSlice {
 
   @Test
   public void testManagedDirectSlice() {
+    // test all values <= 16
     for (int size = 0; size <= 16; size++) {
       testManagedDirectSlice(size);
     }
 
+    // test power of 2
     for (int i = 0; i <= 10; i++) {
       final int size = 32 << i;
       testManagedDirectSlice(size - 1);
@@ -47,8 +49,9 @@ public class TestManagedDirectSlice {
       testManagedDirectSlice(size + 1);
     }
 
+    // test random
     for (int i = 0; i < 10; i++) {
-      final int size = RANDOM.nextInt( 1 << 20);
+      final int size = RANDOM.nextInt(1 << 20);
       testManagedDirectSlice(size);
     }
   }
