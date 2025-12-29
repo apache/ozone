@@ -309,7 +309,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "60",
       type = ConfigType.LONG,
       tags = { DATANODE },
-      description = "Periodic disk check run interval in minutes."
+      description = "Periodic disk check run interval in minutes. " +
+          "A negative value disables periodic disk checks. " +
+          "A value of 0 is invalid and defaults to 60."
   )
   private long periodicDiskCheckIntervalMinutes =
       PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;

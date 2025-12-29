@@ -420,7 +420,9 @@ public class StorageVolumeChecker {
    */
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
     if (started.compareAndSet(true, false)) {
-      periodicDiskChecker.cancel(true);
+      if (periodicDiskChecker != null) {
+        periodicDiskChecker.cancel(true);
+      }
       diskCheckerservice.shutdownNow();
       checkVolumeResultHandlerExecutorService.shutdownNow();
       metrics.unregister();
