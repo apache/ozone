@@ -98,24 +98,26 @@ public class TestObjectHead {
   public void testHeadObject() throws Exception {
     //GIVEN
     String value = RandomStringUtils.secure().nextAlphanumeric(32);
-    OzoneOutputStream out = bucket.createKey("key1",
+    String testKey = "testKey";
+    try (OzoneOutputStream out = bucket.createKey(testKey,
         value.getBytes(UTF_8).length,
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-        ReplicationFactor.ONE), new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.ONE), new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     //WHEN
-    Response response = keyEndpoint.head(bucketName, "key1");
+    Response response = keyEndpoint.head(bucketName, testKey);
 
     //THEN
     assertEquals(200, response.getStatus());
     assertEquals(value.getBytes(UTF_8).length,
-        Long.parseLong(response.getHeaderString("Content-Length")));
+        Long.parseLong(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
 
+    bucket.deleteKey(testKey);
   }
 
   @Test
