@@ -58,7 +58,8 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
         getOmRequest().getRevokeSTSTokenRequest();
 
     // Only S3/Ozone admins can revoke STS tokens by temporary access key ID.
-    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(getUserInfo().getUserName());
+    final OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
+    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(userInfo.getUserName());
     if (!ozoneManager.isS3Admin(ugi)) {
       throw new OMException("Only S3/Ozone admins can revoke STS tokens.", OMException.ResultCodes.PERMISSION_DENIED);
     }
@@ -67,7 +68,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
         .setRevokeSTSTokenRequest(revokeReq)
         .setCmdType(getOmRequest().getCmdType())
         .setClientId(getOmRequest().getClientId())
-        .setUserInfo(getUserInfo());
+        .setUserInfo(userInfo);
 
     if (getOmRequest().hasTraceID()) {
       omRequest.setTraceID(getOmRequest().getTraceID());
