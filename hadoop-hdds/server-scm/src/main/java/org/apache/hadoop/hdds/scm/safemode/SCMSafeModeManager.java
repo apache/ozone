@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
@@ -84,8 +85,9 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SCMContext scmContext;
   private final SafeModeMetrics safeModeMetrics;
 
-  private final long safeModeLogIntervalMs;
+  private long safeModeLogIntervalMs;
   private ScheduledExecutorService safeModeLogExecutor;
+  private ScheduledFuture<?> safeModeLogTask;
 
   public SCMSafeModeManager(final ConfigurationSource conf,
                             final NodeManager nodeManager,
@@ -243,15 +245,21 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   private synchronized void startSafeModePeriodicLogger() {
-    if (!getInSafeMode() || safeModeLogExecutor != null) {
+    if (!getInSafeMode()) {
       return;
     }
-    safeModeLogExecutor = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder()
-            .setNameFormat(scmContext.threadNamePrefix() + "SCM-SafeMode-Log-%d")
-            .setDaemon(true)
-            .build());
-    safeModeLogExecutor.scheduleAtFixedRate(() -> {
+    if (safeModeLogExecutor == null) {
+      safeModeLogExecutor = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder()
+              .setNameFormat(scmContext.threadNamePrefix() + "SCM-SafeMode-Log-%d")
+              .setDaemon(true)
+              .build());
+    }
+
+    if (safeModeLogTask != null && !safeModeLogTask.isDone()) {
+      safeModeLogTask.cancel(false);
+    }
+    safeModeLogTask = safeModeLogExecutor.scheduleAtFixedRate(() -> {
       try {
         logSafeModeStatus();
       } catch (Throwable t) {
@@ -302,6 +310,31 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
   }
 
+  /**
+   * Updates the Safe Mode logging interval dynamically.
+   * This method cancels the existing periodic logging task (if any) and
+   * schedules a new one with the updated interval, without recreating the
+   * executor thread pool.
+   *
+   * @param newInterval The new interval duration
+   * @param unit The time unit of the new interval
+   */
+  public synchronized void reconfigureLogInterval(long newInterval, TimeUnit unit) {
+    long newIntervalMs = unit.toMillis(newInterval);
+    if (this.safeModeLogIntervalMs == newIntervalMs) {
+      return;
+    }
+
+    LOG.info("Reconfiguring Safe Mode Log Interval from {} ms to {} ms",
+        this.safeModeLogIntervalMs, newIntervalMs);
+
+    this.safeModeLogIntervalMs = newIntervalMs;
+    
+    if (getInSafeMode()) {
+      startSafeModePeriodicLogger();
+    }
+  }
+  
   /**
    * Possible states of SCM SafeMode.
    */
