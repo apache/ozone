@@ -165,7 +165,7 @@ public class TestReconcileContainerCommandHandler {
     when(mockSupervisor.getReplicationRequestAvgTime(subject.getMetricsName())).thenReturn(3L);
     when(mockSupervisor.getReplicationQueuedCount(subject.getMetricsName())).thenReturn(1L);
 
-    assertEquals(subject.getMetricsName(), "ContainerReconciliations");
+    assertEquals(subject.getMetricsName(), ReconcileContainerTask.METRIC_NAME);
     assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
     assertEquals(subject.getQueuedCount(), 1);
     assertEquals(subject.getTotalRunTime(), 10);

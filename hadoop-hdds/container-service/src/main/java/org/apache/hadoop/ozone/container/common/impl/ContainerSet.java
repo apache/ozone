@@ -82,7 +82,7 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public static ContainerSet newRwContainerSet(
       WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
-    Objects.requireNonNull(metadataStore, "WitnessedContainerMetadataStore == null");
+    Objects.requireNonNull(metadataStore, "metadataStore == null");
     return new ContainerSet(metadataStore, recoveringTimeout);
   }
 
@@ -187,7 +187,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   private boolean addContainer(Container<?> container, boolean overwrite) throws
       StorageContainerException {
-    Preconditions.checkNotNull(container, "container cannot be null");
+    Objects.requireNonNull(container, "container == null");
 
     long containerId = container.getContainerData().getContainerID();
     State containerState = container.getContainerData().getState();
@@ -416,7 +416,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return {@literal Iterator<Container<?>>}
    */
   public Iterator<Container<?>> getContainerIterator(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume, "volume == null");
     Iterator<Long> containerIdIterator = volume.getContainerIterator();
 
     List<Container<?>> containers = new ArrayList<>();
@@ -439,7 +439,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return number of containers
    */
   public long containerCount(HddsVolume volume) {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume, "volume == null");
     return volume.getContainerCount();
   }
 
@@ -479,8 +479,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   public void listContainer(long startContainerId, long count,
                             List<ContainerData> data) throws
       StorageContainerException {
-    Preconditions.checkNotNull(data,
-        "Internal assertion: data cannot be null");
+    Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(startContainerId >= 0,
         "Start container Id cannot be negative");
     Preconditions.checkState(count > 0,

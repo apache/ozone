@@ -71,7 +71,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -112,7 +112,6 @@ public class TestOpenContainerCount {
   private List<Long> containerIDs;
 
   private List<ContainerWithPipeline> cpw;
-  private CommonUtils commonUtils;
 
   private void initializeInjector() throws Exception {
     ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -156,7 +155,6 @@ public class TestOpenContainerCount {
               .thenReturn(containerWithPipeline);
       containerIDs.add(i);
       cpw.add(containerWithPipeline);
-      commonUtils = new CommonUtils();
     }
 
     // Open 5 containers on pipeline 2
@@ -192,7 +190,7 @@ public class TestOpenContainerCount {
         anyString())).thenReturn(temporaryFolder.resolve("reconDbDir").toFile());
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
+        ReconTestUtils.getReconNodeDetails());
 
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(temporaryFolder.toFile())

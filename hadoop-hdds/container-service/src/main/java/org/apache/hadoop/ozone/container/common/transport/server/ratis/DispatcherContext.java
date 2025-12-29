@@ -34,6 +34,8 @@ import org.apache.ratis.util.Preconditions;
 public final class DispatcherContext {
   private static final DispatcherContext HANDLE_READ_CHUNK
       = newBuilder(Op.HANDLE_READ_CHUNK).build();
+  private static final DispatcherContext HANDLE_READ_BLOCK
+      = newBuilder(Op.HANDLE_READ_BLOCK).build();
   private static final DispatcherContext HANDLE_WRITE_CHUNK
       = newBuilder(Op.HANDLE_WRITE_CHUNK).build();
   private static final DispatcherContext HANDLE_GET_SMALL_FILE
@@ -58,6 +60,10 @@ public final class DispatcherContext {
 
   public static DispatcherContext getHandleReadChunk() {
     return HANDLE_READ_CHUNK;
+  }
+
+  public static DispatcherContext getHandleReadBlock() {
+    return HANDLE_READ_BLOCK;
   }
 
   public static DispatcherContext getHandleWriteChunk() {
@@ -92,6 +98,7 @@ public final class DispatcherContext {
     NULL,
 
     HANDLE_READ_CHUNK,
+    HANDLE_READ_BLOCK,
     HANDLE_WRITE_CHUNK,
     HANDLE_GET_SMALL_FILE,
     HANDLE_PUT_SMALL_FILE,

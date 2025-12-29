@@ -651,20 +651,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.volume.listall.allowed</name>
-    <value>true</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      Allows everyone to list all volumes when set to true. Defaults to true.
-      When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes. Note that this config
-      only applies to OzoneNativeAuthorizer. For other authorizers, admin
-      needs to set policies accordingly to allow all volume listing
-      e.g. for Ranger, a new policy with special volume "/" can be added to
-      allow group public LIST access.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.dirs</name>
     <value/>
     <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
@@ -699,6 +685,14 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       hdds.container.ratis.datanode.storage.dir be configured separately.
+    </description>
+  </property>
+  <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
     </description>
   </property>
   <property>
@@ -3511,6 +3505,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Minimum delay in API to start a new task for Jmx collection.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -4322,6 +4334,43 @@
     <description>
       Maximum threshold number of entries to hold in memory for Container Key Mapper task in hashmap before flushing to
       recon rocks DB containerKeyTable
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
+    <value>200000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
+      recon derby DB
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.iterators</name>
+    <value>5</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of iterator threads to use for parallel table iteration during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.workers</name>
+    <value>20</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads to use for parallel table processing during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.keys.in.memory</name>
+    <value>2000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of keys to batch in memory before handing to worker threads during parallel reprocess
     </description>
   </property>
     

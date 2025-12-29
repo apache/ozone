@@ -223,7 +223,6 @@ share/ozone/lib/ozone-datanode.jar
 share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
-share/ozone/lib/ozone-filesystem-hadoop3-client.jar
 share/ozone/lib/ozone-filesystem.jar
 share/ozone/lib/ozone-freon.jar
 share/ozone/lib/ozone-httpfsgateway.jar

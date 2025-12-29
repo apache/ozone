@@ -33,8 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -102,7 +101,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));
@@ -138,7 +137,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));

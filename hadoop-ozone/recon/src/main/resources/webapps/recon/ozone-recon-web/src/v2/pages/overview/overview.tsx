@@ -280,7 +280,7 @@ const Overview: React.FC<{}> = () => {
             />
           </Col>
           <Col xs={24} sm={24} md={24} lg={14} xl={14}>
-            <OverviewStorageCard storageReport={storageReport} loading={loading} error={clusterState.error}/>
+            <OverviewStorageCard storageReport={storageReport} loading={clusterState.loading} error={clusterState.error}/>
           </Col>
         </Row>
         <Row gutter={[

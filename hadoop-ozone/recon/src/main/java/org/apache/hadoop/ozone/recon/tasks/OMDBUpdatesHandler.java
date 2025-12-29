@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -42,6 +43,8 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
+
+  private final AtomicBoolean closed = new AtomicBoolean(false);
 
   private Map<Integer, String> tablesNames;
   private OMMetadataManager omMetadataManager;
@@ -96,6 +99,11 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private void processEvent(int cfIndex, byte[] keyBytes, byte[]
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
+
+    if (closed.get()) {
+      throw new IllegalStateException("OMDBUpdatesHandler has been closed");
+    }
+
     String tableName = tablesNames.get(cfIndex);
     // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
     // and assuming to typecast as String while de-serializing will throw error.
@@ -333,6 +341,26 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
      * implemented as and when need arises.
      */
 
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    if (closed.compareAndSet(false, true)) {
+      LOG.debug("Closing OMDBUpdatesHandler");
+
+      // Clear internal tracking map to help GC
+      // Note: We do NOT close tables obtained from omMetadataManager as they
+      // are owned and managed by the OMMetadataManager, not by this handler.
+      // Note: omdbUpdateEvents is intentionally NOT cleared here because
+      // getEvents() may be called after close() to retrieve the events
+      // for processing by ReconOmTasks
+      if (omdbLatestUpdateEvents != null) {
+        omdbLatestUpdateEvents.clear();
+      }
+
+      LOG.debug("OMDBUpdatesHandler cleanup completed");
+    }
   }
 
   /**

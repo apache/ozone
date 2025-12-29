@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,6 +426,8 @@ public class HeartbeatEndpointTask
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
       rpcEndpoint.setState(EndPointStates.GETVERSION);
+      // trigger immediate GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Illegal state {} found, expecting {}.",

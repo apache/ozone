@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETIN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
@@ -39,11 +39,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -231,7 +229,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) throws InterruptedException {
+    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
       if (!purgeSnapshotKeys.isEmpty()) {
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
@@ -244,16 +242,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-          submitOMRequest(omRequest);
-        }
+        submitOMRequest(omRequest);
       }
     }
 
     private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
                                                List<SnapshotMoveKeyInfos> deletedKeys,
                                                List<HddsProtos.KeyValue> renamedList,
-                                               List<SnapshotMoveKeyInfos> dirsToMove) throws InterruptedException {
+                                               List<SnapshotMoveKeyInfos> dirsToMove) {
 
       SnapshotMoveTableKeysRequest.Builder moveDeletedKeysBuilder = SnapshotMoveTableKeysRequest.newBuilder()
           .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
@@ -282,9 +278,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .setSnapshotMoveTableKeysRequest(moveDeletedKeys)
           .setClientId(clientId.toString())
           .build();
-      try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-        submitOMRequest(omRequest);
-      }
+      submitOMRequest(omRequest);
     }
 
     private void submitOMRequest(OMRequest omRequest) {
@@ -313,8 +307,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   }
 
   @Override
-  public BackgroundTaskQueue getTasks() {
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+  public DeletingServiceTaskQueue getTasks() {
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new SnapshotDeletingTask());
     return queue;
   }

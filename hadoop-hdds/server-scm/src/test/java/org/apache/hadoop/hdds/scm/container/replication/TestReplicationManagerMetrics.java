@@ -40,7 +40,11 @@ public class TestReplicationManagerMetrics {
 
   @BeforeEach
   public void setup() {
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
 
     // Each lifecycle state has a value from 1 to N. Set the value of the metric
     // to the value by incrementing the counter that number of times.
@@ -56,10 +60,6 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
-    ConfigurationSource conf = new OzoneConfiguration();
-    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-    ReplicationManager replicationManager = mock(ReplicationManager.class);
     when(replicationManager.getConfig()).thenReturn(rmConf);
     when(replicationManager.getContainerReport()).thenReturn(report);
     when(replicationManager.getContainerReplicaPendingOps())

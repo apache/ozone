@@ -66,10 +66,6 @@
       <artifactId>grpc-stub</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-client</artifactId>
     </dependency>
@@ -108,7 +104,7 @@
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>compile-proto-${protobuf2.version}</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -116,48 +112,11 @@
               <goal>test-compile-custom</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
-              <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf2.version}</outputDirectory>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-proto-for-hadoop</id>
-            <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-            </goals>
-            <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${hadoop-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <outputDirectory>target/generated-sources/proto-java-for-hadoop</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <phase>generate-sources</phase>
-            <configuration>
-              <target>
-                <!-- use protobuf from hadoop-thirdparty -->
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="com.google.protobuf" value="org.apache.hadoop.thirdparty.protobuf" />
-                <!-- use matching hdds proto -->
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="org.apache.hadoop.hdds.protocol.proto" value="org.apache.hadoop.hdds.protocol.hadoop_proto" />
-                <!-- rename packages to avoid conflict -->
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="org.apache.hadoop.ozone.protocol.proto" value="org.apache.hadoop.ozone.protocol.hadoop_proto" />
-                <replace dir="target/generated-sources/proto-java-for-hadoop" token="org.apache.hadoop.ozone.security.proto" value="org.apache.hadoop.ozone.security.hadoop_proto" />
-                <move file="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/ozone/protocol/proto" tofile="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/ozone/protocol/hadoop_proto" />
-                <move file="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/ozone/security/proto" tofile="target/generated-sources/proto-java-for-hadoop/org/apache/hadoop/ozone/security/hadoop_proto" />
-              </target>
             </configuration>
           </execution>
         </executions>

@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -72,7 +73,6 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.assertj.core.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,7 +218,7 @@ public class MockNodeManager implements NodeManager {
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
     newStat.set(
         (NODES[x % NODES.length].capacity),
-        (NODES[x % NODES.length].used), remaining, 0, 100000);
+        (NODES[x % NODES.length].used), remaining, 0, 100000, 0);
     this.nodeMetricMap.put(datanodeDetails, newStat);
     aggregateStat.add(newStat);
 
@@ -520,7 +520,7 @@ public class MockNodeManager implements NodeManager {
   public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
     if (commandMap.containsKey(datanodeID)) {
       List<SCMCommand<?>> commandList = commandMap.get(datanodeID);
-      Preconditions.checkNotNull(commandList);
+      Objects.requireNonNull(commandList, "commandList == null");
       commandList.add(command);
     } else {
       List<SCMCommand<?>> commandList = new LinkedList<>();

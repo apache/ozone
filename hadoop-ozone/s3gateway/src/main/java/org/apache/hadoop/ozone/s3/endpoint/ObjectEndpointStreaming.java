@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.util.Map;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.tuple.Pair;
@@ -191,7 +192,7 @@ final class ObjectEndpointStreaming {
       throw ex;
     }
     return Response.ok()
-        .header(OzoneConsts.ETAG, wrapInQuotes(eTag))
+        .header(HttpHeaders.ETAG, wrapInQuotes(eTag))
         .build();
   }
 }

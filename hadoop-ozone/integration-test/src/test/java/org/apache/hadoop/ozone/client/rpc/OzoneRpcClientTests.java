@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -1403,20 +1404,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         keyDetails.getMetadata())) {
       out.write(newContent);
     }
-  }
-
-  private static OzoneKeyDetails assertKeyContent(
-      OzoneBucket bucket, String keyName, byte[] expectedContent
-  ) throws IOException {
-    OzoneKeyDetails updatedKeyDetails = bucket.getKey(keyName);
-
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[expectedContent.length];
-      IOUtils.readFully(is, fileContent);
-      assertArrayEquals(expectedContent, fileContent);
-    }
-
-    return updatedKeyDetails;
   }
 
   private OzoneBucket createBucket(BucketLayout layout) throws IOException {
@@ -2925,6 +2912,46 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .startsWith("key-b-" + i + "-"));
     }
     assertFalse(volABucketBIter.hasNext());
+  }
+
+  @Test
+  public void testListKeyDirectoriesAreNotFiles()
+      throws IOException {
+    // Test that directories in multilevel keys are not marked as files
+
+    String volumeA = "volume-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "bucket-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    OzoneVolume volA = store.getVolume(volumeA);
+    volA.createBucket(bucketA);
+    OzoneBucket volAbucketA = volA.getBucket(bucketA);
+
+    String keyBaseA = "key-a/";
+    for (int i = 0; i < 10; i++) {
+      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      OzoneOutputStream one = volAbucketA.createKey(
+          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      one.write(value);
+      one.close();
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter1 = volAbucketA.listKeys(null);
+    while (volABucketAIter1.hasNext()) {
+      OzoneKey key = volABucketAIter1.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter2 = volAbucketA.listKeys("key-");
+    while (volABucketAIter2.hasNext()) {
+      OzoneKey key = volABucketAIter2.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
   }
 
   @Test
@@ -4454,7 +4481,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .get(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    omKeyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
+    omKeyInfo = omKeyInfo.withMetadataMutations(
+        metadata -> metadata.remove(OzoneConsts.GDPR_FLAG));
 
     omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)
         .put(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),

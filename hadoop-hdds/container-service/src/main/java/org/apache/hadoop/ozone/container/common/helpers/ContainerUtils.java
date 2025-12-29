@@ -27,7 +27,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -105,13 +105,13 @@ public final class ContainerUtils {
    * @return Name of the container.
    */
   public static String getContainerNameFromFile(File containerFile) {
-    Preconditions.checkNotNull(containerFile);
+    Objects.requireNonNull(containerFile, "containerFile == null");
     return Paths.get(containerFile.getParent()).resolve(
         removeExtension(containerFile.getName())).toString();
   }
 
   public static long getContainerIDFromFile(File containerFile) {
-    Preconditions.checkNotNull(containerFile);
+    Objects.requireNonNull(containerFile, "containerFile == null");
     String containerID = getContainerNameFromFile(containerFile);
     return Long.parseLong(containerID);
   }
@@ -123,9 +123,8 @@ public final class ContainerUtils {
    */
   public static void verifyIsNewContainer(File containerFile) throws
       FileAlreadyExistsException {
+    Objects.requireNonNull(containerFile, "containerFile == null");
     Logger log = LoggerFactory.getLogger(ContainerSet.class);
-    Preconditions.checkNotNull(containerFile, "containerFile Should not be " +
-        "null");
     if (containerFile.getParentFile().exists()) {
       log.error("Container already exists on disk. File: {}", containerFile
           .toPath());
@@ -259,7 +258,7 @@ public final class ContainerUtils {
    */
   public static File getChunkDir(ContainerData containerData)
       throws StorageContainerException {
-    Preconditions.checkNotNull(containerData, "Container data can't be null");
+    Objects.requireNonNull(containerData, "containerData == null");
 
     String chunksPath = containerData.getChunksPath();
     if (chunksPath == null) {
@@ -327,6 +326,20 @@ public final class ContainerUtils {
       throw new StorageContainerException("Failed to write " + sizeRequested + " bytes to container "
           + containerId + " due to volume " + volume + " out of space "
           + currentUsage + ", minimum free space spared="  + spared, DISK_OUT_OF_SPACE);
+    }
+  }
+  
+  public static long getPendingDeletionBytes(ContainerData containerData) {
+    if (containerData.getContainerType()
+        .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
+      return ((KeyValueContainerData) containerData)
+          .getBlockPendingDeletionBytes();
+    } else {
+      // If another ContainerType is available later, implement it
+      throw new IllegalArgumentException(
+          "getPendingDeletionBlocks for ContainerType: " +
+              containerData.getContainerType() +
+              " not support.");
     }
   }
 }

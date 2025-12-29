@@ -63,7 +63,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void adminUsernames() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
+    getSubject().reconfigureProperty(OZONE_ADMINISTRATORS, newValue);
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
@@ -74,7 +74,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void readOnlyAdminUsernames() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
+    getSubject().reconfigureProperty(OZONE_READONLY_ADMINISTRATORS,
         newValue);
 
     assertEquals(
@@ -87,11 +87,22 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void replicationInterval() throws ReconfigurationException {
     ReplicationManagerConfiguration config = replicationManagerConfig();
 
-    getSubject().reconfigurePropertyImpl(
+    getSubject().reconfigureProperty(
         "hdds.scm.replication.thread.interval",
         "120s");
 
     assertEquals(Duration.ofSeconds(120), config.getInterval());
+  }
+
+  @Test
+  void containerSampleLimit() throws ReconfigurationException {
+    ReplicationManagerConfiguration config = replicationManagerConfig();
+
+    getSubject().reconfigureProperty(
+        "hdds.scm.replication.container.sample.limit",
+        "120");
+
+    assertEquals(120, config.getContainerSampleLimit());
   }
 
   private ReplicationManagerConfiguration replicationManagerConfig() {
@@ -107,7 +118,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
     int newValue = blockDeleteTXNum + 1;
 
-    getSubject().reconfigurePropertyImpl(
+    getSubject().reconfigureProperty(
         "hdds.scm.block.deletion.per-interval.max",
         String.valueOf(newValue));
 

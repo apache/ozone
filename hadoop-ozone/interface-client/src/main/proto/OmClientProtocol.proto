@@ -881,7 +881,7 @@ message SnapshotInfo {
   optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
   optional string checkpointDir = 11 [deprecated = true];
-  optional int64 dbTxSequenceNumber = 12;
+  optional int64 dbTxSequenceNumber = 12 [deprecated = true];
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
   // snapshot reference size before any key replication or EC
@@ -1205,6 +1205,7 @@ message BasicKeyInfo {
     optional string eTag = 8;
     optional string ownerName = 9;
     optional bool isEncrypted = 10;
+    optional bool isFile = 11;
 }
 
 message DirectoryInfo {

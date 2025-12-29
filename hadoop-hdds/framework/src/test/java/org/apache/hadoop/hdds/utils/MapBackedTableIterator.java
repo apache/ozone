@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.NavigableMap;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -29,9 +29,9 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
 
   private Iterator<Table.KeyValue<String, V>> itr;
   private final String prefix;
-  private final TreeMap<String, V> values;
+  private final NavigableMap<String, V> values;
 
-  public MapBackedTableIterator(TreeMap<String, V> values, String prefix) {
+  public MapBackedTableIterator(NavigableMap<String, V> values, String prefix) {
     this.prefix = prefix;
     this.values = values;
     this.seekToFirst();
@@ -46,7 +46,7 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
 
   @Override
   public void seekToLast() {
-
+    this.seek(this.values.lastKey());
   }
 
   @Override

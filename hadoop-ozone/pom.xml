@@ -119,7 +119,6 @@
       <modules>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
-        <module>ozonefs-hadoop3-client</module>
         <module>ozonefs-shaded</module>
       </modules>
     </profile>

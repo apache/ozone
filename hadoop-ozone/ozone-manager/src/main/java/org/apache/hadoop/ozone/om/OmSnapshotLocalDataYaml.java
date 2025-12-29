@@ -172,9 +172,10 @@ public final class OmSnapshotLocalDataYaml {
         final String prevSnapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID);
         UUID prevSnapId = prevSnapIdStr != null ? UUID.fromString(prevSnapIdStr) : null;
         final String purgeTxInfoStr = (String) nodes.get(OzoneConsts.OM_SLD_TXN_INFO);
+        final long dbTxnSeqNumber = ((Number)nodes.get(OzoneConsts.OM_SLD_DB_TXN_SEQ_NUMBER)).longValue();
         TransactionInfo transactionInfo = purgeTxInfoStr != null ? TransactionInfo.valueOf(purgeTxInfoStr) : null;
         OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(), prevSnapId,
-            transactionInfo);
+            transactionInfo, dbTxnSeqNumber);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);

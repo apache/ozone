@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -89,7 +90,7 @@ public final class RocksDatabase implements Closeable {
   private final ManagedRocksDB db;
   private final ManagedDBOptions dbOptions;
   private final ManagedWriteOptions writeOptions;
-  private final List<ColumnFamilyDescriptor> descriptors;
+  private final Map<String, ColumnFamilyDescriptor> descriptors;
   /** column family names -> {@link ColumnFamily}. */
   private final Map<String, ColumnFamily> columnFamilies;
   /** {@link ColumnFamilyHandle#getID()} -> column family names. */
@@ -201,7 +202,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   private static void close(Map<String, ColumnFamily> columnFamilies,
-      ManagedRocksDB db, List<ColumnFamilyDescriptor> descriptors,
+      ManagedRocksDB db, Collection<ColumnFamilyDescriptor> descriptors,
       ManagedWriteOptions writeOptions, ManagedDBOptions dbOptions) {
     if (columnFamilies != null) {
       for (ColumnFamily f : columnFamilies.values()) {
@@ -307,16 +308,6 @@ public final class RocksDatabase implements Closeable {
       }
     }
 
-    public void batchDeleteRange(ManagedWriteBatch writeBatch, byte[] beginKey, byte[] endKey)
-        throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        writeBatch.deleteRange(getHandle(), beginKey, endKey);
-      } catch (RocksDBException e) {
-        throw toRocksDatabaseException(this, "batchDeleteRange key " + bytes2String(beginKey) + " - " +
-            bytes2String(endKey), e);
-      }
-    }
-
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws RocksDatabaseException {
       if (LOG.isDebugEnabled()) {
@@ -370,18 +361,21 @@ public final class RocksDatabase implements Closeable {
     this.db = db;
     this.dbOptions = dbOptions;
     this.writeOptions = writeOptions;
-    this.descriptors = descriptors;
+    this.descriptors = descriptors.stream().collect(Collectors.toMap(d -> bytes2String(d.getName()), d -> d,
+        (d1, d2) -> {
+        throw new IllegalStateException("Duplicate key " + bytes2String(d1.getName()));
+      }, ConcurrentHashMap::new));
     this.columnFamilies = toColumnFamilyMap(handles);
     this.columnFamilyNames = MemoizedSupplier.valueOf(() -> toColumnFamilyNameMap(columnFamilies.values()));
   }
 
   private Map<String, ColumnFamily> toColumnFamilyMap(List<ColumnFamilyHandle> handles) throws RocksDBException {
-    final Map<String, ColumnFamily> map = new HashMap<>();
+    final Map<String, ColumnFamily> map = new ConcurrentHashMap<>(handles.size());
     for (ColumnFamilyHandle h : handles) {
       final ColumnFamily f = new ColumnFamily(h);
       map.put(f.getName(), f);
     }
-    return Collections.unmodifiableMap(map);
+    return map;
   }
 
   private static Map<Integer, String> toColumnFamilyNameMap(Collection<ColumnFamily> families) {
@@ -421,14 +415,14 @@ public final class RocksDatabase implements Closeable {
       try {
         Thread.currentThread().sleep(1);
       } catch (InterruptedException e) {
-        close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+        close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
         Thread.currentThread().interrupt();
         return;
       }
     }
 
     // close when counter is 0, no more operation
-    close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+    close(columnFamilies, db, descriptors.values(), writeOptions, dbOptions);
   }
 
   private void closeOnError(RocksDBException e) {
@@ -663,6 +657,27 @@ public final class RocksDatabase implements Closeable {
 
   public Collection<ColumnFamily> getExtraColumnFamilies() {
     return Collections.unmodifiableCollection(columnFamilies.values());
+  }
+
+  public void dropColumnFamily(String tableName) throws RocksDatabaseException {
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      ColumnFamily columnFamily = columnFamilies.get(tableName);
+      if (columnFamily != null) {
+        try {
+          getManagedRocksDb().get().dropColumnFamily(columnFamily.getHandle());
+          ColumnFamilyDescriptor descriptor = descriptors.get(tableName);
+          columnFamily.getHandle().close();
+          if (descriptor != null) {
+            RocksDatabase.close(descriptor);
+          }
+          columnFamilies.remove(tableName);
+          descriptors.remove(tableName);
+        } catch (RocksDBException e) {
+          closeOnError(e);
+          throw toRocksDatabaseException(this, "DropColumnFamily " + tableName, e);
+        }
+      }
+    }
   }
 
   byte[] get(ColumnFamily family, byte[] key) throws RocksDatabaseException {

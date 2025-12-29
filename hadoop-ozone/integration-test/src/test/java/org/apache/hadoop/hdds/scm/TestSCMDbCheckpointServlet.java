@@ -171,7 +171,7 @@ public class TestSCMDbCheckpointServlet {
         });
 
     when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(
-        new DBCheckpointServlet.Lock());
+        new DBCheckpointServlet.NoOpLock());
     scmDbCheckpointServletMock.init();
     long initialCheckpointCount =
         scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();

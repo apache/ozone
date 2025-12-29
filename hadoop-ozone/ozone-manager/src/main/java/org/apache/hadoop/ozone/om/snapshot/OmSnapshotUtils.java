@@ -17,25 +17,21 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.HARDLINK_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -44,8 +40,7 @@ public final class OmSnapshotUtils {
 
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmSnapshotUtils.class);
+  public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
 
@@ -58,17 +53,6 @@ public final class OmSnapshotUtils {
    */
   public static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
-  }
-
-  /**
-   * Get the INode for file.
-   *
-   * @param file File whose INode is to be retrieved.
-   * @return INode for file.
-   */
-  @VisibleForTesting
-  public static Object getINode(Path file) throws IOException {
-    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }
 
   /**
@@ -118,64 +102,11 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append('\t')
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append(HARDLINK_SEPARATOR)
           .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
-  }
-
-  /**
-   * Create hard links listed in OM_HARDLINK_FILE.
-   *
-   * @param dbPath Path to db to have links created.
-   * @param deleteSourceFiles - Whether to delete the source files after creating the links.
-   */
-  public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
-    File hardLinkFile =
-        new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
-    List<Path> filesToDelete = new ArrayList<>();
-    if (hardLinkFile.exists()) {
-      // Read file.
-      try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
-        List<String> lines = s.collect(Collectors.toList());
-
-        // Create a link for each line.
-        for (String l : lines) {
-          String[] parts = l.split("\t");
-          if (parts.length != 2) {
-            LOG.warn("Skipping malformed line in hardlink file: {}", l);
-            continue;
-          }
-          String from = parts[1];
-          String to = parts[0];
-          Path fullFromPath = Paths.get(dbPath.toString(), from);
-          filesToDelete.add(fullFromPath);
-          Path fullToPath = Paths.get(dbPath.toString(), to);
-          // Make parent dir if it doesn't exist.
-          Path parent = fullToPath.getParent();
-          if ((parent != null) && (!parent.toFile().exists())) {
-            if (!parent.toFile().mkdirs()) {
-              throw new IOException(
-                  "Failed to create directory: " + parent.toString());
-            }
-          }
-          Files.createLink(fullToPath, fullFromPath);
-        }
-        if (!hardLinkFile.delete()) {
-          throw new IOException("Failed to delete: " + hardLinkFile);
-        }
-      }
-    }
-    if (deleteSourceFiles) {
-      for (Path fileToDelete : filesToDelete) {
-        try {
-          Files.deleteIfExists(fileToDelete);
-        } catch (IOException e) {
-          LOG.warn("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
-        }
-      }
-    }
   }
 
   /**

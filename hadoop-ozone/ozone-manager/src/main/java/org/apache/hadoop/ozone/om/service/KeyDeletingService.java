@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -387,7 +386,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         bucketPurgeKeysSizeMap.values().stream().map(BucketPurgeSize::toProtobuf)
             .forEach(requestBuilder::addBucketPurgeKeysSize);
         bucketPurgeKeysSizeMap.clear();
-        purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+        purgeSuccess = submitPurgeRequest(purgeSuccess, requestBuilder);
         requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
         currSize = baseSize;
       }
@@ -418,19 +417,18 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return requestBuilder;
   }
 
-  private boolean submitPurgeRequest(String snapTableKey, boolean purgeSuccess,
-      PurgeKeysRequest.Builder requestBuilder) {
+  private boolean submitPurgeRequest(boolean purgeSuccess, PurgeKeysRequest.Builder requestBuilder) {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
             .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString()).build();
 
-    try (Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+    try {
       OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
-    } catch (ServiceException | InterruptedException e) {
+    } catch (ServiceException e) {
       LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
       purgeSuccess = false;
       // Continue to next batch instead of returning immediately
@@ -466,9 +464,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   @Override
-  public BackgroundTaskQueue getTasks() {
+  public DeletingServiceTaskQueue getTasks() {
     resetMetrics();
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
