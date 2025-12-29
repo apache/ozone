@@ -159,6 +159,8 @@ enum Type {
   SetLifecycleConfiguration = 150;
   GetLifecycleConfiguration   = 151;
   DeleteLifecycleConfiguration = 152;
+  GetLifecycleServiceStatus    = 153;
+  SetLifecycleServiceStatus     = 154;
 }
 
 enum SafeMode {
@@ -310,6 +312,9 @@ message OMRequest {
   optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 150;
   optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 151;
   optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 152;
+
+  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 153;
+  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 154;
 }
 
 message OMResponse {
@@ -447,6 +452,9 @@ message OMResponse {
   optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 150;
   optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 151;
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 152;
+
+  optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 153;
+  optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 154;
 }
 
 enum Status {
@@ -2439,3 +2447,20 @@ service OzoneManagerService {
     rpc submitRequest(OMRequest)
           returns(OMResponse);
 }
+
+message GetLifecycleServiceStatusRequest {
+}
+
+message GetLifecycleServiceStatusResponse {
+  required bool isEnabled = 1;
+  optional bool isSuspended = 2;
+  repeated string runningBuckets = 3;
+}
+
+message SetLifecycleServiceStatusRequest {
+  required bool suspend = 1;
+}
+
+message SetLifecycleServiceStatusResponse {
+}
+

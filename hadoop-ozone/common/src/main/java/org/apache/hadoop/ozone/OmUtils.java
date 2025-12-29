@@ -278,6 +278,7 @@ public final class OmUtils {
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
     case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -341,6 +342,7 @@ public final class OmUtils {
     case DeleteObjectTagging:
     case SetLifecycleConfiguration:
     case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
     case UnknownCommand:
       return false;
     case EchoRPC:

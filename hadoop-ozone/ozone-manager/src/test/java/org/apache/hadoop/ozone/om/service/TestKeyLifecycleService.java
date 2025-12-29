@@ -101,6 +101,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -114,6 +115,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -1535,6 +1537,45 @@ class TestKeyLifecycleService extends OzoneTestBase {
       } else {
         assertThrows(OMException.class, () -> getDirectory(volumeName, bucketName, dirName));
       }
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testGetLifecycleServiceStatus() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "key";
+      
+      //Service should be enabled but not running
+      OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse status =
+          om.getLifecycleServiceStatus();
+      assertTrue(status.getIsEnabled());
+      assertEquals(0, status.getRunningBucketsCount());
+      
+      // Create and inject for test
+      createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, prefix, null);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      KeyLifecycleService.setInjectors(
+          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, prefix, null, date.toString(), true);
+      Thread.sleep(SERVICE_INTERVAL + 100);
+      
+      // Verify service is running and processing the bucket
+      status = om.getLifecycleServiceStatus();
+      assertTrue(status.getIsEnabled());
+      assertEquals(1, status.getRunningBucketsCount());
+      assertTrue(status.getRunningBucketsList().contains("/" + volumeName + "/" + bucketName));
+      
+      KeyLifecycleService.getInjector(0).resume();
+      KeyLifecycleService.getInjector(1).resume();
+      GenericTestUtils.waitFor(() -> om.getLifecycleServiceStatus().getRunningBucketsCount() == 0,
+          WAIT_CHECK_INTERVAL, 10000);
+      
+      // Verify service completed and is no longer running
+      status = om.getLifecycleServiceStatus();
+      assertTrue(status.getIsEnabled());
+      assertEquals(0, status.getRunningBucketsCount());
+      
       deleteLifecyclePolicy(volumeName, bucketName);
     }
   }
