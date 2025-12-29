@@ -20,30 +20,51 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.apache.commons.lang3.RandomUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import java.util.Random;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for ManagedDirectSlice.
  */
 public class TestManagedDirectSlice {
-
   static {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
 
-  @ParameterizedTest
-  @CsvSource({"0, 1024", "1024, 1024", "512, 1024", "0, 100", "10, 512", "0, 0"})
-  public void testManagedDirectSliceWithOffset(int offset, int numberOfBytesWritten) {
-    ByteBuffer byteBuffer = ByteBuffer.allocateDirect(1024);
-    byte[] randomBytes = RandomUtils.secure().nextBytes(numberOfBytesWritten);
-    byteBuffer.put(randomBytes);
-    byteBuffer.flip();
-    byteBuffer.position(offset);
-    try (ManagedDirectSlice directSlice = new ManagedDirectSlice(byteBuffer);
-         ManagedSlice slice = new ManagedSlice(Arrays.copyOfRange(randomBytes, offset, numberOfBytesWritten))) {
+  static final Random RANDOM = new Random();
+
+  @Test
+  public void testManagedDirectSlice() {
+    testManagedDirectSlice(0);
+    testManagedDirectSlice(1);
+    for (int size = 2; size <= 10; size <<= 1) {
+      testManagedDirectSlice(size - 1);
+      testManagedDirectSlice(size);
+      testManagedDirectSlice(size + 1);
+    }
+    for (int i = 0; i < 5; i++) {
+      final int size = RANDOM.nextInt(1024);
+      testManagedDirectSlice(size);
+    }
+  }
+
+  static void testManagedDirectSlice(int size) {
+    try {
+      runTestManagedDirectSlice(size);
+    } catch (Throwable e) {
+      System.out.printf("Failed for size %d%n", size);
+      throw e;
+    }
+  }
+
+  static void runTestManagedDirectSlice(int size) {
+    final byte[] bytes = new byte[size];
+    RANDOM.nextBytes(bytes);
+    try (CodecBuffer buffer = CodecBuffer.allocateDirect(size).put(ByteBuffer.wrap(bytes));
+         ManagedDirectSlice directSlice = new ManagedDirectSlice(buffer.asReadOnlyByteBuffer());
+         ManagedSlice slice = new ManagedSlice(bytes)) {
+      assertEquals(slice.size(), directSlice.size());
       assertEquals(slice, directSlice);
     }
   }
