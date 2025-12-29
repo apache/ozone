@@ -36,15 +36,19 @@ public class TestManagedDirectSlice {
 
   @Test
   public void testManagedDirectSlice() {
-    testManagedDirectSlice(0);
-    testManagedDirectSlice(1);
-    for (int size = 2; size <= 10; size <<= 1) {
+    for (int size = 0; size <= 16; size++) {
+      testManagedDirectSlice(size);
+    }
+
+    for (int i = 0; i <= 10; i++) {
+      final int size = 32 << i;
       testManagedDirectSlice(size - 1);
       testManagedDirectSlice(size);
       testManagedDirectSlice(size + 1);
     }
-    for (int i = 0; i < 5; i++) {
-      final int size = RANDOM.nextInt(1024);
+
+    for (int i = 0; i < 10; i++) {
+      final int size = RANDOM.nextInt( 1 << 20);
       testManagedDirectSlice(size);
     }
   }
