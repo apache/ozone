@@ -1404,7 +1404,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
           () -> s3Client.getBucketAcl(wrongRequest));
       assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
-      assertEquals("AccessDenied", wrongOwner.getErrorCode());
+      assertEquals("Access Denied", wrongOwner.getErrorCode());
 
       Owner owner = s3Client.getBucketAcl(linkBucketName).getOwner();
       GetBucketAclRequest correctRequest = new GetBucketAclRequest(linkBucketName)
@@ -1429,7 +1429,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       AmazonServiceException wrongOwner = assertThrows(AmazonServiceException.class,
           () -> s3Client.getBucketAcl(wrongRequest));
       assertEquals(HttpURLConnection.HTTP_FORBIDDEN, wrongOwner.getStatusCode());
-      assertEquals("AccessDenied", wrongOwner.getErrorCode());
+      assertEquals("Access Denied", wrongOwner.getErrorCode());
 
       Owner owner = s3Client.getBucketAcl(danglingLinkBucketName).getOwner();
       GetBucketAclRequest correctRequest = new GetBucketAclRequest(danglingLinkBucketName)
