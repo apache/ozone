@@ -32,7 +32,9 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -520,6 +522,20 @@ public final class OmKeyInfo extends WithParentObjectId
                   keyLocationVersion.isMultipartKey())));
     }
 
+    private Builder(OmDirectoryInfo dirInfo) {
+      super(dirInfo);
+      this.acls = AclListBuilder.of(dirInfo.getAcls());
+      this.keyName = dirInfo.getName();
+      this.creationTime = dirInfo.getCreationTime();
+      this.modificationTime = dirInfo.getModificationTime();
+      this.ownerName = dirInfo.getOwner();
+      this.tags = MapBuilder.empty();
+      this.replicationConfig = RatisReplicationConfig
+          .getInstance(ReplicationFactor.ONE);
+      this.omKeyLocationInfoGroups.add(
+          new OmKeyLocationInfoGroup(0, new ArrayList<>()));
+    }
+
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
       return this;
@@ -928,6 +944,14 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Builder toBuilder() {
     return new Builder(this);
+  }
+
+  public static Builder builderFromOmDirectoryInfo(OmDirectoryInfo dirInfo) {
+    return new Builder(dirInfo);
+  }
+
+  public OmDirectoryInfo.Builder toDirectoryInfoBuilder() {
+    return OmDirectoryInfo.builderFromOmKeyInfo(this);
   }
 
   /**
