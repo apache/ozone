@@ -1469,7 +1469,7 @@ public class TestContainerEndpoint {
             .stream().map(entry -> entry.getKey()).collect(
                 Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager
             .batchDeleteContainerMapping(rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1506,7 +1506,7 @@ public class TestContainerEndpoint {
         reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
             .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager.batchDeleteContainerMapping(
             rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);

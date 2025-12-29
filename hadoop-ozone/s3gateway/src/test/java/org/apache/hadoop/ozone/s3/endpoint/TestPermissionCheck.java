@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,9 +36,7 @@ import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
@@ -276,10 +277,7 @@ public class TestPermissionCheck {
         .setConfig(conf)
         .build();
 
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "bucketName", "keyPath", 1024, 0, null, null, null,
-        new ByteArrayInputStream(new byte[]{})));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED, () -> put(objectEndpoint, "bucketName", "keyPath", ""));
   }
 
   @Test
@@ -337,20 +335,11 @@ public class TestPermissionCheck {
             "   </TagSet>" +
             "</Tagging>";
 
-    InputStream tagInput = new ByteArrayInputStream(xml.getBytes(UTF_8));
-
-    OS3Exception e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.put("bucketName", "keyPath", 0, 1,
-            null, "", null, tagInput));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
-
-    e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.delete("bucketName", "keyPath", "", ""));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
-
-    e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.get("bucketName", "keyPath", 0, null,
-            0, null, ""));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> putTagging(objectEndpoint, "bucketName", "keyPath", xml));
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> objectEndpoint.delete("bucketName", "keyPath", null, ""));
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> objectEndpoint.get("bucketName", "keyPath", 0, null, 0, null, ""));
   }
 }

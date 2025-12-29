@@ -656,7 +656,7 @@ public class OzoneManagerServiceProviderImpl
             writeBatch.iterate(omdbUpdatesHandler);
             // Commit the OM DB transactions in recon rocks DB and sync here.
             try (RDBBatchOperation rdbBatchOperation =
-                     new RDBBatchOperation(writeBatch)) {
+                     RDBBatchOperation.newAtomicOperation(writeBatch)) {
               try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
                 rdbBatchOperation.commit(rocksDB, wOpts);
               }
