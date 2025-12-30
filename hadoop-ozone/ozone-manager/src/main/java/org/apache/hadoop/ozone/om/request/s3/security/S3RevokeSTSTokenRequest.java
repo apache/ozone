@@ -18,12 +18,13 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -32,6 +33,8 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSTSTokenResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +42,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles S3RevokeSTSTokenRequest request.
  *
- * <p>This request marks an STS temporary access key id as revoked by inserting
+ * <p>This request marks an STS session token as revoked by inserting
  * it into the {@code s3RevokedStsTokenTable}. Subsequent S3 requests
- * authenticated with the same STS access key id will be rejected when the
+ * authenticated with the same STS session token will be rejected when the
  * revocation state has propagated.</p>
  */
 public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3RevokeSTSTokenRequest.class);
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   public S3RevokeSTSTokenRequest(OMRequest omRequest) {
     super(omRequest);
@@ -57,12 +61,19 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq =
         getOmRequest().getRevokeSTSTokenRequest();
 
-    // Only S3/Ozone admins can revoke STS tokens by temporary access key ID.
+    // Get the original (long-lived) access key id from the session token
+    // and enforce the same permission model that is used for S3 secret
+    // operations (get/set/revoke). Only the owner of the original access
+    // key (i.e. the creator of the STS token) or an S3 / tenant admin is allowed
+    // to revoke its temporary STS credentials.
+    final String sessionToken = revokeReq.getSessionToken();
+    final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
+        sessionToken, ozoneManager.getSecretKeyClient(), CLOCK);
+    final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+
     final OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
-    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(userInfo.getUserName());
-    if (!ozoneManager.isS3Admin(ugi)) {
-      throw new OMException("Only S3/Ozone admins can revoke STS tokens.", OMException.ResultCodes.PERMISSION_DENIED);
-    }
+    final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(originalAccessKeyId);
+    S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
     final OMRequest.Builder omRequest = OMRequest.newBuilder()
         .setRevokeSTSTokenRequest(revokeReq)
@@ -82,19 +93,20 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq = getOmRequest().getRevokeSTSTokenRequest();
-    final String accessKeyId = revokeReq.getAccessKeyId();
+    final String sessionToken = revokeReq.getSessionToken();
 
     // All actual DB mutations are done in the response's addToDBBatch().
     final OMClientResponse omClientResponse = new S3RevokeSTSTokenResponse(
-        accessKeyId, omResponse.build());
+        sessionToken, omResponse.build());
 
     // Audit log
     final Map<String, String> auditMap = new HashMap<>();
-    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, getOmRequest().getUserInfo().getUserName());
+    final OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
+    auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, userInfo.getUserName());
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.REVOKE_STS_TOKEN, auditMap, null, getOmRequest().getUserInfo()));
+        OMAction.REVOKE_STS_TOKEN, auditMap, null, userInfo));
 
-    LOG.info("Marked STS temporary access key '{}' as revoked.", accessKeyId);
+    LOG.info("Marked STS session token '{}' as revoked.", sessionToken);
     return omClientResponse;
   }
 }

@@ -1301,9 +1301,9 @@ public class TestOmMetadataManager {
     assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
 
     final TestClock clock = TestClock.newInstance();
-    final String tempAccessKeyId1 = "ASIA7VUS1EOBCW8RRJVR";
+    final String sessionToken1 = "test-session-token-1";
     final long insertionTime1 = clock.millis();
-    final String tempAccessKeyId2 = "ASIA904E65QIGL9ON305";
+    final String sessionToken2 = "test-session-token-2";
     final long insertionTime2 = insertionTime1 + 1234L;
 
     // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
@@ -1312,24 +1312,24 @@ public class TestOmMetadataManager {
     final TypedTable<String, Long> revokedTable =
         (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
 
-    revokedTable.put(tempAccessKeyId1, insertionTime1);
-    revokedTable.put(tempAccessKeyId2, insertionTime2);
+    revokedTable.put(sessionToken1, insertionTime1);
+    revokedTable.put(sessionToken2, insertionTime2);
 
     // Verify the values are persisted in RocksDB.
-    assertEquals(insertionTime1, revokedTable.getSkipCache(tempAccessKeyId1));
-    assertEquals(insertionTime2, revokedTable.getSkipCache(tempAccessKeyId2));
+    assertEquals(insertionTime1, revokedTable.getSkipCache(sessionToken1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(sessionToken2));
 
     // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
-    revokedTable.addCacheEntry(tempAccessKeyId1, insertionTime1, 1L);
-    revokedTable.addCacheEntry(tempAccessKeyId2, insertionTime2, 1L);
+    revokedTable.addCacheEntry(sessionToken1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(sessionToken2, insertionTime2, 1L);
 
     // Verify get and getIfExist return the stored value
-    assertEquals(insertionTime1, revokedTable.get(tempAccessKeyId1));
-    assertEquals(insertionTime1, revokedTable.getIfExist(tempAccessKeyId1));
-    assertEquals(insertionTime2, revokedTable.get(tempAccessKeyId2));
-    assertEquals(insertionTime2, revokedTable.getIfExist(tempAccessKeyId2));
+    assertEquals(insertionTime1, revokedTable.get(sessionToken1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(sessionToken1));
+    assertEquals(insertionTime2, revokedTable.get(sessionToken2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(sessionToken2));
 
-    // Unknown key should return null for getIfExist
-    assertNull(revokedTable.getIfExist("ASIA_UNKNOWN_ACCESS_KEY"));
+    // Invalid sessionToken should return null for getIfExist
+    assertNull(revokedTable.getIfExist("INVALID_SESSION_TOKEN"));
   }
 }

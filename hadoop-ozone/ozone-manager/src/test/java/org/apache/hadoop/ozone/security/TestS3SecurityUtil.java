@@ -125,7 +125,7 @@ public class TestS3SecurityUtil {
       final String tempAccessKeyId = "temp-access-key-id";
       if (isRevoked) {
         final long insertionTimeMillis = CLOCK.millis();
-        revokedSTSTokenTable.put(tempAccessKeyId, insertionTimeMillis);
+        revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
       }
 
       try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);

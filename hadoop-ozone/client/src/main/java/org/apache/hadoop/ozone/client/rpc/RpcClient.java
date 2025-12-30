@@ -2798,8 +2798,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void revokeSTSToken(String accessKeyId) throws IOException {
-    ozoneManagerClient.revokeSTSToken(accessKeyId);
+  public void revokeSTSToken(String sessionToken) throws IOException {
+    ozoneManagerClient.revokeSTSToken(sessionToken);
   }
 
   private static ExecutorService createThreadPoolExecutor(

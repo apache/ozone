@@ -39,20 +39,20 @@ public class S3RevokeSTSTokenResponse extends OMClientResponse {
 
   private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
-  private final String accessKeyId;
+  private final String sessionToken;
 
-  public S3RevokeSTSTokenResponse(String accessKeyId, @Nonnull OMResponse omResponse) {
+  public S3RevokeSTSTokenResponse(String sessionToken, @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.accessKeyId = accessKeyId;
+    this.sessionToken = sessionToken;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
-    if (accessKeyId != null && getOMResponse().hasStatus() &&  getOMResponse().getStatus() == OK) {
+    if (sessionToken != null && getOMResponse().hasStatus() &&  getOMResponse().getStatus() == OK) {
       final Table<String, Long> table = omMetadataManager.getS3RevokedStsTokenTable();
       if (table != null) {
         // Store insertionTimeMillis as value
-        table.putWithBatch(batchOperation, accessKeyId, CLOCK.millis());
+        table.putWithBatch(batchOperation, sessionToken, CLOCK.millis());
       }
     }
   }

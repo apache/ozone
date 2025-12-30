@@ -29,19 +29,18 @@ import picocli.CommandLine.Option;
 /**
  * Executes revocation of STS tokens.
  *
- * <p>This command marks the specified STS temporary access key id as revoked
- * by adding it to the OM's revoked STS token table. Subsequent S3 requests
- * using the same temporary access key id will be rejected once the revocation
+ * <p>This command marks the specified STS token as revoked by adding it to the OM's revoked STS token table.
+ * Subsequent S3 requests using the same session token will be rejected once the revocation
  * state has propagated.</p>
  */
 @Command(name = "revokeststoken",
-    description = "Revoke S3 STS token for the given access key id")
+    description = "Revoke S3 STS token for the given session token")
 public class RevokeSTSTokenHandler extends S3Handler {
 
-  @Option(names = "-k",
+  @Option(names = "-t",
       required = true,
-      description = "STS temporary access key id (for example, ASIA...)")
-  private String accessKeyId;
+      description = "STS session token")
+  private String sessionToken;
 
   @Option(names = "-y",
       description = "Continue without interactive user confirmation")
@@ -57,8 +56,8 @@ public class RevokeSTSTokenHandler extends S3Handler {
       throws IOException {
 
     if (!yes) {
-      out().print("Enter 'y' to confirm STS token revocation for accessKeyId '" +
-          accessKeyId + "': ");
+      out().print("Enter 'y' to confirm STS token revocation for sessionToken '" +
+          sessionToken + "': ");
       out().flush();
       final Scanner scanner = new Scanner(new InputStreamReader(System.in, StandardCharsets.UTF_8));
       final String confirmation = scanner.next().trim().toLowerCase();
@@ -68,7 +67,7 @@ public class RevokeSTSTokenHandler extends S3Handler {
       }
     }
 
-    client.getObjectStore().revokeSTSToken(accessKeyId);
-    out().println("STS token revoked for accessKeyId '" + accessKeyId + "'.");
+    client.getObjectStore().revokeSTSToken(sessionToken);
+    out().println("STS token revoked for sessionToken '" + sessionToken + "'.");
   }
 }

@@ -815,6 +815,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void revokeSTSToken(String accessKeyId) throws IOException {
+  public void revokeSTSToken(String sessionToken) throws IOException {
   }
 }
