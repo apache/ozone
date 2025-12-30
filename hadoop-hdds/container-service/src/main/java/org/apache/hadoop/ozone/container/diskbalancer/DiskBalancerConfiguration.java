@@ -37,14 +37,14 @@ public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
-  @Config(key = "info.dir", type = ConfigType.STRING,
+  @Config(key = "hdds.datanode.disk.balancer.info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
       description = "The path where datanode diskBalancer's conf is to be " +
           "written to. if this property is not defined, ozone will fall " +
           "back to use metadata directory instead.")
   private String infoDir;
 
-  @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
+  @Config(key = "hdds.datanode.disk.balancer.volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
@@ -53,17 +53,17 @@ public final class DiskBalancerConfiguration {
           " of the entire datanode) no more than the threshold.")
   private double threshold = 10d;
 
-  @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.LONG,
+  @Config(key = "hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec", type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
   private long diskBandwidthInMB = 10;
 
-  @Config(key = "parallel.thread", type = ConfigType.INT,
+  @Config(key = "hdds.datanode.disk.balancer.parallel.thread", type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
 
-  @Config(key = "should.run.default",
+  @Config(key = "hdds.datanode.disk.balancer.should.run.default",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -74,7 +74,7 @@ public final class DiskBalancerConfiguration {
   )
   private boolean diskBalancerShouldRun = false;
 
-  @Config(key = "service.interval",
+  @Config(key = "hdds.datanode.disk.balancer.service.interval",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -85,7 +85,7 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerInterval = Duration.ofSeconds(60).toMillis();
 
-  @Config(key = "service.timeout",
+  @Config(key = "hdds.datanode.disk.balancer.service.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -94,14 +94,14 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "volume.choosing.policy", type = ConfigType.CLASS,
+  @Config(key = "hdds.datanode.disk.balancer.volume.choosing.policy", type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
           ".DefaultVolumeChoosingPolicy",
       tags = {ConfigTag.DISKBALANCER},
       description = "The volume choosing policy of the disk balancer service.")
   private Class<?> volumeChoosingPolicyClass;
 
-  @Config(key = "container.choosing.policy", type = ConfigType.CLASS,
+  @Config(key = "hdds.datanode.disk.balancer.container.choosing.policy", type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
           ".DefaultContainerChoosingPolicy",
       tags = {ConfigTag.DISKBALANCER},
@@ -109,7 +109,7 @@ public final class DiskBalancerConfiguration {
           "service.")
   private Class<?> containerChoosingPolicyClass;
 
-  @Config(key = "stop.after.disk.even",
+  @Config(key = "hdds.datanode.disk.balancer.stop.after.disk.even",
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.DISKBALANCER},
