@@ -33,46 +33,72 @@ public class TestManagedDirectSlice {
   }
 
   static final Random RANDOM = new Random();
+  static final byte[] ZEROS = new byte[1 << 10];
+  private static int count = 0;
 
   @Test
   public void testManagedDirectSlice() {
-    // test all values <= 16
-    for (int size = 0; size <= 16; size++) {
+    // test small sizes
+    final int small = 8;
+    for (int size = 0; size <= small; size++) {
       testManagedDirectSlice(size);
     }
 
-    // test power of 2
-    for (int i = 0; i <= 10; i++) {
-      final int size = 32 << i;
+    // test power of 2 sizes
+    for (int i = 1; i <= 10; i++) {
+      final int size = small << i;
       testManagedDirectSlice(size - 1);
       testManagedDirectSlice(size);
       testManagedDirectSlice(size + 1);
     }
 
-    // test random
-    for (int i = 0; i < 10; i++) {
-      final int size = RANDOM.nextInt(1 << 20);
+    // test random sizes
+    final int bound = ZEROS.length << 10;
+    for (int i = 0; i < 4; i++) {
+      final int size = RANDOM.nextInt(bound);
+      testManagedDirectSlice(size);
+    }
+    for (int i = 0; i < 4; i++) {
+      final int size = RANDOM.nextInt(bound) + ZEROS.length;
       testManagedDirectSlice(size);
     }
   }
 
   static void testManagedDirectSlice(int size) {
-    try {
-      runTestManagedDirectSlice(size);
-    } catch (Throwable e) {
-      System.out.printf("Failed for size %d%n", size);
-      throw e;
+    // test small positions
+    final int small = 3;
+    for (int position = 0; position < small; position++) {
+      testManagedDirectSlice(size, position);
+    }
+    // test large positions
+    for (int i = 0; i < small; i++) {
+      testManagedDirectSlice(size, ZEROS.length - i);
+    }
+    // test random positions
+    for (int i = 0; i < 4; i++) {
+      final int bound = ZEROS.length - 2 * small + 1;
+      final int position = RANDOM.nextInt(bound) + small; // small <= position <= ZEROS.length-small
+      testManagedDirectSlice(size, position);
     }
   }
 
-  static void runTestManagedDirectSlice(int size) {
+  static void testManagedDirectSlice(int size, int position) {
+    System.out.printf("%3d: size %d and position %d%n", ++count, size, position);
     final byte[] bytes = new byte[size];
     RANDOM.nextBytes(bytes);
-    try (CodecBuffer buffer = CodecBuffer.allocateDirect(size).put(ByteBuffer.wrap(bytes));
-         ManagedDirectSlice directSlice = new ManagedDirectSlice(buffer.asReadOnlyByteBuffer());
+    try (CodecBuffer buffer = CodecBuffer.allocateDirect(size + position)
+            .put(ByteBuffer.wrap(ZEROS, 0, position))
+            .put(ByteBuffer.wrap(bytes));
+         ManagedDirectSlice directSlice = new ManagedDirectSlice(getByteBuffer(buffer, position));
          ManagedSlice slice = new ManagedSlice(bytes)) {
       assertEquals(slice.size(), directSlice.size());
       assertEquals(slice, directSlice);
     }
+  }
+
+  static ByteBuffer getByteBuffer(CodecBuffer buffer, int position) {
+    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
+    byteBuffer.position(position);
+    return byteBuffer;
   }
 }
