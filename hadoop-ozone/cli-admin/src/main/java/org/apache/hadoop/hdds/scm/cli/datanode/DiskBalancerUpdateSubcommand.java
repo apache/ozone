@@ -37,7 +37,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand {
 
-  @Option(names = {"-t", "--threshold"},
+  @Option(names = {"-t", "--threshold-percentage"},
       description = "Percentage deviation from average utilization of " +
           "the disks after which a datanode will be rebalanced (for " +
           "example, '10' for 10%%).")

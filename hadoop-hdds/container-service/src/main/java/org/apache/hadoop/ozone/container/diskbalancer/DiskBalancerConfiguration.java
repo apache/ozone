@@ -44,7 +44,7 @@ public final class DiskBalancerConfiguration {
           "back to use metadata directory instead.")
   private String infoDir;
 
-  @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
+  @Config(key = "volume.density.threshold.percent", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
