@@ -105,7 +105,11 @@ public class TestGetAclHandler {
 
     when(objectStore.getAcl(obj)).thenReturn(acls);
 
-    // Execute command without --string flag (JSON output)
+    // Parse command line without flag (default JSON output)
+    CommandLine commandLine = new CommandLine(cmd);
+    commandLine.parseArgs("o3://ozone1/volume/bucket");
+
+    // Execute command with default JSON output
     cmd.publicExecute(client, obj);
 
     // Verify JSON output
@@ -140,11 +144,11 @@ public class TestGetAclHandler {
 
     when(objectStore.getAcl(obj)).thenReturn(acls);
 
-    // Parse command line with --string flag
+    // Parse command line with --json=false flag (string output)
     CommandLine commandLine = new CommandLine(cmd);
-    commandLine.parseArgs("--string", "o3://ozone1/volume/bucket");
+    commandLine.parseArgs("--json=false", "o3://ozone1/volume/bucket");
 
-    // Execute command with --string flag
+    // Execute command with --json=false flag
     cmd.publicExecute(client, obj);
 
     // Verify string output (should omit [ACCESS] for default scope)
@@ -173,49 +177,16 @@ public class TestGetAclHandler {
 
     when(objectStore.getAcl(obj)).thenReturn(acls);
 
-    // Parse command line with --string flag
+    // Parse command line with --json=false flag (string output)
     CommandLine commandLine = new CommandLine(cmd);
-    commandLine.parseArgs("--string", "o3://ozone1/volume/bucket");
+    commandLine.parseArgs("--json=false", "o3://ozone1/volume/bucket");
 
-    // Execute command with --string flag
+    // Execute command with --json=false flag
     cmd.publicExecute(client, obj);
 
     // Verify string output (should include [DEFAULT] for non-default scope)
     String output = outContent.toString(DEFAULT_ENCODING).trim();
     assertEquals("user:user1:rw[DEFAULT],group:hadoop:a[DEFAULT]", output);
-  }
-
-  @Test
-  public void testGetAclAsStringWithShortOption() throws IOException {
-    // Setup mock objects
-    OzoneClient client = mock(OzoneClient.class);
-    ObjectStore objectStore = mock(ObjectStore.class);
-    when(client.getObjectStore()).thenReturn(objectStore);
-
-    List<OzoneAcl> acls = Arrays.asList(
-        OzoneAcl.of(USER, "user1", ACCESS, READ, WRITE),
-        OzoneAcl.of(GROUP, "hadoop", ACCESS, ALL)
-    );
-
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName("bucket")
-        .setVolumeName("volume")
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .build();
-
-    when(objectStore.getAcl(obj)).thenReturn(acls);
-
-    // Parse command line with -o short flag
-    CommandLine commandLine = new CommandLine(cmd);
-    commandLine.parseArgs("-o", "o3://ozone1/volume/bucket");
-
-    // Execute command with -o flag
-    cmd.publicExecute(client, obj);
-
-    // Verify string output (should omit [ACCESS] for default scope)
-    String output = outContent.toString(DEFAULT_ENCODING).trim();
-    assertEquals("user:user1:rw,group:hadoop:a", output);
   }
 
   @Test
@@ -239,11 +210,11 @@ public class TestGetAclHandler {
 
     when(objectStore.getAcl(obj)).thenReturn(acls);
 
-    // Parse command line with --string flag
+    // Parse command line with --json=false flag (string output)
     CommandLine commandLine = new CommandLine(cmd);
-    commandLine.parseArgs("--string", "o3://ozone1/volume/bucket");
+    commandLine.parseArgs("--json=false", "o3://ozone1/volume/bucket");
 
-    // Execute command with --string flag
+    // Execute command with --json=false flag
     cmd.publicExecute(client, obj);
 
     // Verify string output (mixed scopes)

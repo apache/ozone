@@ -30,18 +30,19 @@ import picocli.CommandLine.Option;
  */
 public abstract class GetAclHandler extends AclHandler {
 
-  @Option(names = {"--string", "-o"},
-      description = "Output ACLs as a comma-separated string in the format " +
-          "that can be used with setacl/addacl commands")
-  private boolean stringFormat;
+  @Option(names = {"--json"},
+      description = "Format output as JSON",
+      defaultValue = "true",
+      fallbackValue = "true")
+  private boolean json;
 
   @Override
   protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
     List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-    if (stringFormat) {
-      printAclsAsString(result);
-    } else {
+    if (json) {
       printObjectAsJson(result);
+    } else {
+      printAclsAsString(result);
     }
   }
 
