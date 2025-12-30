@@ -96,7 +96,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     BucketLayout bucketLayout = BucketLayout.fromProto(bucketInfo.getBucketLayout());
     boolean strict = ozoneManager.isStrictS3()
-        || bucketLayout.isObjectStore(ozoneManager.getConfig().isFileSystemPathEnabled());
+        || bucketLayout == BucketLayout.OBJECT_STORE;
+
+    // OBS (Object Store) buckets must follow strict S3 bucket naming rules.
+    // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
     // ACL check during preExecute

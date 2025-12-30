@@ -507,23 +507,12 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
   }
 
-  protected OMBucketCreateRequest doPreExecute(String volumeName,
-      String bucketName,
-      OzoneManagerProtocolProtos.BucketLayoutProto layout) throws Exception {
-    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
-        newBucketInfoBuilder(bucketName, volumeName)
-            .setBucketLayout(layout);
-    if (layout == OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED) {
-      bucketInfo.addMetadata(OMRequestTestUtils.fsoMetadata());
-    }
-    return doPreExecute(bucketInfo);
-  }
-
   private void acceptFSOBucketCreationHelper(String volumeName, String bucketName)
       throws Exception {
-    OMBucketCreateRequest omBucketCreateRequest =
-        doPreExecute(volumeName, bucketName,
-            OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED);
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED);
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(bucketInfo);
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
   }

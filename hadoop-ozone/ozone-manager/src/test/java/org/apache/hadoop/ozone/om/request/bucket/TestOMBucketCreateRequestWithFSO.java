@@ -188,7 +188,7 @@ public class TestOMBucketCreateRequestWithFSO
   public void testNonS3BucketNameAllowedForFSOWhenStrictDisabled() throws Exception {
     // Arrange
     ozoneManager.getConfiguration().setBoolean(
-        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false); // 如果常數名稱不同，改成實際的 key
+        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false);
 
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
