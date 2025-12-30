@@ -70,6 +70,8 @@ public final class ContainerUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerUtils.class);
 
+  private static final String VERSION_FILE   = "VERSION";
+
   private ContainerUtils() {
     //never constructed.
   }
@@ -177,13 +179,13 @@ public final class ContainerUtils {
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Failed to read Datanode ID file as YAML. Reason: {}. " +
-          "Attempting recovery.", e.getMessage());
+      LOG.warn("Failed to read Datanode ID file as YAML. " +
+          "Attempting recovery.", e);
       try {
         return recoverDatanodeDetailsFromVersionFile(path, conf);
       } catch (IOException recoveryEx) {
-        LOG.warn("Datanode ID recovery from VERSION file failed. Reason: {}. " +
-            "Falling back to reading as Protobuf.", recoveryEx.getMessage());
+        LOG.warn("Datanode ID recovery from VERSION file failed. " +
+            "Falling back to reading as Protobuf.", recoveryEx);
         try {
           return readDatanodeDetailsFromProto(path);
         } catch (IOException io) {
@@ -203,11 +205,8 @@ public final class ContainerUtils {
     String dnUuid = null;
     Collection<String> dataNodeDirs =
         HddsServerUtil.getDatanodeStorageDirs(conf);
-    if (dataNodeDirs.isEmpty()) {
-      throw new IOException("hdds.datanode.dir is not configured.");
-    }
     for (String dataNodeDir : dataNodeDirs) {
-      File versionFile = new File(dataNodeDir, "hdds/VERSION");
+      File versionFile = new File(dataNodeDir, HddsVolume.HDDS_VOLUME_DIR + "/" + VERSION_FILE);
       if (versionFile.exists()) {
         Properties props = DatanodeVersionFile.readFrom(versionFile);
         dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
