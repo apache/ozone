@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,7 +29,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
@@ -253,10 +254,9 @@ public class TestDiskBalancerService {
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
-    ImmutableList<HddsVolume> immutableVolumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
-
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, null);
     // data precision loss due to double data involved in calculation
-    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(immutableVolumes)) <= 1);
+    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeUsages)) <= 1);
   }
 
   @Test
@@ -294,7 +294,8 @@ public class TestDiskBalancerService {
     when(containerData.getBytesUsed()).thenReturn(100L);
 
     when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
-    when(containerPolicy.chooseContainer(any(), any(), any(), any(), any(), any(), any())).thenReturn(containerData);
+    when(containerPolicy.chooseContainer(any(), any(), any(), any(), anyDouble(), any(), any()))
+        .thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit
     BackgroundTaskQueue queue = svc.getTasks();

@@ -18,16 +18,19 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.calculateVolumeDataDensity;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -65,6 +68,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -632,54 +636,46 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
-    ImmutableList<HddsVolume> immutableVolumeSet = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaSizes);
 
     // Calculate volumeDataDensity
-    double volumeDatadensity = 0.0;
-    volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(immutableVolumeSet, deltaSizes);
+    final double volumeDataDensity = calculateVolumeDataDensity(volumeUsages);
 
     long bytesToMove = 0;
     if (this.operationalState == DiskBalancerRunningStatus.RUNNING) {
       // this calculates live changes in bytesToMove
       // calculate bytes to move if the balancer is in a running state, else 0.
-      bytesToMove = calculateBytesToMove(immutableVolumeSet);
+      bytesToMove = calculateBytesToMove(volumeUsages);
     }
 
     return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
   }
 
-  public long calculateBytesToMove(ImmutableList<HddsVolume> inputVolumeSet) {
+  public long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet) {
     // If there are no available volumes or only one volume, return 0 bytes to move
     if (inputVolumeSet.isEmpty() || inputVolumeSet.size() < 2) {
       return 0;
     }
 
-    // Calculate ideal usage
-    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(inputVolumeSet, deltaSizes);
-    double normalizedThreshold = threshold / 100.0;
+    // Calculate actual threshold
+    final double actualThreshold = getIdealUsage(inputVolumeSet) + threshold / 100.0;
 
     long totalBytesToMove = 0;
 
     // Calculate excess data in overused volumes
-    for (HddsVolume volume : inputVolumeSet) {
-      SpaceUsageSource usage = volume.getCurrentUsage();
-
+    for (VolumeFixedUsage volumeUsage : inputVolumeSet) {
+      final SpaceUsageSource.Fixed usage = volumeUsage.getUsage();
       if (usage.getCapacity() == 0) {
         continue;
       }
 
-      long deltaSize = deltaSizes.getOrDefault(volume, 0L);
-      double currentUsage = (double)((usage.getCapacity() - usage.getAvailable())
-          + deltaSize + volume.getCommittedBytes()) / usage.getCapacity();
-
-      double volumeUtilisation = currentUsage - idealUsage;
-
+      final double excess = volumeUsage.getUtilization() - actualThreshold;
       // Only consider volumes that exceed the threshold (source volumes)
-      if (volumeUtilisation >= normalizedThreshold) {
+      if (excess > 0) {
         // Calculate excess bytes that need to be moved from this volume
-        long excessBytes = (long) ((volumeUtilisation - normalizedThreshold) * usage.getCapacity());
+        final long excessBytes = (long) (excess * usage.getCapacity());
         totalBytesToMove += Math.max(0, excessBytes);
       }
     }
