@@ -21,6 +21,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -101,6 +104,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -134,6 +138,8 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -537,6 +543,192 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         bos.write(readBuf, 0, readLen);
       }
       assertEquals(value, bos.toString("UTF-8"));
+    }
+  }
+
+  @Test
+  public void testPutAndGetObjectTagging() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, content);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("env", "test");
+    tags.put("project", "ozone");
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      bucket.putObjectTagging(keyName, tags);
+
+      Map<String, String> retrievedTags = bucket.getObjectTagging(keyName);
+      assertEquals(tags.size(), retrievedTags.size());
+      assertEquals("test", retrievedTags.get("env"));
+      assertEquals("ozone", retrievedTags.get("project"));
+    }
+  }
+
+  @Test
+  public void testDeleteObjectTagging() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "test content";
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, content);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("temp", "data");
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      bucket.putObjectTagging(keyName, tags);
+
+      Map<String, String> beforeDelete = bucket.getObjectTagging(keyName);
+      assertEquals(1, beforeDelete.size());
+
+      bucket.deleteObjectTagging(keyName);
+
+      Map<String, String> afterDelete = bucket.getObjectTagging(keyName);
+      assertTrue(afterDelete.isEmpty());
+    }
+  }
+
+  @Test
+  public void testPutObjectTaggingExceedsLimit() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "content");
+
+    Map<String, String> tags = new HashMap<>();
+    for (int i = 1; i <= TAG_NUM_LIMIT + 1; i++) {
+      tags.put("key" + i, "value" + i);
+    }
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      assertThrows(Exception.class, () -> bucket.putObjectTagging(keyName, tags));
+    }
+  }
+
+  @Test
+  public void testPutObjectTaggingReplacesExistingTags() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "content");
+
+    Map<String, String> initialTags = new HashMap<>();
+    initialTags.put("tag1", "value1");
+    initialTags.put("tag2", "value2");
+
+    Map<String, String> replacementTags = new HashMap<>();
+    replacementTags.put("tag3", "value3");
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      bucket.putObjectTagging(keyName, initialTags);
+      bucket.putObjectTagging(keyName, replacementTags);
+
+      Map<String, String> retrievedTags = bucket.getObjectTagging(keyName);
+      assertEquals(1, retrievedTags.size());
+      assertEquals("value3", retrievedTags.get("tag3"));
+      assertFalse(retrievedTags.containsKey("tag1"));
+      assertFalse(retrievedTags.containsKey("tag2"));
+    }
+  }
+
+  private static String repeatChar(char c, int count) {
+    StringBuilder sb = new StringBuilder(count);
+    for (int i = 0; i < count; i++) {
+      sb.append(c);
+    }
+    return sb.toString();
+  }
+
+  private static Stream<Arguments> invalidTagConstraintsProvider() {
+    return Stream.of(
+        Arguments.of(
+            repeatChar('a', TAG_KEY_LENGTH_LIMIT + 1),
+            "value"
+        ),
+        Arguments.of(
+            "valid-key",
+            repeatChar('b', TAG_VALUE_LENGTH_LIMIT + 1)
+        ),
+        Arguments.of(
+            "t$ag@#invalid",
+            "value"
+        ),
+        Arguments.of(
+            "aws:test",
+            "value"
+        )
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidTagConstraintsProvider")
+  public void testPutObjectTaggingInvalidConstraints(String tagKey, String tagValue)
+      throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "content");
+
+    Map<String, String> invalidTags = new HashMap<>();
+    invalidTags.put(tagKey, tagValue);
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      Exception exception = assertThrows(Exception.class,
+          () -> bucket.putObjectTagging(keyName, invalidTags));
+      assertTrue(exception.getMessage().contains("Invalid") ||
+          exception.getMessage().contains("exceed") ||
+          exception.getMessage().contains("aws:"));
+    }
+  }
+
+  @Test
+  public void testPutAndGetObjectTaggingOnNonExistentObject() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("env", "test");
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      assertThrows(Exception.class, () -> bucket.putObjectTagging(keyName, tags));
+      assertThrows(Exception.class, () -> bucket.getObjectTagging(keyName));
+    }
+  }
+
+  @Test
+  public void testDeleteObjectTaggingOnNonExistentObject() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      assertThrows(Exception.class, () -> bucket.deleteObjectTagging(keyName));
     }
   }
 

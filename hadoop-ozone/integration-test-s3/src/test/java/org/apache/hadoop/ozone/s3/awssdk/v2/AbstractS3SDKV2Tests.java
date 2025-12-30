@@ -22,6 +22,9 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -455,7 +458,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         RequestBody.fromString("content"));
 
     List<Tag> tags = new ArrayList<>();
-    for (int i = 1; i <= 11; i++) {
+    for (int i = 1; i <= TAG_NUM_LIMIT + 1; i++) {
       tags.add(Tag.builder().key("key" + i).value("value" + i).build());
     }
 
@@ -514,11 +517,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   private static Stream<Arguments> invalidTagConstraintsProvider() {
     return Stream.of(
         Arguments.of(
-            Arrays.asList(Tag.builder().key(repeatChar('a', 129)).value("value").build()),
+            Arrays.asList(Tag.builder().key(repeatChar('a', TAG_KEY_LENGTH_LIMIT + 1)).value("value").build()),
             HTTP_BAD_REQUEST
         ),
         Arguments.of(
-            Arrays.asList(Tag.builder().key("valid-key").value(repeatChar('b', 257)).build()),
+            Arrays.asList(Tag.builder().key("valid-key").value(repeatChar('b', TAG_VALUE_LENGTH_LIMIT + 1)).build()),
             HTTP_BAD_REQUEST
         ),
         Arguments.of(
