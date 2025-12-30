@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,10 +89,10 @@ public final class ECKeyOutputStream extends KeyOutputStream
   // how much data has been ingested into the stream
   private long writeOffset;
 
-  private List<Runnable> preCommits = Collections.emptyList();
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
 
   @Override
-  public void setPreCommits(@Nonnull List<Runnable> preCommits) {
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
     this.preCommits = preCommits;
   }
 
@@ -494,7 +495,9 @@ public final class ECKeyOutputStream extends KeyOutputStream
               "Expected: %d and actual %d write sizes do not match",
                   expectedSize, offset));
         }
-        preCommits.forEach(Runnable::run);
+        for (CheckedRunnable<IOException> preCommit : preCommits) {
+          preCommit.run();
+        }
         blockOutputStreamEntryPool.commitKey(offset);
       }
     } catch (ExecutionException e) {

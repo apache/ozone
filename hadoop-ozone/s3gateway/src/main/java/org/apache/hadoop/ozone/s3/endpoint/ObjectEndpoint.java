@@ -142,6 +142,7 @@ import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -351,7 +352,7 @@ public class ObjectEndpoint extends EndpointBase {
           if (sha256Digest != null) {
             final String actualSha256 = DatatypeConverter.printHexBinary(
                 sha256Digest.digest()).toLowerCase();
-            Runnable preCommit = () -> {
+            CheckedRunnable<IOException> preCommit = () -> {
               if (!amzContentSha256Header.equals(actualSha256)) {
                 throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
               }

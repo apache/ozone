@@ -112,9 +112,9 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
-  private List<Runnable> preCommits = Collections.emptyList();
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
 
-  public void setPreCommits(@Nonnull List<Runnable> preCommits) {
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
     this.preCommits = preCommits;
   }
 
@@ -662,7 +662,9 @@ public class KeyOutputStream extends OutputStream
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
-      preCommits.forEach(Runnable::run);
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();

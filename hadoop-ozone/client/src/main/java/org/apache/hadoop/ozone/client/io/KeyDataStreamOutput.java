@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,9 +85,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
    */
   private boolean atomicKeyCreation;
 
-  private List<Runnable> preCommits = Collections.emptyList();
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
 
-  public void setPreCommits(@Nonnull List<Runnable> preCommits) {
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
     this.preCommits = preCommits;
   }
 
@@ -439,7 +440,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
-      preCommits.forEach(Runnable::run);
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
+      }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
       blockDataStreamOutputEntryPool.cleanup();
