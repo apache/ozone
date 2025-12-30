@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -583,7 +584,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     String endKey = getLexicographicallyHigherString(prefix);
     LOG.debug("Deleting key range from {} - startKey: {}, endKey: {}",
         table.getName(), prefix, endKey);
-    table.deleteRangeWithBatch(batchOperation, prefix, endKey);
+    try (TableIterator<String, String> itr = table.keyIterator(prefix)) {
+      while (itr.hasNext()) {
+        table.deleteWithBatch(batchOperation, itr.next());
+      }
+    }
   }
 
   @VisibleForTesting
