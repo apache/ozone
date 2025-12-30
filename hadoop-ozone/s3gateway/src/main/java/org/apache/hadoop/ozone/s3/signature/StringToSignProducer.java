@@ -337,7 +337,7 @@ public final class StringToSignProducer {
       }
       break;
     case X_AMZ_CONTENT_SHA256:
-      // Validate x-amz-content-sha256 after data is uploaded to the DN in ObjectEndpoint
+      // Validate x-amz-content-sha256 during upload, before committing the key.
       break;
     default:
       break;
