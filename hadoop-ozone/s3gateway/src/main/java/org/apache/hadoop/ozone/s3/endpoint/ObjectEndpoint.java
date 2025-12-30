@@ -62,7 +62,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.EOFException;
 import java.io.IOException;
@@ -353,8 +352,9 @@ public class ObjectEndpoint extends EndpointBase {
             final String actualSha256 = DatatypeConverter.printHexBinary(
                 sha256Digest.digest()).toLowerCase();
             Runnable preCommit = () -> {
-              Preconditions.checkArgument(amzContentSha256Header.equals(actualSha256),
-                  S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getErrorMessage());
+              if (!amzContentSha256Header.equals(actualSha256)) {
+                throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+              }
             };
             output.getKeyOutputStream().setPreCommits(Collections.singletonList(preCommit));
           }
@@ -405,10 +405,6 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCopyObjectFailureStats(startNanos);
       } else {
         getMetrics().updateCreateKeyFailureStats(startNanos);
-      }
-      if (ex instanceof IllegalArgumentException &&
-          ex.getMessage().equals(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH.getErrorMessage())) {
-        throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
       }
       throw ex;
     } finally {
